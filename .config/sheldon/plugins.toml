@@ -1,0 +1,43 @@
+# `sheldon` configuration file
+# ----------------------------
+#
+# You can modify this file directly or you can use one of the following
+# `sheldon` commands which are provided to assist in editing the config file:
+#
+# - `sheldon add` to add a new plugin to the config file
+# - `sheldon edit` to open up the config file in the default editor
+# - `sheldon remove` to remove a plugin from the config file
+#
+# See the documentation for more https://github.com/rossmacarthur/sheldon#readme
+
+shell = "zsh"
+
+[plugins]
+
+[plugins.zsh-defer]
+github = "romkatv/zsh-defer"
+apply = ["source"] # zsh 起動時に読み込まれる。
+
+# zsh-defer 用、遅延読込みのテンプレートを設定する。
+# apply = ["defer"] を設定したプラグインが遅延読込みされるようになる。
+[templates]
+defer = "{% for file in files %}zsh-defer source \"{{ file }}\"\n{% endfor %}"
+
+# 作業ディレクトリの .env から環境変数をロードする。
+[plugins.env-zsh]
+github = "johnhamelink/env-zsh"
+apply = ["source"]
+
+[plugins.zsh-autosuggestions]
+github = "zsh-users/zsh-autosuggestions"
+apply = ["defer"] # 遅延読込み
+
+# シンタックスハイライト
+[plugins.fast-syntax-highlighting]
+github = "zdharma/fast-syntax-highlighting"
+apply = ["defer"]
+
+# Ctrl-R で、コマンド履歴を複数キーワードの AND で検索する。
+[plugins.H-S-MW]
+github = "z-shell/H-S-MW"
+apply = ["defer"]
