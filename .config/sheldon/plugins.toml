@@ -8,36 +8,75 @@
 # - `sheldon edit` to open up the config file in the default editor
 # - `sheldon remove` to remove a plugin from the config file
 #
-# See the documentation for more https://github.com/rossmacarthur/sheldon#readme
-
+# See the documentation for more
+# https://github.com/rossmacarthur/sheldon#readme
+#
 shell = "zsh"
 
-[plugins]
-
-[plugins.zsh-defer]
-github = "romkatv/zsh-defer"
-apply = ["source"] # zsh 起動時に読み込まれる。
+# デフォルトのプラグイン読込方法を遅延読込みとする。
+# zsh 起動時に読み込ませたい場合は、プラグインに apply = ["source"] を設定する。
+apply = ["defer"]
 
 # zsh-defer 用、遅延読込みのテンプレートを設定する。
 # apply = ["defer"] を設定したプラグインが遅延読込みされるようになる。
 [templates]
 defer = "{% for file in files %}zsh-defer source \"{{ file }}\"\n{% endfor %}"
+fpath = 'fpath=("{{ dir }}" $fpath)'
+
+[plugins]
+# プラグインは、ここで記載の順に source される。記載順に注意すること！
+
+# プラグインを遅延読込みさせる。
+[plugins.zsh-defer]
+github = "romkatv/zsh-defer"
+apply = ["source"] # zsh 起動時に読み込まれる。
 
 # 作業ディレクトリの .env から環境変数をロードする。
 [plugins.env-zsh]
 github = "johnhamelink/env-zsh"
 apply = ["source"]
 
-[plugins.zsh-autosuggestions]
-github = "zsh-users/zsh-autosuggestions"
-apply = ["defer"] # 遅延読込み
+# プロンプトで色を使用出来るようにする。
+[plugins.colors]
+inline = "autoload -Uz colors && zsh-defer colors"
 
 # シンタックスハイライト
 [plugins.fast-syntax-highlighting]
 github = "zdharma/fast-syntax-highlighting"
-apply = ["defer"]
+
+# コマンド入力時にグレーアウトした文字列で入力候補を表示する。
+[plugins.zsh-autosuggestions]
+github = "zsh-users/zsh-autosuggestions"
+
+[plugins.zsh-completions]
+github = "zsh-users/zsh-completions"
+
+[plugins.asdf]
+github = "asdf-vm/asdf"
+
+[plugins.asdf-completions]
+# ローカルディレクトリを指定すると上手く動作しないので、リモートから取得する。
+remote = "https://github.com/asdf-vm/asdf/tree/master/completions"
+apply = ["fpath"]
+
+# zsh 補完機能を有効にする。
+# 下記 2つは、aws-cli の入力補完を有効化するためのもの。
+# - `autoload bashcompinit && bashcompinit`
+# - `complete -C '/usr/local/bin/aws_completer' aws`
+[plugins.compinit]
+inline = "autoload bashcompinit && bashcompinit && autoload -Uz compinit && zsh-defer compinit && zsh-defer complete -C '/usr/local/bin/aws_completer' aws"
 
 # Ctrl-R で、コマンド履歴を複数キーワードの AND で検索する。
-[plugins.H-S-MW]
+[plugins.history-search]
 github = "z-shell/H-S-MW"
-apply = ["defer"]
+
+# zsh 起動時に同時に読み込むべき設定を sync.zsh へ書く。
+# 現在は、 .zshrc 内へ書くことで問題ないため、この設定はコメントアウトする。
+# [plugins.dotfile-sync]
+# local = "~/dotfiles/zsh"
+# use   = ["sync.zsh"]
+# apply = ["source"]
+
+[plugins.dotfile-defers]
+local = "~/dotfiles/zsh"
+use = ["{!sync,*}.zsh"]
