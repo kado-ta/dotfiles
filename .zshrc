@@ -129,40 +129,9 @@ alias -g G='| grep'
 eval "$(starship init zsh)"
 
 ########################################
-# zi
+# Sheldon (zsh プラグイン・マネージャー)
 ########################################
-if [[ ! -f $HOME/.zi/bin/zi.zsh ]]; then
-  print -P "%F{33}▓▒░ %F{160}Installing (%F{33}z-shell/zi%F{160})…%f"
-  command mkdir -p "$HOME/.zi" && command chmod g-rwX "$HOME/.zi"
-  command git clone -q --depth=1 --branch "main" https://github.com/z-shell/zi "$HOME/.zi/bin" && \
-    print -P "%F{33}▓▒░ %F{34}Installation successful.%f%b" || \
-    print -P "%F{160}▓▒░ The clone has failed.%f%b"
-fi
-source "$HOME/.zi/bin/zi.zsh"
-autoload -Uz _zi
-(( ${+_comps} )) && _comps[zi]=_zi
-# examples here -> https://z-shell.pages.dev/docs/gallery/collection
-zicompinit # <- https://z-shell.pages.dev/docs/gallery/collection#minimal
+eval "$(sheldon source)"
 
-########################################
-# zi プラグイン
-########################################
-# 補完
-# zinit ice wait lucid
-# zi light zsh-users/zsh-completions
-
-zinit ice wait lucid atload '_zsh_autosuggest_start'
-zi light zsh-users/zsh-autosuggestions
+# Sheldon で導入している zsh-users/zsh-autosuggestions の設定。
 ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE='fg=242'
-
-# シンタックスハイライト
-zinit ice wait lucid
-zi light zdharma/fast-syntax-highlighting
-
-# Ctrl-R で、コマンド履歴を複数キーワードの AND で検索する
-zinit ice wait lucid
-zi light z-shell/H-S-MW
-
-# 作業ディレクトリの .env から環境変数をロードする
-zinit ice wait lucid
-zi snippet 'https://github.com/johnhamelink/env-zsh/blob/master/env.plugin.zsh'
