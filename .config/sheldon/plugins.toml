@@ -51,13 +51,8 @@ github = "zsh-users/zsh-autosuggestions"
 [plugins.zsh-completions]
 github = "zsh-users/zsh-completions"
 
-[plugins.asdf]
-github = "asdf-vm/asdf"
-
-[plugins.asdf-completions]
-# ローカルディレクトリを指定すると上手く動作しないので、リモートから取得する。
-remote = "https://github.com/asdf-vm/asdf/tree/master/completions"
-apply = ["fpath"]
+# [plugins.asdf-completions]
+# asdf の入力補完は、 brew での asdf インストールと同時にインストール・設定されているぽい。
 
 # zsh 補完機能を有効にする。
 # 下記 2つは、aws-cli の入力補完を有効化するためのもの。
