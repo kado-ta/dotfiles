@@ -1,0 +1,28 @@
+name: 'Dotfiles'
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test-dotfiles-setup:
+    name: 'Dotfiles'
+    runs-on: macos-latest
+
+    # ワークフローのランナーが ubuntu, macos, or windows などに関わらず Bash シェルを使用するよう設定する。
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      # Checkout the repository to the GitHub Actions runner
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      # Initialize and link dotfiles
+      - name: Setup Dotfiles
+        run: make
