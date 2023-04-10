@@ -1,0 +1,212 @@
+{
+    "workbench.startupEditor": "newUntitledFile",
+    "workbench.iconTheme": "material-icon-theme",
+    "workbench.editor.enablePreviewFromQuickOpen": false,
+    "workbench.colorCustomizations": {
+     // ハイライト色の設定
+        "editor.selectionBackground": "#5e8881",          // 選択中テキスト
+        "editor.selectionHighlightBackground": "#3d4242", // 選択中テキストと同じテキストのハイライト
+        "editor.findMatchBackground": "#5691b3",          // 検索ヒットの内、現在、フォーカスしているもの
+        "editor.findMatchHighlightBackground": "#3b5768", // 検索にヒットしたテキストと同じテキスト
+        // "editor.findMatchBorder": "#ffffff", // 検索ヒットの内、現在、フォーカスしているものの枠線
+    },
+    "editor.rulers": [
+        100
+    ],
+    "editor.fontSize": 14,
+    "editor.renderWhitespace": "all",
+    "editor.tabSize": 2,
+    "editor.formatOnType": true,
+    "editor.renderControlCharacters": true,
+    "editor.renderLineHighlight": "all",
+    "files.insertFinalNewline": true,
+    "diffEditor.renderSideBySide": false,
+    "files.trimTrailingWhitespace": true,
+    "[markdown]": {
+        "files.trimTrailingWhitespace": false
+    },
+    "files.trimFinalNewlines": true,
+    "files.maxMemoryForLargeFilesMB": 1536,
+    // "workbench.statusBar.feedback.visible": false,
+    "explorer.autoReveal": false,
+    "extensions.ignoreRecommendations": false,
+    "editor.largeFileOptimizations": false,
+    "files.associations": {
+        "*.painless": "groovy",
+        "*.schema": "ruby"
+    },
+    "editor.formatOnSaveMode": "modifications",
+    "terminal.integrated.copyOnSelection": true,
+    "terminal.external.osxExec": "iTerm.app",
+    "files.autoSave": "afterDelay",
+    "editor.bracketPairColorization.enabled": true,
+    // 基本的な言語機能のサポート
+    "ruby.useLanguageServer": false,
+    "ruby.languageServer": {},
+    "ruby.useBundler": false,
+    "ruby.format": "rubocop",
+    // Linter に rubocop を指定する。
+    "ruby.lint": {
+        "rubocop": {
+            "useBundler": false
+        }
+    },
+    "files.watcherExclude": {
+        "/vendor/bundle/**": true,
+        "/node_modules/**": true,
+        "**/.git/**": true,
+        "**/node_modules/**": true,
+        "**/Applications/**": true,
+        "**/Creative Cloud Files/**": true,
+        "**/Library/**": true,
+        "**/Dropbox/**": true,
+        "**/Desktop/**": true,
+        "**/Downloads/**": true,
+        "**/Documents/**": true,
+        "**/Music/**": true,
+        "**/Pictures/**": true,
+        "**/Public/**": true,
+    },
+    "files.exclude": {
+        "**/.hg": false,
+        "/.DS_Store": true,
+        "/.git": true,
+        "/node_modules": true
+    },
+    "search.exclude": {
+        "/node_modules": true,
+        "/vendor": true
+    },
+    "explorer.confirmDragAndDrop": false,
+    "editor.formatOnPaste": true,
+    "html.format.endWithNewline": true,
+    "html.format.wrapLineLength": 0,
+    "[html]": {
+        "editor.defaultFormatter": null,
+    },
+    "editor.formatOnSave": true,
+    "[terraform]": {
+        "editor.defaultFormatter": "hashicorp.terraform",
+        "editor.formatOnSave": true,
+        "editor.formatOnSaveMode": "file",
+    },
+    "settingsSync.ignoredExtensions": [
+        "vscode.theme-defaults",
+        "vscode.theme-quietlight",
+        "vscode.theme-tomorrow-night-blue"
+    ],
+    "tabnine.experimentalAutoImports": true,
+    "spectral.validateLanguages": [
+        "yaml",
+        "json"
+    ],
+    "spectral.validateFiles": [
+        "**/openapi.yaml",
+        "**/openapi.yml"
+    ],
+    "diffEditor.ignoreTrimWhitespace": false,
+    "[json]": {
+        "editor.defaultFormatter": null
+    },
+    "editor.fontFamily": "HackGen35Nerd, Menlo, Monaco, 'Courier New', monospace",
+    "diffEditor.codeLens": true,
+
+    "todohighlight.keywords": [
+        {
+            "text": "NOTE:",
+            "color": "#000",
+            "backgroundColor": "#97DFFC"
+        },
+    ],
+    "todohighlight.exclude": [
+        "**/node_modules/**",
+        "**/bower_components/**",
+        "**/dist/**",
+        "**/build/**",
+        "**/.vscode/**",
+        "**/.github/**",
+        "**/_output/**",
+        "**/.next/**",
+        "**/bin",
+        "**/vendor",
+        "**/*.min.*",
+        "**/*.map",
+    ],
+
+    "todo-tree.general.tags": [
+        "FIXME",
+        "TODO",
+    ],
+    "todo-tree.general.tagGroups": {
+        "FIXME": [
+            "FIXME",
+            "FIXIT",
+            "FIX",
+        ],
+    },
+    "todo-tree.general.exportPath": "~/Desktop/vscode_todos%Y%m%d-%H%M.txt",
+    "todo-tree.highlights.useColourScheme": true,
+    // ハイライトは todohighlight 拡張機能に任せるため、 todo-tree のハイライト機能を無効化する。
+    "todo-tree.highlights.backgroundColourScheme": [],
+    "todo-tree.filtering.excludeGlobs": [
+        "**/node_modules",
+        "**/bower_components",
+        "**/dist",
+        "**/build",
+        "**/.vscode",
+        "**/.github",
+        "**/_output",
+        "**/.next",
+        "**/*.min.*",
+        "**/*.map",
+        "**/bin",
+        "**/vendor",
+    ],
+    "editor.suggest.filterGraceful": false,
+    "terraform.languageServer.enable": true,
+    "terraform.languageServer.terraform.path": "/opt/homebrew/bin/terraform",
+    "terraform.experimentalFeatures.validateOnSave": false,
+    "task.slowProviderWarning": true,
+    "workbench.colorTheme": "Plastic Slate",
+    "salesforcedx-vscode-soql.experimental.validateQueries": true,
+    "hediet.vscode-drawio.resizeImages": null,
+
+    // Python のパスを poetry でインストールした Python に設定する。
+    "python.defaultInterpreterPath": ".venv/bin/python",
+
+    "[python]": {
+        // Python のときのみ black を動かすために、Python 時のみデフォルト・フォーマッターを無効化する。
+        "editor.defaultFormatter": null,
+
+        // https://code.visualstudio.com/docs/python/editing#_troubleshooting-formatting
+        "editor.formatOnPaste": false,
+        "editor.formatOnSaveMode": "file",
+
+        // isort
+        "editor.codeActionsOnSave": {
+            "source.organizeImports": true
+        },
+    },
+    "isort.args": [
+        "--profile=black",
+    ],
+
+    // flake8
+    "python.linting.enabled": true,
+    "python.linting.pylintEnabled": false,
+    "python.linting.flake8Enabled": true,
+    "python.linting.flake8Path": "./.venv/bin/flake8",
+    "python.linting.flake8Args": [
+        "--config=${workspaceFolder}/.flake8",
+    ],
+    "python.linting.lintOnSave": true,
+
+    // black
+    "python.formatting.provider": "black",
+
+    // autoDocstring
+    "autoDocstring.docstringFormat": "google",
+    "settingsSync.ignoredSettings": [
+        "-python.poetryPath"
+    ],
+}
