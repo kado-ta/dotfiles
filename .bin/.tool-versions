@@ -1,1 +1,6 @@
+awscli 2.11.11
+golang 1.20.3
+nodejs 18.15.0
 poetry 1.4.2
+python 3.11.3
+ruby 3.2.2
