@@ -6,6 +6,9 @@ if [ "$(uname)" != "Darwin" ] ; then
 fi
 
 # Install Xcode
+# rm による削除は、 Command Line Tools インストール時の下記エラーに対する対策。
+# xcode-select: error: command line tools are already installed, use "Software Update" to install updates
+rm -rf /Library/Developer/CommandLineTools
 xcode-select --install > /dev/null
 
 # Install Homebrew
