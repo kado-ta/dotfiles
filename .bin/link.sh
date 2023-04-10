@@ -1,5 +1,10 @@
 #!/bin/bash -e
 
+if [ "$(uname)" != "Darwin" ] ; then
+	echo "This is not macOS!"
+	exit 1
+fi
+
 SCRIPT_DIR=$(cd $(dirname $0) && pwd)
 echo "SCRIPT_DIR is $SCRIPT_DIR"
 

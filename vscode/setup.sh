@@ -1,9 +1,14 @@
 #!/bin/bash -e
 
-SCRIPT_DIR=$(cd $(dirname $0) && pwd)
-echo "SCRIPT_DIR: $SCRIPT_DIR"
+if [ "$(uname)" != "Darwin" ] ; then
+	echo "This is not macOS!"
+	exit 1
+fi
 
+SCRIPT_DIR=$(cd $(dirname $0) && pwd)
 VSCODE_DIR="${HOME}/Library/Application Support/Code/User"
+
+echo "SCRIPT_DIR: $SCRIPT_DIR"
 echo "VSCODE_DIR: $VSCODE_DIR"
 
 # Create symbolic link of settings.json
