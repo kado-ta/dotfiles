@@ -2,7 +2,7 @@
 # 環境変数
 ########################################
 export LANG=ja_JP.UTF-8
-export PATH=/usr/local/bin:/usr/ilocal/sbin:$PATH
+export PATH=/usr/local/bin:/usr/sbin:$PATH
 
 ########################################
 # zsh 本体設定
@@ -28,3 +28,8 @@ eval "$(starship init zsh)"
 # Sheldon (zsh プラグイン・マネージャー)
 ########################################
 eval "$(sheldon source)"
+
+########################################
+# asdf
+########################################
+. /opt/homebrew/opt/asdf/libexec/asdf.sh
