@@ -1,5 +1,5 @@
 # すべての設定を実行する。
-all: init bin/link brew/setup aws/link config/link
+all: init bin/link brew/setup aws/link config/link asdf/setup
 
 # Set initial preference.
 init:
@@ -20,6 +20,9 @@ aws/link:
 # Link config files.
 config/link:
 	.config/link.sh
+
+asdf/setup:
+	asdf/setup.sh
 
 # Set macOS system preferences.
 # TODO: Mac の設定をコマンドで適用できるようにする。
