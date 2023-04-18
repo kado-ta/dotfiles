@@ -13,7 +13,7 @@
     "editor.rulers": [
         100
     ],
-    "editor.fontSize": 14,
+    "editor.fontSize": 13,
     "editor.renderWhitespace": "all",
     "editor.tabSize": 2,
     "editor.formatOnType": true,
@@ -85,11 +85,6 @@
         "editor.defaultFormatter": null,
     },
     "editor.formatOnSave": true,
-    "[terraform]": {
-        "editor.defaultFormatter": "hashicorp.terraform",
-        "editor.formatOnSave": true,
-        "editor.formatOnSaveMode": "file",
-    },
     "settingsSync.ignoredExtensions": [
         "vscode.theme-defaults",
         "vscode.theme-quietlight",
@@ -163,32 +158,45 @@
         "**/vendor",
     ],
     "editor.suggest.filterGraceful": false,
-    "terraform.languageServer.enable": true,
-    "terraform.languageServer.terraform.path": "/opt/homebrew/bin/terraform",
-    "terraform.experimentalFeatures.validateOnSave": false,
     "task.slowProviderWarning": true,
     "workbench.colorTheme": "Plastic Slate",
     "salesforcedx-vscode-soql.experimental.validateQueries": true,
     "hediet.vscode-drawio.resizeImages": null,
 
-    // Python のパスを poetry でインストールした Python に設定する。
-    "python.defaultInterpreterPath": ".venv/bin/python",
+    "terraform.languageServer.enable": true,
+    // ここは、絶対パスで設定する必要がある。
+    "terraform.languageServer.terraform.path": "/Users/kado/.asdf/shims/terraform",
+    "terraform.languageServer.args": [
+        "serve",
+    ],
+    "terraform.experimentalFeatures.validateOnSave": false,
+    "[terraform]": {
+        "editor.defaultFormatter": "hashicorp.terraform",
+        "editor.formatOnSave": true,
+        "editor.formatOnSaveMode": "file",
+    },
+    "tfsec.binaryPath": "~/.asdf/shims/tfsec",
+
+    // Python のパスを Poetry でインストールした Python に設定する。
+    "python.defaultInterpreterPath": "~/.asdf/shims/python",
 
     "[python]": {
         // Python のときのみ black を動かすために、Python 時のみデフォルト・フォーマッターを無効化する。
         "editor.defaultFormatter": null,
 
+        // VSCode に black のエラーが表示される場合の対処方法。
         // https://code.visualstudio.com/docs/python/editing#_troubleshooting-formatting
         "editor.formatOnPaste": false,
         "editor.formatOnSaveMode": "file",
 
-        // isort
+        // 保存時に isort を実行する。
         "editor.codeActionsOnSave": {
             "source.organizeImports": true
         },
     },
     "isort.args": [
-        "--profile=black",
+        // isort の black 互換設定
+        "--profile black",
     ],
 
     // flake8
@@ -197,6 +205,7 @@
     "python.linting.flake8Enabled": true,
     "python.linting.flake8Path": "./.venv/bin/flake8",
     "python.linting.flake8Args": [
+        // flake8 の設定は、プロジェクト直下の .flake8 ファイルに記載する。
         "--config=${workspaceFolder}/.flake8",
     ],
     "python.linting.lintOnSave": true,
@@ -204,9 +213,19 @@
     // black
     "python.formatting.provider": "black",
 
-    // autoDocstring
+    // autoDocstring のスタイルを Google スタイルに設定する。
     "autoDocstring.docstringFormat": "google",
-    "settingsSync.ignoredSettings": [
-        "-python.poetryPath"
+
+    // mypy で Python の型ヒントが書かれているかチェックする。
+    "python.linting.mypyEnabled": true,
+    "python.linting.mypyPath": ".venv/bin/mypy",
+    "python.linting.mypyCategorySeverity.error": "Warning",
+    "python.linting.mypyArgs": [
+        "--follow-imports=skip",    // インポートしたモジュールの型ヒントチェックを行わない。
+        "--ignore-missing-imports", // 解決できないモジュールのインポートを無視する。
+        "--show-column-numbers",    // エラーメッセージにカラム・オフセットも表示するようにする。
+        "--warn-return-any",        // 返り値が正確に明示されていないことを警告する。
+        "--disallow-untyped-defs",  // 返り値が明示されていない関数をエラーとして扱う。
+        "--disallow-untyped-calls", // 返り値の型をが明示されていない関数をエラーとして扱う。
     ],
 }
