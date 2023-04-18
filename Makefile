@@ -25,7 +25,8 @@ asdf/setup:
 	asdf/setup.sh
 
 # Set macOS system preferences.
-# TODO: Mac の設定をコマンドで適用できるようにする。
+# TODO: Mac の設定をコマンドで適用できるようにする。設定スクリプトの書き方は、下記URLを参考にする。
+# https://github.com/JunichiSugiura/JunichiSugiura/blob/main/bundle/scripts/macos-defaults.sh
 defaults:
 	.bin/defaults.sh
 
