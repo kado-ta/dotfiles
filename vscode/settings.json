@@ -23,7 +23,8 @@
     "diffEditor.renderSideBySide": false,
     "files.trimTrailingWhitespace": true,
     "[markdown]": {
-        "files.trimTrailingWhitespace": false
+        "files.trimTrailingWhitespace": false,
+        "editor.wordWrap": "off",
     },
     "files.trimFinalNewlines": true,
     "files.maxMemoryForLargeFilesMB": 1536,
@@ -159,7 +160,7 @@
     ],
     "editor.suggest.filterGraceful": false,
     "task.slowProviderWarning": true,
-    "workbench.colorTheme": "Plastic Slate",
+    "workbench.colorTheme": "Evondev Dracula High Contrast",
     "salesforcedx-vscode-soql.experimental.validateQueries": true,
     "hediet.vscode-drawio.resizeImages": null,
 
@@ -228,4 +229,6 @@
         "--disallow-untyped-defs",  // 返り値が明示されていない関数をエラーとして扱う。
         "--disallow-untyped-calls", // 返り値の型をが明示されていない関数をエラーとして扱う。
     ],
+    "git.openRepositoryInParentFolders": "always",
+    "window.commandCenter": true,
 }
