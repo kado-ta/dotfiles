@@ -4,5 +4,5 @@ nodejs 18.16.1
 poetry 1.5.1
 python 3.11.4
 ruby 3.2.2
-terraform 1.4.5
+terraform 1.5.1
 tfsec 1.28.1
