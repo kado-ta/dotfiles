@@ -1,8 +1,8 @@
-awscli 2.11.11
-golang 1.20.3
-nodejs 18.15.0
-poetry 1.4.2
-python 3.11.3
+awscli 2.12.3
+golang 1.20.5
+nodejs 18.16.1
+poetry 1.5.1
+python 3.11.4
 ruby 3.2.2
-terraform 1.4.5
+terraform 1.5.1
 tfsec 1.28.1
