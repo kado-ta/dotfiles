@@ -13,6 +13,14 @@ bin/link:
 brew/setup:
 	.bin/setup_brew.sh
 
+# Homebrew の依存関係をツリー形式で表示する。
+brew/deps/show:
+	brew deps --installed --tree
+
+# Homebrew でインストール中のパッケージを Brewfile としてリスト抽出する。
+brew/dump:
+	brew bundle dump
+
 # Link AWS config & credentials.
 aws/link:
 	.aws/link.sh
@@ -33,6 +41,10 @@ defaults:
 # Link VSCode settings.json & install extensions.
 vscode/setup:
 	vscode/setup.sh
+
+# VSCode 拡張のリスト最新化する。
+vscode/extensions/list:
+	code --list-extensions > vscode/extensions
 
 # Setup Homebrew zsh.
 zsh/setup:
