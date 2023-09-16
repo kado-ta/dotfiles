@@ -1,4 +1,4 @@
-awscli 2.12.3
+awscli 2.13.15
 golang 1.20.5
 nodejs 18.16.1
 poetry 1.5.1
