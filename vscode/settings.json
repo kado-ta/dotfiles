@@ -1,56 +1,47 @@
 {
-    "workbench.startupEditor": "newUntitledFile",
-    "workbench.iconTheme": "material-icon-theme",
-    "workbench.editor.enablePreviewFromQuickOpen": false,
+    "workbench.colorTheme": "Evondev Dracula High Contrast",
     "workbench.colorCustomizations": {
-     // ハイライト色の設定
-        "editor.selectionBackground": "#5e8881",          // 選択中テキスト
+        // ハイライト色の設定
+        "editor.selectionBackground": "#5e8881", // 選択中テキスト
         "editor.selectionHighlightBackground": "#3d4242", // 選択中テキストと同じテキストのハイライト
-        "editor.findMatchBackground": "#5691b3",          // 検索ヒットの内、現在、フォーカスしているもの
-        "editor.findMatchHighlightBackground": "#3b5768", // 検索にヒットしたテキストと同じテキスト
-        // "editor.findMatchBorder": "#ffffff", // 検索ヒットの内、現在、フォーカスしているものの枠線
+        "editor.findMatchBackground": "#5691b3", // 検索ヒットの内、現在、フォーカスしているもの
+        "editor.findMatchHighlightBackground": "#3b5768" // 検索にヒットしたテキストと同じテキスト
+        // "editor.findMatchBorder": "#ffffff" // 検索ヒットの内、現在、フォーカスしているものの枠線
     },
+    "workbench.editor.enablePreviewFromQuickOpen": false,
+    "workbench.iconTheme": "material-icon-theme",
+    "workbench.startupEditor": "newUntitledFile",
+    // "workbench.statusBar.feedback.visible": false,
     "editor.rulers": [
         100
     ],
+    "editor.fontFamily": "HackGen35Nerd, Menlo, Monaco, 'Courier New', monospace",
     "editor.fontSize": 13,
     "editor.renderWhitespace": "all",
     "editor.tabSize": 2,
     "editor.formatOnType": true,
+    "editor.bracketPairColorization.enabled": true,
     "editor.renderControlCharacters": true,
     "editor.renderLineHighlight": "all",
-    "files.insertFinalNewline": true,
-    "diffEditor.renderSideBySide": false,
-    "files.trimTrailingWhitespace": true,
-    "[markdown]": {
-        "files.trimTrailingWhitespace": false,
-        "editor.wordWrap": "off",
-    },
-    "files.trimFinalNewlines": true,
-    "files.maxMemoryForLargeFilesMB": 1536,
-    // "workbench.statusBar.feedback.visible": false,
-    "explorer.autoReveal": false,
-    "extensions.ignoreRecommendations": false,
     "editor.largeFileOptimizations": false,
+    "editor.formatOnSave": true,
+    "editor.formatOnSaveMode": "modifications",
+    "editor.formatOnPaste": true,
+    "editor.suggest.filterGraceful": false,
+    "diffEditor.renderSideBySide": false,
+    "diffEditor.codeLens": true,
+    "diffEditor.ignoreTrimWhitespace": false,
+    "explorer.autoReveal": false,
+    "explorer.confirmDragAndDrop": false,
+    "extensions.ignoreRecommendations": false,
+    "files.autoSave": "afterDelay",
+    "files.insertFinalNewline": true,
+    "files.maxMemoryForLargeFilesMB": 1536,
+    "files.trimFinalNewlines": true,
+    "files.trimTrailingWhitespace": true,
     "files.associations": {
         "*.painless": "groovy",
         "*.schema": "ruby"
-    },
-    "editor.formatOnSaveMode": "modifications",
-    "terminal.integrated.copyOnSelection": true,
-    "terminal.external.osxExec": "iTerm.app",
-    "files.autoSave": "afterDelay",
-    "editor.bracketPairColorization.enabled": true,
-    // 基本的な言語機能のサポート
-    "ruby.useLanguageServer": false,
-    "ruby.languageServer": {},
-    "ruby.useBundler": false,
-    "ruby.format": "rubocop",
-    // Linter に rubocop を指定する。
-    "ruby.lint": {
-        "rubocop": {
-            "useBundler": false
-        }
     },
     "files.watcherExclude": {
         "/vendor/bundle/**": true,
@@ -66,7 +57,7 @@
         "**/Documents/**": true,
         "**/Music/**": true,
         "**/Pictures/**": true,
-        "**/Public/**": true,
+        "**/Public/**": true
     },
     "files.exclude": {
         "**/.hg": false,
@@ -74,45 +65,31 @@
         "/.git": true,
         "/node_modules": true
     },
+    "git.openRepositoryInParentFolders": "always",
     "search.exclude": {
         "/node_modules": true,
         "/vendor": true
     },
-    "explorer.confirmDragAndDrop": false,
-    "editor.formatOnPaste": true,
-    "html.format.endWithNewline": true,
-    "html.format.wrapLineLength": 0,
-    "[html]": {
-        "editor.defaultFormatter": null,
-    },
-    "editor.formatOnSave": true,
     "settingsSync.ignoredExtensions": [
         "vscode.theme-defaults",
         "vscode.theme-quietlight",
         "vscode.theme-tomorrow-night-blue"
     ],
     "tabnine.experimentalAutoImports": true,
-    "spectral.validateLanguages": [
-        "yaml",
-        "json"
-    ],
-    "spectral.validateFiles": [
-        "**/openapi.yaml",
-        "**/openapi.yml"
-    ],
-    "diffEditor.ignoreTrimWhitespace": false,
-    "[json]": {
-        "editor.defaultFormatter": null
-    },
-    "editor.fontFamily": "HackGen35Nerd, Menlo, Monaco, 'Courier New', monospace",
-    "diffEditor.codeLens": true,
-
+    "task.slowProviderWarning": true,
+    "terminal.integrated.copyOnSelection": true,
+    "terminal.external.osxExec": "iTerm.app",
+    "window.commandCenter": true,
+    //
+    // --------------------------------------------------------------------
+    // ToDo Highlight, ToDo Tree
+    // --------------------------------------------------------------------
     "todohighlight.keywords": [
         {
             "text": "NOTE:",
             "color": "#000",
             "backgroundColor": "#97DFFC"
-        },
+        }
     ],
     "todohighlight.exclude": [
         "**/node_modules/**",
@@ -126,24 +103,23 @@
         "**/bin",
         "**/vendor",
         "**/*.min.*",
-        "**/*.map",
+        "**/*.map"
     ],
-
     "todo-tree.general.tags": [
         "FIXME",
-        "TODO",
+        "TODO"
     ],
     "todo-tree.general.tagGroups": {
         "FIXME": [
             "FIXME",
             "FIXIT",
-            "FIX",
-        ],
+            "FIX"
+        ]
     },
     "todo-tree.general.exportPath": "~/Desktop/vscode_todos%Y%m%d-%H%M.txt",
-    "todo-tree.highlights.useColourScheme": true,
     // ハイライトは todohighlight 拡張機能に任せるため、 todo-tree のハイライト機能を無効化する。
     "todo-tree.highlights.backgroundColourScheme": [],
+    "todo-tree.highlights.useColourScheme": true,
     "todo-tree.filtering.excludeGlobs": [
         "**/node_modules",
         "**/bower_components",
@@ -156,34 +132,56 @@
         "**/*.min.*",
         "**/*.map",
         "**/bin",
-        "**/vendor",
+        "**/vendor"
     ],
-    "editor.suggest.filterGraceful": false,
-    "task.slowProviderWarning": true,
-    "workbench.colorTheme": "Evondev Dracula High Contrast",
-    "salesforcedx-vscode-soql.experimental.validateQueries": true,
-    "hediet.vscode-drawio.resizeImages": null,
-
+    //
+    // End ----------------------------------------------------------------
+    //
+    // --------------------------------------------------------------------
+    // Ruby
+    // --------------------------------------------------------------------
+    "ruby.useLanguageServer": false,
+    "ruby.languageServer": {},
+    "ruby.useBundler": false,
+    "ruby.format": "rubocop",
+    // Linter に rubocop を指定する。
+    "ruby.lint": {
+        "rubocop": {
+            "useBundler": false
+        }
+    },
+    // End ----------------------------------------------------------------
+    //
+    // --------------------------------------------------------------------
+    // Terraform
+    // --------------------------------------------------------------------
     "terraform.languageServer.enable": true,
     // ここは、絶対パスで設定する必要がある。
     "terraform.languageServer.terraform.path": "/Users/kado/.asdf/shims/terraform",
     "terraform.languageServer.args": [
-        "serve",
+        "serve"
     ],
     "terraform.experimentalFeatures.validateOnSave": false,
     "[terraform]": {
         "editor.defaultFormatter": "hashicorp.terraform",
         "editor.formatOnSave": true,
-        "editor.formatOnSaveMode": "file",
+        "editor.formatOnSaveMode": "file"
     },
     "tfsec.binaryPath": "~/.asdf/shims/tfsec",
-
+    //
+    // End ----------------------------------------------------------------
+    //
+    // --------------------------------------------------------------------
+    // Python
+    // --------------------------------------------------------------------
     // Python のパスを Poetry でインストールした Python に設定する。
     "python.defaultInterpreterPath": "~/.asdf/shims/python",
-
+    "python.analysis.extraPaths": [
+        // NOTE: Python のバージョンを変更した場合は、併せて下記パス内 "python3.11" も変更する必要あり。
+        ".venv/lib/python3.11/site-packages"
+    ],
     "[python]": {
-        // Python のときのみ black を動かすために、Python 時のみデフォルト・フォーマッターを無効化する。
-        "editor.defaultFormatter": null,
+        "editor.defaultFormatter": "ms-python.black-formatter",
 
         // VSCode に black のエラーが表示される場合の対処方法。
         // https://code.visualstudio.com/docs/python/editing#_troubleshooting-formatting
@@ -193,42 +191,64 @@
         // 保存時に isort を実行する。
         "editor.codeActionsOnSave": {
             "source.organizeImports": true
-        },
+        }
     },
+
     "isort.args": [
         // isort の black 互換設定
-        "--profile black",
+        "--profile black"
     ],
-
-    // flake8
-    "python.linting.enabled": true,
-    "python.linting.pylintEnabled": false,
-    "python.linting.flake8Enabled": true,
-    "python.linting.flake8Path": "./.venv/bin/flake8",
-    "python.linting.flake8Args": [
-        // flake8 の設定は、プロジェクト直下の .flake8 ファイルに記載する。
-        "--config=${workspaceFolder}/.flake8",
-    ],
-    "python.linting.lintOnSave": true,
-
-    // black
-    "python.formatting.provider": "black",
 
     // autoDocstring のスタイルを Google スタイルに設定する。
     "autoDocstring.docstringFormat": "google",
 
+    // flake8
+    "flake8.path": [
+        "./.venv/bin/flake8"
+    ],
+    "flake8.args": [
+        // flake8 の設定は、プロジェクト直下の .flake8 ファイルに記載する。
+        "--config=${workspaceFolder}/.flake8"
+    ],
+
     // mypy で Python の型ヒントが書かれているかチェックする。
-    "python.linting.mypyEnabled": true,
-    "python.linting.mypyPath": ".venv/bin/mypy",
-    "python.linting.mypyCategorySeverity.error": "Warning",
-    "python.linting.mypyArgs": [
+    "mypy-type-checker.args": [
         "--follow-imports=skip",    // インポートしたモジュールの型ヒントチェックを行わない。
         "--ignore-missing-imports", // 解決できないモジュールのインポートを無視する。
         "--show-column-numbers",    // エラーメッセージにカラム・オフセットも表示するようにする。
         "--warn-return-any",        // 返り値が正確に明示されていないことを警告する。
         "--disallow-untyped-defs",  // 返り値が明示されていない関数をエラーとして扱う。
-        "--disallow-untyped-calls", // 返り値の型をが明示されていない関数をエラーとして扱う。
+        "--disallow-untyped-calls" // 返り値の型をが明示されていない関数をエラーとして扱う。
     ],
-    "git.openRepositoryInParentFolders": "always",
-    "window.commandCenter": true,
+    "mypy-type-checker.path": [
+        ".venv/bin/mypy"
+    ],
+    "mypy-type-checker.severity": {
+        "error": "Warning"
+    },
+    //
+    // End ----------------------------------------------------------------
+    //
+    "html.format.endWithNewline": true,
+    "html.format.wrapLineLength": 0,
+    "[html]": {
+        "editor.defaultFormatter": null
+    },
+    "[markdown]": {
+        "files.trimTrailingWhitespace": false,
+        "editor.wordWrap": "off"
+    },
+    "[json]": {
+        "editor.defaultFormatter": null
+    },
+    "spectral.validateLanguages": [
+        "yaml",
+        "json"
+    ],
+    "spectral.validateFiles": [
+        "**/openapi.yaml",
+        "**/openapi.yml"
+    ],
+    "salesforcedx-vscode-soql.experimental.validateQueries": true,
+    "hediet.vscode-drawio.resizeImages": null
 }
