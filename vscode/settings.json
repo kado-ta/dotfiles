@@ -41,7 +41,8 @@
     "files.trimTrailingWhitespace": true,
     "files.associations": {
         "*.painless": "groovy",
-        "*.schema": "ruby"
+        "*.schema": "ruby",
+        "*.html.erb": "erb"
     },
     "files.watcherExclude": {
         "/vendor/bundle/**": true,
@@ -150,6 +151,13 @@
             "useBundler": false
         }
     },
+    "[erb]": {
+        "editor.defaultFormatter": "aliariff.vscode-erb-beautify",
+        "editor.formatOnSave": true
+    },
+    // VSCode ERB Formatter/Beautify 拡張で使用する HTML フォーマッター: htmlbeautifier gem は、
+    // ローカル環境へインストールして使用する。 gem install htmlbeautifier -N
+    "vscode-erb-beautify.useBundler": false,
     // End ----------------------------------------------------------------
     //
     // --------------------------------------------------------------------
@@ -250,5 +258,6 @@
         "**/openapi.yml"
     ],
     "salesforcedx-vscode-soql.experimental.validateQueries": true,
-    "hediet.vscode-drawio.resizeImages": null
+    "hediet.vscode-drawio.resizeImages": null,
+    "vscode-erb-beautify.keepBlankLines": 1
 }
