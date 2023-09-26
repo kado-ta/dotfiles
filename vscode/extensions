@@ -1,6 +1,10 @@
+aki77.rails-db-schema
 alefragnani.project-manager
+aliariff.vscode-erb-beautify
 bierner.markdown-mermaid
 bpruitt-goddard.mermaid-markdown-syntax-highlighting
+bung87.rails
+bung87.vscode-gemfile
 CircleCI.circleci
 CraigMaslowski.erb
 cssho.vscode-svgviewer
@@ -16,7 +20,6 @@ hediet.vscode-drawio
 ionutvmi.path-autocomplete
 jgclark.vscode-todo-highlight
 kaiwood.endwise
-karunamurti.haml
 kayteh.plastic-slate
 KevinRose.vsc-python-indent
 mgmcdermott.vscode-language-babel
@@ -50,6 +53,7 @@ salesforce.salesforcedx-vscode-lwc
 salesforce.salesforcedx-vscode-soql
 salesforce.salesforcedx-vscode-visualforce
 shd101wyy.markdown-preview-enhanced
+sianglim.slim
 stoplight.spectral
 TabNine.tabnine-vscode
 tamasfe.even-better-toml
