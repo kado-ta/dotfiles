@@ -6,3 +6,4 @@ python 3.11.5
 ruby 3.2.2
 terraform 1.5.7
 tfsec 1.28.4
+direnv 2.33.0

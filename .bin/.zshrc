@@ -33,3 +33,9 @@ eval "$(sheldon source)"
 # asdf
 ########################################
 . /opt/homebrew/opt/asdf/libexec/asdf.sh
+
+########################################
+# direnv
+########################################
+# `asdf direnv setup --shell zsh --version latest` 実行により追加される。
+source "${XDG_CONFIG_HOME:-$HOME/.config}/asdf-direnv/zshrc"
