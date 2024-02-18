@@ -35,7 +35,12 @@ eval "$(sheldon source)"
 . /opt/homebrew/opt/asdf/libexec/asdf.sh
 
 ########################################
-# direnv
+# asdf-direnv
 ########################################
-# `asdf direnv setup --shell zsh --version latest` 実行により追加される。
-source "${XDG_CONFIG_HOME:-$HOME/.config}/asdf-direnv/zshrc"
+# `asdf direnv setup --shell zsh --version latest` 実行により、下の行と必要なファイル追加される。
+# source "${XDG_CONFIG_HOME:-$HOME/.config}/asdf-direnv/zshrc"
+# しかし、この行は Salesforce DataLoader 起動時にエラーを発生させてしまうため、下記の通り実行タイミングを制御する。
+SCRIPT_NAME="$(basename -- "$0")"
+if [[ $SCRIPT_NAME != "dataloader" && $SCRIPT_NAME != "dataloader_console" ]]; then
+  source "${XDG_CONFIG_HOME:-$HOME/.config}/asdf-direnv/zshrc"
+fi
