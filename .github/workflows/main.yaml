@@ -23,7 +23,7 @@ jobs:
     steps:
       # Checkout the repository to the GitHub Actions runner
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       # Initialize and link dotfiles
       - name: Setup Dotfiles
