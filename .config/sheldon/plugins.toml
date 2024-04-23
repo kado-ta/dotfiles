@@ -13,20 +13,23 @@
 #
 shell = "zsh"
 
-# デフォルトのプラグイン読込方法を遅延読込みとする。
-# zsh 起動時に読み込ませたい場合は、プラグインに apply = ["source"] を設定する。
+# zsh-defer と Sheldon のテンプレート機能を組み合わせることでプラグイン遅延読込みを実現する。
+# https://zenn.dev/ganta/articles/e1e0746136ce67#%E3%83%97%E3%83%A9%E3%82%B0%E3%82%A4%E3%83%B3%E3%81%AE%E9%81%85%E5%BB%B6%E8%AA%AD%E3%81%BF%E8%BE%BC%E3%81%BF
+#
+# 1. ここでは、デフォルト設定として遅延読込を設定する。
+# シェル起動時にプラグインを読み込ませる場合は、プラグイン毎に apply = ["source"] を設定する。
 apply = ["defer"]
-
-# zsh-defer 用、遅延読込みのテンプレートを設定する。
-# apply = ["defer"] を設定したプラグインが遅延読込みされるようになる。
+# 2. プラグイン遅延読込み用のテンプレートを定義する。
+# apply = ["defer"] を設定することで、そのプラグインが遅延読み込みされる。
 [templates]
-defer = "{% for file in files %}zsh-defer source \"{{ file }}\"\n{% endfor %}"
+defer = "{{ hooks?.pre | nl }}{% for file in files %}zsh-defer source \"{{ file }}\"\n{% endfor %}{{ hooks?.post | nl }}"
 fpath = 'fpath=("{{ dir }}" $fpath)'
 
-[plugins]
+# -----------------------------------------------------------
 # プラグインは、ここで記載の順に source される。記載順に注意すること！
+# -----------------------------------------------------------
 
-# プラグインを遅延読込みさせる。
+# プラグインの遅延読込機能を提供する。
 [plugins.zsh-defer]
 github = "romkatv/zsh-defer"
 apply = ["source"] # zsh 起動時に読み込まれる。
