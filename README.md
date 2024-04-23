@@ -1,52 +1,129 @@
 # dotfiles
+## Setup
+Finder から下記 2つのファイルを実行する。(**※ ダブルクリックで実行する。**)
+1. `init.command` : Homebrew インストールや zsh 設定など。
+2. `setup.command` : 開発環境に必要なランタイム・ライブラリ等のセットアップ。
 
-## asdf-direnv
-Starship + asdf を使用する環境において、プロンプトの表示が遅くなり警告が表示されることがある。
+## Directories
+下記は、セットアップ時の実行順に記載する。
+
+### .bin
+ローカル環境で使用するシェルやライブラリの設定情報。
+
+下記の順にスクリプトを実行して、セットアップする。
+1. `./.bin/init.sh` : Xcode Command Line Tools と Homebrew をインストールする。
+2. `./.bin/link.sh` : このディレクトリ内のファイルが使用できるよう、シンボリックリンクを作成する。
+3. `./.bin/setup_brew.sh` : `~/.Brewfile` を参照して、一括インストールする。
 
 ```shell
-[WARN] - (starship::utils): Executing command "/Users/kado/.asdf/shims/node" timed out.
-[WARN] - (starship::utils): You can set command_timeout in your config to a higher value to allow longer-running commands to keep executing.
+.
+└── .bin
+    ├── .Brewfile      # Homebrew のパッケージリストファイル
+    ├── .asdfrc        # asdf 設定
+    ├── .gitconfig     # Git 設定
+    ├── .tool-versions # asdf が使用するグローバル・バージョン設定
+    ├── .zprofile      # Zsh 設定 (ログインシェルで一度だけ読み込まれる)
+    ├── .zshrc         # Zsh 設定 (ログインシェルとインタラクティブシェルの場合だけ読み込まれる。)
+    ├── init.sh
+    ├── link.sh
+    └── setup_brew.sh
 ```
 
-この表示遅延への対策として **asdf-direnv** を使用する。
+### zsh
+下記の順にスクリプトを実行して、Zsh とそのプラグインをセットアップする。
 
-### インストール
+1. `./zsh/setup.sh` : Zsh をインストールし、使用できるようセットアップする。
+2. `./zsh/setup_plugins.sh` : Zsh プラグインをインストールする。
 
 ```shell
-$ asdf plugin-add direnv
-$ asdf install direnv latest
-$ asdf global direnv latest
+.
+└── zsh
+    ├── README.md
+    ├── alias.zsh               # Zsh で使用するコマンドのエイリアス定義
+    ├── bindkey.zsh             # Zsh キーバインド設定
+    ├── select-word-style.zsh   # Zsh 上での単語の区切り設定や入力補完の設定
+    ├── setpot.zsh              # Zsh オプション設定
+    ├── setup.sh
+    ├── setup_plugins.sh
+    └── zsh-autosuggestions.zsh # zsh-users/zsh-autosuggestions の設定
 ```
 
-### 初期設定
-下記のコマンドで asdf-direnv の初期設定を行う。
+### asdf
+asdf セットアップ用スクリプト。
+
+`./asdf/setup.sh` を実行することで、`.bin/.tool-versions` に記載の言語等をインストールする。
+
 
 ```shell
-$ asdf direnv setup --shell zsh --version latest
+.
+└── asdf
+    ├── README.md
+    └── setup.sh
 ```
 
-下記 2つのファイルが生成され、
-- `~/.config/asdf-direnv/zshrc`
-- `~/.config/direnv/lib/use_asdf.sh`
+### .aws
+AWS 関連設定。
 
-`~/.zshrc` へ下記のコマンドが追加される。
+`./.aws/link.sh` を実行して、セットアップする。
+
 
 ```shell
-source "${XDG_CONFIG_HOME:-$HOME/.config}/asdf-direnv/zshrc"
+.
+└── .aws
+    ├── config      # 各プロファイルの情報
+    ├── credentials # IAM ユーザーのクレデンシャル
+    └── link.sh
 ```
 
-#### 参考リンク
-- https://qiita.com/ucan-lab/items/38e5663e43bafaca1a0b
-- https://tech.buty4649.net/entry/2021/07/29/201613
+### .config
+各種設定情報。
 
-#### ※ Salesforce Data Loader 対応
-Salesforce Data Loader を使用する場合、これまでの設定ではエラーが発生し、Data Loader が起動しない。
-
-`~/.zshrc` の asdf-direnv 読込設定へ **IF文を追加**し、Data Loader と競合しないようにする。
+`./.config/link.sh` を実行して、セットアップする。
 
 ```shell
-SCRIPT_NAME="$(basename -- "$0")"
-if [[ $SCRIPT_NAME != "dataloader" && $SCRIPT_NAME != "dataloader_console" ]]; then
-  source "${XDG_CONFIG_HOME:-$HOME/.config}/asdf-direnv/zshrc"
-fi
+.
+└── .config
+    ├── karabiner
+    │   └── karabiner.json
+    ├── link.sh
+    ├── sheldon
+    │   └── plugins.toml
+    └── starship
+        └── starship.toml
+```
+
+### vscode
+`./vscode/setup.sh` を実行して、VSCode 設定のシンボリックを作成し、
+VSCode 拡張をインストールする。
+
+```shell
+.
+└── vscode
+    ├── README.md
+    ├── extensions    # VSCode 拡張リスト
+    ├── settings.json # VSCode 設定
+    └── setup.sh
+```
+
+## Makefile
+### `brew/deps/show`
+Homebrew の依存関係をツリー形式で表示する。
+
+```shell
+$ make brew/deps/show
+```
+
+### `brew/dump`
+Homebrew でインストール中のパッケージを Brewfile としてリスト抽出する。
+その Brewfile をベースに .Brewfile を最新化する。
+
+```shell
+$ make brew/dump
+```
+
+### `vscode/extensions/list`
+VSCode 拡張のリスト最新化する。
+
+```shell
+$ make vscode/extensions/list
 ```
