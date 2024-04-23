@@ -1,3 +1,5 @@
+# NOTE: このワークフローは、テスト効果の割に時間がかかりすぎて無料枠を食い潰してしまうため、
+# GitHub の画面から無効化している。必要に応じて [Actions] タブから有効化すること。
 name: 'Dotfiles'
 
 on:
@@ -25,4 +27,4 @@ jobs:
 
       # Initialize and link dotfiles
       - name: Setup Dotfiles
-        run: make
+        run: make # Makefile 一番上に定義されたコマンドを実行する。
