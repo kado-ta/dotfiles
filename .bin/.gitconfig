@@ -25,3 +25,6 @@
 	process = git-lfs filter-process
 	required = true
 	clean = git-lfs clean -- %f
+
+[includeIf "gitdir:~/Dev/numm/"]
+	path = ~/.gitconfig_numm
