@@ -1,16 +1,12 @@
 # Usage: Mac 移行直後は、ホームディレクトリへこのファイルをコピーして、 `brew bundle` コマンドを実行する。
 tap "1password/tap"       # 1Password CLI
 tap "homebrew/bundle"     #
-tap "homebrew/cask"       #
-tap "homebrew/cask-fonts" # Font HackGen
-tap "homebrew/core"       #
 tap "yukiarrr/tap"        # ecsk コマンド
 
 brew "asdf"               # 言語やツールのバージョンを管理する。
 brew "circleci"           # CircleCI コマンド
 brew "coreutils"          # asdf に必要なライブラリ。
 brew "curl"               # データ送受信コマンド。 asdf にも必要。
-brew "openssl@1.1"        # CSR を作成するなど、 SSL 関連のライブラリ。
 brew "openssl@3"
 brew "git"                # Git コマンドは、Mac デフォルトではなく、 Homebrew でインストールする。
 brew "git-filter-repo"    # Git からファイル履歴を削除する。
@@ -40,15 +36,13 @@ cask "figma"
 cask "font-hackgen"      # Starship が必要とするフォント。
 cask "font-hackgen-nerd" # Starship が必要とするフォント。
 cask "google-chrome"
-cask "arc" # 巷で使いやすいと話題のブラウザ
+# cask "arc" # 巷で使いやすいと話題のブラウザ
 cask "iterm2"
-cask "karabiner-elements"
 cask "keepingyouawake"
 cask "messenger"
 cask "notion"
 cask "postman"
-cask "raycast"
-cask "sequel-ace"
+# cask "sequel-ace"
 cask "slack"
 cask "spotify"
 cask "visual-studio-code"
