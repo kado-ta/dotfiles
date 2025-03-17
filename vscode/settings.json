@@ -83,13 +83,16 @@
     "window.commandCenter": true,
     //
     // --------------------------------------------------------------------
-    // ToDo Highlight, ToDo Tree
+    // ToDo Highlight
+    // - TODO コメントのハイライトを担う。
     // --------------------------------------------------------------------
+    "todohighlight.isEnable": true,
+    "todohighlight.isCaseSensitive": true,
     "todohighlight.keywords": [
         {
-            "text": "NOTE:",
+            "text": "@todo",
             "color": "#000",
-            "backgroundColor": "#97DFFC"
+            "backgroundColor": "#FFAB00"
         },
         {
             "text": "@note",
@@ -97,10 +100,25 @@
             "backgroundColor": "#97DFFC"
         },
         {
-            "text": "@todo",
+            "text": "NOTE:",
             "color": "#000",
-            "backgroundColor": "#F5C04D"
-        }
+            "backgroundColor": "#97DFFC",
+        },
+        {
+            "text": "FIXIT:",
+            "color": "#000",
+            "backgroundColor": "#DF6B92",
+        },
+        {
+            "text": "FIX:",
+            "color": "#000",
+            "backgroundColor": "#DF6B92",
+        },
+        {
+            "text": "BUG:",
+            "color": "#000",
+            "backgroundColor": "#DF6B92",
+        },
     ],
     "todohighlight.exclude": [
         "**/node_modules/**",
@@ -108,23 +126,34 @@
         "**/dist/**",
         "**/build/**",
         "**/.vscode/**",
-        "**/.github/**",
         "**/_output/**",
         "**/.next/**",
         "**/bin",
+        "**/coverage",
         "**/vendor",
         "**/*.min.*",
         "**/*.map"
     ],
+    //
+    // --------------------------------------------------------------------
+    // ToDo Tree
+    // - TODO コメントを管理する。
+    // - TODO コメントのハイライトは、TODO Highlight に任せるため、
+    //     ToDo Tree 自体のハイライト機能は無効化しておく。
+    // --------------------------------------------------------------------
     "todo-tree.general.tags": [
         "FIXME",
-        "TODO"
+        "TODO",
+        "FIXIT",
+        "FIX",
+        "BUG"
     ],
     "todo-tree.general.tagGroups": {
         "FIXME": [
             "FIXME",
             "FIXIT",
-            "FIX"
+            "FIX",
+            "BUG"
         ]
     },
     "todo-tree.general.exportPath": "~/Desktop/vscode_todos%Y%m%d-%H%M.txt",
@@ -137,16 +166,14 @@
         "**/dist",
         "**/build",
         "**/.vscode",
-        "**/.github",
         "**/_output",
         "**/.next",
         "**/*.min.*",
         "**/*.map",
         "**/bin",
+        "**/coverage",
         "**/vendor"
     ],
-    //
-    // End
     //
     // --------------------------------------------------------------------
     // Ruby
@@ -154,7 +181,7 @@
     "[ruby]": {
         "editor.defaultFormatter": "Shopify.ruby-lsp",
         "editor.insertSpaces": true,
-        "editor.semanticHighlighting.enabled": true
+        "editor.semanticHighlighting.enabled": true,
     },
     "rubyLsp.rubyVersionManager": {
         "identifier": "asdf"
@@ -167,7 +194,6 @@
     // VSCode ERB Formatter/Beautify 拡張で使用する HTML フォーマッター: htmlbeautifier gem は、
     // ローカル環境へインストールして使用する。 gem install htmlbeautifier -N
     "vscode-erb-beautify.useBundler": false,
-    // End
     //
     // --------------------------------------------------------------------
     // Terraform
@@ -185,8 +211,6 @@
         "editor.formatOnSaveMode": "file"
     },
     "tfsec.binaryPath": "~/.asdf/shims/tfsec",
-    //
-    // End
     //
     // --------------------------------------------------------------------
     // Python
@@ -237,9 +261,6 @@
     "mypy-type-checker.severity": {
         "error": "Warning"
     },
-    //
-    // End
-    //
     "html.format.endWithNewline": true, // TODO:
     "html.format.wrapLineLength": 0,
     "[html]": {
@@ -263,5 +284,11 @@
     "salesforcedx-vscode-soql.experimental.validateQueries": true,
     "hediet.vscode-drawio.resizeImages": null,
     "vscode-erb-beautify.keepBlankLines": 1,
-    "circleci.hostUrl": ""
+    "circleci.hostUrl": "",
+    "projectManager.tags": [
+        "Personal",
+        "Home Loan Advisor",
+        "Home Loan Advisor/Infra",
+        "NUMM"
+    ],
 }
