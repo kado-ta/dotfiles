@@ -28,6 +28,7 @@ cask "1password-cli"
 cask "appcleaner"
 cask "atok"
 cask "brave-browser"
+cask "chatgpt"
 cask "coteditor"
 cask "docker"
 cask "dropbox"
@@ -35,7 +36,6 @@ cask "figma"
 cask "font-hackgen"      # Starship が必要とするフォント。
 cask "font-hackgen-nerd" # Starship が必要とするフォント。
 cask "google-chrome"
-# cask "arc" # 巷で使いやすいと話題のブラウザ
 cask "iterm2"
 cask "keepingyouawake"
 cask "messenger"
