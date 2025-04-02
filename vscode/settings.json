@@ -184,7 +184,7 @@
         "editor.semanticHighlighting.enabled": true,
     },
     "rubyLsp.rubyVersionManager": {
-        "identifier": "asdf"
+        "identifier": "mise"
     },
     "rubyLsp.formatter": "rubocop",
     "[erb]": {
@@ -200,7 +200,7 @@
     // --------------------------------------------------------------------
     "terraform.languageServer.enable": true,
     // ここは、絶対パスで設定する必要がある。
-    "terraform.languageServer.terraform.path": "/Users/kado/.asdf/shims/terraform",
+    "terraform.languageServer.terraform.path": "/Users/kado/.local/share/mise/shims/terraform",
     "terraform.languageServer.args": [
         "serve"
     ],
@@ -210,13 +210,13 @@
         "editor.formatOnSave": true,
         "editor.formatOnSaveMode": "file"
     },
-    "tfsec.binaryPath": "~/.asdf/shims/tfsec",
+    "tfsec.binaryPath": "~/.local/share/mise/shims/tfsec",
     //
     // --------------------------------------------------------------------
     // Python
     // --------------------------------------------------------------------
     // Python のパスを Poetry でインストールした Python に設定する。
-    "python.defaultInterpreterPath": "~/.asdf/shims/python",
+    "python.defaultInterpreterPath": "~/.local/share/mise/shims/python",
     "python.analysis.extraPaths": [
         // NOTE: Python のバージョンを変更した場合は、併せて下記パス内 "python3.11" も変更する必要あり。
         ".venv/lib/python3.11/site-packages"
