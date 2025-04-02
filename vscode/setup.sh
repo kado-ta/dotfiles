@@ -6,15 +6,13 @@ if [ "$(uname)" != "Darwin" ] ; then
 fi
 
 SCRIPT_DIR=$(cd $(dirname $0) && pwd)
-VSCODE_DIR="${HOME}/Library/Application Support/Code/User"
+VSCODE_DIR="$HOME/Library/Application Support/Code/User"
 
 echo "SCRIPT_DIR: $SCRIPT_DIR"
 echo "VSCODE_DIR: $VSCODE_DIR"
 
 # Create symbolic link of settings.json
-if [ -L "${VSCODE_DIR}/settings.json" ]; then
-  ln -snfv "${SCRIPT_DIR}/settings.json" "${VSCODE_DIR}/settings.json"
-fi
+ln -snfv "${SCRIPT_DIR}/settings.json" "${VSCODE_DIR}/settings.json"
 
 # Install VSCode Extensions using the code command
 if [ "$(which code)" != "" ]; then
