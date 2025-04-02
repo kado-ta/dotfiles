@@ -76,7 +76,6 @@
         "vscode.theme-quietlight",
         "vscode.theme-tomorrow-night-blue"
     ],
-    "tabnine.experimentalAutoImports": true,
     "task.slowProviderWarning": true,
     "terminal.integrated.copyOnSelection": true,
     "terminal.external.osxExec": "iTerm.app",
