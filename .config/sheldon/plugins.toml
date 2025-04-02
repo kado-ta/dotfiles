@@ -32,7 +32,7 @@ fpath = 'fpath=("{{ dir }}" $fpath)'
 # プラグインの遅延読込機能を提供する。
 [plugins.zsh-defer]
 github = "romkatv/zsh-defer"
-apply = ["source"] # zsh 起動時に読み込まれる。
+apply = ["source"]           # zsh 起動時に読み込まれる。
 
 # 作業ディレクトリの .env から環境変数をロードする。
 [plugins.env-zsh]
@@ -53,9 +53,6 @@ github = "zsh-users/zsh-autosuggestions"
 
 [plugins.zsh-completions]
 github = "zsh-users/zsh-completions"
-
-# [plugins.asdf-completions]
-# asdf の入力補完は、 brew での asdf インストールと同時にインストール・設定されているぽい。
 
 # zsh 補完機能を有効にする。
 # 下記 2つは、aws-cli の入力補完を有効化するためのもの。
