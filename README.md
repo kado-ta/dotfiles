@@ -72,6 +72,17 @@ AWS 関連設定。
     └── link.sh
 ```
 
+加えて、各 Staging / Production 環境へ SSH 接続するための Session Manager プラグインをインストールする。
+
+これは、macOS でのインストール手順。
+```shell
+$ curl "https://s3.amazonaws.com/session-manager-downloads/plugin/latest/mac_arm64/sessionmanager-bundle.zip" -o "sessionmanager-bundle.zip"
+$ unzip sessionmanager-bundle.zip
+$ sudo ./sessionmanager-bundle/install -i /usr/local/sessionmanagerplugin -b /usr/local/bin/session-manager-plugin
+```
+他のプラットフォームでのインストール手順は、下記 URL を参照。  
+https://docs.aws.amazon.com/ja_jp/systems-manager/latest/userguide/session-manager-working-with-install-plugin.html
+
 ### .config
 各種設定情報。
 
