@@ -5,6 +5,7 @@ tap "yukiarrr/tap"       # ecsk コマンド
 
 brew "mise"              # 言語やツールのバージョンを管理する。
 brew "circleci"          # CircleCI コマンド
+brew "coreutils"         # mise や Ruby の bundle install でも必要とするライブラリを含む。
 brew "curl"              # データ送受信コマンド。
 brew "openssl@3"
 brew "git"               # Git コマンドは、Mac デフォルトではなく、 Homebrew でインストールする。
