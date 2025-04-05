@@ -82,87 +82,55 @@
     "window.commandCenter": true,
     //
     // --------------------------------------------------------------------
-    // ToDo Highlight
-    // - TODO コメントのハイライトを担う。
-    // --------------------------------------------------------------------
-    "todohighlight.isEnable": true,
-    "todohighlight.isCaseSensitive": true,
-    "todohighlight.keywords": [
-        {
-            "text": "@todo",
-            "color": "#000",
-            "backgroundColor": "#FFAB00"
-        },
-        {
-            "text": "@note",
-            "color": "#000",
-            "backgroundColor": "#97DFFC"
-        },
-        {
-            "text": "NOTE:",
-            "color": "#000",
-            "backgroundColor": "#97DFFC",
-        },
-        {
-            "text": "FIXIT:",
-            "color": "#000",
-            "backgroundColor": "#DF6B92",
-        },
-        {
-            "text": "FIX:",
-            "color": "#000",
-            "backgroundColor": "#DF6B92",
-        },
-        {
-            "text": "BUG:",
-            "color": "#000",
-            "backgroundColor": "#DF6B92",
-        },
-    ],
-    "todohighlight.exclude": [
-        "**/node_modules/**",
-        "**/bower_components/**",
-        "**/dist/**",
-        "**/build/**",
-        "**/.vscode/**",
-        "**/_output/**",
-        "**/.next/**",
-        "**/bin",
-        "**/coverage",
-        "**/vendor",
-        "**/*.min.*",
-        "**/*.map"
-    ],
-    //
-    // --------------------------------------------------------------------
     // ToDo Tree
     // - TODO コメントを管理する。
-    // - TODO コメントのハイライトは、TODO Highlight に任せるため、
-    //     ToDo Tree 自体のハイライト機能は無効化しておく。
     // --------------------------------------------------------------------
     "todo-tree.general.tags": [
-        "FIXME",
-        "TODO",
-        "FIXIT",
-        "FIX",
-        "BUG"
+        "TODO:",
+        "FIXME:",
+        "FIXIT:",
+        "FIX:",
+        "BUG:",
+        "NOTE:",
     ],
     "todo-tree.general.tagGroups": {
-        "FIXME": [
-            "FIXME",
-            "FIXIT",
-            "FIX",
-            "BUG"
+        "FIXME:": [
+            "FIXME:",
+            "FIXIT:",
+            "FIX:",
+            "BUG:"
         ]
     },
-    "todo-tree.general.exportPath": "~/Desktop/vscode_todos%Y%m%d-%H%M.txt",
-    // ハイライトは todohighlight 拡張機能に任せるため、 todo-tree のハイライト機能を無効化する。
+    "todo-tree.general.exportPath": "~/Downloads/vscode_todos_%Y%m%d-%H%M.txt",
+    "todo-tree.regex.regexCaseSensitive": true,
+    "todo-tree.highlights.enabled": true,
     "todo-tree.highlights.backgroundColourScheme": [],
-    "todo-tree.highlights.useColourScheme": true,
+    "todo-tree.highlights.useColourScheme": false,
+    "todo-tree.highlights.customHighlight": {
+        "NOTE:": {
+            "foreground": "#000",
+            "background": "#97DFFC",
+            "borderRadius": "2px",
+            "type": "tag"
+        },
+        "TODO:": {
+            "foreground": "#000",
+            "background": "#FFAB00",
+            "borderRadius": "2px",
+            "type": "tag"
+        },
+        "FIXME:": {
+            "foreground": "#fff",
+            "background": "#FF4180",
+            "borderRadius": "2px",
+            "type": "text"
+        },
+    },
     "todo-tree.filtering.excludeGlobs": [
         "**/node_modules",
         "**/bower_components",
         "**/dist",
+        "**/dest",
         "**/build",
         "**/.vscode",
         "**/_output",
@@ -260,7 +228,6 @@
     "mypy-type-checker.severity": {
         "error": "Warning"
     },
-    "html.format.endWithNewline": true, // TODO:
     "html.format.wrapLineLength": 0,
     "[html]": {
         "editor.defaultFormatter": null
@@ -280,7 +247,6 @@
         "**/openapi.yaml",
         "**/openapi.yml"
     ],
-    "salesforcedx-vscode-soql.experimental.validateQueries": true,
     "hediet.vscode-drawio.resizeImages": null,
     "vscode-erb-beautify.keepBlankLines": 1,
     "circleci.hostUrl": "",
