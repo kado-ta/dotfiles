@@ -1,7 +1,7 @@
 #!/bin/bash -e
 
 if [ "$(uname)" != "Darwin" ] ; then
-	echo "This is not macOS!"
+	echo "This is not macOS! .config setup is failed ;("
 	exit 1
 fi
 
@@ -10,12 +10,12 @@ fi
 # 共通コマンド
 SCRIPT_DIR=$(cd $(dirname $0) && pwd)
 CONFIG_DIR="$HOME/.config"
-if [ ! -d $CONFIG_DIR ]; then mkdir $CONFIG_DIR; fi
 
 echo "SCRIPT_DIR: $SCRIPT_DIR"
 echo "CONFIG_DIR: $CONFIG_DIR"
 
-ln -snfv "$SCRIPT_DIR/mise/mise_config.toml"  "$CONFIG_DIR/config.toml"
+if [ ! -d $CONFIG_DIR ]; then mkdir $CONFIG_DIR; fi
+
 ln -snfv "$SCRIPT_DIR/starship/starship.toml" "$CONFIG_DIR/"
 
 SHELDON_DIR="$CONFIG_DIR/sheldon"
@@ -29,4 +29,4 @@ ln -snfv "$SCRIPT_DIR/sheldon/plugins.toml" "$SHELDON_DIR/"
 # if [ ! -d $KARABINER_DIR ]; then mkdir $KARABINER_DIR; fi
 # ln -snfv "$SCRIPT_DIR/karabiner/karabiner.json" "$KARABINER_DIR/"
 
-echo "Success!"
+echo ".config setup is succeeded!"
