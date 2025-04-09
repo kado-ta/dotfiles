@@ -1,0 +1,12 @@
+# mise で管理するツールのグローバル バージョンを指定する。
+# ~/.config/mise/config.toml として使用されるもの。
+# https://mise.jdx.dev/configuration.html#global-config-config-mise-config-toml
+[tools]
+awscli = "2.25.8"
+go = "1.24.2"
+node = "22.14.0"
+poetry = "1.6.1"
+python = "3.11.5"
+ruby = "3.4.2"
+terraform = "1.11.3"
+tfsec = "1.28.13"
