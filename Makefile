@@ -22,3 +22,6 @@ brew/dump:
 # VSCode 拡張のリスト最新化する。
 vscode/extensions/list:
 	code --list-extensions > vscode/extensions
+
+cursor/extensions/list:
+	cursor --list-extensions > vscode/extensions
