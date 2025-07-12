@@ -1,19 +1,17 @@
 {
     "workbench.colorTheme": "Evondev Dracula High Contrast",
+    "workbench.preferredDarkColorTheme": "Default Dark Modern",
+    // ハイライト色の設定
     "workbench.colorCustomizations": {
-        // ハイライト色の設定
         "editor.selectionBackground": "#5e8881", // 選択中テキスト
         "editor.selectionHighlightBackground": "#3d4242d0", // 選択中テキストと同じテキストのハイライト
         "editor.findMatchBackground": "#5691b3", // 検索ヒットの内、現在、フォーカスしているもの
         "editor.findMatchHighlightBackground": "#3b5768d0" // 検索にヒットしたテキストと同じテキスト
-        // "editor.findMatchBorder": "#ffffff" // 検索ヒットの内、現在、フォーカスしているものの枠線
     },
     "workbench.editor.enablePreviewFromQuickOpen": false,
     "workbench.iconTheme": "material-icon-theme",
-    "workbench.startupEditor": "newUntitledFile",
-    // "workbench.statusBar.feedback.visible": false,
     "editor.rulers": [
-        100
+        110
     ],
     "editor.fontFamily": "HackGen35Nerd, Menlo, Monaco, 'Courier New', monospace",
     "editor.fontSize": 13,
@@ -36,7 +34,6 @@
     "extensions.ignoreRecommendations": false,
     "files.autoSave": "afterDelay",
     "files.insertFinalNewline": true,
-    "files.maxMemoryForLargeFilesMB": 1536,
     "files.trimFinalNewlines": true,
     "files.trimTrailingWhitespace": true,
     "files.associations": {
@@ -71,27 +68,16 @@
         "/node_modules": true,
         "/vendor": true
     },
-    "settingsSync.ignoredExtensions": [
-        "vscode.theme-defaults",
-        "vscode.theme-quietlight",
-        "vscode.theme-tomorrow-night-blue"
-    ],
     "task.slowProviderWarning": true,
     "terminal.integrated.copyOnSelection": true,
     "terminal.external.osxExec": "iTerm.app",
     "window.commandCenter": true,
-    //
-    // --------------------------------------------------------------------
-    // ToDo Tree
-    // - TODO コメントを管理する。
-    // --------------------------------------------------------------------
     "todo-tree.general.tags": [
         "TODO:",
         "FIXME:",
         "FIXIT:",
         "FIX:",
         "BUG:",
-        "NOTE:",
     ],
     "todo-tree.general.tagGroups": {
         "FIXME:": [
@@ -103,29 +89,10 @@
     },
     "todo-tree.general.exportPath": "~/Downloads/vscode_todos_%Y%m%d-%H%M.txt",
     "todo-tree.regex.regexCaseSensitive": true,
-    "todo-tree.highlights.enabled": true,
-    "todo-tree.highlights.backgroundColourScheme": [],
+    // ハイライトは Better Comments Next を使用して行う。
+    "todo-tree.highlights.enabled": false,
     "todo-tree.highlights.useColourScheme": false,
-    "todo-tree.highlights.customHighlight": {
-        "NOTE:": {
-            "foreground": "#000",
-            "background": "#97DFFC",
-            "borderRadius": "2px",
-            "type": "tag"
-        },
-        "TODO:": {
-            "foreground": "#000",
-            "background": "#FFAB00",
-            "borderRadius": "2px",
-            "type": "tag"
-        },
-        "FIXME:": {
-            "foreground": "#fff",
-            "background": "#FF4180",
-            "borderRadius": "2px",
-            "type": "text"
-        },
-    },
+    "todo-tree.highlights.backgroundColourScheme": [],
     "todo-tree.filtering.excludeGlobs": [
         "**/node_modules",
         "**/bower_components",
@@ -141,6 +108,35 @@
         "**/coverage",
         "**/vendor"
     ],
+    "better-comments.tags": [
+        {
+            "tag": "TODO:",
+            "color": "#000",
+            "strikethrough": false,
+            "underline": false,
+            "backgroundColor": "#FFAB00",
+            "bold": true,
+            "italic": false
+        },
+        {
+            "tag": "FIXME:",
+            "color": "#fff",
+            "strikethrough": false,
+            "underline": false,
+            "backgroundColor": "#FF4180",
+            "bold": true,
+            "italic": false
+        },
+        {
+            "tag": "NOTE:",
+            "color": "#000",
+            "strikethrough": false,
+            "underline": false,
+            "backgroundColor": "#97DFFC",
+            "bold": true,
+            "italic": false
+        }
+    ],
     //
     // --------------------------------------------------------------------
     // Ruby
@@ -148,12 +144,15 @@
     "[ruby]": {
         "editor.defaultFormatter": "Shopify.ruby-lsp",
         "editor.insertSpaces": true,
-        "editor.semanticHighlighting.enabled": true,
+        "editor.semanticHighlighting.enabled": true
     },
     "rubyLsp.rubyVersionManager": {
         "identifier": "mise"
     },
     "rubyLsp.formatter": "rubocop",
+    "rubyLsp.linters": [
+        "rubocop",
+    ],
     "[erb]": {
         "editor.defaultFormatter": "aliariff.vscode-erb-beautify",
         "editor.formatOnSave": false
@@ -182,7 +181,6 @@
     // --------------------------------------------------------------------
     // Python
     // --------------------------------------------------------------------
-    // Python のパスを Poetry でインストールした Python に設定する。
     "python.defaultInterpreterPath": "~/.local/share/mise/shims/python",
     "python.analysis.extraPaths": [
         // NOTE: Python のバージョンを変更した場合は、併せて下記パス内 "python3.11" も変更する必要あり。
@@ -200,12 +198,10 @@
         }
     },
     "isort.args": [
-        // isort の black 互換設定
-        "--profile black"
+        "--profile black" // isort の black 互換設定
     ],
     // autoDocstring のスタイルを Google スタイルに設定する。
     "autoDocstring.docstringFormat": "google",
-    // flake8
     "flake8.path": [
         "./.venv/bin/flake8"
     ],
@@ -213,7 +209,6 @@
         // flake8 の設定は、プロジェクト直下の .flake8 ファイルに記載する。
         "--config=${workspaceFolder}/.flake8"
     ],
-    // mypy で Python の型ヒントが書かれているかチェックする。
     "mypy-type-checker.args": [
         "--follow-imports=skip", // インポートしたモジュールの型ヒントチェックを行わない。
         "--ignore-missing-imports", // 解決できないモジュールのインポートを無視する。
@@ -256,4 +251,6 @@
         "Home Loan Advisor/Infra",
         "NUMM"
     ],
+    // ローカルファイルプロトコルの扱いに対する確認ダイアログを表示しない。
+    "security.promptForLocalFileProtocolHandling": false,
 }
