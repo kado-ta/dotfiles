@@ -1,8 +1,13 @@
 aki77.rails-db-schema
 alefragnani.project-manager
 aliariff.vscode-erb-beautify
+bierner.github-markdown-preview
+bierner.markdown-checkbox
+bierner.markdown-emoji
+bierner.markdown-footnotes
 bierner.markdown-mermaid
 bierner.markdown-preview-github-styles
+bierner.markdown-yaml-preamble
 bpruitt-goddard.mermaid-markdown-syntax-highlighting
 bung87.rails
 bung87.vscode-gemfile
@@ -10,6 +15,7 @@ circleci.circleci
 craigmaslowski.erb
 dbaeumer.vscode-eslint
 editorconfig.editorconfig
+edwinhuish.better-comments-next
 evondev.dracula-high-contrast
 file-icons.file-icons
 github.vscode-github-actions
@@ -43,4 +49,3 @@ stoplight.spectral
 tamasfe.even-better-toml
 tfsec.tfsec
 usernamehw.errorlens
-yzane.markdown-pdf
