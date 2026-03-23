@@ -1,6 +1,7 @@
 aki77.rails-db-schema
 alefragnani.project-manager
 aliariff.vscode-erb-beautify
+anthropic.claude-code
 bierner.github-markdown-preview
 bierner.markdown-checkbox
 bierner.markdown-emoji
@@ -16,13 +17,12 @@ craigmaslowski.erb
 dbaeumer.vscode-eslint
 editorconfig.editorconfig
 edwinhuish.better-comments-next
-evondev.dracula-high-contrast
 file-icons.file-icons
 github.vscode-github-actions
 grapecity.gc-excelviewer
-gruntfuggly.todo-tree
 hashicorp.terraform
 hediet.vscode-drawio
+hverlin.mise-vscode
 ionutvmi.path-autocomplete
 kaiwood.endwise
 kevinrose.vsc-python-indent
@@ -38,6 +38,7 @@ ms-python.mypy-type-checker
 ms-python.pylint
 ms-python.python
 ms-python.vscode-pylance
+ms-python.vscode-python-envs
 naumovs.color-highlight
 njpwerner.autodocstring
 nmrmsys.vscode-sql-formatter-mod
@@ -49,3 +50,5 @@ stoplight.spectral
 tamasfe.even-better-toml
 tfsec.tfsec
 usernamehw.errorlens
+yzane.markdown-pdf
+zhuangtongfa.material-theme
