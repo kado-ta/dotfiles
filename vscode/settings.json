@@ -1,7 +1,5 @@
 {
-    "workbench.colorTheme": "Evondev Dracula High Contrast",
-    "workbench.preferredDarkColorTheme": "Default Dark Modern",
-    // ハイライト色の設定
+    "workbench.colorTheme": "One Dark Pro Darker",
     "workbench.colorCustomizations": {
         "editor.selectionBackground": "#5e8881", // 選択中テキスト
         "editor.selectionHighlightBackground": "#3d4242d0", // 選択中テキストと同じテキストのハイライト
@@ -31,7 +29,7 @@
     "diffEditor.ignoreTrimWhitespace": false,
     "explorer.autoReveal": false,
     "explorer.confirmDragAndDrop": false,
-    "extensions.ignoreRecommendations": false,
+    "extensions.ignoreRecommendations": true,
     "files.autoSave": "afterDelay",
     "files.insertFinalNewline": true,
     "files.trimFinalNewlines": true,
@@ -72,42 +70,6 @@
     "terminal.integrated.copyOnSelection": true,
     "terminal.external.osxExec": "iTerm.app",
     "window.commandCenter": true,
-    "todo-tree.general.tags": [
-        "TODO:",
-        "FIXME:",
-        "FIXIT:",
-        "FIX:",
-        "BUG:",
-    ],
-    "todo-tree.general.tagGroups": {
-        "FIXME:": [
-            "FIXME:",
-            "FIXIT:",
-            "FIX:",
-            "BUG:"
-        ]
-    },
-    "todo-tree.general.exportPath": "~/Downloads/vscode_todos_%Y%m%d-%H%M.txt",
-    "todo-tree.regex.regexCaseSensitive": true,
-    // ハイライトは Better Comments Next を使用して行う。
-    "todo-tree.highlights.enabled": false,
-    "todo-tree.highlights.useColourScheme": false,
-    "todo-tree.highlights.backgroundColourScheme": [],
-    "todo-tree.filtering.excludeGlobs": [
-        "**/node_modules",
-        "**/bower_components",
-        "**/dist",
-        "**/dest",
-        "**/build",
-        "**/.vscode",
-        "**/_output",
-        "**/.next",
-        "**/*.min.*",
-        "**/*.map",
-        "**/bin",
-        "**/coverage",
-        "**/vendor"
-    ],
     "better-comments.tags": [
         {
             "tag": "TODO:",
@@ -176,12 +138,12 @@
         "editor.formatOnSave": true,
         "editor.formatOnSaveMode": "file"
     },
-    "tfsec.binaryPath": "~/.local/share/mise/shims/tfsec",
+    "tfsec.binaryPath": "/Users/kado/.local/share/mise/shims/tfsec",
     //
     // --------------------------------------------------------------------
     // Python
     // --------------------------------------------------------------------
-    "python.defaultInterpreterPath": "~/.local/share/mise/shims/python",
+    "python.defaultInterpreterPath": "/Users/kado/.local/share/mise/installs/python/latest",
     "python.analysis.extraPaths": [
         // NOTE: Python のバージョンを変更した場合は、併せて下記パス内 "python3.11" も変更する必要あり。
         ".venv/lib/python3.11/site-packages"
@@ -247,10 +209,14 @@
     "circleci.hostUrl": "",
     "projectManager.tags": [
         "Personal",
-        "Home Loan Advisor",
-        "Home Loan Advisor/Infra",
+        "HomeLoan",
+        "HomeLoan/Infra",
         "NUMM"
     ],
+    // Claude Code
+    "claudeCode.preferredLocation": "panel",
+    // --------------------------------------------------------------------
+    "markdown-pdf.mermaidServer": "https://unpkg.com/mermaid@10.4.0/dist/mermaid.js",
     // ローカルファイルプロトコルの扱いに対する確認ダイアログを表示しない。
-    "security.promptForLocalFileProtocolHandling": false,
+    "security.promptForLocalFileProtocolHandling": false
 }
