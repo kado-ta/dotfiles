@@ -1,0 +1,282 @@
+[
+	{
+		"name": "dotfiles",
+		"rootPath": "$home/dotfiles",
+		"paths": [],
+		"tags": [
+			"Personal"
+		],
+		"enabled": true,
+		"profile": ""
+	},
+	{
+		"name": "住宅ローン提案クラウド",
+		"rootPath": "$home/Dev/homeloan_advisor/clc",
+		"paths": [],
+		"tags": [
+			"HomeLoan"
+		],
+		"enabled": true,
+		"profile": ""
+	},
+	{
+		"name": "Salesforce",
+		"rootPath": "$home/Dev/homeloan_advisor/salesforce",
+		"paths": [],
+		"tags": [
+			"HomeLoan"
+		],
+		"enabled": true,
+		"profile": ""
+	},
+	{
+		"name": "Homeloan-Assmt: Frontend",
+		"rootPath": "$home/Dev/homeloan_advisor/homeloan_assmt_front/",
+		"paths": [],
+		"tags": [
+			"HomeLoan"
+		],
+		"enabled": true,
+		"profile": ""
+	},
+	{
+		"name": "Homeloan-Assmt: Backend",
+		"rootPath": "$home/Dev/homeloan_advisor/homeloan_assmt_back/",
+		"paths": [],
+		"tags": [
+			"HomeLoan"
+		],
+		"enabled": true,
+		"profile": ""
+	},
+	{
+		"name": "Homeloan-Assmt: API Spec Editor",
+		"rootPath": "$home/Dev/homeloan_advisor/homeloan_assmt_api_spec_editor/",
+		"paths": [],
+		"tags": [
+			"HomeLoan"
+		],
+		"enabled": true,
+		"profile": ""
+	},
+	{
+		"name": "Homeloan-Assmt: Appl Form Printer",
+		"rootPath": "$home/Dev/homeloan_advisor/appl_form_printer/",
+		"paths": [],
+		"tags": [
+			"HomeLoan"
+		],
+		"enabled": true,
+		"profile": ""
+	},
+	{
+		"name": "Speed-Assmt: API Spec Editor",
+		"rootPath": "$home/Dev/homeloan_advisor/speed_assmt_api_spec_editor/",
+		"paths": [],
+		"tags": [
+			"HomeLoan"
+		],
+		"enabled": true,
+		"profile": ""
+	},
+	{
+		"name": "Speed-Assmt: Backend",
+		"rootPath": "$home/Dev/homeloan_advisor/speed_assmt_back/",
+		"paths": [],
+		"tags": [
+			"HomeLoan"
+		],
+		"enabled": true,
+		"profile": ""
+	},
+	{
+		"name": "Speed-Assmt: Frontend",
+		"rootPath": "$home/Dev/homeloan_advisor/speed_assmt_front/",
+		"paths": [],
+		"tags": [
+			"HomeLoan"
+		],
+		"enabled": true,
+		"profile": ""
+	},
+	{
+		"name": "Speed-Assmt (但陽信金): API Spec Editor",
+		"rootPath": "$home/Dev/homeloan_advisor/tanyo_speed_assmt_api_spec_editor/",
+		"paths": [],
+		"tags": [
+			"HomeLoan"
+		],
+		"enabled": true,
+		"profile": ""
+	},
+	{
+		"name": "Speed-Assmt (但陽信金): Backend",
+		"rootPath": "$home/Dev/homeloan_advisor/tanyo_speed_assmt_back/",
+		"paths": [],
+		"tags": [
+			"HomeLoan"
+		],
+		"enabled": true,
+		"profile": ""
+	},
+	{
+		"name": "Speed-Assmt (但陽信金): Frontend",
+		"rootPath": "$home/Dev/homeloan_advisor/tanyo_speed_assmt_front/",
+		"paths": [],
+		"tags": [
+			"HomeLoan"
+		],
+		"enabled": true,
+		"profile": ""
+	},
+	{
+		"name": "Infra: AWS CLC",
+		"rootPath": "$home/Dev/homeloan_advisor/infra_aws_clc/",
+		"paths": [],
+		"tags": [
+			"HomeLoan/Infra"
+		],
+		"enabled": true,
+		"profile": ""
+	},
+	{
+		"name": "Infra: AWS Assessment",
+		"rootPath": "$home/Dev/homeloan_advisor/infra_aws_assmt/",
+		"paths": [],
+		"tags": [
+			"HomeLoan/Infra"
+		],
+		"enabled": true,
+		"profile": ""
+	},
+	{
+		"name": "Infra: AWS LPs",
+		"rootPath": "$home/Dev/homeloan_advisor/infra_aws_lp",
+		"paths": [],
+		"tags": [
+			"HomeLoan/Infra"
+		],
+		"enabled": true,
+		"profile": ""
+	},
+	{
+		"name": "Infra: AWS Monitoring",
+		"rootPath": "$home/Dev/homeloan_advisor/infra_aws_monitor/",
+		"paths": [],
+		"tags": [
+			"HomeLoan/Infra"
+		],
+		"enabled": true,
+		"profile": ""
+	},
+	{
+		"name": "Infra: AWS Domain",
+		"rootPath": "$home/Dev/homeloan_advisor/infra_aws_domain/",
+		"paths": [],
+		"tags": [
+			"HomeLoan/Infra"
+		],
+		"enabled": true,
+		"profile": ""
+	},
+	{
+		"name": "Infra: AWS Base",
+		"rootPath": "$home/Dev/homeloan_advisor/infra_aws_base/",
+		"paths": [],
+		"tags": [
+			"HomeLoan/Infra"
+		],
+		"enabled": true,
+		"profile": ""
+	},
+	{
+		"name": "Infra: AWS eKYC",
+		"rootPath": "$home/Dev/homeloan_advisor/infra_aws_ekyc/",
+		"paths": [],
+		"tags": [
+			"HomeLoan/Infra"
+		],
+		"enabled": true,
+		"profile": ""
+	},
+	{
+		"name": "Infra: AWS SF-Connect",
+		"rootPath": "$home/Dev/homeloan_advisor/infra_aws_sf_connect/",
+		"paths": [],
+		"tags": [
+			"HomeLoan/Infra"
+		],
+		"enabled": true,
+		"profile": ""
+	},
+	{
+		"name": "Infra: AWS SF-Conn Lambda: Exec SOQL",
+		"rootPath": "$home/Dev/homeloan_advisor/infra_aws_sf_conn_lambda_exec_soql/",
+		"paths": [],
+		"tags": [
+			"HomeLoan/Infra"
+		],
+		"enabled": true,
+		"profile": ""
+	},
+	{
+		"name": "Infra: AWS SF-Conn Lambda: Create Oppty",
+		"rootPath": "$home/Dev/homeloan_advisor/infra_aws_sf_conn_lambda_create_oppty/",
+		"paths": [],
+		"tags": [
+			"HomeLoan/Infra"
+		],
+		"enabled": true,
+		"profile": ""
+	},
+	{
+		"name": "Infra: AWS SF-Conn Lambda: Delete Oppty",
+		"rootPath": "$home/Dev/homeloan_advisor/infra_aws_sf_conn_lambda_delete_oppty/",
+		"paths": [],
+		"tags": [
+			"HomeLoan/Infra"
+		],
+		"enabled": true,
+		"profile": ""
+	},
+	{
+		"name": "Infra: AWS SF-Conn Lambda: Update Account",
+		"rootPath": "$home/Dev/homeloan_advisor/infra_aws_sf_conn_lambda_update_account/",
+		"paths": [],
+		"tags": [
+			"HomeLoan/Infra"
+		],
+		"enabled": true,
+		"profile": ""
+	},
+	{
+		"name": "Infra: AWS Proxy",
+		"rootPath": "$home/Dev/homeloan_advisor/infra_aws_proxy/",
+		"paths": [],
+		"tags": [
+			"HomeLoan/Infra"
+		],
+		"enabled": true,
+		"profile": ""
+	},
+	{
+		"name": "Infra: AWS IAM",
+		"rootPath": "$home/Dev/numm/infra_aws_iam/",
+		"paths": [],
+		"tags": [
+			"NUMM"
+		],
+		"enabled": true,
+		"profile": ""
+	},
+	{
+		"name": "Infra: AWS Domain",
+		"rootPath": "$home/Dev/numm/infra_aws_domain/",
+		"paths": [],
+		"tags": [
+			"NUMM"
+		],
+		"enabled": true,
+		"profile": ""
+	}
+]
