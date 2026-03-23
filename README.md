@@ -112,6 +112,7 @@ VSCode 拡張をインストールする。
 └── vscode
     ├── README.md
     ├── extensions    # VSCode 拡張リスト
+    ├── projects.json # PROJECT MANAGER 拡張用設定
     ├── settings.json # VSCode 設定
     └── setup.sh
 ```
