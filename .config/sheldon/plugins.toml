@@ -51,6 +51,11 @@ github = "zdharma/fast-syntax-highlighting"
 [plugins.zsh-autosuggestions]
 github = "zsh-users/zsh-autosuggestions"
 
+# mise をシェルで有効化する
+# https://mise.jdx.dev/getting-started.html#activate-mise
+[plugins.mise-activate]
+inline = 'eval "$(mise activate zsh)"'
+
 [plugins.zsh-completions]
 github = "zsh-users/zsh-completions"
 
