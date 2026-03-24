@@ -27,7 +27,7 @@ if [ "$(which code)" != "" ]; then
   fi
 
   # VSCode PROJECT MANAGER 拡張の設定ファイルのシンボリックリンクを作成する。
-  ln -snfv "$SCRIPT_DIR/vscode/projects.json" "$PJMANAGER_EXT_DIR/"
+  ln -snfv "${SCRIPT_DIR}/projects.json" "${PJMANAGER_EXT_DIR}/projects.json"
 else
   echo "Install 'code' command from VSCode command palette to install your extensions."
 fi
