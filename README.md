@@ -1,10 +1,10 @@
 # dotfiles
-## Setup
+## ▍Setup
 Finder から下記 2つのファイルを実行する。(**※ ダブルクリックで実行する。**)
 1. `init.command` : Homebrew インストールや zsh 設定など。
 2. `setup.command` : 開発環境に必要なランタイム・ライブラリ等のセットアップ。
 
-## Directories
+## ▍Directories
 下記は、セットアップ時の実行順に記載する。
 
 ### .bin
@@ -103,6 +103,43 @@ $ sudo ./sessionmanager-bundle/install -i /usr/local/sessionmanagerplugin -b /us
 他のプラットフォームでのインストール手順は、下記 URL を参照。  
 https://docs.aws.amazon.com/ja_jp/systems-manager/latest/userguide/session-manager-working-with-install-plugin.html
 
+### Claude Code
+`./.claude/link.sh` を実行して、Claude Code 設定のシンボリックを作成する。
+
+
+```shell
+.
+└── .claude
+    ├── link.sh
+    ├── settings.json       # Claude 設定
+    └── validate-command.sh # PreToolUse フック用スクリプト
+```
+#### settings.json
+`.claude/settings.json` 内のセキュリティ設定は、下記リンクの記事を参考に作成。
+- [【2026年最新版】Claude Codeで行うべきセキュリティ設定 10選 - Qiita](https://qiita.com/miruky/items/51db293a7a7d0d277a5d)
+
+#### validate-command.sh
+Hooks の **PreToolUse フック** を使用して、ツール実行前にカスタムチェックを挟む。
+
+```json
+// ./.claude/settings.json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/validate-command.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
 ### VSCode
 `./vscode/setup.sh` を実行して、VSCode 設定のシンボリックを作成し、
 VSCode 拡張をインストールする。
@@ -117,7 +154,7 @@ VSCode 拡張をインストールする。
     └── setup.sh
 ```
 
-## Makefile
+## ▍Makefile
 ### `brew/deps/show`
 Homebrew の依存関係をツリー形式で表示する。
 

@@ -1,3 +1,4 @@
 .env
 .aws/credentials
 .DS_Store
+Brewfile
