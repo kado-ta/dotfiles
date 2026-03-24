@@ -18,6 +18,9 @@ aws/link.sh
 # mise で管理する言語・プラグインをインストールする。
 mise/setup.sh
 
+# Claude Code 設定のシンボリックリンクを作成する。
+.claude/link.sh
+
 # Set macOS system preferences.
 # TODO: Mac の設定をコマンドで適用できるようにする。設定スクリプトの書き方は、下記URLを参考にする。
 # https://github.com/JunichiSugiura/JunichiSugiura/blob/main/bundle/scripts/macos-defaults.sh
