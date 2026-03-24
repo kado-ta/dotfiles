@@ -70,7 +70,7 @@
 		"profile": ""
 	},
 	{
-		"name": "Speed-Assmt: API Spec Editor",
+		"name": "Speed-Assmt (Main): API Spec Editor",
 		"rootPath": "$home/Dev/homeloan_advisor/speed_assmt_api_spec_editor/",
 		"paths": [],
 		"tags": [
@@ -80,7 +80,7 @@
 		"profile": ""
 	},
 	{
-		"name": "Speed-Assmt: Backend",
+		"name": "Speed-Assmt (Main): Backend",
 		"rootPath": "$home/Dev/homeloan_advisor/speed_assmt_back/",
 		"paths": [],
 		"tags": [
@@ -90,7 +90,7 @@
 		"profile": ""
 	},
 	{
-		"name": "Speed-Assmt: Frontend",
+		"name": "Speed-Assmt (Main): Frontend",
 		"rootPath": "$home/Dev/homeloan_advisor/speed_assmt_front/",
 		"paths": [],
 		"tags": [
@@ -100,7 +100,7 @@
 		"profile": ""
 	},
 	{
-		"name": "Speed-Assmt (但陽信金): API Spec Editor",
+		"name": "Speed-Assmt (TNY): API Spec Editor",
 		"rootPath": "$home/Dev/homeloan_advisor/tanyo_speed_assmt_api_spec_editor/",
 		"paths": [],
 		"tags": [
@@ -110,7 +110,7 @@
 		"profile": ""
 	},
 	{
-		"name": "Speed-Assmt (但陽信金): Backend",
+		"name": "Speed-Assmt (TNY): Backend",
 		"rootPath": "$home/Dev/homeloan_advisor/tanyo_speed_assmt_back/",
 		"paths": [],
 		"tags": [
@@ -120,8 +120,68 @@
 		"profile": ""
 	},
 	{
-		"name": "Speed-Assmt (但陽信金): Frontend",
+		"name": "Speed-Assmt (TNY): Frontend",
 		"rootPath": "$home/Dev/homeloan_advisor/tanyo_speed_assmt_front/",
+		"paths": [],
+		"tags": [
+			"HomeLoan"
+		],
+		"enabled": true,
+		"profile": ""
+	},
+	{
+		"name": "Conn-CIC: API Spec Editor",
+		"rootPath": "$home/Dev/homeloan_advisor/cic_conn_api_spec_editor/",
+		"paths": [],
+		"tags": [
+			"HomeLoan"
+		],
+		"enabled": true,
+		"profile": ""
+	},
+	{
+		"name": "Conn-CIC: Backend",
+		"rootPath": "$home/Dev/homeloan_advisor/cic_connector/",
+		"paths": [],
+		"tags": [
+			"HomeLoan"
+		],
+		"enabled": true,
+		"profile": ""
+	},
+	{
+		"name": "Conn-SF: API Spec Editor",
+		"rootPath": "$home/Dev/homeloan_advisor/sf_conn_api_spec_editor/",
+		"paths": [],
+		"tags": [
+			"HomeLoan"
+		],
+		"enabled": true,
+		"profile": ""
+	},
+	{
+		"name": "Conn-SF: Backend",
+		"rootPath": "$home/Dev/homeloan_advisor/sf_connector/",
+		"paths": [],
+		"tags": [
+			"HomeLoan"
+		],
+		"enabled": true,
+		"profile": ""
+	},
+	{
+		"name": "Conn-eKYC: API Spec Editor",
+		"rootPath": "$home/Dev/homeloan_advisor/ekyc_conn_api_spec_editor/",
+		"paths": [],
+		"tags": [
+			"HomeLoan"
+		],
+		"enabled": true,
+		"profile": ""
+	},
+	{
+		"name": "Conn-eKYC: Backend",
+		"rootPath": "$home/Dev/homeloan_advisor/ekyc_connector/",
 		"paths": [],
 		"tags": [
 			"HomeLoan"
