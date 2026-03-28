@@ -46,6 +46,7 @@ cask "obsidian"
 cask "postman"
 cask "slack"
 cask "spotify"
+cask "typora" # 有償ソフトウェアであるため、インストール後のライセンス購入が必要。
 cask "visual-studio-code"
 cask "keepingyouawake"
 cask "zoom"
