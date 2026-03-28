@@ -1,0 +1,12 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Open current Markdown in Typora",
+      "type": "shell",
+      "command": "open",
+      "args": ["-a", "Typora", "${file}"],
+      "problemMatcher": []
+    }
+  ]
+}
