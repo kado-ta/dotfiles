@@ -7,6 +7,7 @@ brew "circleci"          # CircleCI コマンド
 brew "coreutils"         # mise や Ruby の bundle install でも必要とするライブラリを含む。
 brew "openssl@3"
 brew "curl"              # データ送受信コマンド。
+brew "gh"                # GitHub CLI
 brew "git"               # Git コマンドは、Mac デフォルトではなく、 Homebrew でインストールする。
 brew "git-filter-repo"   # Git からファイル履歴を削除する。
 brew "gnupg"             # Terraform で IAM ユーザーを管理するための GPG キー発行に使用する。

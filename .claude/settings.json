@@ -1,4 +1,5 @@
 {
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "permissions": {
     "deny": [
       "Bash(rm -rf *)",
@@ -10,7 +11,7 @@
       "Bash(git push *)",
       "Bash(git reset --hard *)",
       "Bash(chmod 777 *)",
-      "Bash(sudo:*)",
+      "Bash(sudo *)",
       "Read(./.env)",
       "Read(./.env.*)",
       "Read(./secrets/**)",
@@ -21,6 +22,15 @@
       "Read(~/.ssh/**)",
       "Read(id_rsa)",
       "Write(/etc/**)"
+    ],
+    "allow": [
+      "Bash(npm run *)",
+      "Bash(pnpm *)",
+      "Bash(git status)",
+      "Bash(git diff *)",
+      "Read",
+      "Write",
+      "Edit"
     ],
     "disableBypassPermissionsMode": "disable"
   },
@@ -54,9 +64,13 @@
   "sandbox": {
     "enabled": true,
     "allowUnsandboxedCommands": false,
+    "excludedCommands": [
+      "gh"
+    ],
     "network": {
       "allowedDomains": [
         "github.com",
+        "*.github.com",
         "*.githubusercontent.com",
         "*.npmjs.org",
         "registry.yarnpkg.com",
