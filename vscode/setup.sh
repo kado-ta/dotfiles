@@ -16,6 +16,8 @@ echo "PJMANAGER_EXT_DIR: $PJMANAGER_EXT_DIR"
 # VSCode
 # Create symbolic link of settings.json
 ln -snfv "${SCRIPT_DIR}/settings.json" "${VSCODE_DIR}/settings.json"
+ln -snfv "${SCRIPT_DIR}/keybindings.json" "${VSCODE_DIR}/keybindings.json"
+ln -snfv "${SCRIPT_DIR}/task.json" "${VSCODE_DIR}/task.json"
 
 # Install VSCode Extensions using the code command
 if [ "$(which code)" != "" ]; then
