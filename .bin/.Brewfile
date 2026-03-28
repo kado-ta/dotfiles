@@ -3,6 +3,7 @@ tap "1password/tap"      # 1Password CLI
 tap "homebrew/bundle"    #
 tap "yukiarrr/tap"       # ecsk コマンド
 
+brew "biome"             # Biome: Linter & Formatter for JavaScript / TypeScript
 brew "circleci"          # CircleCI コマンド
 brew "coreutils"         # mise や Ruby の bundle install でも必要とするライブラリを含む。
 brew "openssl@3"
