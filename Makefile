@@ -7,6 +7,7 @@ all:
 #	sh ./.bin/setup_brew.sh
 #	sh ./.bin/link.sh
 #	sh ./.config/link.sh
+#	sh ./ghostty/link.sh
 #	sh ./.aws/link.sh
 #	sh ./mise/setup.sh
 
