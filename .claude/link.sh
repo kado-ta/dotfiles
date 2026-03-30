@@ -16,6 +16,7 @@ ln -snfv "${SCRIPT_DIR}/CLAUDE_.md" "${CLAUDE_DIR}/CLAUDE_.md"
 # hooks ディレクトリが存在しない場合は、ディレクトリを作成した上でシンボリックリンクを作成する。
 [ -d "${CLAUDE_DIR}/hooks" ] || mkdir -p "${CLAUDE_DIR}/hooks"
 ln -snfv "${SCRIPT_DIR}/hooks/validate-command.sh" "${CLAUDE_DIR}/hooks/validate-command.sh"
+ln -snfv "${SCRIPT_DIR}/hooks/protect-main-branch.sh" "${CLAUDE_DIR}/hooks/protect-main-branch.sh"
 
 [ -d "${CLAUDE_DIR}/scripts" ] || mkdir -p "${CLAUDE_DIR}/scripts"
 ln -snfv "${SCRIPT_DIR}/scripts/statusline.sh" "${CLAUDE_DIR}/scripts/statusline.sh"
