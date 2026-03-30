@@ -23,6 +23,7 @@ window-padding-color = extend
 working-directory = /Users/kado/Dev
 scrollback-limit = 10000
 shell-integration = zsh
+shell-integration-features = no-cursor
 
 # =============================================================================
 # macOS
@@ -35,9 +36,9 @@ macos-option-as-alt = left
 # =============================================================================
 # Cursor
 # =============================================================================
-cursor-color = bbbbbb
+cursor-color = #3fade5
 cursor-style = block
-cursor-style-blink = false
+cursor-style-blink = true
 
 # =============================================================================
 # Clipboard
@@ -53,13 +54,13 @@ clipboard-paste-protection = true
 background-opacity = 0.97
 
 # =============================================================================
-# Colors（iTerm2 "kado" プロファイルから移行）
+# Colors
 # =============================================================================
-background = 181d1f
-foreground = 8ea0b3
-bold-color = b5babf
-selection-background = 1a4d74
-selection-foreground = f4f7fa
+background = #181d1f
+foreground = #8ea0b3
+bold-color = #b5babf
+selection-background = #1a4d74
+selection-foreground = #f4f7fa
 
 palette = 0=#003440
 palette = 1=#ed5165
