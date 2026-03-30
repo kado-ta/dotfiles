@@ -30,6 +30,10 @@
       "Write(**/.eslintrc.*)",
       "Write(**/.tflint.hcl)"
     ],
+    "ask": [
+      "Bash(git push)",
+      "Bash(git push *)"
+    ],
     "allow": [
       "Bash(npm run *)",
       "Bash(pnpm *)",
