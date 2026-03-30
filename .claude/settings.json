@@ -35,6 +35,7 @@
       "Bash(git push *)"
     ],
     "allow": [
+      "Bash(gh *)",
       "Bash(npm run *)",
       "Bash(pnpm *)",
       "Bash(git status)",
@@ -117,6 +118,7 @@
   "sandbox": {
     "enabled": true,
     "allowUnsandboxedCommands": false,
+    "enableWeakerNetworkIsolation": true,
     "excludedCommands": [
       "gh"
     ],
