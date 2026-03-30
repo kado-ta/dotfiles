@@ -37,10 +37,12 @@ cask "coteditor"
 cask "docker-desktop"
 cask "dropbox"
 cask "figma"
+cask "font-fira-code"    # コーディング見やすいかわいいフォント
 cask "font-hackgen"      # Starship が必要とするフォント。
 cask "font-hackgen-nerd" # Starship が必要とするフォント。
 cask "google-chrome"
 cask "iterm2"
+cask "ghostty"
 cask "notion"
 cask "obsidian"
 cask "postman"
