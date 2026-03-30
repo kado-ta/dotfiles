@@ -3,34 +3,57 @@
   "permissions": {
     "deny": [
       "Bash(rm -rf *)",
-      "Bash(curl)",
+      "Bash(chmod *)",
+      "Bash(chown *)",
       "Bash(curl *)",
-      "Bash(wget)",
       "Bash(wget *)",
-      "Bash(git push)",
-      "Bash(git push *)",
       "Bash(git reset --hard *)",
-      "Bash(chmod 777 *)",
       "Bash(sudo *)",
-      "Read(./.env)",
-      "Read(./.env.*)",
+      "Read(**/.env*)",
+      "Read(**/id_rsa*)",
+      "Read(**/id_ed25519*)",
+      "Read(~/.ssh/**)",
+      "Read(**/.ssh/**)",
+      "Read(**/.aws/**)",
       "Read(./secrets/**)",
       "Read(./config/credentials/*.*)",
       "Read(**/*.key)",
       "Read(**/*.pem)",
-      "Read(~/.aws/credentials/**)",
-      "Read(~/.ssh/**)",
-      "Read(id_rsa)",
-      "Write(/etc/**)"
+      "Write(/etc/**)",
+      "Write(**/.env*)",
+      "Write(**/.git/config)",
+      "Write(**/package-lock.json)",
+      "Write(**/pnpm-lock.yaml)",
+      "Write(**/yarn.lock)",
+      "Write(**/biome.json)",
+      "Write(**/.eslintrc)",
+      "Write(**/.eslintrc.*)",
+      "Write(**/.tflint.hcl)"
+    ],
+    "ask": [
+      "Bash(git push)",
+      "Bash(git push *)"
     ],
     "allow": [
+      "Bash(gh *)",
       "Bash(npm run *)",
       "Bash(pnpm *)",
       "Bash(git status)",
       "Bash(git diff *)",
       "Read",
-      "Write",
-      "Edit"
+      "Write(app/**)",
+      "Write(src/**)",
+      "Write(docs/**)",
+      "Write(scripts/**)",
+      "Write(spec/**)",
+      "Write(test/**)",
+      "Write(tests/**)",
+      "Write(.tmp/**)",
+      "Write(.gitignore)",
+      "Write(*.md)",
+      "Write(*.config.*)",
+      "Write(package.json)",
+      "Write(tsconfig.json)"
     ],
     "disableBypassPermissionsMode": "disable"
   },
@@ -41,7 +64,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": ".claude/hooks/validate-command.sh"
+            "command": "~/.claude/hooks/validate-command.sh"
           }
         ]
       },
@@ -50,7 +73,29 @@
         "hooks": [
           {
             "type": "command",
-            "command": ".claude/hooks/protect-main-branch.sh"
+            "command": "~/.claude/hooks/protect-main-branch.sh"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r 'if (.tool_input.command // \"\" | test(\"gh pr create\")) then (.tool_response.stdout // \"\" | match(\"https://github\\\\.com/\\\\S+\") | .string) // empty else empty end' | { read -r url; [ -n \"$url\" ] && echo \"{\\\"systemMessage\\\": \\\"PR が作成されました: $url\\\"}\"; } 2>/dev/null || true"
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "terminal-notifier -title \"Claude Code\" -message \"入力待ちプロンプトが表示されました\" -sound default || true"
           }
         ]
       }
@@ -73,6 +118,7 @@
   "sandbox": {
     "enabled": true,
     "allowUnsandboxedCommands": false,
+    "enableWeakerNetworkIsolation": true,
     "excludedCommands": [
       "gh"
     ],
@@ -89,7 +135,8 @@
     "filesystem": {
       "denyRead": [
         "~/.aws/credentials",
-        "~/.ssh"
+        "~/.ssh/id_*",
+        "~/.ssh/config"
       ]
     }
   },
