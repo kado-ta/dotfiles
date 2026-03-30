@@ -73,6 +73,28 @@
         ]
       }
     ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r 'if (.tool_input.command // \"\" | test(\"gh pr create\")) then (.tool_response.stdout // \"\" | match(\"https://github\\\\.com/\\\\S+\") | .string) // empty else empty end' | { read -r url; [ -n \"$url\" ] && echo \"{\\\"systemMessage\\\": \\\"PR が作成されました: $url\\\"}\"; } 2>/dev/null || true"
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "terminal-notifier -title \"Claude Code\" -message \"入力待ちプロンプトが表示されました\" -sound default || true"
+          }
+        ]
+      }
+    ],
     "Stop": [
       {
         "hooks": [
