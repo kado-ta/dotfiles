@@ -135,7 +135,8 @@
     "filesystem": {
       "denyRead": [
         "~/.aws/credentials",
-        "~/.ssh"
+        "~/.ssh/id_*",
+        "~/.ssh/config"
       ]
     }
   },
