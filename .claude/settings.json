@@ -44,6 +44,15 @@
             "command": ".claude/hooks/validate-command.sh"
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/protect-main-branch.sh"
+          }
+        ]
       }
     ],
     "Stop": [
