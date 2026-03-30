@@ -12,8 +12,9 @@
     "editor.rulers": [
         110
     ],
-    "editor.fontFamily": "HackGen35Nerd, Menlo, Monaco, 'Courier New', monospace",
+    "editor.fontFamily": "Fira Code, HackGen35Nerd, Menlo, Monaco, 'Courier New', monospace",
     "editor.fontSize": 13,
+    "editor.fontLigatures": true,
     "editor.renderWhitespace": "all",
     "editor.tabSize": 2,
     "editor.formatOnType": true,
@@ -163,7 +164,7 @@
         "editor.defaultFormatter": "biomejs.biome",
         "editor.formatOnSave": true,
         "editor.codeActionsOnSave": {
-            "quickfix.biome": "explicit"
+            "source.fixAll.biome": "explicit"
         }
     },
     //

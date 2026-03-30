@@ -1,0 +1,79 @@
+# =============================================================================
+# Font
+# =============================================================================
+# HackGen Nerd は Starship のアイコン表示に必要）
+font-family = Fira Code, HackGen Console NF
+font-size = 12
+font-style = Regular
+font-feature = +calt
+font-feature = +liga
+
+# =============================================================================
+# Window
+# =============================================================================
+window-width = 180
+window-height = 60
+window-padding-x = 4
+window-padding-y = 4
+window-padding-color = extend
+
+# =============================================================================
+# Terminal
+# =============================================================================
+working-directory = /Users/kado/Dev
+scrollback-limit = 10000
+shell-integration = zsh
+
+# =============================================================================
+# macOS
+# =============================================================================
+macos-titlebar-style = transparent
+# bindkey -e（emacs キーバインド）で Option+key を Alt として使うために必要
+# 右 Option は macOS の記号入力（例: @, []）に使えるよう left のみ有効化
+macos-option-as-alt = left
+
+# =============================================================================
+# Cursor
+# =============================================================================
+cursor-color = bbbbbb
+cursor-style = block
+cursor-style-blink = false
+
+# =============================================================================
+# Clipboard
+# =============================================================================
+copy-on-select = clipboard
+clipboard-trim-trailing-spaces = true
+clipboard-paste-bracketed-safe = true
+clipboard-paste-protection = true
+
+# =============================================================================
+# Visual
+# =============================================================================
+background-opacity = 0.97
+
+# =============================================================================
+# Colors（iTerm2 "kado" プロファイルから移行）
+# =============================================================================
+background = 181d1f
+foreground = 8ea0b3
+bold-color = b5babf
+selection-background = 1a4d74
+selection-foreground = f4f7fa
+
+palette = 0=#003440
+palette = 1=#ed5165
+palette = 2=#6dc04c
+palette = 3=#b58900
+palette = 4=#3fade5
+palette = 5=#e07bff
+palette = 6=#5c87b1
+palette = 7=#e2e2e2
+palette = 8=#002833
+palette = 9=#e9244f
+palette = 10=#1b9d00
+palette = 11=#d7a301
+palette = 12=#0084cb
+palette = 13=#b333e1
+palette = 14=#006ba5
+palette = 15=#e7e7e7
