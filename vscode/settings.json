@@ -222,9 +222,6 @@
         "editor.wordWrap": "off"
     },
     "markdown-pdf.mermaidServer": "https://unpkg.com/mermaid@10.4.0/dist/mermaid.js",
-    "workbench.editorAssociations": {
-        "*.md": "vscode.markdown.preview.editor"
-    },
     "[json]": {
         "editor.defaultFormatter": null
     },
