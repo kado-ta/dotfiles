@@ -26,4 +26,13 @@ else
 	claude plugins install superpowers@claude-plugins-official
 fi
 
+# Install gstack
+GSTACK_DIR="${CLAUDE_DIR}/skills/gstack"
+if [ -d "${GSTACK_DIR}" ]; then
+	echo "gstack already installed, skipping"
+else
+	git clone --single-branch --depth 1 https://github.com/garrytan/gstack.git "${GSTACK_DIR}"
+	"${GSTACK_DIR}/setup"
+fi
+
 echo "Success!"
