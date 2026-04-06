@@ -14,12 +14,11 @@ ln -snfv "${SCRIPT_DIR}/settings.json" "${CLAUDE_DIR}/settings.json"
 ln -snfv "${SCRIPT_DIR}/CLAUDE_.md" "${CLAUDE_DIR}/CLAUDE_.md"
 
 ln -snfv "${SCRIPT_DIR}/hooks" "${CLAUDE_DIR}/hooks"
-ln -snfv "${SCRIPT_DIR}/skills" "${CLAUDE_DIR}/skills"
 
 [ -d "${CLAUDE_DIR}/scripts" ] || mkdir -p "${CLAUDE_DIR}/scripts"
 ln -snfv "${SCRIPT_DIR}/scripts/statusline.sh" "${CLAUDE_DIR}/scripts/statusline.sh"
 
-# Install plugins
+# Install superpowers
 if claude plugins list 2>/dev/null | grep -q "superpowers@claude-plugins-official"; then
 	echo "superpowers plugin already installed, skipping"
 else
@@ -28,6 +27,7 @@ fi
 
 # Install gstack
 GSTACK_DIR="${CLAUDE_DIR}/skills/gstack"
+[ -d "${CLAUDE_DIR}/skills" ] || mkdir -p "${CLAUDE_DIR}/skills"
 if [ -d "${GSTACK_DIR}" ]; then
 	echo "gstack already installed, skipping"
 else
