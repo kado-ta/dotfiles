@@ -21,6 +21,7 @@ window-padding-color = extend
 # Terminal
 # =============================================================================
 working-directory = /Users/kado/Dev
+window-inherit-working-directory = false
 scrollback-limit = 10000
 shell-integration = zsh
 shell-integration-features = no-cursor

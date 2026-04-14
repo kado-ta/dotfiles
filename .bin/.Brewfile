@@ -1,6 +1,7 @@
 # Usage: Mac 移行直後は、ホームディレクトリへこのファイルをコピーして、 `brew bundle` コマンドを実行する。
 tap "1password/tap"      # 1Password CLI
-tap "homebrew/bundle"    #
+tap "homebrew/bundle"
+tap "oven-sh/bun"        # bun コマンド
 tap "yukiarrr/tap"       # ecsk コマンド
 
 brew "biome"             # Biome: Linter & Formatter for JavaScript / TypeScript
@@ -25,6 +26,7 @@ brew "telnet"            # RTX ルーターへの接続に使用する。
 brew "terminal-notifier" # macOS の通知センターへ通知を送信する
 brew "tree"              # ディレクトリ構造をツリー表示する。
 brew "zsh"               # Zsh は Mac デフォルトを使用せず、 Homebrew でインストールする。
+brew "bun"               # bun コマンド
 brew "yukiarrr/tap/ecsk" # AWS ECS への SSH を簡単にするコマンド。
 
 cask "1password"

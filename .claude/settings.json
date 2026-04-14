@@ -2,13 +2,18 @@
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "permissions": {
     "deny": [
+      "Bash(sudo *)",
       "Bash(rm -rf *)",
       "Bash(chmod *)",
       "Bash(chown *)",
       "Bash(curl *)",
       "Bash(wget *)",
+      "Bash(cat **)",
       "Bash(git reset --hard *)",
-      "Bash(sudo *)",
+      "Bash(sfdx org:deploy *)",
+      "Bash(sf deploy *)",
+      "Bash(terraform apply *)",
+      "Bash(terraform destroy *)",
       "Read(**/.env*)",
       "Read(**/id_rsa*)",
       "Read(**/id_ed25519*)",
@@ -16,9 +21,10 @@
       "Read(**/.ssh/**)",
       "Read(**/.aws/**)",
       "Read(./secrets/**)",
-      "Read(./config/credentials/*.*)",
+      "Read(**/credentials/**)",
       "Read(**/*.key)",
       "Read(**/*.pem)",
+      "Read(**/.pgpass)",
       "Write(/etc/**)",
       "Write(**/.env*)",
       "Write(**/.git/config)",
@@ -31,6 +37,18 @@
       "Write(**/.tflint.hcl)"
     ],
     "ask": [
+      "Bash(gh pr create*)",
+      "Bash(gh pr merge*)",
+      "Bash(gh pr close*)",
+      "Bash(gh pr edit*)",
+      "Bash(gh pr review*)",
+      "Bash(gh pr comment*)",
+      "Bash(gh issue create*)",
+      "Bash(gh issue close*)",
+      "Bash(gh issue comment*)",
+      "Bash(gh issue edit*)",
+      "Bash(gh release create*)",
+      "Bash(gh release delete*)",
       "Bash(git push)",
       "Bash(git push *)"
     ],
@@ -40,6 +58,8 @@
       "Bash(pnpm *)",
       "Bash(git status)",
       "Bash(git diff *)",
+      "Bash(sfdx *)",
+      "Bash(sf *)",
       "Read",
       "Write(app/**)",
       "Write(src/**)",
@@ -53,7 +73,52 @@
       "Write(*.md)",
       "Write(*.config.*)",
       "Write(package.json)",
-      "Write(tsconfig.json)"
+      "Write(tsconfig.json)",
+      "WebFetch(domain:aws.amazon.com)",
+      "WebFetch(domain:awscli.amazonaws.com)",
+      "WebFetch(domain:docs.aws.amazon.com)",
+      "WebFetch(domain:repost.aws)",
+      "WebFetch(domain:docs.cloud.google.com)",
+      "WebFetch(domain:support.google.com)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:api.github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:registry.terraform.io)",
+      "WebFetch(domain:registry.circleci.com)",
+      "WebFetch(domain:circleci.com)",
+      "WebFetch(domain:go.dev)",
+      "WebFetch(domain:code.claude.com)",
+      "WebFetch(domain:www.hashicorp.com)",
+      "WebFetch(domain:datatracker.ietf.org)",
+      "WebFetch(domain:tools.ietf.org)",
+      "WebFetch(domain:www.iana.org)",
+      "WebFetch(domain:www.icann.org)",
+      "WebFetch(domain:techracho.bpsinc.jp)",
+      "WebFetch(domain:dev.classmethod.jp)",
+      "WebFetch(domain:nextjs.org)",
+      "WebFetch(domain:vercel.com)",
+      "WebFetch(domain:zenn.dev)",
+      "WebFetch(domain:qiita.com)",
+      "WebFetch(domain:yarnpkg.com)",
+      "WebFetch(domain:www.npmjs.com)",
+      "WebFetch(domain:pnpm.io)",
+      "WebFetch(domain:biomejs.dev)",
+      "WebFetch(domain:www.ruby-lang.org)",
+      "WebFetch(domain:railsguides.jp)",
+      "WebFetch(domain:rubyonrails.org)",
+      "WebFetch(domain:rubyapi.org)",
+      "WebFetch(domain:docs.rubocop.org)",
+      "WebFetch(domain:rubocop.org)",
+      "WebFetch(domain:rubygems.org)",
+      "WebFetch(domain:nodejs.org)",
+      "WebFetch(domain:ja.react.dev)",
+      "WebFetch(domain:react.dev)",
+      "WebFetch(domain:www.typescriptlang.org)",
+      "WebFetch(domain:mise.jdx.dev)",
+      "WebFetch(domain:docs.docker.com)",
+      "WebFetch(domain:docs.python.org)",
+      "WebFetch(domain:www.openapis.org)",
+      "WebFetch(domain:redocly.com)"
     ],
     "disableBypassPermissionsMode": "disable"
   },
@@ -96,6 +161,17 @@
           {
             "type": "command",
             "command": "terminal-notifier -title \"Claude Code\" -message \"入力待ちプロンプトが表示されました\" -sound default || true"
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/precompact-context.sh"
           }
         ]
       }
