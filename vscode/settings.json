@@ -39,7 +39,8 @@
     "files.associations": {
         "*.painless": "groovy",
         "*.schema": "ruby",
-        "*.html.erb": "erb"
+        "*.html.erb": "erb",
+        "**/skills/**/SKILL.md": "markdown"
     },
     "files.watcherExclude": {
         "/vendor/bundle/**": true,
