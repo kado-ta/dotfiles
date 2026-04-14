@@ -12,7 +12,7 @@ echo "SCRIPT_DIR: $SCRIPT_DIR"
 echo "CLAUDE_DIR: $CLAUDE_DIR"
 
 ln -snfv "${SCRIPT_DIR}/settings.json" "${CLAUDE_DIR}/settings.json"
-ln -snfv "${SCRIPT_DIR}/CLAUDE_.md" "${CLAUDE_DIR}/CLAUDE_.md"
+ln -snfv "${SCRIPT_DIR}/CLAUDE.md" "${CLAUDE_DIR}/CLAUDE.md"
 
 if [ -d "${CLAUDE_DIR}/hooks" ] && [ ! -L "${CLAUDE_DIR}/hooks" ]; then
   echo "Removing existing Claude Code hooks directory: ${CLAUDE_DIR}/hooks"
@@ -37,7 +37,16 @@ if [ -d "${GSTACK_DIR}" ]; then
   echo "gstack already installed, skipping"
 else
   git clone --single-branch --depth 1 https://github.com/garrytan/gstack.git "${GSTACK_DIR}"
-  bash "${GSTACK_DIR}/setup"
+  # "${GSTACK_DIR}/setup" は GSTACK_DIR 内で実行しないと正常終了しない。
+  # サブシェル (...) 内での cd はスクリプト本体のカレントディレクトリに影響しない。
+  (cd "${GSTACK_DIR}" && ./setup)
 fi
+
+# Link personal skills (global, available in all projects)
+for skill_dir in "${SCRIPT_DIR}/skills"/*/; do
+  [ -d "$skill_dir" ] || continue
+  skill_name=$(basename "${skill_dir}")
+  ln -snfv "${skill_dir}" "${CLAUDE_DIR}/skills/${skill_name}"
+done
 
 echo "Success!"
