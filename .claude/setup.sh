@@ -12,7 +12,7 @@ echo "SCRIPT_DIR: $SCRIPT_DIR"
 echo "CLAUDE_DIR: $CLAUDE_DIR"
 
 ln -snfv "${SCRIPT_DIR}/settings.json" "${CLAUDE_DIR}/settings.json"
-ln -snfv "${SCRIPT_DIR}/CLAUDE_.md" "${CLAUDE_DIR}/CLAUDE_.md"
+ln -snfv "${SCRIPT_DIR}/CLAUDE.md" "${CLAUDE_DIR}/CLAUDE.md"
 ln -snfv "${SCRIPT_DIR}/docs" "${CLAUDE_DIR}/docs"
 
 if [ -d "${CLAUDE_DIR}/hooks" ] && [ ! -L "${CLAUDE_DIR}/hooks" ]; then
