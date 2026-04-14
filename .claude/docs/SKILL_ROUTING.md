@@ -31,4 +31,4 @@
 > 次のステップ: **{次のスキル名}** を使います。
 > 進めてよいですか？」
 
-詳細なフロー・プロンプト例は `docs/gstack-superpowers-cheatsheet.md` を参照。
+詳細なフロー・プロンプト例は `.claude/docs/SKILL_ROUTING_README.md` を参照。
