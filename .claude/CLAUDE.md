@@ -197,3 +197,8 @@ Claude は変更時に以下の形式で要約すること。
 ## gstack
 - すべてのウェブブラウジングに gstack の `/browse` スキルを使用すること。
 - `mcp__claude-in-chrome__*` ツールは絶対に使用しないこと.
+
+---
+
+## Skill routing
+@SKILL_ROUTING.md
