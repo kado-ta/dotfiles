@@ -3,10 +3,14 @@
   "tasks": [
     {
       "label": "Open current Markdown in Typora",
-      "type": "shell",
+      "type": "process",
       "command": "open",
       "args": ["-a", "Typora", "${file}"],
-      "problemMatcher": []
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "never",
+        "close": true
+      }
     }
   ]
 }
