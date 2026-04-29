@@ -30,6 +30,13 @@ else
   claude plugins install superpowers@claude-plugins-official
 fi
 
+# Install claude-code-setup
+if claude plugins list 2>/dev/null | grep -q " claude-code-setup@claude-plugins-official$"; then
+  echo "claude-code-setup plugin already installed, skipping"
+else
+  claude plugins install claude-code-setup@claude-plugins-official
+fi
+
 # Install gstack
 GSTACK_DIR="${CLAUDE_DIR}/skills/gstack"
 [ -d "${CLAUDE_DIR}/skills" ] || mkdir -p "${CLAUDE_DIR}/skills"
