@@ -19,6 +19,7 @@ brew "jq"                # JSON データの加工／整形コマンド。
 brew "libyaml"
 brew "mise"              # 言語やツールのバージョンを管理する。
 brew "mysql@8.0"         # MySQL クライアント。バージョンをアプリケーションで使用中の MySQL 8.0 に合わせる。
+brew "pandoc"            # Typora で Markdown ファイルを他形式でエクスポートするために使用する。
 brew "pinentry-mac"      # Terraform で IAM ユーザーを管理するための GPG キー発行に使用する。
 brew "sheldon"           # シェルのライブラリを管理する。
 brew "starship"          # シェル用プロンプト。高速でカスタマイズ性が高い。
@@ -43,8 +44,8 @@ cask "figma"
 cask "font-fira-code"    # コーディング見やすいかわいいフォント
 cask "font-hackgen"      # Starship が必要とするフォント。
 cask "font-hackgen-nerd" # Starship が必要とするフォント。
-cask "google-chrome"
 cask "ghostty"
+cask "google-chrome"
 cask "notion"
 cask "obsidian"
 cask "postman"
