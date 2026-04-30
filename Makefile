@@ -18,6 +18,7 @@ brew/deps/show:
 # Homebrew でインストール中のパッケージを Brewfile としてリスト抽出する。
 # このコマンドで生成される Brewfile をベースに .Brewfile を最新化する。
 brew/dump:
+	rm -rf Brewfile
 	brew bundle dump
 
 # VSCode 拡張のリスト最新化する。
