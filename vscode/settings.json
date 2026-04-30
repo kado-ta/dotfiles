@@ -246,5 +246,6 @@
     "claudeCode.preferredLocation": "panel",
     // --------------------------------------------------------------------
     // ローカルファイルプロトコルの扱いに対する確認ダイアログを表示しない。
-    "security.promptForLocalFileProtocolHandling": false
+    "security.promptForLocalFileProtocolHandling": false,
+    "workbench.startupEditor": "none"
 }
