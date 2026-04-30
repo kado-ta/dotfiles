@@ -1,58 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
-  "theme": "dark-ansi",
   "permissions": {
-    "deny": [
-      "Bash(sudo *)",
-      "Bash(rm -rf *)",
-      "Bash(chmod *)",
-      "Bash(chown *)",
-      "Bash(curl *)",
-      "Bash(wget *)",
-      "Bash(cat **)",
-      "Bash(git reset --hard *)",
-      "Bash(sfdx org:deploy *)",
-      "Bash(sf deploy *)",
-      "Bash(terraform apply *)",
-      "Bash(terraform destroy *)",
-      "Read(**/.env*)",
-      "Read(**/id_rsa*)",
-      "Read(**/id_ed25519*)",
-      "Read(~/.ssh/**)",
-      "Read(**/.ssh/**)",
-      "Read(**/.aws/**)",
-      "Read(./secrets/**)",
-      "Read(**/credentials/**)",
-      "Read(**/*.key)",
-      "Read(**/*.pem)",
-      "Read(**/.pgpass)",
-      "Write(/etc/**)",
-      "Write(**/.env*)",
-      "Write(**/.git/config)",
-      "Write(**/package-lock.json)",
-      "Write(**/pnpm-lock.yaml)",
-      "Write(**/yarn.lock)",
-      "Write(**/biome.json)",
-      "Write(**/.eslintrc)",
-      "Write(**/.eslintrc.*)",
-      "Write(**/.tflint.hcl)"
-    ],
-    "ask": [
-      "Bash(gh pr create*)",
-      "Bash(gh pr merge*)",
-      "Bash(gh pr close*)",
-      "Bash(gh pr edit*)",
-      "Bash(gh pr review*)",
-      "Bash(gh pr comment*)",
-      "Bash(gh issue create*)",
-      "Bash(gh issue close*)",
-      "Bash(gh issue comment*)",
-      "Bash(gh issue edit*)",
-      "Bash(gh release create*)",
-      "Bash(gh release delete*)",
-      "Bash(git push)",
-      "Bash(git push *)"
-    ],
     "allow": [
       "Bash(gh *)",
       "Bash(npm run *)",
@@ -120,6 +68,57 @@
       "WebFetch(domain:docs.python.org)",
       "WebFetch(domain:www.openapis.org)",
       "WebFetch(domain:redocly.com)"
+    ],
+    "deny": [
+      "Bash(sudo *)",
+      "Bash(rm -rf *)",
+      "Bash(chmod *)",
+      "Bash(chown *)",
+      "Bash(curl *)",
+      "Bash(wget *)",
+      "Bash(cat **)",
+      "Bash(git reset --hard *)",
+      "Bash(sfdx org:deploy *)",
+      "Bash(sf deploy *)",
+      "Bash(terraform apply *)",
+      "Bash(terraform destroy *)",
+      "Read(**/.env*)",
+      "Read(**/id_rsa*)",
+      "Read(**/id_ed25519*)",
+      "Read(~/.ssh/**)",
+      "Read(**/.ssh/**)",
+      "Read(**/.aws/**)",
+      "Read(./secrets/**)",
+      "Read(**/credentials/**)",
+      "Read(**/*.key)",
+      "Read(**/*.pem)",
+      "Read(**/.pgpass)",
+      "Write(/etc/**)",
+      "Write(**/.env*)",
+      "Write(**/.git/config)",
+      "Write(**/package-lock.json)",
+      "Write(**/pnpm-lock.yaml)",
+      "Write(**/yarn.lock)",
+      "Write(**/biome.json)",
+      "Write(**/.eslintrc)",
+      "Write(**/.eslintrc.*)",
+      "Write(**/.tflint.hcl)"
+    ],
+    "ask": [
+      "Bash(gh pr create*)",
+      "Bash(gh pr merge*)",
+      "Bash(gh pr close*)",
+      "Bash(gh pr edit*)",
+      "Bash(gh pr review*)",
+      "Bash(gh pr comment*)",
+      "Bash(gh issue create*)",
+      "Bash(gh issue close*)",
+      "Bash(gh issue comment*)",
+      "Bash(gh issue edit*)",
+      "Bash(gh release create*)",
+      "Bash(gh release delete*)",
+      "Bash(git push)",
+      "Bash(git push *)"
     ],
     "disableBypassPermissionsMode": "disable"
   },
@@ -192,13 +191,13 @@
     "type": "command",
     "command": "~/.claude/scripts/statusline.sh"
   },
+  "enabledPlugins": {
+    "superpowers@claude-plugins-official": true,
+    "claude-code-setup@claude-plugins-official": true
+  },
   "sandbox": {
     "enabled": true,
     "allowUnsandboxedCommands": false,
-    "enableWeakerNetworkIsolation": true,
-    "excludedCommands": [
-      "gh"
-    ],
     "network": {
       "allowedDomains": [
         "github.com",
@@ -215,10 +214,11 @@
         "~/.ssh/id_*",
         "~/.ssh/config"
       ]
-    }
+    },
+    "enableWeakerNetworkIsolation": true,
+    "excludedCommands": [
+      "gh"
+    ]
   },
-  "enabledPlugins": {
-    "superpowers@claude-plugins-official": true,
-    "claude-code-setup@claude-plugins-official": true
-  }
+  "theme": "dark-ansi"
 }
