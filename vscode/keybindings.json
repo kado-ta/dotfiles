@@ -10,5 +10,13 @@
     "command": "workbench.action.tasks.runTask",
     "args": "Open current Markdown in Typora",
     "when": "editorTextFocus"
-  }
+},
+{
+    "key": "shift+enter",
+    "command": "workbench.action.terminal.sendSequence",
+    "args": {
+        "text": "\u001b\r"
+    },
+    "when": "terminalFocus"
+}
 ]
