@@ -37,16 +37,25 @@
 ---
 
 ## Output Format for Changes
-変更時: **What changed** / **Why** / **Impact** / **Validation** の4項目で要約すること。
+以下のいずれかに該当する変更時は **What changed** / **Why** / **Impact** / **Validation** の 4 項目で要約する:
+- 設計判断を含む変更
+- 複数ファイル（2 ファイル以上）にまたがる変更
+- 公開 API・スキーマ・設定ファイルの変更
+- セキュリティ・認証・破壊的操作を含む変更
+
+軽微な変更（typo 修正、1 ファイル内のリネーム、コメント追記など）は 1〜2 行で簡潔に報告すれば足りる。
 
 ---
 
 ## Git / GitHub Rules
-- **CRITICAL**: main / master / staging への直接コミット禁止。コミット前に `git branch --show-current` 確認必須。
+- **CRITICAL**: main / master / staging への直接コミット禁止。`hooks/protect-main-branch.sh` が PreToolUse でブロックする実装になっているが、Claude 側でも commit 前にブランチを意識すること。
 - コミットメッセージは英語・[Conventional Commits](https://www.conventionalcommits.org/ja/v1.0.0/) 形式（`feat:` `fix:` `refactor:` `test:` `docs:` `chore:`）。
 - 大きな変更は論理単位で分ける。自動生成ファイルの変更は理由を明記する。
 - GitHub 操作はすべて `gh` コマンドを使用（MCP 経由禁止）。
-- PR 作成前にテスト・lint を実施すること。PR 本文は日本語で書く。
+- PR 作成前にテスト・lint を実施すること。
+- PR 本文の言語はプロジェクトの慣習に合わせる:
+  - 社内・個人リポジトリ: 日本語をデフォルトとする。
+  - OSS・対外プロジェクト: 既存 PR の言語に合わせる（不明な場合は英語）。
 - CI/CD がある場合、PR 作成後に `gh pr checks` でステータスを確認して完了とする。
 
 ---
@@ -57,16 +66,22 @@
 ---
 
 ## Compaction policy
-コンテキスト圧縮時は、下記を必ず保持:
-- 変更したファイルの一覧
-- 実行したテストコマンドとその結果
-- 未完了の TODO
+コンテキスト圧縮 (PreCompact) 時、`hooks/precompact-context.sh` が以下を自動的に渡す:
+- 現在のブランチ名
+- 未コミット変更（`git status --short` の先頭 20 行）
+- 直近 5 件のコミット
+
+加えて Claude 自身が要約に必ず保持すべき情報:
+- 実行したテスト・lint・型チェックコマンドとその結果
+- 未完了の TODO と次のアクション
+- 直前にユーザーから受けた判断・指示（推測ではなく確定情報）
 
 ---
 
 ## gstack
-- すべてのウェブブラウジングに gstack の `/browse` スキルを使用すること。
-- `mcp__claude-in-chrome__*` ツールは絶対に使用しないこと.
+- 対話型ブラウジング（クリック・フォーム入力・スクリーンショット・QA・ログイン後の状態確認）には gstack の `/browse` スキルを使用する。
+- 静的なドキュメント参照（公式ドキュメント・MDN・GitHub README など、URL を開いて読むだけ）は `WebFetch` を使ってよい。`settings.json` の allow リストに登録されたドメインに限る。
+- `mcp__claude-in-chrome__*` ツールは絶対に使用しないこと。
 
 ---
 
@@ -123,33 +138,50 @@ Claude Code が判断に迷ったら自発的に提案:
 ### 運用ルール
 - **信頼境界**: Codex 出力はそのままコミットしない。要約は該当 file:line を直接 Read で再確認、実装 diff は `/codex review` 必須。
 - **ループ防止**: 1 タスクで `/codex consult` は最大 2 回。3 回目は人間判断を仰ぐ。
-- **フォールバック**: `codex` CLI が exit code ≠ 0、または 60 秒以内に応答が無い場合は Claude 直接実行へ切り替え、原因をユーザーへ報告。
+- **フォールバック**: `codex` CLI が exit code ≠ 0、または下記タイムアウト内に応答が無い場合は Claude 直接実行へ切り替え、原因をユーザーへ報告:
+  - [A] 読込委譲 / [D] 相談: 120 秒
+  - [B] 限定実装委譲: 300 秒
+  - [C] レビュー: 600 秒
 - **可視化**: Codex 委譲時は 1 行で報告（例: `[Codex委譲A] xxx.log (3200 行) を要約依頼します`）。
 
 ---
 
 ## Skill Routing
-ユーザーのリクエストが届いたら、まずシーンを判定してから起点スキルを呼ぶ。
-直接回答・他ツール先行は禁止。スキルには専用ワークフローがあり、その場しのぎの回答より優れた結果を生む。
+ユーザーのリクエストが届いたら、まずシーンを判定してから起点スキルを呼ぶ。スキルには専用ワークフローがあり、その場しのぎの回答より優れた結果を生む。
+
+ただし以下は直接回答可（スキル起動不要）:
+- シーン判定表のどの行にも該当しない単発の質問（例: 「このファイルの何行目に X がある？」「この変数の型は？」）
+- 既存ファイルの確認・閲覧のみで完結する依頼
+- ユーザーが明示的にスキル起動を不要と指示した場合
+
+それ以外でシーン判定表に該当する場合は、必ず起点スキルを呼ぶ。
 
 ### シーン判定ルール
-動詞で判断する:
-- 新規追加系（作る・追加・実装・追加したい・作りたい）→ 新機能開発
-- 修正系（直す・修正する・壊れた・エラー・動かない・失敗する・〜になっている）→ バグ修正
-- どちらにも当てはまらない → 実装を始める前に確認する:
-  「これは新機能の追加ですか、それとも既存の不具合修正ですか？」
+動詞で判断する。**判定が衝突する場合は下記の優先順位で解決**する:
+
+1. **UI/Design 関連語**（見た目・デザイン・レイアウト・スタイル・Figma・CSS・コンポーネント外観）が含まれる場合は、動詞が修正系でも **UI/Design 改善** を優先する。
+2. **レビュー・デプロイ系**（レビュー・PR・ship・デプロイ・マージ）が含まれる場合は、新規/修正よりもそちらを優先する。
+3. それ以外は動詞で判断する:
+   - 新規追加系（作る・追加・実装・追加したい・作りたい）→ 新機能開発
+   - 修正系（直す・修正する・壊れた・エラー・動かない・失敗する・〜になっている）→ バグ修正
+     - 画面表示・ブラウザ操作・レンダリングが原因のバグは **バグ修正（UI/ブラウザ起因）** = `/investigate` を起点に使う。
+     - それ以外のサーバー・CLI・ロジック起因は **バグ修正（非UI）** = `superpowers:systematic-debugging` を起点に使う。
+4. どれにも当てはまらない → 実装を始める前に確認する:
+   「これは新機能の追加ですか、それとも既存の不具合修正ですか？」
 
 ### シーン判定表
 
 | シーン | 日本語トリガー例 | 起点スキル | 連鎖先（完了後に提示） |
 |---|---|---|---|
 | 新機能開発 | 〜を作りたい / 〜を追加したい / 〜機能を実装 | `superpowers:brainstorming` | writing-plans → TDD → **code-style** → verification → /ship |
-| バグ修正 | 壊れた / エラーになる / 動かない / 〜が失敗する | `superpowers:systematic-debugging` | /investigate（UI起因時）→ TDD → **code-style** → verification → /ship |
+| バグ修正（非UI） | サーバーエラー / API が失敗する / CLI が動かない / ロジックが壊れた | `superpowers:systematic-debugging` | TDD → **code-style** → verification → /ship |
+| バグ修正（UI/ブラウザ起因） | 画面表示が崩れる / クリックできない / フォーム送信失敗 / レンダリングが壊れた | `/investigate` | TDD → **code-style** → verification → /ship |
 | UI/Design改善 | 見た目を直したい / デザインを変えたい / Figma通りに | `superpowers:writing-plans` | executing-plans → /design-review → /qa → verification → /ship |
 | PRレビュー | レビューして / 差分を確認 / マージ前チェック | `superpowers:requesting-code-review` | /review → receiving-code-review（指摘あり時）|
 | デプロイ・PR作成 | shipして / PRを出して / デプロイ | `superpowers:verification-before-completion` | /ship → /land-and-deploy |
 | リファクタリング | リファクタ / 整理 / 責務分離 | `superpowers:brainstorming` | writing-plans → using-git-worktrees → executing-plans → verification |
-| 定期品質チェック | retro / 振り返り / セキュリティ監査 | `/retro` or `/cso` | — |
+| 振り返り | retro / 振り返り / 週次まとめ / 何を出荷したか | `/retro` | — |
+| セキュリティ監査 | セキュリティ監査 / 脆弱性チェック / 攻撃面確認 / OWASP | `/cso` | — |
 
 > **Codex 連携**: 各シーンで [Codex Offload Rules](#codex-offload-rules) を参照し、読込 (A) / 限定実装 (B) / レビュー (C) / 相談 (D) を適切に委譲すること。
 
