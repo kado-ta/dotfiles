@@ -12,17 +12,28 @@ Claude への日本語指示から、Superpowers・gstack の適切なスキル�
 
 ---
 
+## シーン判定の優先順位
+
+CLAUDE.md の `Skill Routing > シーン判定ルール` を要約:
+
+1. **UI/Design 関連語**（見た目・デザイン・レイアウト・スタイル・Figma・CSS・コンポーネント外観）が含まれる場合は、動詞が修正系でも **UI/Design 改善**（シーン 3）を優先。
+2. **レビュー・デプロイ系**（レビュー・PR・ship・デプロイ・マージ）が含まれる場合は、新規/修正よりもそちらを優先（シーン 4 or 5）。
+3. それ以外は動詞で判断（新規 → シーン 1、修正 → シーン 2）。
+4. どれにも該当しない単発質問は直接回答可。
+
 ## シーン一覧
 
 | # | シーン | 起点スキル | 連鎖フロー |
 |---|---|---|---|
 | 1 | [新機能開発](#1-新機能開発) | `superpowers:brainstorming` | → writing-plans → TDD → verification → /ship |
-| 2 | [バグ修正](#2-バグ修正) | `superpowers:systematic-debugging` | → /investigate → TDD → verification → /ship |
+| 2a | [バグ修正（非UI）](#2-バグ修正) | `superpowers:systematic-debugging` | → TDD → verification → /ship |
+| 2b | [バグ修正（UI/ブラウザ起因）](#2-バグ修正) | `/investigate` | → TDD → verification → /ship |
 | 3 | [UI/Design改善](#3-uidesign改善figma起点) | `superpowers:writing-plans` | → executing-plans → /design-review → /qa → verification → /ship |
 | 4 | [PRコードレビュー](#4-prコードレビュー) | `superpowers:requesting-code-review` | → /review → receiving-code-review |
 | 5 | [デプロイ・PR作成](#5-デプロイpr作成) | `superpowers:verification-before-completion` | → /ship → /land-and-deploy |
 | 6 | [リファクタリング](#6-リファクタリング) | `superpowers:brainstorming` | → writing-plans → using-git-worktrees → executing-plans → verification |
-| 7 | [定期品質チェック](#7-定期的な品質チェック) | `/retro` or `/cso` | — |
+| 7a | [振り返り](#7-定期的な品質チェック) | `/retro` | — |
+| 7b | [セキュリティ監査](#7-定期的な品質チェック) | `/cso` | — |
 
 ---
 
@@ -88,30 +99,34 @@ Claude への日本語指示から、Superpowers・gstack の適切なスキル�
 
 > バグ報告 → 原因調査 → 修正 → 回帰テスト → デプロイ
 
+起点スキルは**バグの発生層**で分岐する:
+
+| 分岐 | 適用条件 | 起点スキル |
+|---|---|---|
+| 2a 非UI | サーバーエラー / API 失敗 / CLI が動かない / ロジック・データ層の不具合 | `superpowers:systematic-debugging` |
+| 2b UI/ブラウザ起因 | 画面表示崩れ / クリック不可 / フォーム送信失敗 / レンダリング異常 | `/investigate` |
+
+判別がつかない場合は症状を見直し、ブラウザを開かないと再現できないなら 2b、コンソール/ログで完結するなら 2a。
+
 ### Step 1: 原因調査
 
-- **起点スキル:** `superpowers:systematic-debugging`
-- **渡す情報:** バグの症状・再現手順・発生環境・関連ファイル
-- **プロンプト例:**
+- **起点スキル:** 上表に従って `superpowers:systematic-debugging` または `/investigate`
+- **渡す情報:** バグの症状・再現手順・発生環境・関連ファイル（2b の場合は URL も）
+- **プロンプト例（2a 非UI）:**
   ```
   以下のバグを調査してください。
   症状: [〇〇をすると〇〇になる]
   再現手順: [手順]
   関連ファイル: [ファイルパス]
   ```
+- **プロンプト例（2b UI/ブラウザ起因）:**
+  ```
+  /investigate [URL] で [操作] を行い、コンソールエラー・ネットワークエラー・
+  レンダリング状態を収集してください。
+  ```
 - **注意点:** 原因を仮定して修正を始めない。根本原因を特定するまで実装に進まない。
 
-### Step 2: ブラウザ上での動作確認（UI起因の場合）
-
-- **スキル:** `/investigate`
-- **渡す情報:** バグが発生するURL・操作手順
-- **プロンプト例:**
-  ```
-  /investigate [URL] で [操作] を行い、コンソールエラー・ネットワークエラーを収集してください。
-  ```
-- **注意点:** サーバーサイド起因のバグには不要。UIやAPIレスポンスに関わるバグで有効。
-
-### Step 3: 回帰テストを先に書く
+### Step 2: 回帰テストを先に書く
 
 - **スキル:** `superpowers:test-driven-development`
 - **プロンプト例:**
@@ -120,7 +135,7 @@ Claude への日本語指示から、Superpowers・gstack の適切なスキル�
   ```
 - **注意点:** テストがRedになることを確認してから修正コードを書く。修正後にGreenになることを確認。
 
-### Step 4: 完了確認・PR作成・デプロイ
+### Step 3: 完了確認・PR作成・デプロイ
 
 - **スキル:** `superpowers:verification-before-completion` → `/ship` → `/land-and-deploy`
 - **注意点:** 修正が他の機能に影響していないか（デグレ）を必ず確認。
@@ -254,30 +269,35 @@ Claude への日本語指示から、Superpowers・gstack の適切なスキル�
 
 ## 7. 定期的な品質チェック
 
-> 振り返り → セキュリティ監査 → パフォーマンス計測 → QAレポート → 学習記録
+振り返り (7a) とセキュリティ監査 (7b) は独立したルーチン。トリガー語で分岐する。
+パフォーマンス計測・QA レポート・学習記録は補助スキルとして必要に応じて追加実行する。
 
-### Step 1: 振り返り（週次・スプリント単位）
+### 7a. 振り返り（週次・スプリント単位）
 
 - **起点スキル:** `/retro`
+- **トリガー語:** retro / 振り返り / 週次まとめ / 何を出荷したか
 - **注意点:** コミット履歴・作業パターン・コード品質メトリクスを分析。週次での実行が推奨。
 
-### Step 2: セキュリティ監査
+### 7b. セキュリティ監査
 
-- **スキル:** `/cso`
+- **起点スキル:** `/cso`
+- **トリガー語:** セキュリティ監査 / 脆弱性チェック / 攻撃面確認 / OWASP
 - **注意点:** OWASP Top 10・STRIDE・シークレット漏洩・依存関係サプライチェーンを横断検査。月次または大きな変更後に実行。
 
-### Step 3: パフォーマンス計測
+### 補助スキル
+
+#### パフォーマンス計測
 
 - **スキル:** `/benchmark`
 - **渡す情報:** 計測対象URL・比較基準
 - **注意点:** 初回実行でベースラインを確立し、以降はそのベースラインと比較して回帰を検出。
 
-### Step 4: QAレポート
+#### QAレポート
 
 - **スキル:** `/qa-only`
 - **注意点:** `/qa`（バグ修正まで実行）と違い、発見のみ。品質の現状把握や修正を別セッションに持ち越したい場合に使う。
 
-### Step 5: 学習の記録
+#### 学習の記録
 
 - **スキル:** `/learn`
 - **注意点:** プロジェクト固有の知見を永続化。次回以降のQA・設計判断に自動参照される。
