@@ -6,7 +6,6 @@ tap "yukiarrr/tap"       # ecsk コマンド
 
 brew "biome"             # Biome: Linter & Formatter for JavaScript / TypeScript
 brew "circleci"          # CircleCI コマンド
-brew "codex"             # OpenAI Codex CLI (Claude Code との協調動作用)
 brew "coreutils"         # mise や Ruby の bundle install でも必要とするライブラリを含む。
 brew "openssl@3"
 brew "curl"              # データ送受信コマンド。
@@ -38,6 +37,7 @@ cask "atok"
 cask "brave-browser"
 cask "chatgpt"
 cask "claude-code"
+cask "codex"             # OpenAI Codex CLI (Claude Code との協調動作用)
 cask "coteditor"
 cask "docker-desktop"
 cask "dropbox"
