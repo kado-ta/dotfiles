@@ -70,7 +70,7 @@
 		"profile": ""
 	},
 	{
-		"name": "Speed-Assmt (Main): API Spec Editor",
+		"name": "Spd-Assmt (Main): API Spec Editor",
 		"rootPath": "$home/Dev/homeloan_advisor/speed_assmt_api_spec_editor/",
 		"paths": [],
 		"tags": [
@@ -80,7 +80,7 @@
 		"profile": ""
 	},
 	{
-		"name": "Speed-Assmt (Main): Backend",
+		"name": "Spd-Assmt (Main): Backend",
 		"rootPath": "$home/Dev/homeloan_advisor/speed_assmt_back/",
 		"paths": [],
 		"tags": [
@@ -90,7 +90,7 @@
 		"profile": ""
 	},
 	{
-		"name": "Speed-Assmt (Main): Frontend",
+		"name": "Spd-Assmt (Main): Frontend",
 		"rootPath": "$home/Dev/homeloan_advisor/speed_assmt_front/",
 		"paths": [],
 		"tags": [
@@ -100,7 +100,37 @@
 		"profile": ""
 	},
 	{
-		"name": "Speed-Assmt (TNY): API Spec Editor",
+		"name": "Spd-Assmt (VA): API Spec Editor",
+		"rootPath": "$home/Dev/homeloan_advisor/va_speed_assmt_api_spec_editor/",
+		"paths": [],
+		"tags": [
+			"HomeLoan"
+		],
+		"enabled": true,
+		"profile": ""
+	},
+	{
+		"name": "Spd-Assmt (VA): Backend",
+		"rootPath": "$home/Dev/homeloan_advisor/va_speed_assmt_back/",
+		"paths": [],
+		"tags": [
+			"HomeLoan"
+		],
+		"enabled": true,
+		"profile": ""
+	},
+	{
+		"name": "Spd-Assmt (VA): Frontend",
+		"rootPath": "$home/Dev/homeloan_advisor/va_speed_assmt_front/",
+		"paths": [],
+		"tags": [
+			"HomeLoan"
+		],
+		"enabled": true,
+		"profile": ""
+	},
+	{
+		"name": "Spd-Assmt (TNY): API Spec Editor",
 		"rootPath": "$home/Dev/homeloan_advisor/tanyo_speed_assmt_api_spec_editor/",
 		"paths": [],
 		"tags": [
@@ -110,7 +140,7 @@
 		"profile": ""
 	},
 	{
-		"name": "Speed-Assmt (TNY): Backend",
+		"name": "Spd-Assmt (TNY): Backend",
 		"rootPath": "$home/Dev/homeloan_advisor/tanyo_speed_assmt_back/",
 		"paths": [],
 		"tags": [
@@ -120,7 +150,7 @@
 		"profile": ""
 	},
 	{
-		"name": "Speed-Assmt (TNY): Frontend",
+		"name": "Spd-Assmt (TNY): Frontend",
 		"rootPath": "$home/Dev/homeloan_advisor/tanyo_speed_assmt_front/",
 		"paths": [],
 		"tags": [
