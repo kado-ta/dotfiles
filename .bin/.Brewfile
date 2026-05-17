@@ -37,6 +37,7 @@ cask "atok"
 cask "brave-browser"
 cask "chatgpt"
 cask "claude-code"
+cask "codex"             # OpenAI Codex CLI (Claude Code との協調動作用)
 cask "coteditor"
 cask "docker-desktop"
 cask "dropbox"
