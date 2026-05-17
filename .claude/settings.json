@@ -9,6 +9,7 @@
       "Bash(git diff *)",
       "Bash(sfdx *)",
       "Bash(sf *)",
+      "Bash(codex *)",
       "Read",
       "Write(app/**)",
       "Write(src/**)",
@@ -220,5 +221,6 @@
       "gh"
     ]
   },
-  "theme": "dark-ansi"
+  "theme": "dark-ansi",
+  "model": "opus"
 }
