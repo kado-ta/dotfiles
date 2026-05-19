@@ -221,6 +221,5 @@
       "gh"
     ]
   },
-  "theme": "dark-ansi",
-  "model": "opus"
+  "theme": "dark-daltonized"
 }
