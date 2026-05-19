@@ -19,6 +19,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `mise/setup.sh` — mise 設定をシンボリックリンクしランタイムをインストール
 - `.config/link.sh`, `.aws/link.sh`, `ghostty/link.sh`, `vscode/setup.sh`
 - `.claude/setup.sh` — Claude Code 設定のシンボリックリンク作成とプラグインインストール
+- `.codex/link.sh` — Codex CLI 設定のシンボリックリンク作成
 
 ## Makefile ターゲット
 
@@ -40,6 +41,7 @@ make vscode/ext/list  # vscode/extensions リストを再生成
 | `.config/` | karabiner, sheldon, starship の設定 |
 | `.aws/` | AWS CLI プロファイル設定（credentials は gitignore 済み） |
 | `.claude/` | Claude Code の設定・フック・スキル・セットアップスクリプト |
+| `.codex/` | Codex CLI の設定（`config.toml` — `~/.codex/config.toml` にシンボリックリンク） |
 | `vscode/` | VSCode 設定・拡張リスト・プロジェクトマネージャー設定 |
 | `ghostty/` | Ghostty ターミナル設定 |
 
