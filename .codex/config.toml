@@ -1,9 +1,24 @@
 model = "gpt-5.5"
 model_reasoning_effort = "xhigh"
+
 [marketplaces.openai-bundled]
-last_updated = "2026-05-19T22:26:08Z"
+last_updated = "2026-05-19T23:42:33Z"
 source_type = "local"
 source = "/Users/kado/.codex/.tmp/bundled-marketplaces/openai-bundled"
 
+[marketplaces.openai-primary-runtime]
+last_updated = "2026-05-19T23:42:50Z"
+source_type = "local"
+source = "/Users/kado/.cache/codex-runtimes/codex-primary-runtime/plugins/openai-primary-runtime"
+
 [plugins."browser@openai-bundled"]
+enabled = true
+
+[plugins."documents@openai-primary-runtime"]
+enabled = true
+
+[plugins."spreadsheets@openai-primary-runtime"]
+enabled = true
+
+[plugins."presentations@openai-primary-runtime"]
 enabled = true
