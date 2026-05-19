@@ -10,6 +10,7 @@ all:
 #	sh ./ghostty/link.sh
 #	sh ./.aws/link.sh
 #	sh ./mise/setup.sh
+#	sh ./.codex/link.sh
 
 # Homebrew の依存関係をツリー形式で表示する。
 brew/deps/show:

@@ -1,0 +1,9 @@
+model = "gpt-5.5"
+model_reasoning_effort = "xhigh"
+[marketplaces.openai-bundled]
+last_updated = "2026-05-19T22:26:08Z"
+source_type = "local"
+source = "/Users/kado/.codex/.tmp/bundled-marketplaces/openai-bundled"
+
+[plugins."browser@openai-bundled"]
+enabled = true
