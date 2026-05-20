@@ -13,6 +13,7 @@ echo "CLAUDE_DIR: $CLAUDE_DIR"
 
 ln -snfv "${SCRIPT_DIR}/settings.json" "${CLAUDE_DIR}/settings.json"
 ln -snfv "${SCRIPT_DIR}/CLAUDE.md" "${CLAUDE_DIR}/CLAUDE.md"
+ln -snfv "${SCRIPT_DIR}/mcp.json" "${CLAUDE_DIR}/mcp.json"
 
 if [ -d "${CLAUDE_DIR}/hooks" ] && [ ! -L "${CLAUDE_DIR}/hooks" ]; then
   echo "Removing existing Claude Code hooks directory: ${CLAUDE_DIR}/hooks"
