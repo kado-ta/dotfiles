@@ -1,7 +1,8 @@
 #!/bin/bash
-# Status line displaying: cwd | ctx% | 5h% | 7d% | model | effort
+# Status line displaying: cwd ⎇ branch | ctx% | 5h% | 7d% | model | effort
 # Percent segments (ctx / 5h / 7d) use threshold colors;
-# cwd / model / effort use fixed colors.
+# cwd / branch / model / effort use fixed colors.
+# Branch is shown only when the current directory is inside a git repository.
 
 input=$(cat)
 
@@ -28,6 +29,14 @@ IFS=$'\x1f' read -r DIR CTX FIVE_H WEEK MODEL EFFORT < <(
 SHORT_DIR="${DIR/#$HOME/~}"
 [ -z "$SHORT_DIR" ] && SHORT_DIR="-"
 
+GIT_BRANCH=""
+if [ -n "$DIR" ]; then
+    GIT_BRANCH=$(git -C "$DIR" symbolic-ref --short HEAD 2>/dev/null)
+    if [ -z "$GIT_BRANCH" ] && git -C "$DIR" rev-parse --git-dir >/dev/null 2>&1; then
+        GIT_BRANCH="(detached)"
+    fi
+fi
+
 pick_color() {
     local pct="$1"
     if [[ ! "$pct" =~ ^[0-9]+$ ]]; then printf '%s' "$DIM"
@@ -37,7 +46,11 @@ pick_color() {
 }
 
 SEP=" │ "
-parts=("${CYAN}${SHORT_DIR}${RESET}")
+if [ -n "$GIT_BRANCH" ]; then
+    parts=("${CYAN}${SHORT_DIR} ⎇ ${GIT_BRANCH}${RESET}")
+else
+    parts=("${CYAN}${SHORT_DIR}${RESET}")
+fi
 
 if [ -n "$CTX" ]; then
     parts+=("ctx $(pick_color "$CTX")${CTX}%${RESET}")
