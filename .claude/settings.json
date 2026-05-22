@@ -38,7 +38,12 @@
       "Write(tsconfig.json)",
       "Skill(claude-code-setup:claude-automation-recommender)",
       "Skill(gstack-upgrade)",
+      "Skill(superpowers:brainstorming)",
+      "Skill(superpowers:executing-plans)",
       "Skill(superpowers:verification-before-completion)",
+      "Skill(superpowers:finishing-a-development-branch)",
+      "Skill(superpowers:requesting-code-review)",
+      "Skill(review)",
       "WebFetch(domain:aws.amazon.com)",
       "WebFetch(domain:awscli.amazonaws.com)",
       "WebFetch(domain:docs.aws.amazon.com)",
@@ -85,6 +90,7 @@
       "WebFetch(domain:www.openapis.org)",
       "WebFetch(domain:redocly.com)",
       "WebFetch(domain:claude.com)",
+      "WebFetch(domain:docs.claude.com)",
       "WebFetch(domain:eu-central-1-1.aws.cloud2.influxdata.com)"
     ],
     "deny": [
