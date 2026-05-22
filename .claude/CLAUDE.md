@@ -20,7 +20,6 @@ Karpathy の LLM コーディング原則 (<https://github.com/multica-ai/andrej
 
 ### 1. Think Before Coding (実装前に考える)
 **推測しない。迷いを隠さない。トレードオフを明示する。**
-- 前提を明示して進める。不確かなら質問する。
 - 解釈が複数あるなら、黙って選ばず並べて示す。
 - よりシンプルな代替案があれば提示する。必要なら押し返す。
 - 不明点があれば手を止め、何が不明か言語化して質問する。
@@ -31,7 +30,6 @@ Karpathy の LLM コーディング原則 (<https://github.com/multica-ai/andrej
 - 一回しか使わないコードを抽象化しない。
 - 要求されていない `flexibility` / `configurability` を追加しない。
 - 起こりえないシナリオのエラーハンドリングは不要。
-- 200 行で書いたものが 50 行で済むなら書き直す。
 - 「Senior engineer が複雑すぎると言うか?」と自問し、Yes なら簡素化する。
 
 ### 3. Surgical Changes (外科手術的な変更)
