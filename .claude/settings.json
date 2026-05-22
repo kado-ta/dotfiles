@@ -194,7 +194,8 @@
   },
   "enabledPlugins": {
     "superpowers@claude-plugins-official": true,
-    "claude-code-setup@claude-plugins-official": true
+    "claude-code-setup@claude-plugins-official": true,
+    "ruby-lsp@claude-plugins-official": true
   },
   "sandbox": {
     "enabled": true,
