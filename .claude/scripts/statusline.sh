@@ -1,6 +1,7 @@
 #!/bin/bash
-# Status line displaying: cwd | ctx% | 5h% | 7d% | effort
-# All segments are color-coded with thresholded percentages.
+# Status line displaying: cwd | ctx% | 5h% | 7d% | model | effort
+# Percent segments (ctx / 5h / 7d) use threshold colors;
+# cwd / model / effort use fixed colors.
 
 input=$(cat)
 
@@ -21,7 +22,7 @@ IFS=$'\x1f' read -r DIR CTX FIVE_H WEEK MODEL EFFORT < <(
         (.rate_limits.seven_day.used_percentage // "" | tostring | split(".")[0]),
         (.model.display_name // ""),
         (.effort.level // "")
-    ] | join("")'
+    ] | join("\u001f")'
 )
 
 SHORT_DIR="${DIR/#$HOME/~}"
