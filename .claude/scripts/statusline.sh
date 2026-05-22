@@ -13,25 +13,29 @@ MAGENTA=$'\033[35m'
 BLUE=$'\033[34m'
 RESET=$'\033[0m'
 
-DIR=$(printf '%s' "$input" | jq -r '.workspace.current_dir // empty')
-CTX=$(printf '%s' "$input" | jq -r '.context_window.used_percentage // empty' | cut -d. -f1)
-FIVE_H=$(printf '%s' "$input" | jq -r '.rate_limits.five_hour.used_percentage // empty' | cut -d. -f1)
-WEEK=$(printf '%s' "$input" | jq -r '.rate_limits.seven_day.used_percentage // empty' | cut -d. -f1)
-MODEL=$(printf '%s' "$input" | jq -r '.model.display_name // empty')
-EFFORT=$(printf '%s' "$input" | jq -r '.effort.level // empty')
+IFS=$'\x1f' read -r DIR CTX FIVE_H WEEK MODEL EFFORT < <(
+    printf '%s' "$input" | jq -r '[
+        (.workspace.current_dir // ""),
+        (.context_window.used_percentage // "" | tostring | split(".")[0]),
+        (.rate_limits.five_hour.used_percentage // "" | tostring | split(".")[0]),
+        (.rate_limits.seven_day.used_percentage // "" | tostring | split(".")[0]),
+        (.model.display_name // ""),
+        (.effort.level // "")
+    ] | join("")'
+)
 
 SHORT_DIR="${DIR/#$HOME/~}"
 [ -z "$SHORT_DIR" ] && SHORT_DIR="-"
 
 pick_color() {
     local pct="$1"
-    if [ -z "$pct" ]; then printf '%s' "$DIM"
+    if [[ ! "$pct" =~ ^[0-9]+$ ]]; then printf '%s' "$DIM"
     elif [ "$pct" -ge 90 ]; then printf '%s' "$RED"
     elif [ "$pct" -ge 70 ]; then printf '%s' "$YELLOW"
     else printf '%s' "$GREEN"; fi
 }
 
-SEP=" ${DIM}|${RESET} "
+SEP=" │ "
 parts=("${CYAN}${SHORT_DIR}${RESET}")
 
 if [ -n "$CTX" ]; then
