@@ -1,13 +1,7 @@
 # ~/.claude/CLAUDE.md
 
-## Purpose
-このファイルは、Claude Code がどのリポジトリでも共通して守る作業原則を定義する。
-
----
-
 ## Working Principles
-- 思考は英語で行い、最終的な出力は日本語とする。
-  - ユーザーへの確認・質問・結果表示は、必ず日本語を使用すること。
+- IMPORTANT: **思考は英語で行い、最終的な出力は日本語とする。ユーザーへの確認・質問・結果表示・ドキュメントは、必ず日本語を使用すること**。
 - 仕様が曖昧な場合は既存コード → テスト → ドキュメント → 依頼内容の順で確認する。
 
 ---
@@ -26,6 +20,7 @@ Karpathy の LLM コーディング原則 (<https://github.com/multica-ai/andrej
 
 ### 2. Simplicity First (シンプルさを優先)
 **問題を解く最小限のコード。推測は不要。**
+
 - 依頼されていない機能は作らない。
 - 一回しか使わないコードを抽象化しない。
 - 要求されていない `flexibility` / `configurability` を追加しない。
@@ -80,7 +75,7 @@ Karpathy の LLM コーディング原則 (<https://github.com/multica-ai/andrej
 ---
 
 ## Git / GitHub Rules
-- **CRITICAL**: main / master / staging への直接コミット禁止。コミット前にブランチを必ず確認する。
+- IMPORTANT: **main / master / staging への直接コミット禁止。コミット前にブランチを必ず確認する**。
 - コミットメッセージは英語・[Conventional Commits](https://www.conventionalcommits.org/ja/v1.0.0/) 形式（`feat:` `fix:` `refactor:` `test:` `docs:` `chore:`）。
 - 大きな変更は論理単位で分ける。自動生成ファイルの変更は理由を明記する。
 - GitHub 操作はすべて `gh` コマンドを使用（MCP 経由禁止）。
@@ -130,28 +125,4 @@ Karpathy の LLM コーディング原則 (<https://github.com/multica-ai/andrej
 ---
 
 ## Skill Routing
-ユーザーのリクエストはまずシーンを判定し、該当する起点スキルを呼ぶ。詳細フロー・プロンプト例は `.claude/docs/SKILL_ROUTING.md` を参照。
-
-直接回答可（スキル起動不要）:
-- シーン判定表のどの行にも該当しない単発の質問（例: 「このファイルの何行目に X がある？」「この変数の型は？」）
-- 既存ファイルの確認・閲覧のみで完結する依頼
-- ユーザーが明示的にスキル起動を不要と指示した場合
-
-### シーン判定ルール
-衝突時の優先順位: **(1) UI/Design 関連語 > (2) レビュー・デプロイ系 > (3) 動詞判断（新規=brainstorming / 修正=systematic-debugging、UI 起因のみ /investigate）**。判定不能なら実装前に「新機能 or 不具合修正？」を確認。
-
-### シーン判定表
-
-| シーン | 日本語トリガー例 | 起点スキル | 連鎖先（完了後に提示） |
-|---|---|---|---|
-| 新機能開発 | 〜を作りたい / 〜を追加したい / 〜機能を実装 | `superpowers:brainstorming` | writing-plans → TDD → **code-style** → verification → /ship |
-| バグ修正（非UI） | サーバーエラー / API が失敗する / CLI が動かない / ロジックが壊れた | `superpowers:systematic-debugging` | TDD → **code-style** → verification → /ship |
-| バグ修正（UI/ブラウザ起因） | 画面表示が崩れる / クリックできない / フォーム送信失敗 / レンダリングが壊れた | `/investigate` | TDD → **code-style** → verification → /ship |
-| UI/Design改善 | 見た目を直したい / デザインを変えたい / Figma通りに | `superpowers:writing-plans` | executing-plans → /design-review → /qa → verification → /ship |
-| PRレビュー | レビューして / 差分を確認 / マージ前チェック | `superpowers:requesting-code-review` | /review → receiving-code-review（指摘あり時）|
-| デプロイ・PR作成 | shipして / PRを出して / デプロイ | `superpowers:verification-before-completion` | /ship → /land-and-deploy |
-| リファクタリング | リファクタ / 整理 / 責務分離 | `superpowers:brainstorming` | writing-plans → using-git-worktrees → executing-plans → verification |
-| 振り返り | retro / 振り返り / 週次まとめ / 何を出荷したか | `/retro` | — |
-| セキュリティ監査 | セキュリティ監査 / 脆弱性チェック / 攻撃面確認 / OWASP | `/cso` | — |
-
-各シーンで [Codex Offload Rules](#codex-offload-rules) を参照し委譲する。完了後は「`{起点スキル}` 完了 → 次は **{次のスキル}** を使います。進めてよいですか？」のフォーマットで次ステップを提示する。
+`skill-routing` スキルを使用してシーンを判定すること。
