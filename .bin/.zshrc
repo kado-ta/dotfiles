@@ -3,6 +3,8 @@
 ########################################
 export LANG=ja_JP.UTF-8
 export PATH=/usr/local/bin:/usr/sbin:$PATH
+export HOMEBREW_AUTO_UPDATE_SECS=259200 # 3日毎
+export HOMEBREW_NO_ENV_HINTS=1
 
 ########################################
 # zsh 本体設定
