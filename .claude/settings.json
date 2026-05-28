@@ -16,7 +16,6 @@
       "Bash(git -C * status *)",
       "Bash(git -C * diff *)",
       "Bash(git -C * log *)",
-      "Bash(git -C * show *)",
       "Bash(git -C * add *)",
       "Bash(git commit *)",
       "Bash(git check-ignore *)",
