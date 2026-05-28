@@ -99,6 +99,16 @@ Karpathy の LLM コーディング原則 (<https://github.com/multica-ai/andrej
 
 ---
 
+## Doc Conventions
+
+Plan / Design などのドキュメントを生成する際は以下の規約に従うこと:
+
+- 保存先: プロジェクトルートの `docs/` ディレクトリ
+- ディレクトリ名: `YYYYMMDD_<名前>` 形式（日付は今日の日付を `YYYYMMDD` で付与）
+- ファイル名: `[<種別>]_<名前>.md` 形式（種別は `plan` / `design` など英語スネークケース）
+
+---
+
 ## gstack
 - 対話型ブラウジング（クリック・フォーム入力・スクリーンショット・QA・ログイン後の状態確認）には gstack の `/browse` スキルを使用する。
 - 静的なドキュメント参照（公式ドキュメント・MDN・GitHub README など、URL を開いて読むだけ）は `WebFetch` を使ってよい。`settings.json` の allow リストに登録されたドメインに限る。
