@@ -50,6 +50,13 @@ else
   (cd "${GSTACK_DIR}" && ./setup)
 fi
 
+# Install genshijin
+if claude plugins list 2>/dev/null | grep -q " genshijin@InterfaceX-co-jp$"; then
+  echo "genshijin plugin already installed, skipping"
+else
+  claude plugins install InterfaceX-co-jp/genshijin
+fi
+
 # Link personal skills (global, available in all projects)
 for skill_dir in "${SCRIPT_DIR}/skills"/*/; do
   [ -d "$skill_dir" ] || continue
