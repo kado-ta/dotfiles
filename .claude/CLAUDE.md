@@ -1,7 +1,7 @@
 # ~/.claude/CLAUDE.md
 
 ## Working Principles
-- IMPORTANT: **思考は英語で行い、最終的な出力は日本語とする。ユーザーへの確認・質問・結果表示・ドキュメントは、必ず日本語を使用すること**。
+- [IMPORTANT] **思考は英語で行い、最終的な出力は日本語とする。ユーザーへの確認・質問・結果表示・ドキュメントは、必ず日本語を使用すること**。
 - 仕様が曖昧な場合は既存コード → テスト → ドキュメント → 依頼内容の順で確認する。
 
 ---
@@ -75,7 +75,7 @@ Karpathy の LLM コーディング原則 (<https://github.com/multica-ai/andrej
 ---
 
 ## Git / GitHub Rules
-- IMPORTANT: **main / master / staging への直接コミット禁止。コミット前にブランチを必ず確認する**。
+- [IMPORTANT] **main / master / staging への直接コミット禁止。コミット前にブランチを必ず確認する**。
 - コミットメッセージは英語・[Conventional Commits](https://www.conventionalcommits.org/ja/v1.0.0/) 形式（`feat:` `fix:` `refactor:` `test:` `docs:` `chore:`）。
 - 大きな変更は論理単位で分ける。自動生成ファイルの変更は理由を明記する。
 - GitHub 操作はすべて `gh` コマンドを使用（MCP 経由禁止）。
@@ -87,7 +87,7 @@ Karpathy の LLM コーディング原則 (<https://github.com/multica-ai/andrej
 ---
 
 ## Preferred Decision Order
-判断順: セキュリティ > 正確性 > 既存仕様整合 > 運用容易性 > 実装速度
+[IMPORTANT] 判断順: セキュリティ > 正確性 > 既存仕様整合 > 運用容易性 > 実装速度
 
 ---
 
@@ -103,26 +103,3 @@ Karpathy の LLM コーディング原則 (<https://github.com/multica-ai/andrej
 - 対話型ブラウジング（クリック・フォーム入力・スクリーンショット・QA・ログイン後の状態確認）には gstack の `/browse` スキルを使用する。
 - 静的なドキュメント参照（公式ドキュメント・MDN・GitHub README など、URL を開いて読むだけ）は `WebFetch` を使ってよい。`settings.json` の allow リストに登録されたドメインに限る。
 - `mcp__claude-in-chrome__*` ツールは絶対に使用しないこと。
-
----
-
-## Codex Offload Rules
-
-コンテキスト節約とレビュー精度のため、以下は Codex に委譲する。
-詳細・タイムアウト・依頼フォーマットは `.claude/docs/CODEX_OFFLOAD.md` を参照。
-
-| ケース | コマンド | 主なトリガー |
-|---|---|---|
-| 読込委譲 | `/codex consult` | 単一ファイル > 1000 行 / 横断検索 > 5 ファイル & 2000 行 / ログ解析 / 全体把握 |
-| 限定実装 | `codex exec` | 機械的な一括修正のみ（型エラー、import 整理、format、単純テスト追加） |
-| レビュー | `/codex review` | `/ship` 前 / 差分 > 200 行 / auth・token・migration・schema 変更 |
-| 相談 | `/codex consult` | 実装案 2 つ以上で迷う / デバッグ仮説 3 つ以上 / ユーザーから「どう思う？」 |
-
-- 信頼境界: Codex 出力はそのままコミットしない。実装 diff は `/codex review` でゲート。
-- ループ防止: 1 タスクで `/codex consult` は最大 2 回。
-- CLI が失敗・タイムアウトの場合は Claude 直接実行に切り替え、原因を報告。
-
----
-
-## Skill Routing
-`skill-routing` スキルを使用してシーンを判定すること。

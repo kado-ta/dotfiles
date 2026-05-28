@@ -1,6 +1,6 @@
 # Codex Offload Rules
 
-Claude Code のコンテキストを節約しつつ精度を保つため、以下の条件で gstack の `/codex` スキル（または `codex exec`）へ委譲する。CLAUDE.md の「Codex Offload Rules」セクションが要約版、本ドキュメントが詳細リファレンス。
+Claude Code のコンテキストを節約しつつ精度を保つため、以下の条件で gstack の `/codex` スキル（または `codex exec`）へ委譲する。
 
 ---
 
