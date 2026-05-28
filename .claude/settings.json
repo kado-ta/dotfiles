@@ -13,8 +13,11 @@
       "Bash(git add *)",
       "Bash(git status *)",
       "Bash(git commit -m ' *)",
-      "Bash(git -C /Users/kado/dotfiles status)",
-      "Bash(git -C /Users/kado/dotfiles diff --stat)",
+      "Bash(git -C * status *)",
+      "Bash(git -C * diff *)",
+      "Bash(git -C * log *)",
+      "Bash(git -C * show *)",
+      "Bash(git -C * add *)",
       "Bash(git commit *)",
       "Bash(git check-ignore *)",
       "Bash(gh *)",
@@ -39,10 +42,12 @@
       "Skill(claude-code-setup:claude-automation-recommender)",
       "Skill(gstack-upgrade)",
       "Skill(superpowers:brainstorming)",
+      "Skill(superpowers:writing-plans)",
       "Skill(superpowers:executing-plans)",
       "Skill(superpowers:verification-before-completion)",
       "Skill(superpowers:finishing-a-development-branch)",
       "Skill(superpowers:requesting-code-review)",
+      "Skill(superpowers:systematic-debugging)",
       "Skill(review)",
       "WebFetch(domain:aws.amazon.com)",
       "WebFetch(domain:awscli.amazonaws.com)",
@@ -245,5 +250,6 @@
       "gh"
     ]
   },
+  "effortLevel": "xhigh",
   "theme": "dark-daltonized"
 }
