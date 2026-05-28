@@ -9,7 +9,8 @@ if echo "$COMMAND" | grep -q 'rm -rf'; then
 fi
 
 # 本番環境への接続をブロック
-if echo "$COMMAND" | grep -qE 'prod|prd'; then
+# 'prod' が含まれているもの、または、'prd' が単語として含まれている ('-prd-', '_prd_' など) をブロック対象とする。
+if echo "$COMMAND" | grep -qE 'prod|(^|[^[:alnum:]])prd([^[:alnum:]]|$)'; then
   echo "Blocked: production access is not allowed" >&2
   exit 2
 fi
