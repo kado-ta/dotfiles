@@ -39,6 +39,7 @@ cask "chatgpt"
 cask "claude-code"
 cask "codex"             # OpenAI Codex CLI (Claude Code との協調動作用)
 cask "coteditor"
+cask "dbgate"            # Database manager for MySQL, PostgreSQL, SQL Server, MongoDB, SQLite and others
 cask "docker-desktop"
 cask "dropbox"
 cask "figma"
@@ -47,6 +48,7 @@ cask "font-hackgen"      # Starship が必要とするフォント。
 cask "font-hackgen-nerd" # Starship が必要とするフォント。
 cask "ghostty"
 cask "google-chrome"
+cask "keepingyouawake"
 cask "notion"
 cask "obsidian"
 cask "postman"
@@ -54,5 +56,10 @@ cask "slack"
 cask "spotify"
 cask "typora" # 有償ソフトウェアであるため、インストール後のライセンス購入が必要。
 cask "visual-studio-code"
-cask "keepingyouawake"
 cask "zoom"
+
+go "cmd/go"
+go "cmd/gofmt"
+npm "@salesforce/cli"
+npm "corepack"
+npm "vercel"
