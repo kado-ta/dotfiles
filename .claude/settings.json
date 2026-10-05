@@ -212,6 +212,15 @@
             "command": "afplay /System/Library/Sounds/Glass.aiff"
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/skills/gstack/hosts/claude/hooks/timeline-stop-hook",
+            "timeout": 5
+          }
+        ]
       }
     ]
   },
