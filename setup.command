@@ -13,13 +13,13 @@ zsh/setup_plugins.sh
 .config/link.sh
 
 # AWS CLI の設定と Credentils のシンボリックリンクを作成する。
-aws/link.sh
+.aws/link.sh
 
 # mise で管理する言語・プラグインをインストールする。
 mise/setup.sh
 
 # Claude Code 設定のシンボリックリンクを作成する。
-.claude/link.sh
+.claude/setup.sh
 
 # Codex 設定のシンボリックリンクを作成する。
 .codex/link.sh

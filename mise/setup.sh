@@ -25,4 +25,4 @@ echo "mise config is linked!"
 ###########################################################
 # 下記コマンドは ~/.config/mise/config.toml のシンボリックリンク作成済みであることを前提とする。
 # ~/.config/mise/config.toml に記載の言語・プラグインをインストールする。
-mise install $(awk -F ' = ' '/=/ {gsub(/"/, "", $2); printf "%s@%s ", $1, $2}' $CONFIG_DIR/mise/config.toml)
+mise install
