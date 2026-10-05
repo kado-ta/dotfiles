@@ -1,5 +1,4 @@
 {
-    "chat.viewSessions.orientation": "stacked",
     "workbench.colorTheme": "One Dark Pro Darker",
     "workbench.colorCustomizations": {
         "editor.selectionBackground": "#5e8881", // 選択中テキスト
@@ -247,5 +246,7 @@
     // --------------------------------------------------------------------
     // ローカルファイルプロトコルの扱いに対する確認ダイアログを表示しない。
     "security.promptForLocalFileProtocolHandling": false,
-    "workbench.startupEditor": "none"
+    "workbench.startupEditor": "none",
+    "claudeCode.hideOnboarding": true,
+    "chat.viewSessions.orientation": "stacked"
 }
