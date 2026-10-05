@@ -28,7 +28,6 @@ ln -snfv "${SCRIPT_DIR}/scripts/statusline.sh" "${CLAUDE_DIR}/scripts/statusline
 if claude plugins list 2>/dev/null | grep -q " superpowers@claude-plugins-official$"; then
   echo "superpowers plugin already installed, skipping"
 else
-  claude plugin marketplace add anthropics/claude-plugins-official
   claude plugins install superpowers@claude-plugins-official
 fi
 
