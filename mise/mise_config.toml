@@ -2,11 +2,11 @@
 # ~/.config/mise/config.toml として使用されるもの。
 # https://mise.jdx.dev/configuration.html#global-config-config-mise-config-toml
 [tools]
-awscli = { version = "2.32.33", symlink_bins = "true" }
-go = "1.24.2"
-node = "22.22.0"
-poetry = "1.7.1"
-python = "3.13.3"
-ruby = "4.0.1"
-terraform = "1.12.2"
-tfsec = "1.28.13"
+aws-cli = "2.37.8"
+go = "1.27.1"
+node = "26.10.0"
+poetry = { version = "2.5.1", depends = "python" }
+python = "3.14.7"
+ruby = "4.0.7"
+terraform = "1.16.4"
+tfsec = "1.28.14"
