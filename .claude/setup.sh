@@ -28,6 +28,7 @@ ln -snfv "${SCRIPT_DIR}/scripts/statusline.sh" "${CLAUDE_DIR}/scripts/statusline
 if claude plugins list 2>/dev/null | grep -q " superpowers@claude-plugins-official$"; then
   echo "superpowers plugin already installed, skipping"
 else
+  claude plugin marketplace add anthropics/claude-plugins-official
   claude plugins install superpowers@claude-plugins-official
 fi
 
@@ -48,13 +49,6 @@ else
   # "${GSTACK_DIR}/setup" は GSTACK_DIR 内で実行しないと正常終了しない。
   # サブシェル (...) 内での cd はスクリプト本体のカレントディレクトリに影響しない。
   (cd "${GSTACK_DIR}" && ./setup)
-fi
-
-# Install genshijin
-if claude plugins list 2>/dev/null | grep -q " genshijin@InterfaceX-co-jp$"; then
-  echo "genshijin plugin already installed, skipping"
-else
-  claude plugins install InterfaceX-co-jp/genshijin
 fi
 
 # Link personal skills (global, available in all projects)
