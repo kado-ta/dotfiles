@@ -9,6 +9,8 @@ bierner.markdown-footnotes
 bierner.markdown-preview-github-styles
 biomejs.biome
 bpruitt-goddard.mermaid-markdown-syntax-highlighting
+catppuccin.catppuccin-vsc
+catppuccin.catppuccin-vsc-icons
 charliermarsh.ruff
 circleci.circleci
 cyberbiont.vscode-open-in-typora
@@ -28,11 +30,9 @@ ms-python.vscode-pylance
 ms-python.vscode-python-envs
 naumovs.color-highlight
 njpwerner.autodocstring
-pkief.material-icon-theme
 renesaarsoo.sql-formatter-vsc
 shopify.ruby-lsp
 sianglim.slim
 stoplight.spectral
 tamasfe.even-better-toml
 usernamehw.errorlens
-zhuangtongfa.material-theme
