@@ -96,9 +96,9 @@ AWS 関連設定。
 
 これは、macOS でのインストール手順。
 ```shell
-$ curl "https://s3.amazonaws.com/session-manager-downloads/plugin/latest/mac_arm64/sessionmanager-bundle.zip" -o "sessionmanager-bundle.zip"
-$ unzip sessionmanager-bundle.zip
-$ sudo ./sessionmanager-bundle/install -i /usr/local/sessionmanagerplugin -b /usr/local/bin/session-manager-plugin
+curl "https://s3.amazonaws.com/session-manager-downloads/plugin/latest/mac_arm64/sessionmanager-bundle.zip" -o "sessionmanager-bundle.zip"
+unzip sessionmanager-bundle.zip
+sudo ./sessionmanager-bundle/install -i /usr/local/sessionmanagerplugin -b /usr/local/bin/session-manager-plugin
 ```
 他のプラットフォームでのインストール手順は、下記 URL を参照。  
 https://docs.aws.amazon.com/ja_jp/systems-manager/latest/userguide/session-manager-working-with-install-plugin.html
@@ -159,7 +159,7 @@ VSCode 拡張をインストールする。
 Homebrew の依存関係をツリー形式で表示する。
 
 ```shell
-$ make brew/deps/show
+make brew/deps/show
 ```
 
 ### `brew/dump`
@@ -167,12 +167,12 @@ Homebrew でインストール中のパッケージを Brewfile としてリス�
 その Brewfile をベースに .Brewfile を最新化する。
 
 ```shell
-$ make brew/dump
+make brew/dump
 ```
 
 ### `vscode/ext/list`
 VSCode 拡張のリスト最新化する。
 
 ```shell
-$ make vscode/ext/list
+make vscode/ext/list
 ```

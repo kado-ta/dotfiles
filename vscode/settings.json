@@ -1,5 +1,5 @@
 {
-    "workbench.colorTheme": "One Dark Pro Darker",
+    "workbench.colorTheme": "One Dark Pro Night Flat",
     "workbench.colorCustomizations": {
         "editor.selectionBackground": "#5e8881", // 選択中テキスト
         "editor.selectionHighlightBackground": "#3d4242d0", // 選択中テキストと同じテキストのハイライト
@@ -8,9 +8,8 @@
     },
     "workbench.editor.enablePreviewFromQuickOpen": false,
     "workbench.iconTheme": "material-icon-theme",
-    "editor.rulers": [
-        110
-    ],
+    "workbench.startupEditor": "none",
+    "editor.rulers": [110],
     "editor.fontFamily": "Fira Code, HackGen35Nerd, Menlo, Monaco, 'Courier New', monospace",
     "editor.fontSize": 13,
     "editor.fontLigatures": true,
@@ -101,6 +100,8 @@
             "italic": false
         }
     ],
+    // autoDocstring のスタイルを Google スタイルに設定する。
+    "autoDocstring.docstringFormat": "google",
     //
     // --------------------------------------------------------------------
     // JSON Schema
@@ -115,6 +116,13 @@
         "https://developer.microsoft.com/json-schemas/": true,
         "https://biomejs.dev": true
     },
+    "[jsonc]": {
+        "editor.defaultFormatter": "biomejs.biome",
+        "editor.formatOnSave": true,
+        "editor.insertSpaces": true,
+        "editor.tabSize": 4,
+        "editor.detectIndentation": false
+    },
     //
     // --------------------------------------------------------------------
     // Ruby
@@ -128,9 +136,7 @@
         "identifier": "mise"
     },
     "rubyLsp.formatter": "rubocop",
-    "rubyLsp.linters": [
-        "rubocop",
-    ],
+    "rubyLsp.linters": ["rubocop"],
     "[erb]": {
         "editor.defaultFormatter": "aliariff.vscode-erb-beautify",
         "editor.formatOnSave": false
@@ -144,18 +150,24 @@
     // Terraform
     // --------------------------------------------------------------------
     "terraform.languageServer.enable": true,
-    // ここは、絶対パスで設定する必要がある。
-    "terraform.languageServer.terraform.path": "/Users/kado/.local/share/mise/shims/terraform",
-    "terraform.languageServer.args": [
-        "serve"
-    ],
+    // ここは、絶対パスで設定する必要がある。通常は $PATH から自動検出される
+    // "terraform.languageServer.terraform.path": "~/.local/share/mise/shims/terraform",
+    "terraform.languageServer.args": ["serve"],
     "terraform.experimentalFeatures.validateOnSave": false,
     "[terraform]": {
         "editor.defaultFormatter": "hashicorp.terraform",
         "editor.formatOnSave": true,
         "editor.formatOnSaveMode": "file"
     },
-    "tfsec.binaryPath": "/Users/kado/.local/share/mise/shims/tfsec",
+    //
+    // --------------------------------------------------------------------
+    // Trivy
+    // --------------------------------------------------------------------
+    "trivy.misconfigScanning": true,
+    "trivy.vulnScanning": false,
+    "trivy.secretScanning": false,
+    "trivy.minimumReportedSeverity": "UNKNOWN",
+    "trivy.useAquaPlatform": false,
     //
     // --------------------------------------------------------------------
     // JavaScript, TypeScript
@@ -171,34 +183,25 @@
     // --------------------------------------------------------------------
     // Python
     // --------------------------------------------------------------------
-    "python.defaultInterpreterPath": "/Users/kado/.local/share/mise/installs/python/latest",
+    // ここは、絶対パスで設定する必要がある。通常は $PATH から自動検出される。
+    // "python.defaultInterpreterPath": "~/.local/share/mise/installs/python/latest",
     "python.analysis.extraPaths": [
         // NOTE: Python のバージョンを変更した場合は、併せて下記パス内 "python3.11" も変更する必要あり。
         ".venv/lib/python3.11/site-packages"
     ],
+    // NOTE: Ruff は .flake8 を読まないので、その設定は pyproject.toml に記述する必要がある。
     "[python]": {
-        "editor.defaultFormatter": "ms-python.black-formatter",
-        // VSCode に black のエラーが表示される場合の対処方法。
-        // https://code.visualstudio.com/docs/python/editing#_troubleshooting-formatting
+        "editor.defaultFormatter": "charliermarsh.ruff",
         "editor.formatOnPaste": false,
+        "editor.formatOnSave": true,
         "editor.formatOnSaveMode": "file",
-        // 保存時に isort を実行する。
+        // 明示的な保存時に、Ruff で import を並べ替える。
         "editor.codeActionsOnSave": {
-            "source.organizeImports": "explicit"
+            "source.fixAll.ruff": "explicit",
+            "source.organizeImports.ruff": "explicit"
         }
     },
-    "isort.args": [
-        "--profile black" // isort の black 互換設定
-    ],
-    // autoDocstring のスタイルを Google スタイルに設定する。
-    "autoDocstring.docstringFormat": "google",
-    "flake8.path": [
-        "./.venv/bin/flake8"
-    ],
-    "flake8.args": [
-        // flake8 の設定は、プロジェクト直下の .flake8 ファイルに記載する。
-        "--config=${workspaceFolder}/.flake8"
-    ],
+    // 型チェックは、引き続き mypy を使用する。
     "mypy-type-checker.args": [
         "--follow-imports=skip", // インポートしたモジュールの型ヒントチェックを行わない。
         "--ignore-missing-imports", // 解決できないモジュールのインポートを無視する。
@@ -207,12 +210,14 @@
         "--disallow-untyped-defs", // 返り値が明示されていない関数をエラーとして扱う。
         "--disallow-untyped-calls" // 返り値の型をが明示されていない関数をエラーとして扱う。
     ],
-    "mypy-type-checker.path": [
-        ".venv/bin/mypy"
-    ],
+    "mypy-type-checker.path": [".venv/bin/mypy"],
     "mypy-type-checker.severity": {
         "error": "Warning"
     },
+    //
+    // --------------------------------------------------------------------
+    // HTML, Markdown, etc...
+    // --------------------------------------------------------------------
     "html.format.wrapLineLength": 0,
     "[html]": {
         "editor.defaultFormatter": null
@@ -221,32 +226,25 @@
         "files.trimTrailingWhitespace": false,
         "editor.wordWrap": "off"
     },
-    "markdown-pdf.mermaidServer": "https://unpkg.com/mermaid@10.4.0/dist/mermaid.js",
     "[json]": {
         "editor.defaultFormatter": null
     },
-    "spectral.validateLanguages": [
-        "yaml",
-        "json"
-    ],
-    "spectral.validateFiles": [
-        "**/openapi.yaml",
-        "**/openapi.yml"
-    ],
+    "spectral.validateLanguages": ["yaml", "json"],
+    "spectral.validateFiles": ["**/openapi.yaml", "**/openapi.yml"],
     "hediet.vscode-drawio.resizeImages": null,
     "circleci.hostUrl": "",
     "projectManager.tags": [
         "Personal",
+        "KSC",
         "HomeLoan",
         "HomeLoan/Infra",
         "NUMM"
     ],
     // Claude Code
     "claudeCode.preferredLocation": "panel",
+    "claudeCode.hideOnboarding": true,
+    "chat.viewSessions.orientation": "stacked",
     // --------------------------------------------------------------------
     // ローカルファイルプロトコルの扱いに対する確認ダイアログを表示しない。
-    "security.promptForLocalFileProtocolHandling": false,
-    "workbench.startupEditor": "none",
-    "claudeCode.hideOnboarding": true,
-    "chat.viewSessions.orientation": "stacked"
+    "security.promptForLocalFileProtocolHandling": false
 }
