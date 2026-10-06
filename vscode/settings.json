@@ -1,5 +1,5 @@
 {
-    "workbench.colorTheme": "One Dark Pro Night Flat",
+    "workbench.colorTheme": "Catppuccin Mocha",
     "workbench.colorCustomizations": {
         "editor.selectionBackground": "#5e8881", // 選択中テキスト
         "editor.selectionHighlightBackground": "#3d4242d0", // 選択中テキストと同じテキストのハイライト
@@ -7,7 +7,7 @@
         "editor.findMatchHighlightBackground": "#3b5768d0" // 検索にヒットしたテキストと同じテキスト
     },
     "workbench.editor.enablePreviewFromQuickOpen": false,
-    "workbench.iconTheme": "material-icon-theme",
+    "workbench.iconTheme": "catppuccin-latte",
     "workbench.startupEditor": "none",
     "editor.rulers": [110],
     "editor.fontFamily": "Fira Code, HackGen35Nerd, Menlo, Monaco, 'Courier New', monospace",
