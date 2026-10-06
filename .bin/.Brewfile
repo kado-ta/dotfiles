@@ -25,6 +25,7 @@ brew "starship"          # シェル用プロンプト。高速でカスタマ�
 brew "telnet"            # RTX ルーターへの接続に使用する。
 brew "terminal-notifier" # macOS の通知センターへ通知を送信する
 brew "tree"              # ディレクトリ構造をツリー表示する。
+brew "trivy"             # コンテナイメージの脆弱性スキャンツール
 # brew "zsh"               # Zsh は Mac デフォルトを使用せず、 Homebrew でインストールする。
 brew "bun"               # bun コマンド
 brew "yukiarrr/tap/ecsk" # AWS ECS への SSH を簡単にするコマンド。
