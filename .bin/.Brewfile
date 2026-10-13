@@ -40,6 +40,7 @@ cask "1password"
 cask "1password-cli"
 cask "atok"
 cask "chatgpt"
+cask "claude"
 cask "claude-code"
 cask "codex"             # OpenAI Codex CLI (Claude Code との協調動作用)
 cask "coteditor"
