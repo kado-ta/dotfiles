@@ -116,6 +116,9 @@
         "https://developer.microsoft.com/json-schemas/": true,
         "https://biomejs.dev": true
     },
+    "[json]": {
+        "editor.defaultFormatter": "biomejs.biome"
+    },
     "[jsonc]": {
         "editor.defaultFormatter": "biomejs.biome",
         "editor.formatOnSave": true,
@@ -225,9 +228,6 @@
     "[markdown]": {
         "files.trimTrailingWhitespace": false,
         "editor.wordWrap": "off"
-    },
-    "[json]": {
-        "editor.defaultFormatter": null
     },
     "spectral.validateLanguages": ["yaml", "json"],
     "spectral.validateFiles": ["**/openapi.yaml", "**/openapi.yml"],
