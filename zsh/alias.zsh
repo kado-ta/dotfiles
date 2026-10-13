@@ -28,3 +28,8 @@ alias sudo='sudo '
 # グローバルエイリアス
 alias -g L='| less'
 alias -g G='| grep'
+
+# Claude Code / Codex の起動なしに Understad Anything スキルのダッシュボードを起動する。
+function ua-dashboard() {
+  npx https://github.com/Egonex-AI/Understand-Anything/releases/latest/download/understand-anything-viewer.tgz "${1:-.}"
+}
