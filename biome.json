@@ -1,0 +1,16 @@
+{
+    "overrides": [
+        {
+            "includes": [
+                ".claude/settings.json",
+                ".claude/settings.local.json"
+            ],
+            "json": {
+                "formatter": {
+                    "indentStyle": "space",
+                    "indentWidth": 2
+                }
+            }
+        }
+    ]
+}
