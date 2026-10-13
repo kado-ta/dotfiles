@@ -12,7 +12,7 @@ font-feature = +liga
 # Window
 # =============================================================================
 window-width = 180
-window-height = 60
+window-height = 62
 window-padding-x = 4
 window-padding-y = 4
 window-padding-color = extend
@@ -61,6 +61,9 @@ cursor-click-to-move = false
 # =============================================================================
 keybind = super+left=previous_tab
 keybind = super+right=next_tab
+
+# Ghostty 検索欄へ Cmd + v でクリップボードの内容を貼り付けられるようにする。
+keybind = super+v=paste_from_clipboard
 
 # =============================================================================
 # Clipboard
