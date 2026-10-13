@@ -231,7 +231,16 @@
   "enabledPlugins": {
     "superpowers@claude-plugins-official": true,
     "claude-code-setup@claude-plugins-official": true,
-    "ruby-lsp@claude-plugins-official": true
+    "ruby-lsp@claude-plugins-official": true,
+    "understand-anything@understand-anything": true
+  },
+  "extraKnownMarketplaces": {
+    "understand-anything": {
+      "source": {
+        "source": "github",
+        "repo": "Egonex-AI/Understand-Anything"
+      }
+    }
   },
   "sandbox": {
     "enabled": true,
