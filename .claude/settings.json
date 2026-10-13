@@ -1,272 +1,266 @@
 {
-  "$schema": "https://json.schemastore.org/claude-code-settings.json",
-  "permissions": {
-    "allow": [
-      "Bash(brew info *)",
-      "Bash(brew search *)",
-      "Bash(git status)",
-      "Bash(claude plugins *)",
-      "Bash(codex --version)",
-      "Bash(command -v codex)",
-      "Bash(git diff *)",
-      "Bash(git checkout *)",
-      "Bash(git add *)",
-      "Bash(git status *)",
-      "Bash(git commit -m ' *)",
-      "Bash(git -C * status *)",
-      "Bash(git -C * diff *)",
-      "Bash(git -C * log *)",
-      "Bash(git -C * add *)",
-      "Bash(git commit *)",
-      "Bash(git check-ignore *)",
-      "Bash(gh *)",
-      "Bash(npm run *)",
-      "Bash(pnpm *)",
-      "Bash(sfdx *)",
-      "Bash(sf *)",
-      "Read",
-      "Write(app/**)",
-      "Write(src/**)",
-      "Write(docs/**)",
-      "Write(scripts/**)",
-      "Write(spec/**)",
-      "Write(test/**)",
-      "Write(tests/**)",
-      "Write(.tmp/**)",
-      "Write(.gitignore)",
-      "Write(*.md)",
-      "Write(*.config.*)",
-      "Write(package.json)",
-      "Write(tsconfig.json)",
-      "Skill(claude-code-setup:claude-automation-recommender)",
-      "Skill(gstack-upgrade)",
-      "Skill(superpowers:brainstorming)",
-      "Skill(superpowers:writing-plans)",
-      "Skill(superpowers:executing-plans)",
-      "Skill(superpowers:verification-before-completion)",
-      "Skill(superpowers:finishing-a-development-branch)",
-      "Skill(superpowers:requesting-code-review)",
-      "Skill(superpowers:systematic-debugging)",
-      "Skill(review)",
-      "WebFetch(domain:aws.amazon.com)",
-      "WebFetch(domain:awscli.amazonaws.com)",
-      "WebFetch(domain:docs.aws.amazon.com)",
-      "WebFetch(domain:repost.aws)",
-      "WebFetch(domain:docs.cloud.google.com)",
-      "WebFetch(domain:support.google.com)",
-      "WebFetch(domain:github.com)",
-      "WebFetch(domain:api.github.com)",
-      "WebFetch(domain:raw.githubusercontent.com)",
-      "WebFetch(domain:registry.terraform.io)",
-      "WebFetch(domain:registry.circleci.com)",
-      "WebFetch(domain:circleci.com)",
-      "WebFetch(domain:go.dev)",
-      "WebFetch(domain:code.claude.com)",
-      "WebFetch(domain:www.hashicorp.com)",
-      "WebFetch(domain:datatracker.ietf.org)",
-      "WebFetch(domain:tools.ietf.org)",
-      "WebFetch(domain:www.iana.org)",
-      "WebFetch(domain:www.icann.org)",
-      "WebFetch(domain:techracho.bpsinc.jp)",
-      "WebFetch(domain:dev.classmethod.jp)",
-      "WebFetch(domain:nextjs.org)",
-      "WebFetch(domain:vercel.com)",
-      "WebFetch(domain:zenn.dev)",
-      "WebFetch(domain:qiita.com)",
-      "WebFetch(domain:yarnpkg.com)",
-      "WebFetch(domain:www.npmjs.com)",
-      "WebFetch(domain:pnpm.io)",
-      "WebFetch(domain:biomejs.dev)",
-      "WebFetch(domain:www.ruby-lang.org)",
-      "WebFetch(domain:railsguides.jp)",
-      "WebFetch(domain:rubyonrails.org)",
-      "WebFetch(domain:rubyapi.org)",
-      "WebFetch(domain:docs.rubocop.org)",
-      "WebFetch(domain:rubocop.org)",
-      "WebFetch(domain:rubygems.org)",
-      "WebFetch(domain:nodejs.org)",
-      "WebFetch(domain:ja.react.dev)",
-      "WebFetch(domain:react.dev)",
-      "WebFetch(domain:www.typescriptlang.org)",
-      "WebFetch(domain:mise.jdx.dev)",
-      "WebFetch(domain:docs.docker.com)",
-      "WebFetch(domain:docs.python.org)",
-      "WebFetch(domain:www.openapis.org)",
-      "WebFetch(domain:redocly.com)",
-      "WebFetch(domain:claude.com)",
-      "WebFetch(domain:docs.claude.com)",
-      "WebFetch(domain:eu-central-1-1.aws.cloud2.influxdata.com)"
-    ],
-    "deny": [
-      "Bash(sudo *)",
-      "Bash(rm -rf *)",
-      "Bash(chmod *)",
-      "Bash(chown *)",
-      "Bash(curl *)",
-      "Bash(wget *)",
-      "Bash(cat **)",
-      "Bash(git reset --hard *)",
-      "Bash(sfdx org:deploy *)",
-      "Bash(sf deploy *)",
-      "Bash(terraform apply *)",
-      "Bash(terraform destroy *)",
-      "Read(**/.env*)",
-      "Read(**/id_rsa*)",
-      "Read(**/id_ed25519*)",
-      "Read(~/.ssh/**)",
-      "Read(**/.ssh/**)",
-      "Read(**/.aws/**)",
-      "Read(./secrets/**)",
-      "Read(**/credentials/**)",
-      "Read(**/*.key)",
-      "Read(**/*.pem)",
-      "Read(**/.pgpass)",
-      "Write(/etc/**)",
-      "Write(**/.env*)",
-      "Write(**/.git/config)",
-      "Write(**/package-lock.json)",
-      "Write(**/pnpm-lock.yaml)",
-      "Write(**/yarn.lock)",
-      "Write(**/biome.json)",
-      "Write(**/.eslintrc)",
-      "Write(**/.eslintrc.*)",
-      "Write(**/.tflint.hcl)"
-    ],
-    "ask": [
-      "Bash(gh pr create*)",
-      "Bash(gh pr merge*)",
-      "Bash(gh pr close*)",
-      "Bash(gh pr edit*)",
-      "Bash(gh pr review*)",
-      "Bash(gh pr comment*)",
-      "Bash(gh issue create*)",
-      "Bash(gh issue close*)",
-      "Bash(gh issue comment*)",
-      "Bash(gh issue edit*)",
-      "Bash(gh release create*)",
-      "Bash(gh release delete*)",
-      "Bash(git push)",
-      "Bash(git push *)"
-    ],
-    "disableBypassPermissionsMode": "disable"
-  },
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "~/.claude/hooks/validate-command.sh"
-          }
-        ]
-      },
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "~/.claude/hooks/protect-main-branch.sh"
-          }
-        ]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "jq -r 'if (.tool_input.command // \"\" | test(\"gh pr create\")) then (.tool_response.stdout // \"\" | match(\"https://github\\\\.com/\\\\S+\") | .string) // empty else empty end' | { read -r url; [ -n \"$url\" ] && echo \"{\\\"systemMessage\\\": \\\"PR が作成されました: $url\\\"}\"; } 2>/dev/null || true"
-          }
-        ]
-      }
-    ],
-    "Notification": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "terminal-notifier -title \"Claude Code\" -message \"入力待ちプロンプトが表示されました\" -sound default || true"
-          }
-        ]
-      }
-    ],
-    "PreCompact": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "~/.claude/hooks/precompact-context.sh"
-          }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "afplay /System/Library/Sounds/Glass.aiff"
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "~/.claude/skills/gstack/hosts/claude/hooks/timeline-stop-hook",
-            "timeout": 5
-          }
-        ]
-      }
-    ]
-  },
-  "statusLine": {
-    "type": "command",
-    "command": "~/.claude/scripts/statusline.sh"
-  },
-  "enabledPlugins": {
-    "superpowers@claude-plugins-official": true,
-    "claude-code-setup@claude-plugins-official": true,
-    "ruby-lsp@claude-plugins-official": true,
-    "understand-anything@understand-anything": true
-  },
-  "extraKnownMarketplaces": {
-    "understand-anything": {
-      "source": {
-        "source": "github",
-        "repo": "Egonex-AI/Understand-Anything"
-      }
-    }
-  },
-  "sandbox": {
-    "enabled": true,
-    "allowUnsandboxedCommands": false,
-    "network": {
-      "allowedDomains": [
-        "github.com",
-        "*.github.com",
-        "*.githubusercontent.com",
-        "*.npmjs.org",
-        "registry.yarnpkg.com",
-        "pypi.org"
-      ]
+    "$schema": "https://json.schemastore.org/claude-code-settings.json",
+    "permissions": {
+        "allow": [
+            "Bash(brew info *)",
+            "Bash(brew search *)",
+            "Bash(git status)",
+            "Bash(claude plugins *)",
+            "Bash(codex --version)",
+            "Bash(command -v codex)",
+            "Bash(git diff *)",
+            "Bash(git checkout *)",
+            "Bash(git add *)",
+            "Bash(git status *)",
+            "Bash(git commit -m ' *)",
+            "Bash(git -C * status *)",
+            "Bash(git -C * diff *)",
+            "Bash(git -C * log *)",
+            "Bash(git -C * add *)",
+            "Bash(git commit *)",
+            "Bash(git check-ignore *)",
+            "Bash(gh *)",
+            "Bash(npm run *)",
+            "Bash(pnpm *)",
+            "Bash(sfdx *)",
+            "Bash(sf *)",
+            "Read",
+            "Write(app/**)",
+            "Write(src/**)",
+            "Write(docs/**)",
+            "Write(scripts/**)",
+            "Write(spec/**)",
+            "Write(test/**)",
+            "Write(tests/**)",
+            "Write(.tmp/**)",
+            "Write(.gitignore)",
+            "Write(*.md)",
+            "Write(*.config.*)",
+            "Write(package.json)",
+            "Write(tsconfig.json)",
+            "Skill(claude-code-setup:claude-automation-recommender)",
+            "Skill(gstack-upgrade)",
+            "Skill(superpowers:brainstorming)",
+            "Skill(superpowers:writing-plans)",
+            "Skill(superpowers:executing-plans)",
+            "Skill(superpowers:verification-before-completion)",
+            "Skill(superpowers:finishing-a-development-branch)",
+            "Skill(superpowers:requesting-code-review)",
+            "Skill(superpowers:systematic-debugging)",
+            "Skill(review)",
+            "WebFetch(domain:aws.amazon.com)",
+            "WebFetch(domain:awscli.amazonaws.com)",
+            "WebFetch(domain:docs.aws.amazon.com)",
+            "WebFetch(domain:repost.aws)",
+            "WebFetch(domain:docs.cloud.google.com)",
+            "WebFetch(domain:support.google.com)",
+            "WebFetch(domain:github.com)",
+            "WebFetch(domain:api.github.com)",
+            "WebFetch(domain:raw.githubusercontent.com)",
+            "WebFetch(domain:registry.terraform.io)",
+            "WebFetch(domain:registry.circleci.com)",
+            "WebFetch(domain:circleci.com)",
+            "WebFetch(domain:go.dev)",
+            "WebFetch(domain:code.claude.com)",
+            "WebFetch(domain:www.hashicorp.com)",
+            "WebFetch(domain:datatracker.ietf.org)",
+            "WebFetch(domain:tools.ietf.org)",
+            "WebFetch(domain:www.iana.org)",
+            "WebFetch(domain:www.icann.org)",
+            "WebFetch(domain:techracho.bpsinc.jp)",
+            "WebFetch(domain:dev.classmethod.jp)",
+            "WebFetch(domain:nextjs.org)",
+            "WebFetch(domain:vercel.com)",
+            "WebFetch(domain:zenn.dev)",
+            "WebFetch(domain:qiita.com)",
+            "WebFetch(domain:yarnpkg.com)",
+            "WebFetch(domain:www.npmjs.com)",
+            "WebFetch(domain:pnpm.io)",
+            "WebFetch(domain:biomejs.dev)",
+            "WebFetch(domain:www.ruby-lang.org)",
+            "WebFetch(domain:railsguides.jp)",
+            "WebFetch(domain:rubyonrails.org)",
+            "WebFetch(domain:rubyapi.org)",
+            "WebFetch(domain:docs.rubocop.org)",
+            "WebFetch(domain:rubocop.org)",
+            "WebFetch(domain:rubygems.org)",
+            "WebFetch(domain:nodejs.org)",
+            "WebFetch(domain:ja.react.dev)",
+            "WebFetch(domain:react.dev)",
+            "WebFetch(domain:www.typescriptlang.org)",
+            "WebFetch(domain:mise.jdx.dev)",
+            "WebFetch(domain:docs.docker.com)",
+            "WebFetch(domain:docs.python.org)",
+            "WebFetch(domain:www.openapis.org)",
+            "WebFetch(domain:redocly.com)",
+            "WebFetch(domain:claude.com)",
+            "WebFetch(domain:docs.claude.com)",
+            "WebFetch(domain:eu-central-1-1.aws.cloud2.influxdata.com)"
+        ],
+        "deny": [
+            "Bash(sudo *)",
+            "Bash(rm -rf *)",
+            "Bash(chmod *)",
+            "Bash(chown *)",
+            "Bash(curl *)",
+            "Bash(wget *)",
+            "Bash(cat **)",
+            "Bash(git reset --hard *)",
+            "Bash(sfdx org:deploy *)",
+            "Bash(sf deploy *)",
+            "Bash(terraform apply *)",
+            "Bash(terraform destroy *)",
+            "Read(**/.env*)",
+            "Read(**/id_rsa*)",
+            "Read(**/id_ed25519*)",
+            "Read(~/.ssh/**)",
+            "Read(**/.ssh/**)",
+            "Read(**/.aws/**)",
+            "Read(./secrets/**)",
+            "Read(**/credentials/**)",
+            "Read(**/*.key)",
+            "Read(**/*.pem)",
+            "Read(**/.pgpass)",
+            "Write(/etc/**)",
+            "Write(**/.env*)",
+            "Write(**/.git/config)",
+            "Write(**/package-lock.json)",
+            "Write(**/pnpm-lock.yaml)",
+            "Write(**/yarn.lock)",
+            "Write(**/biome.json)",
+            "Write(**/.eslintrc)",
+            "Write(**/.eslintrc.*)",
+            "Write(**/.tflint.hcl)"
+        ],
+        "ask": [
+            "Bash(gh pr create*)",
+            "Bash(gh pr merge*)",
+            "Bash(gh pr close*)",
+            "Bash(gh pr edit*)",
+            "Bash(gh pr review*)",
+            "Bash(gh pr comment*)",
+            "Bash(gh issue create*)",
+            "Bash(gh issue close*)",
+            "Bash(gh issue comment*)",
+            "Bash(gh issue edit*)",
+            "Bash(gh release create*)",
+            "Bash(gh release delete*)",
+            "Bash(git push)",
+            "Bash(git push *)"
+        ],
+        "disableBypassPermissionsMode": "disable"
     },
-    "filesystem": {
-      "denyRead": [
-        "~/.aws/credentials",
-        "~/.ssh/id_*",
-        "~/.ssh/config"
-      ]
+    "hooks": {
+        "PreToolUse": [
+            {
+                "matcher": "Bash",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "~/.claude/hooks/validate-command.sh"
+                    }
+                ]
+            },
+            {
+                "matcher": "Bash",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "~/.claude/hooks/protect-main-branch.sh"
+                    }
+                ]
+            }
+        ],
+        "PostToolUse": [
+            {
+                "matcher": "Bash",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "jq -r 'if (.tool_input.command // \"\" | test(\"gh pr create\")) then (.tool_response.stdout // \"\" | match(\"https://github\\\\.com/\\\\S+\") | .string) // empty else empty end' | { read -r url; [ -n \"$url\" ] && echo \"{\\\"systemMessage\\\": \\\"PR が作成されました: $url\\\"}\"; } 2>/dev/null || true"
+                    }
+                ]
+            }
+        ],
+        "Notification": [
+            {
+                "matcher": "",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "terminal-notifier -title \"Claude Code\" -message \"入力待ちプロンプトが表示されました\" -sound default || true"
+                    }
+                ]
+            }
+        ],
+        "PreCompact": [
+            {
+                "matcher": "",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "~/.claude/hooks/precompact-context.sh"
+                    }
+                ]
+            }
+        ],
+        "Stop": [
+            {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "afplay /System/Library/Sounds/Glass.aiff"
+                    }
+                ]
+            },
+            {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "~/.claude/skills/gstack/hosts/claude/hooks/timeline-stop-hook",
+                        "timeout": 5
+                    }
+                ]
+            }
+        ]
     },
-    "enableWeakerNetworkIsolation": true,
-    "excludedCommands": [
-      "gh"
-    ]
-  },
-  "effortLevel": "xhigh",
-  "theme": "dark-daltonized"
+    "statusLine": {
+        "type": "command",
+        "command": "~/.claude/scripts/statusline.sh"
+    },
+    "enabledPlugins": {
+        "superpowers@claude-plugins-official": true,
+        "claude-code-setup@claude-plugins-official": true,
+        "ruby-lsp@claude-plugins-official": true,
+        "understand-anything@understand-anything": true
+    },
+    "extraKnownMarketplaces": {
+        "understand-anything": {
+            "source": {
+                "source": "github",
+                "repo": "Egonex-AI/Understand-Anything"
+            }
+        }
+    },
+    "sandbox": {
+        "enabled": true,
+        "allowUnsandboxedCommands": false,
+        "network": {
+            "allowedDomains": [
+                "github.com",
+                "*.github.com",
+                "*.githubusercontent.com",
+                "*.npmjs.org",
+                "registry.yarnpkg.com",
+                "pypi.org"
+            ]
+        },
+        "filesystem": {
+            "denyRead": ["~/.aws/credentials", "~/.ssh/id_*", "~/.ssh/config"]
+        },
+        "enableWeakerNetworkIsolation": true,
+        "excludedCommands": ["gh"]
+    },
+    "effortLevel": "xhigh",
+    "theme": "dark-daltonized"
 }
