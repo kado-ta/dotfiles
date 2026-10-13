@@ -256,16 +256,10 @@
       ]
     },
     "filesystem": {
-      "denyRead": [
-        "~/.aws/credentials",
-        "~/.ssh/id_*",
-        "~/.ssh/config"
-      ]
+      "denyRead": ["~/.aws/credentials", "~/.ssh/id_*", "~/.ssh/config"]
     },
     "enableWeakerNetworkIsolation": true,
-    "excludedCommands": [
-      "gh"
-    ]
+    "excludedCommands": ["gh"]
   },
   "effortLevel": "xhigh",
   "modelSettings": {
