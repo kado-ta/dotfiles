@@ -7,7 +7,7 @@
         "editor.findMatchHighlightBackground": "#3b5768d0" // 検索にヒットしたテキストと同じテキスト
     },
     "workbench.editor.enablePreviewFromQuickOpen": false,
-    "workbench.iconTheme": "catppuccin-latte",
+    "workbench.iconTheme": "catppuccin-mocha",
     "workbench.startupEditor": "none",
     "editor.rulers": [110],
     "editor.fontFamily": "Fira Code, HackGen35Nerd, Menlo, Monaco, 'Courier New', monospace",
