@@ -13,6 +13,7 @@ echo "CODEX_DIR: $CODEX_DIR"
 
 if [ ! -d $CODEX_DIR ]; then mkdir -p $CODEX_DIR; fi
 ln -snfv "$SCRIPT_DIR/config.toml" "$CODEX_DIR/config.toml"
+ln -snfv "$SCRIPT_DIR/AGENTS.md" "$CODEX_DIR/AGENTS.md"
 
 # Understad Anything スキルをインストールする。
 curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/install.sh | bash -s codex
