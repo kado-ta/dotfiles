@@ -14,4 +14,4 @@ echo "SCRIPT_DIR: $SCRIPT_DIR"
 echo "BIOME_DIR: $BIOME_DIR"
 
 if [ ! -d "$BIOME_DIR" ]; then mkdir -p "$BIOME_DIR"; fi
-ln -snfv "${SCRIPT_DIR}/biome.json" "${BIOME_DIR}/biome.json"
+ln -snfv "${SCRIPT_DIR}/biome.jsonc" "${BIOME_DIR}/biome.jsonc"
