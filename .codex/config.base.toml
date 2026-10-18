@@ -1,6 +1,5 @@
 model = "gpt-6-astra"
 model_reasoning_effort = "high"
-
 developer_instructions = """
 ## 作業原則
 - 思考は英語で行い、最終的な出力は日本語とする。
@@ -57,6 +56,30 @@ personality = "pragmatic"
 model_verbosity = "medium"
 sandbox_mode = "read-only"
 
+[tui]
+screen_reader_detection_done = true
+
+status_line = [
+  "current-dir",
+  "git-branch",
+  "context-used",
+  "five-hour-limit",
+  "weekly-limit",
+  "model-with-reasoning",
+]
+status_line_use_colors = true
+
+[tui.model_availability_nux]
+"gpt-6.1-sol" = 4
+
+[features]
+js_repl = false
+memories = true
+
+[memories]
+generate_memories = true
+use_memories = true
+
 [marketplaces.openai-bundled]
 source_type = "local"
 source = "~/.codex/.tmp/bundled-marketplaces/openai-bundled"
@@ -98,14 +121,14 @@ enabled = true
 [plugins."code-review@openai-bundled"]
 enabled = true
 
-[features]
-js_repl = false
-memories = true
+[plugins."superpowers@openai-curated"]
+enabled = true
 
 [desktop]
 followUpQueueMode = "queue"
 dock-icon-preference = "app-default"
 conversationDetailMode = "STEPS_PROSE"
+ambient-suggestions-enabled = false
 enabled-reasoning-efforts = [
   "low",
   "medium",
@@ -145,7 +168,3 @@ command = "./Codex Computer Use.app/Contents/SharedSupport/SkyComputerUseClient.
 args = ["mcp"]
 cwd = "."
 enabled = false
-
-[memories]
-generate_memories = true
-use_memories = true
