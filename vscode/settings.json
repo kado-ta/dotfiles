@@ -102,6 +102,7 @@
             "italic": false
         }
     ],
+    "mise.checkForNewMiseVersion": false,
     // autoDocstring のスタイルを Google スタイルに設定する。
     "autoDocstring.docstringFormat": "google",
     //
