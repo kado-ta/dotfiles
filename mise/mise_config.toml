@@ -7,7 +7,7 @@ biome = "2.5.15"
 go = "1.27.1"
 node = "26.10.0"
 pnpm = "12.14.0"
-poetry = { version = "2.5.1", depends = "python" }
 python = "3.14.7"
 ruby = "4.0.7"
 terraform = "1.16.4"
+uv = "0.13.1"

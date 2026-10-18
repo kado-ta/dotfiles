@@ -16,12 +16,20 @@ echo "CONFIG_DIR: $CONFIG_DIR"
 
 if [ ! -d $CONFIG_DIR ]; then mkdir $CONFIG_DIR; fi
 
+# starship
 ln -snfv "$SCRIPT_DIR/starship/starship.toml" "$CONFIG_DIR/"
 
+# sheldon
 SHELDON_DIR="$CONFIG_DIR/sheldon"
 echo "SHELDON_DIR: $SHELDON_DIR"
 if [ ! -d $SHELDON_DIR ]; then mkdir $SHELDON_DIR; fi
 ln -snfv "$SCRIPT_DIR/sheldon/plugins.toml" "$SHELDON_DIR/"
+
+# uv
+UV_DIR="$CONFIG_DIR/sheldon"
+echo "SHELDON_DIR: $UV_DIR"
+if [ ! -d $UV_DIR ]; then mkdir $UV_DIR; fi
+ln -snfv "$SCRIPT_DIR/uv/uv.toml" "$UV_DIR/"
 
 # NOTE: karabiner は使用していないので、関連コマンドをコメントアウトする。
 # KARABINER_DIR="$CONFIG_DIR/karabiner"
