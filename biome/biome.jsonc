@@ -1,0 +1,37 @@
+{
+  // NOTE: この URL内のバージョンは、mise グローバル設定のバージョンと一致させる。
+  "$schema": "https://biomejs.dev/schemas/2.5.15/schema.json",
+  "formatter": {
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineEnding": "lf"
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "single",
+      "semicolons": "always",
+      "trailingCommas": "all"
+    }
+  },
+  "json": {
+    "formatter": {
+      "expand": "always"
+    }
+  },
+  "overrides": [
+    {
+      "includes": [
+        "**/vscode/settings.json"
+      ],
+      "json": {
+        "parser": {
+          "allowComments": true,
+          "allowTrailingCommas": true
+        },
+        "formatter": {
+          "indentWidth": 4
+        }
+      }
+    }
+  ]
+}
