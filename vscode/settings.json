@@ -255,8 +255,9 @@
         "NUMM"
     ],
     // Claude Code
-    "claudeCode.preferredLocation": "panel",
+    "claudeCode.preferredLocation": "sidebar",
     "claudeCode.hideOnboarding": true,
+    "claudeCode.initialPermissionMode": "manual",
     "chat.viewSessions.orientation": "stacked",
     // --------------------------------------------------------------------
     // ローカルファイルプロトコルの扱いに対する確認ダイアログを表示しない。
