@@ -3,10 +3,9 @@ tap "1password/tap"      # 1Password CLI
 tap "oven-sh/bun"        # bun コマンド
 tap "yukiarrr/tap"       # ecsk コマンド
 
-brew "biome"             # Biome: Linter & Formatter for JavaScript / TypeScript
-brew "circleci"          # CircleCI コマンド
+brew "actionlint"        # Static checker for GitHub Actions workflow files
+brew "bun"               # Incredibly fast JavaScript runtime, bundler, test runner, and package manager
 brew "coreutils"         # mise や Ruby の bundle install でも必要とするライブラリを含む。
-brew "openssl@3"
 brew "curl"              # データ送受信コマンド。
 brew "gh"                # GitHub CLI
 brew "git"               # Git コマンドは、Mac デフォルトではなく、 Homebrew でインストールする。
@@ -18,6 +17,7 @@ brew "jq"                # JSON データの加工／整形コマンド。
 brew "libyaml"
 brew "mise"              # 言語やツールのバージョンを管理する。
 # brew "mysql@8.0"         # MySQL クライアント。バージョンをアプリケーションで使用中の MySQL 8.0 に合わせる。
+brew "openssl@3"
 brew "pandoc"            # Typora で Markdown ファイルを他形式でエクスポートするために使用する。
 brew "pinentry-mac"      # Terraform で IAM ユーザーを管理するための GPG キー発行に使用する。
 brew "sheldon"           # シェルのライブラリを管理する。
@@ -27,7 +27,6 @@ brew "terminal-notifier" # macOS の通知センターへ通知を送信する
 brew "tree"              # ディレクトリ構造をツリー表示する。
 brew "trivy"             # コンテナイメージの脆弱性スキャンツール
 # brew "zsh"               # Zsh は Mac デフォルトを使用せず、 Homebrew でインストールする。
-brew "bun"               # bun コマンド
 brew "yukiarrr/tap/ecsk" # AWS ECS への SSH を簡単にするコマンド。
 
 # Colima + Docker CLI で Docker Desktop を代替する。
