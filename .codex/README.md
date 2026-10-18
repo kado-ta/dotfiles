@@ -122,34 +122,41 @@ codex-config-sync
 `setup.sh` は何度実行してもよい（リンクは `ln -snfv` で張り直す）。ただしスキルのインストールは毎回リモートの最新版を取得する。
 
 <a name="instructions"></a>
+
 ## 指示ファイル：AGENTS.md と developer_instructions
 
-Codex への常設の指示は 2 か所で管理している。
+Codex の動作をカスタマイズする2種類の指示。主な違いは**適用範囲と指示の優先順位**。
 
-| 観点 | `AGENTS.md` | `config.base.toml` の `developer_instructions` |
-| --- | --- | --- |
-| 実体 | `~/dotfiles/.codex/AGENTS.md`（Markdown） | `config.base.toml` 内の TOML 複数行文字列 |
-| Codex への渡り方 | `~/.codex/AGENTS.md`（`CODEX_HOME` 直下）をグローバル指示として読み込む | 設定値として、セッションに developer instructions として注入される |
-| 反映方法 | シンボリックリンクなので、**編集後に Codex を再起動するだけ** | **`codex-config-sync` が必要**（`config.toml` へマージされて初めて有効） |
-| プロジェクトの `AGENTS.md` との関係 | プロジェクトルートから現在ディレクトリまでの `AGENTS.md` と連結され、**現在ディレクトリに近いファイルが優先**される | プロジェクトの `AGENTS.md` とは独立して常に注入される |
-| サイズ | `project_doc_max_bytes`（既定 32 KiB）を超えると以降が読み込まれない | 明示的な上限はないが、毎セッションのコンテキストを消費する |
-| 置き換え | `~/.codex/AGENTS.override.md` があればそちらが優先される | 端末ごとに変えたい場合は `config.local.toml` で上書きできる |
+| 比較項目       | `AGENTS.md`                              | `developer_instructions`         |
+| -------------- | ---------------------------------------- | -------------------------------- |
+| 設定場所       | `~/.codex/AGENTS.md`                     | `~/.codex/config.toml`           |
+| 記述形式       | Markdown                                 | TOML の文字列                    |
+| 指示の優先順位 | User レベル                              | Developer レベル（上位）         |
+| 主な用途       | 開発方針・コーディング規約・回答ルール   | 優先度の高い動作指示             |
+| スコープ       | グローバル・リポジトリ・サブディレクトリ | グローバル・プロジェクト         |
+| 階層的な適用   | 上位から下位へ指示を追加                 | 設定レイヤーの優先順位で値を決定 |
 
-### 使い分け
+### 実行環境ごとの適用
 
-- **`developer_instructions`**：どのリポジトリでも必ず守らせたい、短く安定した**行動ルール**を書く。
-  - 例：思考は英語・出力は日本語、セーフティルール、テストポリシー、変更報告フォーマット、Git/GitHub ルール、判断優先順位、Claude Code との連携役割（レビュアー・コンサルタントとしての振る舞い）。
-  - Claude Code の `~/.claude/CLAUDE.md` に相当する内容を Codex 向けに置く場所。
-- **`AGENTS.md`**：Codex の**人格・回答スタイル・汎用的な作業方針**を書く。
-  - 例：ロール（CTO・テックリード視点のカウンターパート）、情報の検証方針、分析・意思決定支援の進め方、出力フォーマット、Markdown リンク規約。
-  - 分量が多く、頻繁に推敲する内容に向く（sync 不要で反映できるため）。
-- **プロジェクト固有のルール**はどちらにも書かず、各リポジトリの `AGENTS.md` に書く。
+| 実行環境                        | AGENTS.md | developer_instructions |
+| ------------------------------- | --------- | ---------------------- |
+| ChatGPT Desktop：ChatGPT モード | ✅         | 未確認                 |
+| ChatGPT Desktop：Codex モード   | ✅         | ⚠️ 不具合報告あり       |
+| Codex CLI                       | ✅         | ✅                      |
+| ChatGPT Web                     | ❌         | ❌                      |
 
-### 編集時の注意
+> [!NOTE]
+> Desktop では `developer_instructions` が適用されない不具合が報告されているため、動作確認が必要。
+> [GitHub - developer_instructions の不具合報告](https://github.com/openai/codex/issues/33238)
 
-- 同じ規則を両方に書かない。現在は「日本語で出力する」「テスト未実行を成功扱いしない」などが重複しているため、変更時はもう一方との整合を確認する。
-- 両者が矛盾すると、どちらが優先されるかの挙動に依存することになる。矛盾させないことを前提に運用する。
-- `developer_instructions` を Codex アプリ側で変更した場合も、`codex-config-import --key developer_instructions --apply` で取り込める。
+
+### 運用方針
+
+- **`AGENTS.md` を基本とする**：CLI・Desktop 共通の指示を集約する。
+- **`developer_instructions`** は補助的に使用：**Codex CLI で上位の指示が必要な場合**に限定する。
+- プロジェクト固有の指示は各リポジトリの `AGENTS.md` に記述する。
+- 両方の指示が矛盾する場合、原則として `developer_instructions` が優先される。
+
 
 <a name="commands"></a>
 ## コマンド（zsh エイリアス）
