@@ -1,0 +1,10 @@
+# Rust 製の Python パッケージ・プロジェクト管理ツール
+# ~/.config/uv/uv.toml
+
+# uv が管理する Python よりも、mise で管理する
+# システム側の Python を使用する
+python-preference = "only-system"
+
+# Python の自動ダウンロードを禁止
+# 明示的な uv python install は引き続き可能
+python-downloads = "manual"
