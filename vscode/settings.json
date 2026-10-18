@@ -9,7 +9,9 @@
     "workbench.editor.enablePreviewFromQuickOpen": false,
     "workbench.iconTheme": "catppuccin-mocha",
     "workbench.startupEditor": "none",
-    "editor.rulers": [110],
+    "editor.rulers": [
+        110
+    ],
     "editor.fontFamily": "Fira Code, HackGen35Nerd, Menlo, Monaco, 'Courier New', monospace",
     "editor.fontSize": 13,
     "editor.fontLigatures": true,
@@ -139,7 +141,9 @@
         "identifier": "mise"
     },
     "rubyLsp.formatter": "rubocop",
-    "rubyLsp.linters": ["rubocop"],
+    "rubyLsp.linters": [
+        "rubocop"
+    ],
     "[erb]": {
         "editor.defaultFormatter": "aliariff.vscode-erb-beautify",
         "editor.formatOnSave": false
@@ -155,7 +159,9 @@
     "terraform.languageServer.enable": true,
     // ここは、絶対パスで設定する必要がある。通常は $PATH から自動検出される
     // "terraform.languageServer.terraform.path": "~/.local/share/mise/shims/terraform",
-    "terraform.languageServer.args": ["serve"],
+    "terraform.languageServer.args": [
+        "serve"
+    ],
     "terraform.experimentalFeatures.validateOnSave": false,
     "[terraform]": {
         "editor.defaultFormatter": "hashicorp.terraform",
@@ -213,7 +219,9 @@
         "--disallow-untyped-defs", // 返り値が明示されていない関数をエラーとして扱う。
         "--disallow-untyped-calls" // 返り値の型をが明示されていない関数をエラーとして扱う。
     ],
-    "mypy-type-checker.path": [".venv/bin/mypy"],
+    "mypy-type-checker.path": [
+        ".venv/bin/mypy"
+    ],
     "mypy-type-checker.severity": {
         "error": "Warning"
     },
@@ -229,8 +237,14 @@
         "files.trimTrailingWhitespace": false,
         "editor.wordWrap": "off"
     },
-    "spectral.validateLanguages": ["yaml", "json"],
-    "spectral.validateFiles": ["**/openapi.yaml", "**/openapi.yml"],
+    "spectral.validateLanguages": [
+        "yaml",
+        "json"
+    ],
+    "spectral.validateFiles": [
+        "dist/**/openapi.yaml",
+        "dist/**/openapi.yml"
+    ],
     "hediet.vscode-drawio.resizeImages": null,
     "circleci.hostUrl": "",
     "projectManager.tags": [
