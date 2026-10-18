@@ -10,7 +10,6 @@ bierner.markdown-preview-github-styles
 biomejs.biome
 bpruitt-goddard.mermaid-markdown-syntax-highlighting
 catppuccin.catppuccin-vsc
-catppuccin.catppuccin-vsc-icons
 charliermarsh.ruff
 circleci.circleci
 cyberbiont.vscode-open-in-typora
@@ -35,4 +34,5 @@ shopify.ruby-lsp
 sianglim.slim
 stoplight.spectral
 tamasfe.even-better-toml
+thang-nm.catppuccin-perfect-icons
 usernamehw.errorlens

@@ -7,7 +7,7 @@
         "editor.findMatchHighlightBackground": "#3b5768d0" // 検索にヒットしたテキストと同じテキスト
     },
     "workbench.editor.enablePreviewFromQuickOpen": false,
-    "workbench.iconTheme": "catppuccin-mocha",
+    "workbench.iconTheme": "catppuccin-perfect-dark",
     "workbench.startupEditor": "none",
     "editor.rulers": [
         110
