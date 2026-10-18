@@ -29,6 +29,19 @@ alias sudo='sudo '
 alias -g L='| less'
 alias -g G='| grep'
 
+# Codex 設定を ~/dotfiles/.codex で管理する設定と同期するコマンド
+# - 同期実行: codex-config-sync
+# - Dry Run: codex-config-sync --dry-run
+alias codex-config-sync='uv run --no-project --with "tomlkit>=0.13,<1" python "$HOME/dotfiles/.codex/sync.py"'
+
+# Codex が変更した ~/.codex/config.toml の内容を
+# 選択的に ~/dotfiles/.codex/config.base.toml へ反映する。
+# - 変更候補を確認(差分のみ表示): codex-config-import
+# - 指定した設定のみインポート: codex-config-import --key model_reasoning_effort --apply
+# - Git管理済みの設定項目をまとめてインポート: codex-config-import --all-managed --apply
+# - Codex が新しく追加した設定を明示的にインポート: codex-config-import --key features.multi_agent --apply
+alias codex-config-import='uv run --no-project --with "tomlkit>=0.13,<1" python "$HOME/dotfiles/.codex/import.py"'
+
 # Claude Code / Codex の起動なしに Understad Anything スキルのダッシュボードを起動する。
 function ua-dashboard() {
   npx https://github.com/Egonex-AI/Understand-Anything/releases/latest/download/understand-anything-viewer.tgz "${1:-.}"
