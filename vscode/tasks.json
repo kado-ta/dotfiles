@@ -5,7 +5,11 @@
       "label": "Open current Markdown in Typora",
       "type": "process",
       "command": "open",
-      "args": ["-a", "Typora", "${file}"],
+      "args": [
+        "-a",
+        "Typora",
+        "${file}"
+      ],
       "problemMatcher": [],
       "presentation": {
         "reveal": "never",
