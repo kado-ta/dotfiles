@@ -44,6 +44,7 @@ cask "claude-code"
 cask "codex"             # OpenAI Codex CLI (Claude Code との協調動作用)
 cask "coteditor"
 cask "dbgate"            # Database manager for MySQL, PostgreSQL, SQL Server, MongoDB, SQLite and others
+cask "devtoys"           # JWT, Base64 等を変換するユーティリティーツール
 cask "figma"
 cask "font-fira-code"    # コーディング見やすいかわいいフォント
 cask "font-hackgen"      # Starship が必要とするフォント。
