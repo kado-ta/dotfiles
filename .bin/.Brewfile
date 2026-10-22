@@ -38,6 +38,7 @@ brew "docker-compose" # Isolated development environments using Docker
 cask "1password"
 cask "1password-cli"
 cask "atok"
+cask "bruno"             # Open source API Client
 cask "chatgpt"
 cask "claude"
 cask "claude-code"
