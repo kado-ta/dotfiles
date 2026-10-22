@@ -10,12 +10,16 @@
     "key": "ctrl+tab",
     "command": "workbench.action.nextEditor"
   },
-  // .md ファイルを開いた状態で Cmd + Shift + T で、開いているファイルを Typora へ渡す。
+  // .md ファイルを開いた状態から Cmd+Opt+T キーで、そのファイルを Typora で開く。
   {
-    "key": "cmd+shift+t",
+    "key": "cmd+alt+t",
     "command": "workbench.action.tasks.runTask",
     "args": "Open current Markdown in Typora",
-    "when": "editorTextFocus"
+    "when": "editorLangId == markdown"
+  },
+  {
+    "key": "cmd+alt+t",
+    "command": "-workbench.action.closeOtherEditors"
   },
   {
     "key": "shift+enter",
