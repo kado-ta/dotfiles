@@ -13,6 +13,7 @@
       "problemMatcher": [],
       "presentation": {
         "reveal": "never",
+        "panel": "dedicated",
         "close": true
       }
     }
