@@ -12,6 +12,7 @@ brew "git"               # Git コマンドは、Mac デフォルトではなく
 brew "git-filter-repo"   # Git からファイル履歴を削除する。
 brew "gnupg"             # Terraform で IAM ユーザーを管理するための GPG キー発行に使用する。
 brew "grep"              # grep コマンド。当たり前に必要。
+brew "herdr"             # Agent multiplexer that lives in your terminal
 brew "imagemagick"       # rmagick gem をインストールするために、ImageMagick@7 が必要。
 brew "jq"                # JSON データの加工／整形コマンド。
 brew "libyaml"
