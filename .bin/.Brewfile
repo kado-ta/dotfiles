@@ -4,6 +4,7 @@ tap "oven-sh/bun"        # bun コマンド
 tap "yukiarrr/tap"       # ecsk コマンド
 
 brew "actionlint"        # Static checker for GitHub Actions workflow files
+brew "atuin"             # Improved shell history for zsh, bash, fish and nushell
 brew "bun"               # Incredibly fast JavaScript runtime, bundler, test runner, and package manager
 brew "coreutils"         # mise や Ruby の bundle install でも必要とするライブラリを含む。
 brew "curl"              # データ送受信コマンド。
@@ -23,6 +24,7 @@ brew "pandoc"            # Typora で Markdown ファイルを他形式でエク
 brew "pinentry-mac"      # Terraform で IAM ユーザーを管理するための GPG キー発行に使用する。
 brew "sheldon"           # シェルのライブラリを管理する。
 brew "starship"          # シェル用プロンプト。高速でカスタマイズ性が高い。
+brew "tealdeer"          # Very fast implementation of tldr in Rust
 brew "telnet"            # RTX ルーターへの接続に使用する。
 brew "terminal-notifier" # macOS の通知センターへ通知を送信する
 brew "tree"              # ディレクトリ構造をツリー表示する。
