@@ -32,5 +32,4 @@ description: Use when starting any task — determines which skill to invoke by 
 | 振り返り | retro / 振り返り / 週次まとめ / 何を出荷したか | `/retro` | — |
 | セキュリティ監査 | セキュリティ監査 / 脆弱性チェック / 攻撃面確認 / OWASP | `/cso` | — |
 
-各シーンで Codex Offload Rules（`.claude/docs/CODEX_OFFLOAD.md` 参照）に従い委譲する。  
 完了後は「`{起点スキル}` 完了 → 次は **{次のスキル}** を使います。進めてよいですか？」のフォーマットで次ステップを提示する。
