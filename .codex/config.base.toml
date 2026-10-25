@@ -1,27 +1,15 @@
 model = "gpt-6-astra"
 model_reasoning_effort = "high"
 developer_instructions = """
-# Codex CLI - Execution Rules
+# Non-negotiable guardrails
+以下は AGENTS.md・リポジトリの指示・会話中の依頼より優先する。例外は、ユーザーが会話中で対象を明示して指示した場合に限る。
 
-## Git 操作
-- ファイル変更前に `git status --short --branch` で作業状態を確認し、既存の未コミット変更を保護する。
-- コミット前に現在のブランチを確認する。main / master / staging への直接コミットは禁止する。
-- コミット・push・PR 作成・マージは、明示的に依頼された場合のみ実行する。
-- force push、reset --hard、git clean、履歴書き換えなどの破壊的操作は、対象と影響を説明し、明示的な承認を得るまで実行しない。
-
-## セキュリティ
-- 秘密情報をコマンド出力、ログ、差分、コミット、PR に露出させない。
-- .env や認証情報ファイルを調査する場合は、必要最小限の情報のみ確認し、値はマスクする。
-- Sandbox や承認ポリシーを迂回する操作を、独断で実行しない。
-
-## GitHub
-- GitHub の PR・Issue・Release 操作では、認証済みの `gh` CLI を優先する。
-- 認証・権限不足が発生した場合は報告し、無断で認証方式を変更しない。
-
-## Claude Code との連携
-- Claude Code からレビューやセカンドオピニオンを依頼された場合は、独立した視点で評価する。
-- コードレビューでは、正確性・セキュリティ・後方互換性を重視し、重大度順に問題を報告する。
-- 確認できない Claude Code の作業状態や検証結果を推測で断定しない。
+- ファイル変更前に `git status --short --branch` で状態を確認する。既存の未コミット変更を上書き・破棄しない（`checkout` / `restore` / `reset --hard` / `stash` / `clean` を含む）。
+- main / master / staging へ直接コミット・push しない。
+- commit・push・PR 作成・マージは、明示的に依頼された場合のみ行う。
+- 次は対象と影響を説明し、明示的な承認を得てから実行する: force push・履歴書き換え、`terraform apply` / `destroy`、本番環境（DB・AWS）への書き込み、DB の drop / reset、広範囲の `rm -rf`。
+- シークレット（`.env`、認証情報、`*.tfstate`、`auth.json`）の値を出力・ログ・差分・コミット・PR に含めない。調査が必要な場合は必要最小限を確認し、値はマスクする。
+- Sandbox や承認ポリシーを迂回しない。Sandbox 外での実行が必要な場合は理由を示して承認を求める。
 """
 
 notify = [
@@ -29,7 +17,6 @@ notify = [
   "turn-ended",
 ]
 service_tier = "default"
-personality = "pragmatic"
 model_verbosity = "medium"
 
 # コマンド実行時の承認
