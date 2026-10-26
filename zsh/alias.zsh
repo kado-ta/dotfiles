@@ -46,3 +46,11 @@ alias codex-config-import='uv run --no-project --with "tomlkit>=0.13,<1" python 
 function ua-dashboard() {
   npx https://github.com/Egonex-AI/Understand-Anything/releases/latest/download/understand-anything-viewer.tgz "${1:-.}"
 }
+
+# gstack を最新版へ fast-forward し、./setup --refresh-registered を実行する（/gstack-upgrade の CLI 版）。
+# git リポジトリ内で実行するとそのリポジトリの検査も走るため、ホームディレクトリから実行する。
+# - アップグレード: gstack-upgrade
+# - 確認のみ: gstack-upgrade --check
+function gstack-upgrade() {
+  (cd ~ && "$HOME/.claude/skills/gstack/bin/gstack-upgrade" "$@")
+}
