@@ -60,8 +60,8 @@ Codex のユーザー設定 `~/.codex/config.toml` は、モデルや MCP の設
 | ファイル | 役割 | `~/.codex/` への反映方法 |
 | --- | --- | --- |
 | `README.md` | このドキュメント | なし |
-| `AGENTS.md` | Codex のグローバル指示（ロール・回答方針・出力フォーマットなど） | `setup.sh` がシンボリックリンクを作成 |
-| `config.base.toml` | 複数端末で共有する Codex 設定（モデル・`developer_instructions`・プラグイン・MCP など） | `sync.py` が `config.toml` へマージ |
+| `AGENTS.md` | Codex のグローバル指示の正本（回答方針・作業ルール・安全ルール・レビュー方針など） | `setup.sh` がシンボリックリンクを作成 |
+| `config.base.toml` | 複数端末で共有する Codex 設定（モデル・`developer_instructions`（安全ガードレール）・プラグイン・MCP など） | `sync.py` が `config.toml` へマージ |
 | `setup.sh` | `AGENTS.md` のリンク作成と Understand Anything スキルのインストール | — |
 | `sync.py` | `config.base.toml` + `config.local.toml` → `config.toml` | — |
 | `import.py` | `config.toml` の変更を選択的に `config.base.toml` へ取り込む | — |
@@ -127,14 +127,17 @@ codex-config-sync
 
 Codex の動作をカスタマイズする2種類の指示。主な違いは**適用範囲と指示の優先順位**。
 
-| 比較項目       | `AGENTS.md`                              | `developer_instructions`         |
-| -------------- | ---------------------------------------- | -------------------------------- |
-| 設定場所       | `~/.codex/AGENTS.md`                     | `~/.codex/config.toml`           |
-| 記述形式       | Markdown                                 | TOML の文字列                    |
-| 指示の優先順位 | User レベル                              | Developer レベル（上位）         |
-| 主な用途       | 開発方針・コーディング規約・回答ルール   | 優先度の高い動作指示             |
-| スコープ       | グローバル・リポジトリ・サブディレクトリ | グローバル・プロジェクト         |
-| 階層的な適用   | 上位から下位へ指示を追加                 | 設定レイヤーの優先順位で値を決定 |
+| 比較項目       | `AGENTS.md`                                    | `developer_instructions`                     |
+| -------------- | ---------------------------------------------- | -------------------------------------------- |
+| 設定場所       | `~/.codex/AGENTS.md`                           | `~/.codex/config.toml`                       |
+| 記述形式       | Markdown                                       | TOML の文字列                                |
+| 指示の優先順位 | User レベル（推測）                            | Developer レベル（推測・公式に記載なし）     |
+| 主な用途       | すべての指示の正本（回答方針・作業ルールなど） | 安全ガードレールのみ（AGENTS.md と意図的に重複） |
+| スコープ       | グローバル・リポジトリ・サブディレクトリ       | グローバル・プロジェクト                     |
+| 階層的な適用   | 上位から下位へ連結（近いファイルが優先）       | 設定レイヤーの優先順位で値を決定             |
+
+> [!NOTE]
+> 公式の設定リファレンスでの `developer_instructions` の説明は「Additional developer instructions injected into the session」のみで、AGENTS.md との優先順位は明記されていない。上表の優先順位は推測であり、未確認。
 
 ### 実行環境ごとの適用
 
@@ -152,10 +155,26 @@ Codex の動作をカスタマイズする2種類の指示。主な違いは**�
 
 ### 運用方針
 
-- **`AGENTS.md` を基本とする**：CLI・Desktop 共通の指示を集約する。
-- **`developer_instructions`** は補助的に使用：**Codex CLI で上位の指示が必要な場合**に限定する。
+- **`AGENTS.md` を正本とする**：CLI・Desktop 共通の指示をすべて集約する。Desktop で `developer_instructions` が適用されない場合に備え、安全ルールも `AGENTS.md` の Safety セクションに記述する。
+- **`developer_instructions` は安全ガードレールに限定する**：未コミット変更の保護、保護ブランチへの直接コミット禁止、破壊的操作・本番操作の承認、シークレットの非出力、Sandbox の非迂回など、リポジトリの指示や会話中の依頼より優先させたいルールだけを置く。
+- 安全ルールを変更するときは、`AGENTS.md` の Safety / Git セクションと `developer_instructions` の**両方**を更新する。
 - プロジェクト固有の指示は各リポジトリの `AGENTS.md` に記述する。
-- 両方の指示が矛盾する場合、原則として `developer_instructions` が優先される。
+- Claude Code 側の `~/dotfiles/.claude/CLAUDE.md` と作業ルールの内容を揃える。片方を変更したら、もう片方への反映要否を確認する。
+
+### 編集の指針
+
+公式の Best practices / Customization に基づく。
+
+- 短く、具体的な行動に結びつく指示だけを書く。「正確性を重視する」のような曖昧な指示は効果が薄い。
+- 新しいルールは、同じ誤りを繰り返したときに追加する。
+- グローバルの `AGENTS.md` にはコミュニケーション方針と全リポジトリ共通の既定を書き、リポジトリ固有の規約・コマンドは各リポジトリ側に書く。
+- AGENTS.md の連結結果には `project_doc_max_bytes`（既定 32 KiB）の上限がある。グローバル分はリポジトリ側の AGENTS.md と合算されるため、肥大化させない。
+- HTML コメントがコンテキストから除去されるかは確認できていないため、メンテナンス用のメモは `AGENTS.md` ではなくこの README に書く。
+- 繰り返し使う手順はスキル（`~/.agents/skills`）に、必ず止めたいコマンドは文章ではなく Sandbox・承認ポリシー・Rules（experimental）で強制することを検討する。
+
+### 反映の確認
+
+変更後に Codex を再起動し、作業中のリポジトリのルートで「現在読み込まれている指示を要約して」と依頼する。`AGENTS.md` と `developer_instructions` の両方の内容が要約に含まれることを確認する。
 
 
 <a name="commands"></a>
@@ -486,6 +505,7 @@ chmod 600 "$HOME/.codex/config.toml"
 - dry-run を利用した自動テスト／サンプル TOML の回帰テスト。
 - `import.py` のキー名・値に対する機密情報検査の強化。
 - 不要バックアップの世代管理。
+- 破壊的コマンドを `~/.codex/rules/*.rules` で `forbidden` / `prompt` にし、`developer_instructions` の文章による指示を補強する（Rules は experimental）。
 
 <a name="references"></a>
 ## 参考資料
@@ -493,6 +513,8 @@ chmod 600 "$HOME/.codex/config.toml"
 - [OpenAI Codex: Configuration Reference](https://developers.openai.com/codex/config-reference)
 - [OpenAI Codex: Config Basics](https://developers.openai.com/codex/config-basic)
 - [OpenAI Codex: AGENTS.md](https://developers.openai.com/codex/guides/agents-md)
+- [OpenAI Codex: Best practices](https://developers.openai.com/codex/learn/best-practices)
+- [OpenAI Codex: Customization](https://developers.openai.com/codex/concepts/customization)
 - [uv: Running scripts / Inline script metadata](https://docs.astral.sh/uv/guides/scripts/)
 - [PEP 723: Inline script metadata](https://peps.python.org/pep-0723/)
 - [tomlkit: GitHub](https://github.com/python-poetry/tomlkit)
