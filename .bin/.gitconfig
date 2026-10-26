@@ -28,3 +28,5 @@
 
 [includeIf "gitdir:~/Dev/numm/"]
 	path = ~/.gitconfig_numm
+[core]
+	quotePath = false
