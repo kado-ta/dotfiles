@@ -4,10 +4,10 @@
 [tools]
 aws-cli = { version = "latest", symlink_bins = "true" }
 biome = "latest"
-go = "1.27.1"
+go = "1.27.3"
 node = "26.12.1"
 pnpm = "latest"
-python = "3.14.7"
-ruby = "4.0.7"
-terraform = "1.16.6"
+python = "3.15.1"
+ruby = "4.0.9"
+terraform = "1.17.0"
 uv = "latest"
