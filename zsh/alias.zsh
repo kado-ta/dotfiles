@@ -4,6 +4,8 @@ case ${OSTYPE} in
         # Mac用の設定
         export CLICOLOR=1
         alias ls='ls -G -F'
+        # Typora でファイルを開く（例: typora hoge.md）
+        alias typora='open -a Typora'
         ;;
     linux*)
         # Linux用の設定
