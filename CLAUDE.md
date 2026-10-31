@@ -12,9 +12,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 1. `init.command` — Homebrew + Xcode CLI Tools のインストール（Finder からダブルクリック）
 2. `setup.command` — ランタイム・ライブラリ・ツール設定（Finder からダブルクリック）
 
-以下の個別スクリプトはシェル再起動後に実行する必要がある（`Makefile` コメント参照）:
+以下の個別スクリプトはシェル再起動後に実行する必要がある（`setup.command` 参照）:
 - `.bin/link.sh` — dotfiles を `~` にシンボリックリンク
-- `.bin/setup_brew.sh` — `Brewfile` からパッケージをインストール
+- `.bin/setup_brew.sh` — `~/.Brewfile`（`.bin/.Brewfile` へのリンク）からパッケージをインストール
 - `zsh/setup.sh` / `zsh/setup_plugins.sh`
 - `mise/setup.sh` — mise 設定をシンボリックリンクしランタイムをインストール
 - `.config/link.sh`, `.aws/link.sh`, `ghostty/link.sh`, `vscode/setup.sh`
@@ -22,12 +22,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `.codex/link.sh` — Codex CLI 設定のシンボリックリンク作成
 - `.obsidian/setup.sh` — Obsidian 設定と CSS スニペットを Vault（`~/Obsidian/main/.obsidian/`）にシンボリックリンク（Vault 作成後、Obsidian を閉じた状態で実行）
 
-## Makefile ターゲット
+<a name="mise-tasks"></a>
+## mise タスク
+
+タスクはリポジトリルートの `mise.toml` に定義する。`mise tasks` で一覧を表示する。
 
 ```sh
-make brew/deps/show   # Homebrew の依存関係ツリーを表示
-make brew/dump        # インストール済みパッケージから Brewfile を再生成
-make vscode/ext/list  # vscode/extensions リストを再生成
+mise run brew:deps:show   # Homebrew の依存関係ツリーを表示
+mise run brew:dump        # インストール済みパッケージから Brewfile を再生成
+mise run vscode:ext:list  # vscode/extensions リストを再生成
 ```
 
 ## アーキテクチャ
@@ -73,7 +76,7 @@ make vscode/ext/list  # vscode/extensions リストを再生成
 ## 規約
 
 - テストは `.claude/hooks/tests/` のフック回帰テストのみ。フックを変更したら `bash .claude/hooks/tests/test-protect-main-branch.sh` を実行する。それ以外の動作確認はセットアップスクリプトを手動実行して行う。
-- `Brewfile` はリポジトリルートが正規版。`make brew/dump` で再生成する。
-- `vscode/extensions` は `make vscode/ext/list` で生成するため手動編集しない。
+- Homebrew のパッケージリストの正規版は `.bin/.Brewfile`。リポジトリルートの `Brewfile` は `mise run brew:dump` で生成し、`.bin/.Brewfile` を最新化するためのベースとして使う。
+- `vscode/extensions` は `mise run vscode:ext:list` で生成するため手動編集しない。
 - `.aws/credentials` は gitignore 済み。credentials をコミットしない。
 - Markdown ファイル名（`.md` を除く部分）は英大文字と `_` のみで構成する（例: `README.md`, `SYNC_BACKUP.md`）。新規作成・リネーム時に適用する。`docs/` 配下は例外とし、グローバル規約の保存パスに従う。
