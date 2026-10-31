@@ -2,3 +2,6 @@
 .aws/credentials
 .DS_Store
 Brewfile
+
+# バックアップファイルを Git 管理対象にしない。
+*.bak*
