@@ -50,7 +50,7 @@ make vscode/ext/list  # vscode/extensions リストを再生成
 ## Claude Code 設定（`.claude/`）
 
 `.claude/setup.sh` がメインのエントリーポイント。以下を実行する:
-- `settings.json` と `CLAUDE.md` を `~/.claude/` にシンボリックリンク
+- `settings.json`、`CLAUDE.md`、`rules/`、`mcp.json` を `~/.claude/` にシンボリックリンク
 - `hooks/` ディレクトリを `~/.claude/hooks/` にシンボリックリンク
 - プラグインをインストール: `superpowers@claude-plugins-official`, `claude-code-setup@claude-plugins-official`, `gstack`
 - `skills/*/` を `~/.claude/skills/` にシンボリックリンク
