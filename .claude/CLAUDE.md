@@ -69,7 +69,7 @@ https://x.com/ai_database/status/2114184481951330365?s=12
 - API は OpenAPI を正とする spec-first。エンドポイント変更時は spec を先に更新し、`redocly lint` で検証する。spec と実装が既に食い違っている箇所は、spec を正とみなさず着手前に確認する。
 - API の手動確認用に Bruno コレクションがあれば、変更に合わせて更新する。
 - ローカル実行は Docker Compose 定義があればそれを使う。
-- Plan / Design などのドキュメントは `docs/YYYYMMDD_<名前>/[<種別>]_<名前>.md` に保存する（日付は作成日、種別は `plan` / `design` などの英語スネークケース）。Superpowers などのスキルの既定パスより優先する。`[ ]` を含むため、シェルではパスを引用符で囲む。
+- 文書（仕様書・ADR・runbook・plan / design などの作業文書）の置き場所・命名・運用は `~/.claude/rules/DOCUMENTS.md` に従う。
 
 ## Cross-model review (Codex)
 - Codex はレビュワーとして使う。設計判断を含む変更、大規模変更、セキュリティ関連の変更では、完了前に Codex レビューを提案する。
