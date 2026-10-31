@@ -1,0 +1,307 @@
+/* =====================================================================
+   typora-like.css
+   Obsidian を Typora の表示に寄せるスニペット
+     - Light mode : Typora "GitHub" テーマ相当
+     - Dark mode  : Typora "Night" テーマ相当
+   対象   : Reading view（全面）/ Live Preview（変数 + 見出し下線・字間・
+            インラインコード・表）。Source mode には個別指定を当てない
+   前提   : Obsidian テーマ = Default
+            Settings > Appearance のフォント指定は空（指定があるとそちらが優先）
+            「Readable line length」ON で本文幅が Typora の #write 幅になる
+   ===================================================================== */
+
+
+/* =====================================================================
+   1. Light : Typora GitHub
+   ===================================================================== */
+.theme-light {
+  /* --- Font / Text ------------------------------------------------- */
+  --font-text-theme: "Open Sans", "Clear Sans", "Helvetica Neue", Helvetica, Arial,
+    "Segoe UI Emoji", "SF Pro", "Hiragino Sans", "Hiragino Kaku Gothic ProN",
+    "Yu Gothic UI", "Meiryo", sans-serif;
+  --line-height-normal: 1.6;
+  --p-spacing: 0.8em;
+
+  --background-primary: #ffffff;
+  --background-secondary: #fafafa;      /* Typora: --side-bar-bg-color */
+  --text-normal: rgb(51, 51, 51);
+  --text-muted: #777777;
+  --bold-weight: 700;
+
+  /* --- Width (#write: 860px / 1024px / 1200px) --------------------- */
+  --file-line-width: 860px;
+
+  /* --- Link -------------------------------------------------------- */
+  --link-color: #4183c4;
+  --link-color-hover: #4183c4;
+  --link-external-color: #4183c4;
+  --link-external-color-hover: #4183c4;
+
+  /* --- Headings ---------------------------------------------------- */
+  --h1-size: 2.25em;  --h1-line-height: 1.2;   --h1-weight: 700; --h1-color: rgb(51, 51, 51);
+  --h2-size: 1.75em;  --h2-line-height: 1.225; --h2-weight: 700; --h2-color: rgb(51, 51, 51);
+  --h3-size: 1.5em;   --h3-line-height: 1.43;  --h3-weight: 700; --h3-color: rgb(51, 51, 51);
+  --h4-size: 1.25em;  --h4-line-height: 1.4;   --h4-weight: 700; --h4-color: rgb(51, 51, 51);
+  --h5-size: 1em;     --h5-line-height: 1.4;   --h5-weight: 700; --h5-color: rgb(51, 51, 51);
+  --h6-size: 1em;     --h6-line-height: 1.4;   --h6-weight: 700; --h6-color: #777777;
+
+  /* --- Code -------------------------------------------------------- */
+  --code-background: #f8f8f8;           /* .md-fences */
+  --code-normal: rgb(51, 51, 51);
+
+  /* --- Blockquote -------------------------------------------------- */
+  --blockquote-border-thickness: 4px;
+  --blockquote-border-color: #dfe2e5;
+  --blockquote-color: #777777;
+  --blockquote-font-style: normal;
+  --blockquote-background-color: transparent;
+
+  /* --- HR ---------------------------------------------------------- */
+  --hr-color: #e7e7e7;
+  --hr-thickness: 2px;
+
+  /* --- Table (全周罫線 + 偶数行ストライプ) -------------------------- */
+  --table-border-width: 1px;
+  --table-border-color: #dfe2e5;
+  --table-header-border-width: 1px;
+  --table-header-border-color: #dfe2e5;
+  --table-column-first-border-width: 1px;
+  --table-column-last-border-width: 1px;
+  --table-row-last-border-width: 1px;
+  --table-header-background: #f8f8f8;
+  --table-header-background-hover: #f8f8f8;
+  --table-header-weight: 700;
+  --table-header-color: rgb(51, 51, 51);
+  --table-row-alt-background: #f8f8f8;
+  --table-column-alt-background: transparent;
+}
+
+@media only screen and (min-width: 1400px) {
+  .theme-light { --file-line-width: 1024px; }
+}
+@media only screen and (min-width: 1800px) {
+  .theme-light { --file-line-width: 1200px; }
+}
+
+/* --- Headings: margin / border (Reading view) ---------------------- */
+.theme-light .markdown-rendered :is(h1, h2, h3, h4, h5, h6) {
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+}
+.theme-light .markdown-rendered :is(h1, h2) {
+  border-bottom: 1px solid #eee;
+}
+/* Live Preview の h1 / h2 下線 */
+.theme-light .markdown-source-view.mod-cm6.is-live-preview .cm-line:is(.HyperMD-header-1, .HyperMD-header-2) {
+  border-bottom: 1px solid #eee;
+}
+
+/* --- Inline code --------------------------------------------------- */
+.theme-light .markdown-rendered :not(pre) > code {
+  background-color: #f3f4f4;
+  border: 1px solid #e7eaed;
+  border-radius: 3px;
+  padding: 0 2px;
+  font-size: 0.9em;
+  color: rgb(51, 51, 51);
+}
+.theme-light .markdown-source-view.mod-cm6.is-live-preview .cm-inline-code {
+  background-color: #f3f4f4;
+}
+
+/* --- Code block ---------------------------------------------------- */
+.theme-light .markdown-rendered pre {
+  background-color: #f8f8f8;
+  border: 1px solid #e7eaed;
+  border-radius: 3px;
+  padding: 8px 1em 6px;
+  margin: 15px 0;
+}
+
+/* --- Blockquote ---------------------------------------------------- */
+.theme-light .markdown-rendered blockquote {
+  padding: 0 15px;
+  margin: 0.8em 0;
+}
+
+/* --- Table --------------------------------------------------------- */
+.theme-light .markdown-rendered :is(th, td) {
+  padding: 6px 13px;
+}
+
+/* --- HR ------------------------------------------------------------ */
+.theme-light .markdown-rendered hr {
+  margin: 16px 0;
+}
+
+
+/* =====================================================================
+   2. Dark : Typora Night
+   ===================================================================== */
+.theme-dark {
+  /* --- Font / Text ------------------------------------------------- */
+  --font-text-theme: "Helvetica Neue", Helvetica, Arial, "Segoe UI Emoji", "SF Pro",
+    "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Meiryo", sans-serif;
+  --font-monospace-theme: Monaco, Consolas, "Andale Mono", "DejaVu Sans Mono", monospace;
+  --line-height-normal: 1.625;          /* 1.625rem / 16px */
+  --p-spacing: 1.5rem;
+
+  --background-primary: #363b40;
+  --background-secondary: #2e3033;      /* Typora: --side-bar-bg-color */
+  --text-normal: #b8bfc6;
+  --text-selection: rgba(74, 137, 220, 0.5);  /* #4a89dc（文字が隠れないよう半透明化） */
+  --bold-color: #dedede;
+
+  /* --- Width (#write: 914px / 1024px / 1200px) --------------------- */
+  --file-line-width: 914px;
+
+  /* --- Link -------------------------------------------------------- */
+  --link-color: #e0e0e0;
+  --link-color-hover: #ffffff;
+  --link-external-color: #e0e0e0;
+  --link-external-color-hover: #ffffff;
+  --link-decoration: underline;
+  --link-external-decoration: underline;
+
+  /* --- Headings（line-height は Typora の rem 値を font-size 比に換算） */
+  --h1-font: "Lucida Grande", "Corbel", "Hiragino Sans", "Yu Gothic UI", "Meiryo", sans-serif;
+  --h2-font: var(--h1-font);
+  --h3-font: var(--h1-font);
+  --h4-font: var(--h1-font);
+  --h5-font: var(--h1-font);
+  --h6-font: var(--h1-font);
+  --h1-size: 2.5em;   --h1-line-height: 1.1;     --h1-weight: 400; --h1-color: #dedede;
+  --h2-size: 1.63em;  --h2-line-height: 1.15;   --h2-weight: 700; --h2-color: #dedede;
+  --h3-size: 1.17em;  --h3-line-height: 1.282;  --h3-weight: 700; --h3-color: #dedede;
+  --h4-size: 1.12em;  --h4-line-height: 1.228;  --h4-weight: 400; --h4-color: #ffffff;
+  --h5-size: 0.97em;  --h5-line-height: 1.289;  --h5-weight: 700; --h5-color: #dedede;
+  --h6-size: 0.93em;  --h6-line-height: 1.075;  --h6-weight: 400; --h6-color: #ffffff;
+
+  /* --- Code -------------------------------------------------------- */
+  --code-background: #333333;           /* pre.md-fences */
+  --code-normal: #b8bfc6;
+
+  /* --- Blockquote -------------------------------------------------- */
+  --blockquote-border-thickness: 2px;
+  --blockquote-border-color: #474d54;
+  --blockquote-color: #9da2a6;
+  --blockquote-font-style: normal;
+  --blockquote-background-color: transparent;
+
+  /* --- HR ---------------------------------------------------------- */
+  --hr-color: #474d54;
+  --hr-thickness: 2px;
+
+  /* --- Highlight (mark) -------------------------------------------- */
+  --text-highlight-bg: #d3d40e;
+
+  /* --- Table (全周罫線・ストライプなし) ----------------------------- */
+  --table-border-width: 1px;
+  --table-border-color: #474d54;
+  --table-header-border-width: 1px;
+  --table-header-border-color: #474d54;
+  --table-column-first-border-width: 1px;
+  --table-column-last-border-width: 1px;
+  --table-row-last-border-width: 1px;
+  --table-header-background: transparent;
+  --table-header-background-hover: transparent;
+  --table-header-weight: 700;
+  --table-header-color: #dedede;
+  --table-row-alt-background: transparent;
+  --table-column-alt-background: transparent;
+}
+
+@media only screen and (min-width: 1400px) {
+  .theme-dark { --file-line-width: 1024px; }
+}
+@media only screen and (min-width: 1800px) {
+  .theme-dark { --file-line-width: 1200px; }
+}
+
+/* --- Headings: letter-spacing（Reading view / Live Preview 共通） --- */
+.theme-dark .markdown-rendered h1,
+.theme-dark .markdown-source-view.mod-cm6.is-live-preview .HyperMD-header-1 {
+  letter-spacing: -1.5px;
+}
+.theme-dark .markdown-rendered :is(h2, h3),
+.theme-dark .markdown-source-view.mod-cm6.is-live-preview :is(.HyperMD-header-2, .HyperMD-header-3) {
+  letter-spacing: -1px;
+}
+
+/* --- Headings: margin (Reading view) ------------------------------- */
+.theme-dark .markdown-rendered :is(h1, h2, h3, h4, h5, h6) {
+  margin: 0 0 1.5rem;
+  padding: 0;
+}
+.theme-dark .markdown-rendered h1 { margin-top: 2em; }
+.theme-dark .markdown-rendered h6 { margin-bottom: 0.75rem; }
+
+/* --- Paragraph / List spacing (Reading view) ----------------------- */
+.theme-dark .markdown-rendered :is(p, ul, ol, table) {
+  margin-top: 0;
+  margin-bottom: 1.5rem;
+}
+.theme-dark .markdown-rendered :is(ul, ol) :is(ul, ol) {
+  margin: 0;
+}
+
+/* --- Link (Reading view) ------------------------------------------- */
+.theme-dark .markdown-rendered a {
+  transition: all 0.2s ease-in-out;
+}
+
+/* --- Inline code --------------------------------------------------- */
+.theme-dark .markdown-rendered :not(pre) > code {
+  background-color: rgba(0, 0, 0, 0.05);
+  padding: 2px 5px;
+  font-size: 0.875em;
+  border: none;
+}
+.theme-dark .markdown-source-view.mod-cm6.is-live-preview .cm-inline-code {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+/* --- Code block ---------------------------------------------------- */
+.theme-dark .markdown-rendered pre {
+  background-color: #333333;
+  padding: 10px 10px 10px 30px;
+  margin: 0 0 20px;
+  border: none;
+}
+.theme-dark .markdown-rendered pre code {
+  font-size: 0.875em;
+}
+
+/* --- Blockquote ---------------------------------------------------- */
+.theme-dark .markdown-rendered blockquote {
+  padding-left: 30px;
+  margin: 35px 0 1.875rem 1.875rem;
+}
+
+/* --- Table --------------------------------------------------------- */
+.theme-dark .markdown-rendered table {
+  width: 100%;
+  max-width: 100%;
+  border-collapse: collapse;
+}
+.theme-dark .markdown-rendered :is(th, td) {
+  padding: 5px 10px;
+  vertical-align: top;
+}
+
+/* --- HR ------------------------------------------------------------ */
+.theme-dark .markdown-rendered hr {
+  margin: 24px 0;
+}
+
+/* --- Highlight (mark) ---------------------------------------------- */
+/* Night は背景色のみ指定。文字色は Typora base.css 相当の黒を想定 */
+.theme-dark .markdown-rendered mark,
+.theme-dark .markdown-source-view.mod-cm6.is-live-preview .cm-highlight {
+  color: #000000;
+}
+
+/* --- Code block のシンタックスカラーは Obsidian 既定のまま ----------
+   Typora Night の配色は night/codeblock.dark.css に定義されているが、
+   未移植。
+   ------------------------------------------------------------------- */
