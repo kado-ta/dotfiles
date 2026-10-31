@@ -29,7 +29,16 @@ ms-python.vscode-pylance
 ms-python.vscode-python-envs
 naumovs.color-highlight
 njpwerner.autodocstring
+redhat.vscode-xml
 renesaarsoo.sql-formatter-vsc
+salesforce.salesforcedx-vscode-apex
+salesforce.salesforcedx-vscode-apex-testing
+salesforce.salesforcedx-vscode-core
+salesforce.salesforcedx-vscode-metadata
+salesforce.salesforcedx-vscode-org
+salesforce.salesforcedx-vscode-services
+salesforce.salesforcedx-vscode-visualforce
+salesforce.sfdx-code-analyzer-vscode
 shopify.ruby-lsp
 sianglim.slim
 stoplight.spectral
