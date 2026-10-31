@@ -20,6 +20,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `.config/link.sh`, `.aws/link.sh`, `ghostty/link.sh`, `vscode/setup.sh`
 - `.claude/setup.sh` — Claude Code 設定のシンボリックリンク作成とプラグインインストール
 - `.codex/link.sh` — Codex CLI 設定のシンボリックリンク作成
+- `.obsidian/setup.sh` — Obsidian 設定と CSS スニペットを Vault（`~/Obsidian/main/.obsidian/`）にシンボリックリンク（Vault 作成後、Obsidian を閉じた状態で実行）
 
 ## Makefile ターゲット
 
@@ -33,17 +34,18 @@ make vscode/ext/list  # vscode/extensions リストを再生成
 
 各トップレベルディレクトリは独立しており、それぞれ `setup.sh` / `link.sh` を持つ:
 
-| ディレクトリ | 役割 |
-|---|---|
-| `.bin/` | シェルコア設定（`.zshrc`, `.zprofile`, `.gitconfig`, `.Brewfile`） |
-| `zsh/` | Zsh プラグイン設定（エイリアス・キーバインド・オプション・autosuggestions） |
-| `mise/` | `mise_config.toml` — 言語ランタイムのバージョン管理 |
-| `.config/` | karabiner, sheldon, starship の設定 |
-| `.aws/` | AWS CLI プロファイル設定（credentials は gitignore 済み） |
-| `.claude/` | Claude Code の設定・フック・スキル・セットアップスクリプト |
-| `.codex/` | Codex CLI の設定（`config.toml` — `~/.codex/config.toml` にシンボリックリンク） |
-| `vscode/` | VSCode 設定・拡張リスト・プロジェクトマネージャー設定 |
-| `ghostty/` | Ghostty ターミナル設定 |
+| ディレクトリ | 役割                                                                                                                                             |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `.bin/`      | シェルコア設定（`.zshrc`, `.zprofile`, `.gitconfig`, `.Brewfile`）                                                                               |
+| `zsh/`       | Zsh プラグイン設定（エイリアス・キーバインド・オプション・autosuggestions）                                                                      |
+| `mise/`      | `mise_config.toml` — 言語ランタイムのバージョン管理                                                                                              |
+| `.config/`   | karabiner, sheldon, starship の設定                                                                                                              |
+| `.aws/`      | AWS CLI プロファイル設定（credentials は gitignore 済み）                                                                                        |
+| `.claude/`   | Claude Code の設定・フック・スキル・セットアップスクリプト                                                                                       |
+| `.codex/`    | Codex CLI の設定（`config.toml` — `~/.codex/config.toml` にシンボリックリンク）                                                                  |
+| `.obsidian/` | Obsidian の Vault 設定と CSS スニペット（`~/Obsidian/main/.obsidian/` にシンボリックリンク）、Vault の同期・バックアップ手順（`SYNC_BACKUP.md`） |
+| `vscode/`    | VSCode 設定・拡張リスト・プロジェクトマネージャー設定                                                                                            |
+| `ghostty/`   | Ghostty ターミナル設定                                                                                                                           |
 
 ## Claude Code 設定（`.claude/`）
 
@@ -55,9 +57,9 @@ make vscode/ext/list  # vscode/extensions リストを再生成
 
 ### フック
 
-| ファイル | トリガー | 動作 |
-|---|---|---|
-| `hooks/validate-command.sh` | PreToolUse (Bash) | `rm -rf` および `prod`/`prd` を含むコマンドをブロック |
+| ファイル                       | トリガー          | 動作                                                     |
+| ------------------------------ | ----------------- | -------------------------------------------------------- |
+| `hooks/validate-command.sh`    | PreToolUse (Bash) | `rm -rf` および `prod`/`prd` を含むコマンドをブロック    |
 | `hooks/protect-main-branch.sh` | PreToolUse (Bash) | `main`, `master`, `staging` への `git commit` をブロック |
 
 フックが exit code `2` を返すとツール実行がブロックされ、stderr の内容が Claude に表示される。

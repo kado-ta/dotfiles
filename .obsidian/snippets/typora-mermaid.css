@@ -1,0 +1,392 @@
+/* =====================================================================
+   typora-mermaid.css
+   Obsidian の Mermaid を Typora の表示に寄せるスニペット
+     - Light mode : Mermaid "default" テーマ（Typora GitHub はこれを使用）
+     - Dark mode  : Typora Night の night/mermaid.dark.css から移植
+                    （同ファイルに定義がない要素は mermaid v8 dark 配色ベースの推測）
+   方針   : 色はすべて先頭の変数で管理 → 微調整は変数だけ触ればよい
+            classDef / style 指定は Mermaid 11 がインラインの !important で
+            出力するため、本スニペットより優先される
+   対象   : Obsidian 1.14 系（同梱 Mermaid 11.13.0）。1.15 以降（Pele）は対象外
+            flowchart / sequence / gantt / class / state / ER
+            （pie, mindmap, timeline, journey 等は未対応）
+   ===================================================================== */
+
+
+/* =====================================================================
+   1. Palette
+   ===================================================================== */
+
+/* --- Light : mermaid default ---------------------------------------- */
+.theme-light .mermaid {
+  --tm-node-bg: #ececff;
+  --tm-node-border: #9370db;
+  --tm-node-text: #333333;
+  --tm-line: #333333;
+  --tm-edge-label-bg: #e8e8e8;
+  --tm-edge-label-text: #333333;
+  --tm-cluster-bg: #ffffde;
+  --tm-cluster-border: #aaaa33;
+  --tm-cluster-text: #333333;
+  --tm-title: #333333;
+
+  /* sequence */
+  --tm-actor-bg: #ececff;
+  --tm-actor-border: hsl(259.6, 59.8%, 87.9%);
+  --tm-actor-text: #000000;
+  --tm-actor-line: grey;
+  --tm-signal: #333333;
+  --tm-signal-text: #333333;
+  --tm-note-bg: #fff5ad;
+  --tm-note-border: #aaaa33;
+  --tm-note-text: #000000;
+  --tm-labelbox-bg: #ececff;
+  --tm-labelbox-border: hsl(259.6, 59.8%, 87.9%);
+  --tm-label-text: #000000;
+  --tm-loop-text: #000000;
+  --tm-loop-line: hsl(259.6, 59.8%, 87.9%);
+  --tm-activation-bg: #f4f4f4;
+  --tm-activation-border: #666666;
+  --tm-seqnum-text: #ffffff;
+
+  /* gantt */
+  --tm-gantt-section0: rgba(102, 102, 255, 0.49);
+  --tm-gantt-section2: #fff400;
+  --tm-gantt-section-alt: #ffffff;
+  --tm-task-bg: #8a90dd;
+  --tm-task-border: #534fbc;
+  --tm-task-text: #ffffff;
+  --tm-task-text-outside: #000000;
+  --tm-task-text-dark: #000000;
+  --tm-active-bg: #bfc7ff;
+  --tm-active-border: #534fbc;
+  --tm-done-bg: lightgrey;
+  --tm-done-border: grey;
+  --tm-crit-bg: red;
+  --tm-crit-border: #ff8888;
+  --tm-today: red;
+  --tm-grid: lightgrey;
+  --tm-grid-text: #333333;
+  --tm-section-title: #333333;
+  --tm-done-crit-text: #000000;
+}
+
+/* --- Dark : Typora Night（night/mermaid.dark.css）------------------
+   「*」印は同ファイルに定義がなく、mermaid v8 dark 配色ベースの推測 */
+.theme-dark .mermaid {
+  --tm-node-bg: #bdd5ea;
+  --tm-node-border: #81b1db;
+  --tm-node-text: #323d47;
+  --tm-line: lightgrey;
+  --tm-edge-label-bg: #e8e8e8;
+  --tm-edge-label-text: #323d47;
+  --tm-cluster-bg: #6d6d65;
+  --tm-cluster-border: rgba(255, 255, 255, 0.25);
+  --tm-cluster-text: #f9fffe;
+  --tm-title: lightgrey;
+
+  /* sequence */
+  --tm-actor-bg: #bdd5ea;
+  --tm-actor-border: #81b1db;
+  --tm-actor-text: #000000;
+  --tm-actor-line: lightgrey;
+  --tm-signal: lightgrey;
+  --tm-signal-text: lightgrey;
+  --tm-note-bg: #fff5ad;
+  --tm-note-border: rgba(255, 255, 255, 0.25);
+  --tm-note-text: #000000;
+  --tm-labelbox-bg: #bdd5ea;
+  --tm-labelbox-border: #81b1db;
+  --tm-label-text: #323d47;
+  --tm-loop-text: lightgrey;
+  --tm-loop-line: #81b1db;
+  --tm-activation-bg: #6d6d65;      /* * */
+  --tm-activation-border: #81b1db;  /* * */
+  --tm-seqnum-text: #000000;        /* * */
+
+  /* gantt */
+  --tm-gantt-section0: rgba(255, 255, 255, 0.3);
+  --tm-gantt-section2: #eae8b9;
+  --tm-gantt-section-alt: #ffffff;
+  --tm-task-bg: #bdd5ea;
+  --tm-task-border: rgba(255, 255, 255, 0.5);
+  --tm-task-text: #323d47;
+  --tm-task-text-outside: lightgrey;
+  --tm-task-text-dark: #323d47;
+  --tm-active-bg: #81b1db;
+  --tm-active-border: rgba(255, 255, 255, 0.5);
+  --tm-done-bg: lightgrey;
+  --tm-done-border: grey;           /* * */
+  --tm-crit-bg: #e83737;
+  --tm-crit-border: #e83737;
+  --tm-today: #db5757;
+  --tm-grid: rgba(255, 255, 255, 0.3);
+  --tm-grid-text: lightgrey;
+  --tm-section-title: #f9fffe;
+  --tm-done-crit-text: lightgrey;
+}
+
+
+/* =====================================================================
+   0. Dark mode filter
+   Obsidian 本体はダークモードで .mermaid > svg に反転フィルターをかける
+   （Mermaid 既定のライト配色を暗くするため）。本スニペットはダーク用の
+   配色を直接指定するので解除する。.mmk-stage > svg は Mermaid Kit 使用時
+   （Match diagrams to the theme OFF の場合に Kit が反転をかける）
+   ===================================================================== */
+.theme-dark .mermaid > svg,
+.theme-dark .mermaid .mmk-stage > svg {
+  filter: none;
+}
+
+
+/* =====================================================================
+   2. Flowchart / 共通ノード（class・state v2 もノード扱い）
+   ===================================================================== */
+
+/* ノード図形 */
+.mermaid .node :is(rect, circle, ellipse, polygon, path):not([style*="fill"]):not(.state-start):not(.state-end) {
+  fill: var(--tm-node-bg) !important;
+  stroke: var(--tm-node-border) !important;
+}
+
+/* ノードラベル（htmlLabels / SVG text 両対応） */
+.mermaid .node :is(.label, .nodeLabel, .nodeLabel *, foreignObject div, foreignObject span, foreignObject p) {
+  color: var(--tm-node-text) !important;
+}
+.mermaid .node :is(text, tspan) {
+  fill: var(--tm-node-text) !important;
+}
+
+/* エッジ（線） */
+.mermaid :is(.flowchart-link, .edgePath .path, .relation, .transition, .er.relationshipLine):not([style*="stroke"]) {
+  stroke: var(--tm-line) !important;
+}
+
+/* 矢じり */
+.mermaid :is(marker.marker, .arrowheadPath, .arrowMarkerPath) {
+  fill: var(--tm-line) !important;
+  stroke: var(--tm-line) !important;
+}
+
+/* エッジラベル */
+.mermaid .edgeLabel,
+.mermaid .edgeLabel :is(p, span, div),
+.mermaid .labelBkg {
+  background-color: var(--tm-edge-label-bg) !important;
+  color: var(--tm-edge-label-text) !important;
+}
+.mermaid .edgeLabel rect {
+  fill: var(--tm-edge-label-bg) !important;
+  opacity: 1 !important;
+}
+.mermaid .edgeLabel :is(text, tspan) {
+  fill: var(--tm-edge-label-text) !important;
+}
+
+/* サブグラフ（cluster） */
+.mermaid .cluster rect:not([style*="fill"]) {
+  fill: var(--tm-cluster-bg) !important;
+  stroke: var(--tm-cluster-border) !important;
+}
+.mermaid .cluster :is(.nodeLabel, .nodeLabel *, span, p) {
+  color: var(--tm-cluster-text) !important;
+}
+.mermaid .cluster :is(text, tspan) {
+  fill: var(--tm-cluster-text) !important;
+}
+
+/* 図タイトル */
+.mermaid :is(.flowchartTitleText, .titleText, .classTitleText, .statediagramTitleText) {
+  fill: var(--tm-title) !important;
+}
+
+
+/* =====================================================================
+   3. Sequence diagram
+   ===================================================================== */
+.mermaid rect.actor {
+  fill: var(--tm-actor-bg) !important;
+  stroke: var(--tm-actor-border) !important;
+}
+.mermaid :is(text.actor, text.actor > tspan) {
+  fill: var(--tm-actor-text) !important;
+  stroke: none !important;
+}
+.mermaid .actor-man :is(line, circle) {
+  fill: var(--tm-actor-bg) !important;
+  stroke: var(--tm-actor-border) !important;
+}
+.mermaid .actor-line {
+  stroke: var(--tm-actor-line) !important;
+}
+
+.mermaid :is(.messageLine0, .messageLine1) {
+  stroke: var(--tm-signal) !important;
+}
+.mermaid .messageText {
+  fill: var(--tm-signal-text) !important;
+  stroke: none !important;
+}
+.mermaid :is(marker[id$="arrowhead"], marker[id$="crosshead"], marker[id$="filled-head"]) path {
+  fill: var(--tm-signal) !important;
+  stroke: var(--tm-signal) !important;
+}
+.mermaid marker[id$="sequencenumber"] {
+  fill: var(--tm-signal) !important;
+}
+.mermaid .sequenceNumber {
+  fill: var(--tm-seqnum-text) !important;
+}
+
+.mermaid .note:not([style*="fill"]) {
+  fill: var(--tm-note-bg) !important;
+  stroke: var(--tm-note-border) !important;
+}
+.mermaid :is(.noteText, .noteText > tspan) {
+  fill: var(--tm-note-text) !important;
+  stroke: none !important;
+}
+
+.mermaid .labelBox {
+  fill: var(--tm-labelbox-bg) !important;
+  stroke: var(--tm-labelbox-border) !important;
+}
+.mermaid :is(.labelText, .labelText > tspan) {
+  fill: var(--tm-label-text) !important;
+  stroke: none !important;
+}
+.mermaid :is(.loopText, .loopText > tspan) {
+  fill: var(--tm-loop-text) !important;
+  stroke: none !important;
+}
+.mermaid .loopLine {
+  stroke: var(--tm-loop-line) !important;
+  fill: var(--tm-loop-line) !important;
+}
+
+.mermaid :is(.activation0, .activation1, .activation2) {
+  fill: var(--tm-activation-bg) !important;
+  stroke: var(--tm-activation-border) !important;
+}
+
+
+/* =====================================================================
+   4. Gantt
+   ===================================================================== */
+.mermaid .section0 { fill: var(--tm-gantt-section0) !important; }
+.mermaid .section2 { fill: var(--tm-gantt-section2) !important; }
+.mermaid :is(.section1, .section3) { fill: var(--tm-gantt-section-alt) !important; }
+
+.mermaid rect.task:is(.task0, .task1, .task2, .task3) {
+  fill: var(--tm-task-bg) !important;
+  stroke: var(--tm-task-border) !important;
+}
+.mermaid rect.task:is(.active0, .active1, .active2, .active3) {
+  fill: var(--tm-active-bg) !important;
+  stroke: var(--tm-active-border) !important;
+}
+.mermaid rect.task:is(.done0, .done1, .done2, .done3) {
+  fill: var(--tm-done-bg) !important;
+  stroke: var(--tm-done-border) !important;
+}
+.mermaid rect.task:is(.crit0, .crit1, .crit2, .crit3) {
+  fill: var(--tm-crit-bg) !important;
+  stroke: var(--tm-crit-border) !important;
+}
+.mermaid rect.task:is(.activeCrit0, .activeCrit1, .activeCrit2, .activeCrit3) {
+  fill: var(--tm-active-bg) !important;
+  stroke: var(--tm-crit-border) !important;
+}
+.mermaid rect.task:is(.doneCrit0, .doneCrit1, .doneCrit2, .doneCrit3) {
+  fill: var(--tm-done-bg) !important;
+  stroke: var(--tm-crit-border) !important;
+}
+
+.mermaid :is(.taskText, .taskText0, .taskText1, .taskText2, .taskText3) {
+  fill: var(--tm-task-text) !important;
+}
+.mermaid :is(.taskTextOutsideRight, .taskTextOutsideLeft,
+             .taskTextOutside0, .taskTextOutside1, .taskTextOutside2, .taskTextOutside3) {
+  fill: var(--tm-task-text-outside) !important;
+}
+.mermaid :is(.activeText0, .activeText1, .activeText2, .activeText3,
+             .doneText0, .doneText1, .doneText2, .doneText3,
+             .critText0, .critText1, .critText2, .critText3) {
+  fill: var(--tm-task-text-dark) !important;
+}
+.mermaid :is(.doneCritText0, .doneCritText1, .doneCritText2, .doneCritText3) {
+  fill: var(--tm-done-crit-text) !important;
+}
+
+.mermaid .grid .tick line { stroke: var(--tm-grid) !important; }
+.mermaid .grid .tick text { fill: var(--tm-grid-text) !important; }
+.mermaid .grid path { stroke-width: 0 !important; }
+.mermaid .today { stroke: var(--tm-today) !important; }
+.mermaid :is(.sectionTitle, .sectionTitle0, .sectionTitle1, .sectionTitle2, .sectionTitle3) {
+  fill: var(--tm-section-title) !important;
+}
+
+
+/* =====================================================================
+   5. Class / State / ER（旧レンダラ向け。v2 系は「2. 共通ノード」で適用）
+   ===================================================================== */
+.mermaid g.classGroup rect,
+.mermaid g.stateGroup rect,
+.mermaid .er.entityBox {
+  fill: var(--tm-node-bg) !important;
+  stroke: var(--tm-node-border) !important;
+}
+.mermaid g.classGroup line {
+  stroke: var(--tm-node-border) !important;
+}
+.mermaid :is(g.classGroup text, g.stateGroup text, .stateLabel text, .er.entityLabel) {
+  fill: var(--tm-node-text) !important;
+}
+.mermaid :is(.classLabel .box, .er.relationshipLabelBox) {
+  fill: var(--tm-edge-label-bg) !important;
+  opacity: 1 !important;
+}
+.mermaid :is(.classLabel .label, .er.relationshipLabel) {
+  fill: var(--tm-edge-label-text) !important;
+}
+
+
+/* =====================================================================
+   6. Fit to view（初期表示で図全体を表示領域に収める）
+   既定      : 幅は本文カラム、高さはウィンドウ高の 72%（--tm-fit-max-height）を
+               上限とし、どちらかを超える図は図全体が見えるまで縮小
+               （小さい図は原寸のまま。72% は Mermaid Kit の「Fit」と同じ基準）
+   オプション: ノートの frontmatter に `cssclasses: mermaid-fill` を書くと、
+               小さい図も上限まで拡大
+   仕組み    : Mermaid が出力する max-width / height を CSS で上書きし、
+               幅・高さに上限を設ける。高さだけが上限に達した場合は、
+               viewBox と SVG 既定の preserveAspectRatio（xMidYMid meet）により
+               縦横比を保ったまま中央寄せで縮小される
+   図の種類  : Obsidian は flowchart / sequence / ER を useMaxWidth: false
+               （width 属性が px）、gantt / class / state 等を useMaxWidth: true
+               （width="100%" + インライン max-width: 原寸px）で描画する。
+               後者の原寸上限を残すため、max-width の上書きは前者だけに当てる
+   Kit 使用時: SVG が .mmk-stage の中に移るため、このセクションは適用されない
+               （サイズは Mermaid Kit が制御する）
+   ===================================================================== */
+.mermaid {
+  --tm-fit-max-height: 72vh;
+  overflow: hidden;
+  text-align: center;
+}
+.mermaid > svg {
+  display: block;
+  margin-inline: auto;
+  max-height: var(--tm-fit-max-height) !important;
+  height: auto !important;
+}
+.mermaid > svg:not([width="100%"]) {
+  max-width: 100% !important;
+}
+
+/* 拡大モード（ノート単位で opt-in） */
+.mermaid-fill .mermaid > svg {
+  width: 100% !important;
+  max-width: 100% !important;
+}
