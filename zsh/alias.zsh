@@ -4,6 +4,8 @@ case ${OSTYPE} in
         # Mac用の設定
         export CLICOLOR=1
         alias ls='ls -G -F'
+        # Typora でファイルを開く（例: typora hoge.md）
+        alias typora='open -a Typora'
         ;;
     linux*)
         # Linux用の設定
@@ -42,7 +44,7 @@ alias codex-config-sync='uv run --no-project --with "tomlkit>=0.13,<1" python "$
 # - Codex が新しく追加した設定を明示的にインポート: codex-config-import --key features.multi_agent --apply
 alias codex-config-import='uv run --no-project --with "tomlkit>=0.13,<1" python "$HOME/dotfiles/.codex/import.py"'
 
-# Claude Code / Codex の起動なしに Understad Anything スキルのダッシュボードを起動する。
+# Claude Code / Codex の起動なしに Understand Anything スキルのダッシュボードを起動する。
 function ua-dashboard() {
   npx https://github.com/Egonex-AI/Understand-Anything/releases/latest/download/understand-anything-viewer.tgz "${1:-.}"
 }
