@@ -236,11 +236,16 @@
     "[html]": {
         "editor.defaultFormatter": null
     },
+    "markdown.validate.enabled": true,
+    // Markdown 内で HTML リンクを使用するため、下記の警告を無効化する。
+    "markdown.validate.fragmentLinks.enabled": "ignore",
+    "markdown.validate.fileLinks.markdownFragmentLinks": "ignore",
     "[markdown]": {
         "files.trimTrailingWhitespace": false,
         "editor.wordWrap": "off",
         "editor.formatOnPaste": false,
-        "editor.formatOnType": false
+        "editor.formatOnType": false,
+        "editor.defaultFormatter": "biomejs.biome"
     },
     "[xml]": {
         "editor.defaultFormatter": "redhat.vscode-xml",
