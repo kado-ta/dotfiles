@@ -8,9 +8,17 @@ if echo "$COMMAND" | grep -q 'rm -rf'; then
   exit 2  # exit 2 でツール実行をブロック
 fi
 
+# Allow read-only SF Lifecycle Center queries and pull request creation (the Hub org is production) as a single simple command.
+# Reject shell metacharacters so that no other command can be chained after the allowed one.
+is_allowed_devops_command() {
+  [[ "$COMMAND" == *$'\n'* ]] && return 1
+  echo "$COMMAND" | grep -q '[;&|<>`$()]' && return 1
+  echo "$COMMAND" | grep -qE '^(SF_[A-Z_]+=[^[:space:]]+ +)*sf +devops[ :](project[ :]list|pipeline[ :](list|get)|work-item[ :]list|request[ :]status|review[ :]create)( |$)'
+}
+
 # 本番環境への接続をブロック
 # 'prod' が含まれているもの、または、'prd' が単語として含まれている ('-prd-', '_prd_' など) をブロック対象とする。
-if echo "$COMMAND" | grep -qE 'prod|(^|[^[:alnum:]])prd([^[:alnum:]]|$)'; then
+if ! is_allowed_devops_command && echo "$COMMAND" | grep -qE 'prod|(^|[^[:alnum:]])prd([^[:alnum:]]|$)'; then
   echo "Blocked: production access is not allowed" >&2
   exit 2
 fi
