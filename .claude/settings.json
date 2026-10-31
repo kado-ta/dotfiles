@@ -94,7 +94,16 @@
       "WebFetch(domain:redocly.com)",
       "WebFetch(domain:claude.com)",
       "WebFetch(domain:docs.claude.com)",
-      "WebFetch(domain:eu-central-1-1.aws.cloud2.influxdata.com)"
+      "WebFetch(domain:eu-central-1-1.aws.cloud2.influxdata.com)",
+      "WebFetch(domain:learn.chatgpt.com)",
+      "WebFetch(domain:code.visualstudio.com)",
+      "WebFetch(domain:shopify.github.io)",
+      "WebFetch(domain:marketplace.visualstudio.com)",
+      "WebFetch(domain:open-vsx.org)",
+      "WebFetch(domain:devblogs.microsoft.com)",
+      "WebFetch(domain:microsoft.github.io)",
+      "WebFetch(domain:help.salesforce.com)",
+      "WebFetch(domain:developer.salesforce.com)"
     ],
     "deny": [
       "Bash(sudo *)",
