@@ -2,6 +2,12 @@
 # ~/.config/mise/config.toml として使用されるもの。
 # https://mise.jdx.dev/configuration.html#global-config-config-mise-config-toml
 [tools]
+# sf の依存が pino 10 系に移ったり、9.14.0 以外を使うようになると、この行は何にも当てはまらなくなる。
+# 定期的に次のコマンドで確認し、結果に 9.14.0 がなければ、trust_policy_excludes を削除すること。
+# find "$(mise where npm:@salesforce/cli)" -path '*/node_modules/pino/package.json' -exec grep -H '"version"' {} +
+"npm:@salesforce/cli" = { version = "latest", trust_policy_excludes = [
+  "pino@9.14.0",
+] }
 aws-cli = { version = "latest", symlink_bins = "true" }
 # インストール後に biome/biome.jsonc の $schema URL のバージョンを自動で一致させる。
 # ~/.config/mise/config.toml はこのファイルへの symlink なので、実体をたどって dotfiles の場所を特定する。
