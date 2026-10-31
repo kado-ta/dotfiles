@@ -1,0 +1,15 @@
+# リポジトリ保守用のタスク。`mise tasks` で一覧を表示し、`mise run <タスク名>` で実行する。
+# セットアップ（init.command / setup.command）は mise のインストール前に実行するため、ここには定義しない。
+
+[tasks."brew:deps:show"]
+description = "Homebrew の依存関係をツリー形式で表示する"
+run = "brew deps --installed --tree"
+
+# 生成される Brewfile をベースに .bin/.Brewfile を最新化する。
+[tasks."brew:dump"]
+description = "インストール済みパッケージを Brewfile に書き出す"
+run = ["rm -rf Brewfile", "brew bundle dump"]
+
+[tasks."vscode:ext:list"]
+description = "VSCode 拡張のリストを vscode/extensions に書き出す"
+run = "code --list-extensions > vscode/extensions"
