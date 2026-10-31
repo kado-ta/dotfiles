@@ -17,7 +17,7 @@ ln -snfv "$SCRIPT_DIR/AGENTS.md" "$CODEX_DIR/AGENTS.md"
 # superpowers プラグイン
 codex plugin add superpowers@openai-curated
 
-# Understad Anything スキルをインストールする。
+# Understand Anything スキルをインストールする。
 curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/install.sh | bash -s codex
 
 # Claude Code でインストール済みの gstack を Codex でも使用できるようにする。

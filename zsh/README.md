@@ -138,6 +138,7 @@ exec zsh
 | `rm` / `cp` / `mv` | `-i` で上書き・削除前に確認 |
 | `mkdir` | `-p` で親ディレクトリも作成 |
 | `be` | `bundle exec` |
+| `typora <file>` | Typora でファイルを開く（`open -a Typora`、macOS のみ） |
 | `sudo` | `sudo ` 後のコマンドでもエイリアスを展開 |
 | `L` / `G`（グローバル） | `\| less` / `\| grep` |
 | `codex-config-sync` / `codex-config-import` | Codex 設定の同期・取り込み（[.codex/README.md](../.codex/README.md) 参照） |
