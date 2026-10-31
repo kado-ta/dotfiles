@@ -63,34 +63,11 @@ CD_PATHS=()
 C_PATHS=()
 TARGETS=()
 COMMAND_START=1
-HEREDOC_END=""
-HEREDOC_BODY=0
 i=0
 while [ "$i" -lt "${#TOKENS[@]}" ]; do
   token="${TOKENS[$i]#(}"
-  # Skip heredoc bodies (from the next line after `<<DELIM` up to the DELIM line) as data
-  if [ "$HEREDOC_BODY" -eq 1 ]; then
-    if [ "$token" = "$HEREDOC_END" ]; then
-      HEREDOC_BODY=0
-      HEREDOC_END=""
-    fi
-    i=$((i + 1))
-    continue
-  fi
-  case "$token" in
-    *'<<<'*) ;;
-    *'<<'*)
-      HEREDOC_END="${token#*<<}"
-      HEREDOC_END="${HEREDOC_END:-${TOKENS[$((i + 1))]:-}}"
-      HEREDOC_END="${HEREDOC_END#-}"
-      HEREDOC_END="${HEREDOC_END//[\'\"]/}"
-      ;;
-  esac
   case "$token" in
     '&&' | '||' | ';' | '|' | '&')
-      if [ "$token" = ';' ] && [ -n "$HEREDOC_END" ]; then
-        HEREDOC_BODY=1
-      fi
       COMMAND_START=1
       i=$((i + 1))
       continue

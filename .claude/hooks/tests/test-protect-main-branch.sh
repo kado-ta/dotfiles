@@ -82,11 +82,12 @@ check 2 "$MAIN" "git commit -m x"$'\n'"# $(printf '%0300000d' 0)" 'long line aft
 check 0 "$FEAT" "git commit -m \"cd $MAIN && git -C $MAIN commit\"" 'paths inside commit message'
 check 0 "$FEAT" "git commit -m \"\$(cat <<'EOF'"$'\n'"feat: x"$'\n\n'"cd $MAIN"$'\n'"EOF"$'\n'")\"" 'heredoc commit message'
 
-# Heredoc bodies are data, not commands
-check 0 "$FEAT" "git commit -m \"\$(cat <<'EOF'"$'\n'"docs: x"$'\n\n'"cd $T/missing"$'\n'"git commit -m example"$'\n'"EOF"$'\n'")\"" 'cd and git commit in a heredoc commit message'
-check 0 "$FEAT" "git commit -m x && gh pr create --body \"\$(cat <<'EOF'"$'\n'"cd $T/missing"$'\n'"git commit -m example"$'\n'"EOF"$'\n'")\"" 'cd and git commit in a heredoc PR body'
+# Heredocs and `<<` do not hide a commit
 check 2 "$FEAT" "cat > /dev/null <<EOF"$'\n'"text"$'\n'"EOF"$'\n'"git -C $MAIN commit -m x" 'commit after a heredoc'
 check 2 "$FEAT" "grep -q x <<<\"\$v\"; git -C $MAIN commit -m x" 'here-string is not a heredoc'
+check 2 "$FEAT" "printf '%s\n' \"<<EOF\""$'\n'"git -C $MAIN commit -m x" '<< in a string'
+check 2 "$FEAT" "cat <<EOF ; git -C $MAIN commit -m x"$'\n'"text"$'\n'"EOF" 'commit on the heredoc start line'
+check 2 "$FEAT" "cat <<EOF"$'\n'"\$( git -C $MAIN commit -m x )"$'\n'"EOF" 'command substitution in an unquoted heredoc'
 
 # Unresolvable repository is blocked (fail closed)
 check 2 "$FEAT" 'git -C "$REPO" commit -m x' 'variable in -C'
