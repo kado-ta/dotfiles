@@ -237,7 +237,9 @@
     },
     "[markdown]": {
         "files.trimTrailingWhitespace": false,
-        "editor.wordWrap": "off"
+        "editor.wordWrap": "off",
+        "editor.formatOnPaste": false,
+        "editor.formatOnType": false
     },
     "[xml]": {
         "editor.defaultFormatter": "redhat.vscode-xml",
