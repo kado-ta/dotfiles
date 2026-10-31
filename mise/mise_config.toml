@@ -18,6 +18,7 @@ node = "26.12.1"
 pnpm = "latest"
 python = "3.15.1"
 ruby = "4.0.9"
+ruff = "latest"
 terraform = "1.17.0"
 uv = "latest"
 # VSCode 用 Apex拡張が Java 21 に依存しているので、ここで指定する。詳細は ./JAVA.md を参照。
