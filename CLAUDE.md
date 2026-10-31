@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## このリポジトリについて
 
-シェル・エディタ・開発ツールの設定を管理する macOS dotfiles リポジトリ。各ディレクトリの `link.sh` / `setup.sh` を通じて設定ファイルを `~` にシンボリックリンクする。ビルド手順・テストスイートは存在しない。
+シェル・エディタ・開発ツールの設定を管理する macOS dotfiles リポジトリ。各ディレクトリの `link.sh` / `setup.sh` を通じて設定ファイルを `~` にシンボリックリンクする。ビルド手順は存在せず、テストはフックの回帰テストのみ。
 
 ## セットアップフロー
 
@@ -64,13 +64,15 @@ make vscode/ext/list  # vscode/extensions リストを再生成
 
 フックが exit code `2` を返すとツール実行がブロックされ、stderr の内容が Claude に表示される。
 
+`protect-main-branch.sh` は、フックの cwd と、コマンド中のすべての `git commit` について `cd <dir>` と `git -C <dir>` から解決したリポジトリのブランチを判定し、いずれかが保護ブランチならブロックする。移動先を解決できない場合（変数を含むパス、存在しないディレクトリなど）もブロックする。
+
 ### 個人スキル
 
 `skills/code-style/` と `skills/superpowers-doc-conventions/` は `~/.claude/skills/` にグローバルシンボリックリンクされ、Superpowers スキルの動作を上書き・拡張する。
 
 ## 規約
 
-- テストは存在しない。動作確認はセットアップスクリプトを手動実行して行う。
+- テストは `.claude/hooks/tests/` のフック回帰テストのみ。フックを変更したら `bash .claude/hooks/tests/test-protect-main-branch.sh` を実行する。それ以外の動作確認はセットアップスクリプトを手動実行して行う。
 - `Brewfile` はリポジトリルートが正規版。`make brew/dump` で再生成する。
 - `vscode/extensions` は `make vscode/ext/list` で生成するため手動編集しない。
 - `.aws/credentials` は gitignore 済み。credentials をコミットしない。
