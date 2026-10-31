@@ -3,7 +3,10 @@
 # https://mise.jdx.dev/configuration.html#global-config-config-mise-config-toml
 [tools]
 aws-cli = { version = "latest", symlink_bins = "true" }
-biome = "latest"
+# インストール後に biome/biome.jsonc の $schema URL のバージョンを自動で一致させる。
+# ~/.config/mise/config.toml はこのファイルへの symlink なので、実体をたどって dotfiles の場所を特定する。
+# MISE_CONFIG_FILE は `mise install biome@x` のようにバージョンを明示すると空になるため使わない。
+biome = { version = "latest", postinstall = 'bash "$(dirname "$(readlink -f "$HOME/.config/mise/config.toml")")/../biome/sync_schema.sh"' }
 go = "1.27.3"
 node = "26.12.1"
 pnpm = "latest"
