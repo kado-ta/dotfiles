@@ -21,7 +21,8 @@
   "overrides": [
     {
       "includes": [
-        "**/vscode/settings.json"
+        "**/vscode/settings.json",
+        "**/Code/User/settings.json"
       ],
       "json": {
         "parser": {
