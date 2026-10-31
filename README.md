@@ -1,13 +1,17 @@
 # dotfiles
+
 ## ▍Setup
+
 Finder から下記 2つのファイルを実行する。(**※ ダブルクリックで実行する。**)
 1. `init.command` : Homebrew インストールや zsh 設定など。
 2. `setup.command` : 開発環境に必要なランタイム・ライブラリ等のセットアップ。
 
 ## ▍Directories
+
 下記は、セットアップ時の実行順に記載する。
 
 ### .bin
+
 ローカル環境で使用するシェルやライブラリの設定情報。
 
 下記の順にスクリプトを実行して、セットアップする。
@@ -28,6 +32,7 @@ Finder から下記 2つのファイルを実行する。(**※ ダブルクリ�
 ```
 
 ### zsh
+
 下記の順にスクリプトを実行して、Zsh とそのプラグインをセットアップする。
 
 1. `./zsh/setup.sh` : Zsh をインストールし、使用できるようセットアップする。
@@ -47,6 +52,7 @@ Finder から下記 2つのファイルを実行する。(**※ ダブルクリ�
 ```
 
 ### mise
+
 mise セットアップ用スクリプト。
 
 `./mise/setup.sh` をを実行することで、`./mise/mise_config.toml` -> `~/.config/mise/config.toml` のシンボリックリンクが作成され、
@@ -61,6 +67,7 @@ mise セットアップ用スクリプト。
 ```
 
 ### .config
+
 各種設定情報。
 
 `./.config/link.sh` を実行して、セットアップする。
@@ -79,6 +86,7 @@ mise セットアップ用スクリプト。
 ```
 
 ### .aws
+
 AWS 関連設定。
 
 `./.aws/link.sh` を実行して、セットアップする。
@@ -104,6 +112,7 @@ sudo ./sessionmanager-bundle/install -i /usr/local/sessionmanagerplugin -b /usr/
 https://docs.aws.amazon.com/ja_jp/systems-manager/latest/userguide/session-manager-working-with-install-plugin.html
 
 ### Claude Code
+
 `./.claude/link.sh` を実行して、Claude Code 設定のシンボリックを作成する。
 
 
@@ -115,10 +124,12 @@ https://docs.aws.amazon.com/ja_jp/systems-manager/latest/userguide/session-manag
     └── validate-command.sh # PreToolUse フック用スクリプト
 ```
 #### settings.json
+
 `.claude/settings.json` 内のセキュリティ設定は、下記リンクの記事を参考に作成。
 - [【2026年最新版】Claude Codeで行うべきセキュリティ設定 10選 - Qiita](https://qiita.com/miruky/items/51db293a7a7d0d277a5d)
 
 #### validate-command.sh
+
 Hooks の **PreToolUse フック** を使用して、ツール実行前にカスタムチェックを挟む。
 
 ```json
@@ -141,6 +152,7 @@ Hooks の **PreToolUse フック** を使用して、ツール実行前にカス
 ```
 
 ### VSCode
+
 `./vscode/setup.sh` を実行して、VSCode 設定のシンボリックを作成し、
 VSCode 拡張をインストールする。
 
@@ -154,25 +166,35 @@ VSCode 拡張をインストールする。
     └── setup.sh
 ```
 
-## ▍Makefile
-### `brew/deps/show`
+<a name="mise-tasks"></a>
+## ▍mise タスク
+
+リポジトリルートの `mise.toml` に定義している。`mise tasks` で一覧を表示できる。
+
+<a name="brew-deps-show"></a>
+### `brew:deps:show`
+
 Homebrew の依存関係をツリー形式で表示する。
 
 ```shell
-make brew/deps/show
+mise run brew:deps:show
 ```
 
-### `brew/dump`
+<a name="brew-dump"></a>
+### `brew:dump`
+
 Homebrew でインストール中のパッケージを Brewfile としてリスト抽出する。
 その Brewfile をベースに .Brewfile を最新化する。
 
 ```shell
-make brew/dump
+mise run brew:dump
 ```
 
-### `vscode/ext/list`
+<a name="vscode-ext-list"></a>
+### `vscode:ext:list`
+
 VSCode 拡張のリスト最新化する。
 
 ```shell
-make vscode/ext/list
+mise run vscode:ext:list
 ```

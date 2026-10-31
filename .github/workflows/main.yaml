@@ -27,4 +27,4 @@ jobs:
 
       # Initialize and link dotfiles
       - name: Setup Dotfiles
-        run: make # Makefile 一番上に定義されたコマンドを実行する。
+        run: ./init.command
