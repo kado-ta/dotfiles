@@ -74,3 +74,4 @@ make vscode/ext/list  # vscode/extensions リストを再生成
 - `Brewfile` はリポジトリルートが正規版。`make brew/dump` で再生成する。
 - `vscode/extensions` は `make vscode/ext/list` で生成するため手動編集しない。
 - `.aws/credentials` は gitignore 済み。credentials をコミットしない。
+- Markdown ファイル名（`.md` を除く部分）は英大文字と `_` のみで構成する（例: `README.md`, `SYNC_BACKUP.md`）。新規作成・リネーム時に適用する。`docs/` 配下は例外とし、グローバル規約の保存パスに従う。
