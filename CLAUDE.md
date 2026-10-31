@@ -68,7 +68,7 @@ make vscode/ext/list  # vscode/extensions リストを再生成
 
 ### 個人スキル
 
-`skills/code-style/` と `skills/superpowers-doc-conventions/` は `~/.claude/skills/` にグローバルシンボリックリンクされ、Superpowers スキルの動作を上書き・拡張する。
+`skills/*/` 配下の個人スキルは `~/.claude/skills/` にグローバルシンボリックリンクされ、全プロジェクトで使える。各スキルの用途は `SKILL.md` の `description` を参照する。
 
 ## 規約
 
