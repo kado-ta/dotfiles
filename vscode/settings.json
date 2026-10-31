@@ -114,6 +114,7 @@
         "https://schemastore.azurewebsites.net/": true,
         "https://raw.githubusercontent.com/microsoft/vscode/": true,
         "https://raw.githubusercontent.com/devcontainers/spec/": true,
+        "https://raw.githubusercontent.com/catppuccin/vscode/": true,
         "https://www.schemastore.org/": true,
         "https://json.schemastore.org/": true,
         "https://json-schema.org/": true,
@@ -259,7 +260,6 @@
     // mise でインストールした Java を認識させるための設定。
     "salesforcedx-vscode-apex.java.home": "/Library/Java/JavaVirtualMachines/temurin-21.jdk/Contents/Home",
     "hediet.vscode-drawio.resizeImages": null,
-    "circleci.hostUrl": "",
     "projectManager.tags": [
         "Personal",
         "KSC",
@@ -275,5 +275,6 @@
     // --------------------------------------------------------------------
     // ローカルファイルプロトコルの扱いに対する確認ダイアログを表示しない。
     "security.promptForLocalFileProtocolHandling": false,
+    "spreadjs.ribbonMode": "classic",
     "xml.server.vmargs": "-Xmx1024M"
 }
