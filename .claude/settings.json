@@ -295,5 +295,7 @@
       "effortLevel": "xhigh"
     }
   },
-  "theme": "dark-daltonized"
+  "theme": "dark-daltonized",
+  "agentPushNotifEnabled": true,
+  "inputNeededNotifEnabled": true
 }
