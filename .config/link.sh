@@ -26,8 +26,8 @@ if [ ! -d $SHELDON_DIR ]; then mkdir $SHELDON_DIR; fi
 ln -snfv "$SCRIPT_DIR/sheldon/plugins.toml" "$SHELDON_DIR/"
 
 # uv
-UV_DIR="$CONFIG_DIR/sheldon"
-echo "SHELDON_DIR: $UV_DIR"
+UV_DIR="$CONFIG_DIR/uv"
+echo "UV_DIR: $UV_DIR"
 if [ ! -d $UV_DIR ]; then mkdir $UV_DIR; fi
 ln -snfv "$SCRIPT_DIR/uv/uv.toml" "$UV_DIR/"
 
