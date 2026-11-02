@@ -156,7 +156,6 @@ exec zsh
 | `colors`（inline） | 遅延 | プロンプトの色 |
 | `zdharma/fast-syntax-highlighting` | 遅延 | シンタックスハイライト |
 | `zsh-users/zsh-autosuggestions` | 遅延 | 入力候補のグレー表示 |
-| `mise-activate`（inline） | 遅延 | `mise activate zsh` |
 | `zsh-users/zsh-completions` | 遅延 | 補完定義の追加 |
 | `compinit`（inline） | 遅延 | 補完の有効化と aws-cli 補完 |
 | `z-shell/H-S-MW` | 遅延 | `Ctrl-R` で複数キーワード AND 検索 |
@@ -197,8 +196,7 @@ exec zsh
 
 1. **`setup.sh` は `/etc/shells` の重複を確認しない。** 再実行すると同じパスが追記される。
 2. **`setup.command` の実行順序。** `zsh/setup_plugins.sh` が `.bin/setup_brew.sh`（`sheldon` のインストール）や `.config/link.sh`（`plugins.toml` のリンク）より前に実行される。新しい Mac では [新しい Mac での実行順序](#setup) に従う。
-3. **mise の二重初期化。** `.bin/.zshrc` と `plugins.toml` の `mise-activate` の両方で `mise activate zsh` を実行している。
-4. **自動テストはない。** 変更後は新しいシェルを起動して動作を確認する。
+3. **自動テストはない。** 変更後は新しいシェルを起動して動作を確認する。
 
 <a name="troubleshooting"></a>
 ## トラブルシューティング
