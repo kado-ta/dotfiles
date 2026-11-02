@@ -15,6 +15,7 @@ echo "SCRIPT_DIR: $SCRIPT_DIR"
 echo "CONFIG_DIR: $CONFIG_DIR"
 
 if [ ! -d $CONFIG_DIR ]; then mkdir $CONFIG_DIR; fi
+mkdir -p "$CONFIG_DIR/mise"
 
 ln -snfv "$SCRIPT_DIR/mise_config.toml"  "$CONFIG_DIR/mise/config.toml"
 

@@ -1,16 +1,21 @@
 #!/bin/bash -e
 
-# Sheldon で管理する zsh のプラグインをインストールする。
-zsh/setup_plugins.sh
-
-# Brewfile にしたがって、ライブラリを一括インストールする。
-.bin/setup_brew.sh
+# ターミナルから実行した場合と、Finder から実行した場合とで、実行ディレクトリを一致させる。
+if [ "$(basename $(pwd))" != "dotfiles" ]; then
+		cd ~/dotfiles
+fi
 
 # dotfile 系のシンボリックリンクを作成する。
 .bin/link.sh
 
+# Brewfile にしたがって、ライブラリを一括インストールする。
+.bin/setup_brew.sh
+
 # $HOME/.config 下に必要な設定ファイルのシンボリックリンクを作成する。
 .config/link.sh
+
+# Sheldon で管理する zsh のプラグインをインストールする。
+zsh/setup_plugins.sh
 
 # AWS CLI の設定と Credentils のシンボリックリンクを作成する。
 .aws/link.sh
@@ -22,7 +27,7 @@ mise/setup.sh
 .claude/setup.sh
 
 # Codex 設定のシンボリックリンクを作成する。
-.codex/link.sh
+.codex/setup.sh
 
 # Set macOS system preferences.
 # TODO: Mac の設定をコマンドで適用できるようにする。設定スクリプトの書き方は、下記URLを参考にする。
