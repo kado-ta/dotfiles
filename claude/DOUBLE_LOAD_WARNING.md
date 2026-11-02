@@ -3,7 +3,7 @@
 dotfiles リポジトリのディレクトリで Claude Code を起動したときに起きる、設定の 2 重読み込みについてまとめる。
 
 > [!NOTE]
-> 2026-11-03 に `.claude/` を `claude/` へ改名した（案 B）。結果と展開手順は[改名の結果](#rename-result)と[他のマシンへの展開](#deploy-to-other-machines)を参照する。それ以外の節は、改名前の 2026-11-02 時点の調査記録で、Claude Code の仕様変更で変わる可能性がある。
+> 2026-11-03 に `.claude/` を `claude/` へ改名した（案 B）。結果と手順は[改名の結果](#rename-result)、[他のマシンへの展開](#deploy-to-other-machines)、[リンクが消えたときの復旧](#link-recovery)を参照する。それ以外の節は、改名前の 2026-11-02 時点の調査記録で、Claude Code の仕様変更で変わる可能性がある。
 
 <a name="summary"></a>
 ## 要点
@@ -75,7 +75,21 @@ Claude Code 2.1.309 のバイナリには `scrubbed replaced symlinked-deny path
 4. `ls -l ~/.claude/settings.json ~/.claude/CLAUDE.md ~/.claude/rules ~/.claude/hooks` でリンクを確認する。`~/.claude/settings.json` が `dotfiles/claude/settings.json` を指していること。`dotfiles/.claude/settings.json` のままなら、保護が外れている。
 5. 新しいセッションで `/hooks` が 11 件になっていることを確認する。
 
-`claude/` がないブランチへ切り替えたときは、`settings.json` を含むすべてのリンクが切れる。
+<a name="link-recovery"></a>
+## リンクが消えたときの復旧
+
+> [!CAUTION]
+> `claude/` がないコミット（改名前の `main` など）へ切り替えるときは、先に Claude Code のセッションをすべて閉じる。
+
+`claude/` がないコミットへ切り替えると、リンク先がなくなるだけでなく、リンクそのものが消えることがある。2026-11-03 には、切り替えの 5 秒後に `~/.claude/` の `settings.json`・`CLAUDE.md`・`rules`・`hooks` のリンクが消えた（リンクを張り直したときと同じ処理が原因と考えられるが、推測を含む）。`mcp.json` などのリンクは残ったが、リンク先がないので切れた状態になった。
+
+`claude/` があるブランチに戻しても、消えたリンクは戻らない。リンクが消えている間は、グローバルの deny ルール・フック・指示が読み込まれない。Claude Code からの張り直しは、サンドボックスと auto mode に拒否された。
+
+1. Claude Code のセッションをすべて閉じる。
+2. `claude/` があるブランチにいることを確認する。なければ `git switch` で戻す。
+3. IDE の統合ターミナルではなく、通常のターミナルで `~/dotfiles/claude/setup.sh` を実行する。
+4. `ls -l ~/.claude/settings.json ~/.claude/CLAUDE.md ~/.claude/rules ~/.claude/hooks` で、4 つとも `dotfiles/claude/` 配下を指していることを確認する。
+5. 新しいセッションで `/hooks` が 11 件になっていることを確認する。
 
 <a name="references"></a>
 ## 関連
