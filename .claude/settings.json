@@ -197,7 +197,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "terminal-notifier -title \"Claude Code\" -message \"入力待ちプロンプトが表示されました\" -sound default || true"
+            "command": "afplay /System/Library/Sounds/Ping.aiff"
           }
         ]
       }
