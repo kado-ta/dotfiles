@@ -93,7 +93,7 @@ Codex のユーザー設定 `~/.codex/config.toml` は、モデルや MCP の設
 - Codex CLI がインストール済みであること（`.bin/.Brewfile` の `cask "codex"`）。
 - `.claude/setup.sh` で gstack（`~/.claude/skills/gstack`）をインストール済みであること。`setup.sh` はこの gstack を Codex 向けにセットアップする。
 - `uv` が利用可能であること（`mise` 管理の場合は `uv --version` が成功すること）。
-- Python 3.11 以上と `tomlkit` を使用する。いずれも `uv` が取得するため、個別の `pip install` や `.venv` 作成は不要。初回はネットワークが必要な場合がある。
+- Python 3.11 以上と `tomlkit` を使用する。Python は `mise` 管理のものを使う（`.config/uv/uv.toml` で `uv` による Python のダウンロードを無効にしている）。`tomlkit` は `uv` が取得するため、個別の `pip install` や `.venv` 作成は不要。初回はネットワークが必要な場合がある。
 - `zsh/alias.zsh` が読み込まれていること（Sheldon が `~/dotfiles/zsh/*.zsh` を読み込む）。
 
 ### `setup.sh` が行うこと
