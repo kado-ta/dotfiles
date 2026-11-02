@@ -37,7 +37,11 @@ mise run vscode:ext:list  # vscode/extensions リストを再生成
 
 ## Claude Code 設定（`claude/`）
 
-`claude/setup.sh` がメインのエントリーポイント。以下を実行する:
+このディレクトリを `.claude/` という名前にしない。dotfiles で起動したときに、`~/.claude/` のリンク先と同じファイルが Project 設定としても読み込まれるため（[経緯](claude/DOUBLE_LOAD_WARNING.md)）。
+
+dotfiles で起動したときだけ必要な設定（`denyWrite`、`claudeMdExcludes`）は、`.claude/settings.json` に置く。
+
+`claude/setup.sh` がメインのエントリーポイント。Claude Code のセッション内と IDE の統合ターミナルでは実行を拒否する（[経緯](claude/DOUBLE_LOAD_WARNING.md#deploy-to-other-machines)）。通常のターミナルで、すべてのセッションを閉じてから実行する。以下を実行する:
 - `settings.json`、`CLAUDE.md`、`rules/`、`mcp.json` を `~/.claude/` にシンボリックリンク
 - `hooks/` ディレクトリを `~/.claude/hooks/` にシンボリックリンク
 - `scripts/statusline.sh`（ステータスライン）を `~/.claude/scripts/` にシンボリックリンク
