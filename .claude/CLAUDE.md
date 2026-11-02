@@ -91,6 +91,13 @@ https://x.com/ai_database/status/2114184481951330365?s=12
 - 対話型ブラウジング（クリック・フォーム入力・スクリーンショット・QA・ログイン後の状態確認）には gstack の `/browse` スキルを使う。
 - 静的なドキュメント参照（公式ドキュメント・MDN・GitHub README など、読むだけ）は `WebFetch` を使ってよい。`settings.json` の allow リストにないドメインは、取得前に許可を求める。
 - `mcp__claude-in-chrome__*` ツールは使わない。
+- サイト・API・CLI の動作を通しで検証し、見つけたバグまで直す依頼には gstack の `/qa` を使う。個別のブラウザ操作は上記の `/browse` を使う。
+- PR やブランチの差分のレビュー依頼には gstack の `/review` を使う。Codex レビューの方針は「Cross-model review (Codex)」のとおりで、これを置き換えない。
+
+<!--
+gstack の CLAUDE.md へのルーティング規則の追記案内は routing_declined で止めている。
+元に戻す方法: ~/.claude/skills/gstack/bin/gstack-config set routing_declined false
+-->
 
 ## Completion report
 
