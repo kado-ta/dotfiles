@@ -13,7 +13,7 @@ ZSH_PATH="$(brew --prefix)/bin/zsh"
 echo "Zsh path: $ZSH_PATH"
 
 # デフォルト・シェルを Homebrew でインストールした zsh へ変更する。
-echo $ZSH_PATH >> /etc/shells
+echo $ZSH_PATH | sudo tee -a /etc/shells
 chsh -s $ZSH_PATH
 
 # NOTE: 実行後にシェルを再起動すること。
