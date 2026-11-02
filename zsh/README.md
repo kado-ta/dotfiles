@@ -122,44 +122,44 @@ exec zsh
 <a name="config-files"></a>
 ## 設定ファイル
 
-| ファイル | 内容 |
-| --- | --- |
-| `alias.zsh` | コマンドのエイリアス・関数（下表） |
-| `bindkey.zsh` | Emacs 風キーバインド（`bindkey -e`） |
-| `select-word-style.zsh` | 単語区切り文字（`/` も区切りにして `^W` でパス 1 階層分を削除）、補完の大文字小文字無視、`sudo` 後のコマンド補完、`ps` のプロセス名補完 |
-| `setpot.zsh` | `setopt` によるシェルオプション（ヒストリ共有・重複除外、`auto_cd`、`auto_pushd`、`extended_glob`、`no_beep` など） |
-| `zsh-autosuggestions.zsh` | zsh-autosuggestions の候補表示色（`ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE='fg=242'`） |
+| ファイル                  | 内容                                                                                                                                    |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `alias.zsh`               | コマンドのエイリアス・関数（下表）                                                                                                      |
+| `bindkey.zsh`             | Emacs 風キーバインド（`bindkey -e`）                                                                                                    |
+| `select-word-style.zsh`   | 単語区切り文字（`/` も区切りにして `^W` でパス 1 階層分を削除）、補完の大文字小文字無視、`sudo` 後のコマンド補完、`ps` のプロセス名補完 |
+| `setpot.zsh`              | `setopt` によるシェルオプション（ヒストリ共有・重複除外、`auto_cd`、`auto_pushd`、`extended_glob`、`no_beep` など）                     |
+| `zsh-autosuggestions.zsh` | zsh-autosuggestions の候補表示色（`ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE='fg=242'`）                                                          |
 
 ### `alias.zsh` の主な定義
 
-| 名前 | 内容 |
-| --- | --- |
-| `ls` / `la` / `ll` | OS 別の色付き表示（macOS は `ls -G -F`） |
-| `rm` / `cp` / `mv` | `-i` で上書き・削除前に確認 |
-| `mkdir` | `-p` で親ディレクトリも作成 |
-| `be` | `bundle exec` |
-| `typora <file>` | Typora でファイルを開く（`open -a Typora`、macOS のみ） |
-| `sudo` | `sudo ` 後のコマンドでもエイリアスを展開 |
-| `L` / `G`（グローバル） | `\| less` / `\| grep` |
+| 名前                                        | 内容                                                                       |
+| ------------------------------------------- | -------------------------------------------------------------------------- |
+| `ls` / `la` / `ll`                          | OS 別の色付き表示（macOS は `ls -G -F`）                                   |
+| `rm` / `cp` / `mv`                          | `-i` で上書き・削除前に確認                                                |
+| `mkdir`                                     | `-p` で親ディレクトリも作成                                                |
+| `be`                                        | `bundle exec`                                                              |
+| `typora <file>`                             | Typora でファイルを開く（`open -a Typora`、macOS のみ）                    |
+| `sudo`                                      | `sudo ` 後のコマンドでもエイリアスを展開                                   |
+| `L` / `G`（グローバル）                     | `\| less` / `\| grep`                                                      |
 | `codex-config-sync` / `codex-config-import` | Codex 設定の同期・取り込み（[.codex/README.md](../.codex/README.md) 参照） |
-| `ua-dashboard [dir]` | Understand Anything のダッシュボードを起動（関数） |
-| `gstack-upgrade [--check]` | gstack を最新版へ更新（`--check` は確認のみ）（関数） |
+| `ua-dashboard [dir]`                        | Understand Anything のダッシュボードを起動（関数）                         |
+| `gstack-upgrade [--check]`                  | gstack を最新版へ更新（`--check` は確認のみ）（関数）                      |
 
 ### プラグイン（`.config/sheldon/plugins.toml`）
 
 プラグインの追加・削除は `plugins.toml` で行う。現在の構成は以下のとおり（記載順に読み込まれる）。
 
-| プラグイン | 読み込み | 役割 |
-| --- | --- | --- |
-| `romkatv/zsh-defer` | 即時 | 遅延読み込み機能 |
-| `johnhamelink/env-zsh` | 即時 | 作業ディレクトリの `.env` から環境変数を読み込む |
-| `colors`（inline） | 遅延 | プロンプトの色 |
-| `zdharma/fast-syntax-highlighting` | 遅延 | シンタックスハイライト |
-| `zsh-users/zsh-autosuggestions` | 遅延 | 入力候補のグレー表示 |
-| `zsh-users/zsh-completions` | 遅延 | 補完定義の追加 |
-| `compinit`（inline） | 遅延 | 補完の有効化と aws-cli 補完 |
-| `z-shell/H-S-MW` | 遅延 | `Ctrl-R` で複数キーワード AND 検索 |
-| `dotfile-defers`（local） | 遅延 | `~/dotfiles/zsh/*.zsh` |
+| プラグイン                         | 読み込み | 役割                                             |
+| ---------------------------------- | -------- | ------------------------------------------------ |
+| `romkatv/zsh-defer`                | 即時     | 遅延読み込み機能                                 |
+| `johnhamelink/env-zsh`             | 即時     | 作業ディレクトリの `.env` から環境変数を読み込む |
+| `colors`（inline）                 | 遅延     | プロンプトの色                                   |
+| `zdharma/fast-syntax-highlighting` | 遅延     | シンタックスハイライト                           |
+| `zsh-users/zsh-autosuggestions`    | 遅延     | 入力候補のグレー表示                             |
+| `zsh-users/zsh-completions`        | 遅延     | 補完定義の追加                                   |
+| `compinit`（inline）               | 遅延     | 補完の有効化と aws-cli 補完                      |
+| `z-shell/H-S-MW`                   | 遅延     | `Ctrl-R` で複数キーワード AND 検索               |
+| `dotfile-defers`（local）          | 遅延     | `~/dotfiles/zsh/*.zsh`                           |
 
 <a name="operations"></a>
 ## 日常運用
