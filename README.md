@@ -48,7 +48,7 @@ Finder で `init.command` をダブルクリックする（ターミナルから
 | 4   | `zsh/setup_plugins.sh` | Sheldon で Zsh プラグインをインストールする                                                                                     |
 | 5   | `.aws/link.sh`         | AWS CLI の設定（`config`・`credentials`）をリンクする                                                                           |
 | 6   | `mise/setup.sh`        | mise の設定を `~/.config/mise/config.toml` にリンクし、言語ランタイム・ツールをインストールする                                 |
-| 7   | `.claude/setup.sh`     | Claude Code の設定をリンクし、プラグインと gstack をインストールする（[詳細](#claude-code)）                                    |
+| 7   | `claude/setup.sh`      | Claude Code の設定をリンクし、プラグインと gstack をインストールする（[詳細](#claude-code)）                                    |
 | 8   | `.codex/setup.sh`      | Codex の `AGENTS.md` をリンクし、プラグインとスキルをインストールする。7 でインストールした gstack を使うため、7 の後に実行する |
 | 9   | `vscode/setup.sh`      | VSCode の設定をリンクし、拡張をインストールする                                                                                 |
 | 10  | `ghostty/link.sh`      | Ghostty の設定を `~/.config/ghostty/` にリンクする                                                                              |
@@ -83,7 +83,7 @@ Finder で `init.command` をダブルクリックする（ターミナルから
 | `.config/`   | Starship・Sheldon・uv の設定（`karabiner/` は現在リンクしていない）                    | `~/.config/`                               | —                                          |
 | `mise/`      | 言語ランタイム・ツールのグローバルバージョン（`mise_config.toml`）                     | `~/.config/mise/config.toml`               | [mise/JAVA.md](mise/JAVA.md)               |
 | `.aws/`      | AWS CLI のプロファイル設定（`credentials` は Git 管理外）                              | `~/.aws/`                                  | —                                          |
-| `.claude/`   | Claude Code の設定・フック・ルール・個人スキル                                         | `~/.claude/`                               | [Claude Code 設定](#claude-code)           |
+| `claude/`    | Claude Code の設定・フック・ルール・個人スキル                                         | `~/.claude/`                               | [Claude Code 設定](#claude-code)           |
 | `.codex/`    | Codex CLI のグローバル指示（`AGENTS.md`）と共通設定（`config.base.toml`）              | `~/.codex/`                                | [.codex/README.md](.codex/README.md)       |
 | `vscode/`    | VSCode の設定・キーバインド・タスク・拡張リスト・Project Manager 拡張の設定            | `~/Library/Application Support/Code/User/` | —                                          |
 | `ghostty/`   | Ghostty の設定                                                                         | `~/.config/ghostty/`                       | —                                          |
@@ -97,7 +97,7 @@ Finder で `init.command` をダブルクリックする（ターミナルから
 <a name="claude-code"></a>
 ## Claude Code 設定
 
-`.claude/setup.sh` は次を行う。
+`claude/setup.sh` は次を行う。
 
 - `settings.json`・`CLAUDE.md`・`rules/`・`mcp.json`・`hooks/`・`scripts/statusline.sh` を `~/.claude/` にリンクする。`~/.claude/hooks/` が実ディレクトリの場合は、削除してからリンクに置き換える。
 - `skills/*/` の個人スキルを `~/.claude/skills/` にリンクする（全プロジェクトで使える）。
@@ -120,7 +120,7 @@ Finder で `init.command` をダブルクリックする（ターミナルから
 フックを変更したら、回帰テストを実行する。
 
 ```shell
-bash .claude/hooks/tests/test-protect-main-branch.sh
+bash claude/hooks/tests/test-protect-main-branch.sh
 ```
 
 <a name="operations"></a>

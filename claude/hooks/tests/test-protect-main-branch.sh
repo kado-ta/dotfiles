@@ -7,7 +7,11 @@ set -uo pipefail
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 HOOK="${1:-${SCRIPT_DIR}/../protect-main-branch.sh}"
 
-T=$(mktemp -d)
+# Use an explicit template: plain `mktemp -d` ignores TMPDIR on macOS.
+T=$(mktemp -d "${TMPDIR:-/tmp}/test-protect-main-branch.XXXXXX") || {
+  echo "mktemp failed" >&2
+  exit 1
+}
 trap 'rm -rf "$T"' EXIT
 MAIN="$T/main-repo"
 FEAT="$T/feat-repo"
