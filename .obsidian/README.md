@@ -92,11 +92,11 @@
 <a name="app-json"></a>
 ### `app.json`: ファイルとリンク
 
-| キー | 値 | 設定画面（`Settings → Files and links`） | 内容 |
-|---|---|---|---|
-| `useMarkdownLinks` | `true` | `Use [[Wikilinks]]`: OFF | 内部リンクを Wikilink（`[[...]]`）ではなく Markdown リンク（`[表示名](パス.md)`）で作成する |
-| `newLinkFormat` | `"relative"` | New link format: Relative path to file | 新しく作るリンクのパスを、リンク元ノートからの相対パスにする |
-| `alwaysUpdateLinks` | `true` | Automatically update internal links: ON | ファイルの移動・リネーム時に、確認なしで内部リンクを更新する |
+| キー                | 値           | 設定画面（`Settings → Files and links`） | 内容                                                                                        |
+| ------------------- | ------------ | ---------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `useMarkdownLinks`  | `true`       | `Use [[Wikilinks]]`: OFF                 | 内部リンクを Wikilink（`[[...]]`）ではなく Markdown リンク（`[表示名](パス.md)`）で作成する |
+| `newLinkFormat`     | `"relative"` | New link format: Relative path to file   | 新しく作るリンクのパスを、リンク元ノートからの相対パスにする                                |
+| `alwaysUpdateLinks` | `true`       | Automatically update internal links: ON  | ファイルの移動・リネーム時に、確認なしで内部リンクを更新する                                |
 
 `useMarkdownLinks` と `newLinkFormat` は、ノートを GitHub・Typora でも同じように読めるようにするための設定（[MARKDOWN.md](../claude/rules/MARKDOWN.md) の方針に合わせている）。相対パスにするのは、GitHub・Typora がリンクをリンク元ファイルからの相対パスとして解決するため。
 
@@ -112,30 +112,30 @@
 
 有効にするプラグインの ID を列挙する。プラグイン本体は管理しないため、端末ごとにインストールする（未インストールのプラグインは有効にならない）。
 
-| ID | プラグイン名 | 用途 |
-|---|---|---|
-| `remotely-save` | Remotely Save | Cloudflare R2 経由の端末間同期（[SYNC_BACKUP.md](SYNC_BACKUP.md#sync)） |
-| `obsidian-git` | Git | GitHub へのバックアップ（[SYNC_BACKUP.md](SYNC_BACKUP.md#backup)） |
-| `mermaid-kit` | Mermaid Kit | Mermaid 図の拡大・縮小・パン・全画面表示（[snippets/README.md](snippets/README.md)） |
-| `html-viewer` | HTML Viewer | Vault 内の `.html` ファイルをサンドボックス内で表示する |
+| ID              | プラグイン名  | 用途                                                                                 |
+| --------------- | ------------- | ------------------------------------------------------------------------------------ |
+| `remotely-save` | Remotely Save | Cloudflare R2 経由の端末間同期（[SYNC_BACKUP.md](SYNC_BACKUP.md#sync)）              |
+| `obsidian-git`  | Git           | GitHub へのバックアップ（[SYNC_BACKUP.md](SYNC_BACKUP.md#backup)）                   |
+| `mermaid-kit`   | Mermaid Kit   | Mermaid 図の拡大・縮小・パン・全画面表示（[snippets/README.md](snippets/README.md)） |
+| `html-viewer`   | HTML Viewer   | Vault 内の `.html` ファイルをサンドボックス内で表示する                              |
 
 <a name="core-plugins-json"></a>
 ### `core-plugins.json`: コアプラグイン
 
 コアプラグインごとの ON/OFF を持つ。OFF にしているのは次のプラグインで、それ以外はすべて ON。
 
-| ID | 設定画面での名前 |
-|---|---|
-| `footnotes` | Footnotes view |
-| `slash-command` | Slash commands |
-| `zk-prefixer` | Unique note creator |
-| `random-note` | Random note |
-| `slides` | Slides |
-| `audio-recorder` | Audio recorder |
-| `workspaces` | Workspaces |
-| `publish` | Publish |
-| `sync` | Sync |
-| `webviewer` | Web viewer |
+| ID               | 設定画面での名前    |
+| ---------------- | ------------------- |
+| `footnotes`      | Footnotes view      |
+| `slash-command`  | Slash commands      |
+| `zk-prefixer`    | Unique note creator |
+| `random-note`    | Random note         |
+| `slides`         | Slides              |
+| `audio-recorder` | Audio recorder      |
+| `workspaces`     | Workspaces          |
+| `publish`        | Publish             |
+| `sync`           | Sync                |
+| `webviewer`      | Web viewer          |
 
 `sync`（Obsidian Sync）を OFF にしているのは、端末間同期を Remotely Save に一本化しているため（[SYNC_BACKUP.md](SYNC_BACKUP.md#policy) 参照）。
 
@@ -149,8 +149,8 @@
 
 既定から変更したホットキーだけを持つ。
 
-| キー | コマンド |
-|---|---|
+| キー  | コマンド                                                      |
+| ----- | ------------------------------------------------------------- |
 | `⌥⌘T` | Open in default app（現在のファイルを OS の既定アプリで開く） |
 
 <a name="snippets-dir"></a>
@@ -163,12 +163,12 @@ Obsidian の本文と Mermaid 図を Typora 風（ライトは GitHub テーマ�
 
 `setup.sh` がリンクしないファイルは Vault 側にだけ保存され、他の端末には反映されない（Remotely Save の Sync Config Dir は無効で、Vault の `.gitignore` でも `.obsidian/` を除外しているため。[SYNC_BACKUP.md](SYNC_BACKUP.md#policy) 参照）。
 
-| ファイル | 内容・扱い |
-|---|---|
-| `plugins/` | コミュニティプラグイン本体と各プラグインの設定（`data.json`）。Remotely Save の `data.json` には R2 の認証情報が含まれるため、dotfiles に入れない。端末ごとにインストール・設定する |
-| `workspace.json` | 開いているタブ・ペインの配置など、端末ごとに変わる状態 |
-| `themes/` | コミュニティテーマ。CSS スニペットは Default テーマを前提とするため使わない |
-| 上記以外（`daily-notes.json` など） | UI で設定すると Vault 側に作られる。端末間で揃えたい場合は [設定ファイルを管理対象に加える](#add-managed-file) |
+| ファイル                            | 内容・扱い                                                                                                                                                                          |
+| ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `plugins/`                          | コミュニティプラグイン本体と各プラグインの設定（`data.json`）。Remotely Save の `data.json` には R2 の認証情報が含まれるため、dotfiles に入れない。端末ごとにインストール・設定する |
+| `workspace.json`                    | 開いているタブ・ペインの配置など、端末ごとに変わる状態                                                                                                                              |
+| `themes/`                           | コミュニティテーマ。CSS スニペットは Default テーマを前提とするため使わない                                                                                                         |
+| 上記以外（`daily-notes.json` など） | UI で設定すると Vault 側に作られる。端末間で揃えたい場合は [設定ファイルを管理対象に加える](#add-managed-file)                                                                      |
 
 <a name="operations"></a>
 ## 日常運用
