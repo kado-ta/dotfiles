@@ -57,14 +57,14 @@ Codex のユーザー設定 `~/.codex/config.toml` は、モデルや MCP の設
 
 ### `.codex/` 内のファイル
 
-| ファイル | 役割 | `~/.codex/` への反映方法 |
-| --- | --- | --- |
-| `README.md` | このドキュメント | なし |
-| `AGENTS.md` | Codex のグローバル指示の正本（回答方針・作業ルール・安全ルール・レビュー方針など） | `setup.sh` がシンボリックリンクを作成 |
-| `config.base.toml` | 複数端末で共有する Codex 設定（モデル・`developer_instructions`（安全ガードレール）・プラグイン・MCP など） | `sync.py` が `config.toml` へマージ |
-| `setup.sh` | `AGENTS.md` のリンク作成と Understand Anything スキルのインストール | — |
-| `sync.py` | `config.base.toml` + `config.local.toml` → `config.toml` | — |
-| `import.py` | `config.toml` の変更を選択的に `config.base.toml` へ取り込む | — |
+| ファイル           | 役割                                                                                                                          | `~/.codex/` への反映方法              |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
+| `README.md`        | このドキュメント                                                                                                              | なし                                  |
+| `AGENTS.md`        | Codex のグローバル指示の正本（回答方針・作業ルール・安全ルール・レビュー方針など）                                            | `setup.sh` がシンボリックリンクを作成 |
+| `config.base.toml` | 複数端末で共有する Codex 設定（モデル・`developer_instructions`（安全ガードレール）・プラグイン・MCP など）                   | `sync.py` が `config.toml` へマージ   |
+| `setup.sh`         | `AGENTS.md` のリンク作成、superpowers プラグインと Understand Anything スキルのインストール、gstack の Codex 向けセットアップ | —                                     |
+| `sync.py`          | `config.base.toml` + `config.local.toml` → `config.toml`                                                                      | —                                     |
+| `import.py`        | `config.toml` の変更を選択的に `config.base.toml` へ取り込む                                                                  | —                                     |
 
 > **重要**
 >
@@ -74,15 +74,15 @@ Codex のユーザー設定 `~/.codex/config.toml` は、モデルや MCP の設
 
 ### ファイルと変更権限
 
-| ファイル | 主な変更者 | Git 管理 | 備考 |
-| --- | --- | --- | --- |
-| `~/dotfiles/.codex/AGENTS.md` | 人 | する | `~/.codex/AGENTS.md` からリンクされる |
-| `~/dotfiles/.codex/config.base.toml` | 人（編集・import） | する | `[projects]` は記述しない |
-| `~/dotfiles/.codex/sync.py` | 人 | する | Codex 設定反映スクリプト |
-| `~/dotfiles/.codex/import.py` | 人 | する | Codex 設定取込スクリプト |
-| `~/.codex/config.local.toml` | 人 | しない | 必要な端末だけ作成 |
-| `~/.codex/config.toml` | Codex / sync.py | しない | `[projects]` を保持 |
-| `~/.codex/auth.json` | Codex | しない | **絶対に Git へ追加しない** |
+| ファイル                             | 主な変更者         | Git 管理 | 備考                                  |
+| ------------------------------------ | ------------------ | -------- | ------------------------------------- |
+| `~/dotfiles/.codex/AGENTS.md`        | 人                 | する     | `~/.codex/AGENTS.md` からリンクされる |
+| `~/dotfiles/.codex/config.base.toml` | 人（編集・import） | する     | `[projects]` は記述しない             |
+| `~/dotfiles/.codex/sync.py`          | 人                 | する     | Codex 設定反映スクリプト              |
+| `~/dotfiles/.codex/import.py`        | 人                 | する     | Codex 設定取込スクリプト              |
+| `~/.codex/config.local.toml`         | 人                 | しない   | 必要な端末だけ作成                    |
+| `~/.codex/config.toml`               | Codex / sync.py    | しない   | `[projects]` を保持                   |
+| `~/.codex/auth.json`                 | Codex              | しない   | **絶対に Git へ追加しない**           |
 
 <a name="setup"></a>
 ## セットアップ（setup.sh）
@@ -90,8 +90,10 @@ Codex のユーザー設定 `~/.codex/config.toml` は、モデルや MCP の設
 ### 前提条件
 
 - macOS（`setup.sh` は macOS 以外では終了する）。
+- Codex CLI がインストール済みであること（`.bin/.Brewfile` の `cask "codex"`）。
+- `.claude/setup.sh` で gstack（`~/.claude/skills/gstack`）をインストール済みであること。`setup.sh` はこの gstack を Codex 向けにセットアップする。
 - `uv` が利用可能であること（`mise` 管理の場合は `uv --version` が成功すること）。
-- Python 3.11 以上と `tomlkit` を使用する。いずれも `uv` が取得するため、個別の `pip install` や `.venv` 作成は不要。初回はネットワークが必要な場合がある。
+- Python 3.11 以上と `tomlkit` を使用する。Python は `mise` 管理のものを使う（`.config/uv/uv.toml` で `uv` による Python のダウンロードを無効にしている）。`tomlkit` は `uv` が取得するため、個別の `pip install` や `.venv` 作成は不要。初回はネットワークが必要な場合がある。
 - `zsh/alias.zsh` が読み込まれていること（Sheldon が `~/dotfiles/zsh/*.zsh` を読み込む）。
 
 ### `setup.sh` が行うこと
@@ -99,14 +101,16 @@ Codex のユーザー設定 `~/.codex/config.toml` は、モデルや MCP の設
 1. macOS であることを確認する。
 2. `~/.codex/` がなければ作成する。
 3. `~/dotfiles/.codex/AGENTS.md` を `~/.codex/AGENTS.md` へシンボリックリンクする（`ln -snfv`）。
-4. Understand Anything スキルを Codex 向けにインストールする（GitHub の `install.sh` を `curl | bash` で実行）。
+4. superpowers プラグインを追加する（`codex plugin add superpowers@openai-curated`）。
+5. Understand Anything スキルを Codex 向けにインストールする（GitHub の `install.sh` を `curl | bash` で実行）。
+6. Claude Code 用にインストールした gstack を、Codex でも使えるようにセットアップする（`~/.claude/skills/gstack/setup --host codex`）。
 
 **`setup.sh` は `config.toml` を作成・変更しない。** 設定の反映は後述の `codex-config-sync` で行う。
 
 ### 実行手順
 
 ```bash
-# 1. AGENTS.md のリンクとスキルのインストール
+# 1. AGENTS.md のリンク、プラグインとスキルのインストール
 ~/dotfiles/.codex/setup.sh
 
 # 2. エイリアスを読み込む（新しいシェルを開いてもよい）
@@ -119,7 +123,7 @@ codex-config-sync --dry-run
 codex-config-sync
 ```
 
-`setup.sh` は何度実行してもよい（リンクは `ln -snfv` で張り直す）。ただしスキルのインストールは毎回リモートの最新版を取得する。
+`setup.sh` は何度実行してもよい（リンクは `ln -snfv` で張り直す）。ただし、Understand Anything スキルは実行のたびにリモートの最新版を取得する。
 
 <a name="instructions"></a>
 
@@ -127,14 +131,14 @@ codex-config-sync
 
 Codex の動作をカスタマイズする2種類の指示。主な違いは**適用範囲と指示の優先順位**。
 
-| 比較項目       | `AGENTS.md`                                    | `developer_instructions`                     |
-| -------------- | ---------------------------------------------- | -------------------------------------------- |
-| 設定場所       | `~/.codex/AGENTS.md`                           | `~/.codex/config.toml`                       |
-| 記述形式       | Markdown                                       | TOML の文字列                                |
-| 指示の優先順位 | User レベル（推測）                            | Developer レベル（推測・公式に記載なし）     |
+| 比較項目       | `AGENTS.md`                                    | `developer_instructions`                         |
+| -------------- | ---------------------------------------------- | ------------------------------------------------ |
+| 設定場所       | `~/.codex/AGENTS.md`                           | `~/.codex/config.toml`                           |
+| 記述形式       | Markdown                                       | TOML の文字列                                    |
+| 指示の優先順位 | User レベル（推測）                            | Developer レベル（推測・公式に記載なし）         |
 | 主な用途       | すべての指示の正本（回答方針・作業ルールなど） | 安全ガードレールのみ（AGENTS.md と意図的に重複） |
-| スコープ       | グローバル・リポジトリ・サブディレクトリ       | グローバル・プロジェクト                     |
-| 階層的な適用   | 上位から下位へ連結（近いファイルが優先）       | 設定レイヤーの優先順位で値を決定             |
+| スコープ       | グローバル・リポジトリ・サブディレクトリ       | グローバル・プロジェクト                         |
+| 階層的な適用   | 上位から下位へ連結（近いファイルが優先）       | 設定レイヤーの優先順位で値を決定                 |
 
 > [!NOTE]
 > 公式の設定リファレンスでの `developer_instructions` の説明は「Additional developer instructions injected into the session」のみで、AGENTS.md との優先順位は明記されていない。上表の優先順位は推測であり、未確認。
@@ -143,10 +147,10 @@ Codex の動作をカスタマイズする2種類の指示。主な違いは**�
 
 | 実行環境                        | AGENTS.md | developer_instructions |
 | ------------------------------- | --------- | ---------------------- |
-| ChatGPT Desktop：ChatGPT モード | ✅         | 未確認                 |
-| ChatGPT Desktop：Codex モード   | ✅         | ⚠️ 不具合報告あり       |
-| Codex CLI                       | ✅         | ✅                      |
-| ChatGPT Web                     | ❌         | ❌                      |
+| ChatGPT Desktop：ChatGPT モード | ✅        | 未確認                 |
+| ChatGPT Desktop：Codex モード   | ✅        | ⚠️ 不具合報告あり      |
+| Codex CLI                       | ✅        | ✅                     |
+| ChatGPT Web                     | ❌        | ❌                     |
 
 > [!NOTE]
 > Desktop では `developer_instructions` が適用されない不具合が報告されているため、動作確認が必要。
@@ -187,9 +191,9 @@ alias codex-config-sync='uv run --no-project --with "tomlkit>=0.13,<1" python "$
 alias codex-config-import='uv run --no-project --with "tomlkit>=0.13,<1" python "$HOME/dotfiles/.codex/import.py"'
 ```
 
-| エイリアス | 実行内容 | 主なオプション |
-| --- | --- | --- |
-| `codex-config-sync` | `sync.py`：base/local を `~/.codex/config.toml` へ反映 | `--dry-run` |
+| エイリアス            | 実行内容                                                          | 主なオプション                                      |
+| --------------------- | ----------------------------------------------------------------- | --------------------------------------------------- |
+| `codex-config-sync`   | `sync.py`：base/local を `~/.codex/config.toml` へ反映            | `--dry-run`                                         |
 | `codex-config-import` | `import.py`：`config.toml` の変更を `config.base.toml` へ取り込む | `--key <KEY>`（複数可）、`--all-managed`、`--apply` |
 
 - `--no-project`：カレントディレクトリの `pyproject.toml` を無視して実行する。
@@ -202,16 +206,16 @@ alias codex-config-import='uv run --no-project --with "tomlkit>=0.13,<1" python 
 
 ### チートシート
 
-| 目的 | コマンド | 書き込み先 |
-| --- | --- | --- |
-| 共通・端末設定の反映差分を確認 | `codex-config-sync --dry-run` | なし |
-| 共通・端末設定を Codex に反映 | `codex-config-sync` | `~/.codex/config.toml` |
-| Codex 側の変更候補を確認 | `codex-config-import` | なし |
-| 1 項目を共通設定へ取り込む | `codex-config-import --key model_reasoning_effort --apply` | `config.base.toml` |
-| 複数項目を取り込む | `codex-config-import --key model --key model_reasoning_effort --apply` | `config.base.toml` |
-| Git 管理済み項目を一括で取り込む | `codex-config-import --all-managed --apply` | `config.base.toml` |
-| 新しい項目を明示的に取り込む | `codex-config-import --key features.some_flag --apply` | `config.base.toml` |
-| 取り込み後の Git 差分を確認 | `git -C "$HOME/dotfiles" diff -- .codex/config.base.toml` | なし |
+| 目的                             | コマンド                                                               | 書き込み先             |
+| -------------------------------- | ---------------------------------------------------------------------- | ---------------------- |
+| 共通・端末設定の反映差分を確認   | `codex-config-sync --dry-run`                                          | なし                   |
+| 共通・端末設定を Codex に反映    | `codex-config-sync`                                                    | `~/.codex/config.toml` |
+| Codex 側の変更候補を確認         | `codex-config-import`                                                  | なし                   |
+| 1 項目を共通設定へ取り込む       | `codex-config-import --key model_reasoning_effort --apply`             | `config.base.toml`     |
+| 複数項目を取り込む               | `codex-config-import --key model --key model_reasoning_effort --apply` | `config.base.toml`     |
+| Git 管理済み項目を一括で取り込む | `codex-config-import --all-managed --apply`                            | `config.base.toml`     |
+| 新しい項目を明示的に取り込む     | `codex-config-import --key features.some_flag --apply`                 | `config.base.toml`     |
+| 取り込み後の Git 差分を確認      | `git -C "$HOME/dotfiles" diff -- .codex/config.base.toml`              | なし                   |
 
 `features.some_flag` は指定方法を示す**仮のキー名**であり、実際に利用できる Codex 設定であることを意味しない。
 
@@ -376,14 +380,14 @@ git -C "$HOME/dotfiles" diff -- .codex/config.base.toml
 
 **例外：** `[projects]` は base/local に記述を禁止し（記述するとエラー）、既存の `config.toml` の値を維持する。
 
-| 変更 | `sync.py` の動作 |
-| --- | --- |
-| base にあるキーを更新 | 実ファイルへ反映 |
-| local にあるキーを更新 | base より優先して反映 |
-| Codex が `[projects]` を追加 | 保持 |
-| base/local にない未知のキー | 既存値を保持 |
-| base からキーを削除 | **既存の実ファイルからは削除しない** |
-| base の文字列中の `~/` | 実行環境のホームディレクトリの絶対パスへ展開 |
+| 変更                         | `sync.py` の動作                             |
+| ---------------------------- | -------------------------------------------- |
+| base にあるキーを更新        | 実ファイルへ反映                             |
+| local にあるキーを更新       | base より優先して反映                        |
+| Codex が `[projects]` を追加 | 保持                                         |
+| base/local にない未知のキー  | 既存値を保持                                 |
+| base からキーを削除          | **既存の実ファイルからは削除しない**         |
+| base の文字列中の `~/`       | 実行環境のホームディレクトリの絶対パスへ展開 |
 
 ### import.py：config → base
 
@@ -416,11 +420,11 @@ git -C "$HOME/dotfiles" diff -- .codex/config.base.toml
 <a name="backup"></a>
 ## バックアップ・復元
 
-| 操作 | バックアップ先 |
-| --- | --- |
-| 初期移行 | `~/.codex/config.toml.pre-dotfiles.bak` |
-| `sync.py` による更新 | `~/.codex/config.toml.backup-<timestamp>` |
-| `import.py --apply` | `~/.codex/config-import-backups/config.base-<timestamp>.toml` |
+| 操作                 | バックアップ先                                                |
+| -------------------- | ------------------------------------------------------------- |
+| 初期移行             | `~/.codex/config.toml.pre-dotfiles.bak`                       |
+| `sync.py` による更新 | `~/.codex/config.toml.backup-<timestamp>`                     |
+| `import.py --apply`  | `~/.codex/config-import-backups/config.base-<timestamp>.toml` |
 
 バックアップの一覧：
 
