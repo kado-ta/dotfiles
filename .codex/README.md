@@ -62,7 +62,7 @@ Codex のユーザー設定 `~/.codex/config.toml` は、モデルや MCP の設
 | `README.md`        | このドキュメント                                                                                                              | なし                                  |
 | `AGENTS.md`        | Codex のグローバル指示の正本（回答方針・作業ルール・安全ルール・レビュー方針など）                                            | `setup.sh` がシンボリックリンクを作成 |
 | `config.base.toml` | 複数端末で共有する Codex 設定（モデル・`developer_instructions`（安全ガードレール）・プラグイン・MCP など）                   | `sync.py` が `config.toml` へマージ   |
-| `setup.sh`         | `AGENTS.md` のリンク作成と Understand Anything スキルのインストール                                                           | —                                     |
+| `setup.sh`         | `AGENTS.md` のリンク作成、superpowers プラグインと Understand Anything スキルのインストール、gstack の Codex 向けセットアップ | —                                     |
 | `sync.py`          | `config.base.toml` + `config.local.toml` → `config.toml`                                                                      | —                                     |
 | `import.py`        | `config.toml` の変更を選択的に `config.base.toml` へ取り込む                                                                  | —                                     |
 
@@ -90,6 +90,8 @@ Codex のユーザー設定 `~/.codex/config.toml` は、モデルや MCP の設
 ### 前提条件
 
 - macOS（`setup.sh` は macOS 以外では終了する）。
+- Codex CLI がインストール済みであること（`.bin/.Brewfile` の `cask "codex"`）。
+- `.claude/setup.sh` で gstack（`~/.claude/skills/gstack`）をインストール済みであること。`setup.sh` はこの gstack を Codex 向けにセットアップする。
 - `uv` が利用可能であること（`mise` 管理の場合は `uv --version` が成功すること）。
 - Python 3.11 以上と `tomlkit` を使用する。いずれも `uv` が取得するため、個別の `pip install` や `.venv` 作成は不要。初回はネットワークが必要な場合がある。
 - `zsh/alias.zsh` が読み込まれていること（Sheldon が `~/dotfiles/zsh/*.zsh` を読み込む）。
@@ -99,14 +101,16 @@ Codex のユーザー設定 `~/.codex/config.toml` は、モデルや MCP の設
 1. macOS であることを確認する。
 2. `~/.codex/` がなければ作成する。
 3. `~/dotfiles/.codex/AGENTS.md` を `~/.codex/AGENTS.md` へシンボリックリンクする（`ln -snfv`）。
-4. Understand Anything スキルを Codex 向けにインストールする（GitHub の `install.sh` を `curl | bash` で実行）。
+4. superpowers プラグインを追加する（`codex plugin add superpowers@openai-curated`）。
+5. Understand Anything スキルを Codex 向けにインストールする（GitHub の `install.sh` を `curl | bash` で実行）。
+6. Claude Code 用にインストールした gstack を、Codex でも使えるようにセットアップする（`~/.claude/skills/gstack/setup --host codex`）。
 
 **`setup.sh` は `config.toml` を作成・変更しない。** 設定の反映は後述の `codex-config-sync` で行う。
 
 ### 実行手順
 
 ```bash
-# 1. AGENTS.md のリンクとスキルのインストール
+# 1. AGENTS.md のリンク、プラグインとスキルのインストール
 ~/dotfiles/.codex/setup.sh
 
 # 2. エイリアスを読み込む（新しいシェルを開いてもよい）
@@ -119,7 +123,7 @@ codex-config-sync --dry-run
 codex-config-sync
 ```
 
-`setup.sh` は何度実行してもよい（リンクは `ln -snfv` で張り直す）。ただしスキルのインストールは毎回リモートの最新版を取得する。
+`setup.sh` は何度実行してもよい（リンクは `ln -snfv` で張り直す）。ただし、Understand Anything スキルは実行のたびにリモートの最新版を取得する。
 
 <a name="instructions"></a>
 

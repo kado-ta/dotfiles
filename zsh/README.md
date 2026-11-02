@@ -109,15 +109,13 @@ exec zsh
 ~/dotfiles/zsh/setup.sh
 # → ターミナルを再起動
 
-# 2. Sheldon 本体と設定ファイルを用意してからプラグインを入れる
+# 2. Sheldon 本体と設定ファイルを用意してからプラグインを入れる（setup.command 経由でも可）
 ~/dotfiles/.bin/link.sh          # ~/.Brewfile, ~/.zshrc などをリンク
 ~/dotfiles/.bin/setup_brew.sh    # sheldon / starship / mise などをインストール
 ~/dotfiles/.config/link.sh       # ~/.config/sheldon/plugins.toml をリンク
 ~/dotfiles/zsh/setup_plugins.sh
 exec zsh
 ```
-
-`setup.command` は `zsh/setup_plugins.sh` を最初に実行するため、新しい Mac ではこの時点で `sheldon` や `plugins.toml` が揃っておらず失敗しうる（[既知の制約・注意点](#limitations) 参照）。
 
 <a name="config-files"></a>
 ## 設定ファイル
@@ -195,8 +193,7 @@ exec zsh
 ## 既知の制約・注意点
 
 1. **`setup.sh` は `/etc/shells` の重複を確認しない。** 再実行すると同じパスが追記される。
-2. **`setup.command` の実行順序。** `zsh/setup_plugins.sh` が `.bin/setup_brew.sh`（`sheldon` のインストール）や `.config/link.sh`（`plugins.toml` のリンク）より前に実行される。新しい Mac では [新しい Mac での実行順序](#setup) に従う。
-3. **自動テストはない。** 変更後は新しいシェルを起動して動作を確認する。
+2. **自動テストはない。** 変更後は新しいシェルを起動して動作を確認する。
 
 <a name="troubleshooting"></a>
 ## トラブルシューティング
