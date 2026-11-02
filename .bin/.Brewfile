@@ -26,7 +26,6 @@ brew "sheldon"           # シェルのライブラリを管理する。
 brew "starship"          # シェル用プロンプト。高速でカスタマイズ性が高い。
 brew "tealdeer"          # Very fast implementation of tldr in Rust
 brew "telnet"            # RTX ルーターへの接続に使用する。
-brew "terminal-notifier" # macOS の通知センターへ通知を送信する
 brew "tree"              # ディレクトリ構造をツリー表示する。
 brew "trivy"             # コンテナイメージの脆弱性スキャンツール
 # brew "zsh"               # Zsh は Mac デフォルトを使用せず、 Homebrew でインストールする。
@@ -41,22 +40,22 @@ brew "docker-compose" # Isolated development environments using Docker
 cask "1password"
 cask "1password-cli"
 cask "atok"
-cask "bruno"             # Open source API Client
+cask "bruno"              # Open source API Client
 cask "chatgpt"
 cask "claude"
 cask "claude-code"
-cask "codex"             # OpenAI Codex CLI (Claude Code との協調動作用)
+cask "codex"              # OpenAI Codex CLI (Claude Code との協調動作用)
 cask "coteditor"
-cask "dbgate"            # Database manager for MySQL, PostgreSQL, SQL Server, MongoDB, SQLite and others
-cask "devtoys"           # JWT, Base64 等を変換するユーティリティーツール
+cask "dbgate"             # Database manager for MySQL, PostgreSQL, SQL Server, MongoDB, SQLite and others
+cask "devtoys"            # JWT, Base64 等を変換するユーティリティーツール
 cask "figma"
-cask "font-fira-code"    # コーディング見やすいかわいいフォント
-cask "font-hackgen"      # Starship が必要とするフォント。
-cask "font-hackgen-nerd" # Starship が必要とするフォント。
+cask "font-fira-code"     # コーディング見やすいかわいいフォント
+cask "font-hackgen"       # Starship が必要とするフォント。
+cask "font-hackgen-nerd"  # Starship が必要とするフォント。
 cask "ghostty"
 cask "keepingyouawake"
 cask "obsidian"
-cask "typora"            # 有償ソフトウェアであるため、インストール後のライセンス購入が必要。
+cask "typora"             # 有償ソフトウェアであるため、インストール後のライセンス購入が必要。
 cask "visual-studio-code"
 
 # 下記は、必要に応じてコメントアウトを解除する。
