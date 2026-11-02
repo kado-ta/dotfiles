@@ -6,6 +6,14 @@ if [ "$(uname)" != "Darwin" ] ; then
   exit 1
 fi
 
+# セッション中に ~/.claude のリンクを張り直すと、Claude Code のサンドボックスがリンクを削除し、
+# deny ルール・フック・サンドボックスが無効になる。経緯は DOUBLE_LOAD_WARNING.md を参照する。
+# CLAUDECODE は IDE の統合ターミナルにも設定されるが、IDE にセッションが残っている可能性が高いので拒否する。
+if [ -n "${CLAUDECODE:-}" ]; then
+  echo "Run this from a plain terminal (not an IDE-integrated one) with all Claude Code sessions closed."
+  exit 1
+fi
+
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 CLAUDE_DIR="$HOME/.claude"
 echo "SCRIPT_DIR: $SCRIPT_DIR"

@@ -1,0 +1,30 @@
+{
+  "claudeMdExcludes": [
+    "**/dotfiles/claude/CLAUDE.md"
+  ],
+  "permissions": {
+    "ask": [
+      "Edit(/zsh/**)",
+      "Edit(/.config/sheldon/**)",
+      "Edit(/.config/starship/**)",
+      "Edit(/mise/**)",
+      "Edit(/mise.toml)",
+      "Edit(/ghostty/config)",
+      "Edit(/vscode/tasks.json)"
+    ]
+  },
+  "sandbox": {
+    "filesystem": {
+      "denyWrite": [
+        "./claude",
+        "./zsh",
+        "./.config/sheldon",
+        "./.config/starship",
+        "./mise",
+        "./mise.toml",
+        "./ghostty/config",
+        "./vscode/tasks.json"
+      ]
+    }
+  }
+}
