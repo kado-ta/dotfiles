@@ -6,22 +6,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 シェル・エディタ・開発ツールの設定を管理する macOS dotfiles リポジトリ。各ディレクトリの `link.sh` / `setup.sh` を通じて設定ファイルを `~` にシンボリックリンクする。ビルド手順は存在せず、テストはフックの回帰テストのみ。
 
-## セットアップフロー
-
-新しいマシンでは以下の順に実行する:
-1. `init.command` — Homebrew + Xcode CLI Tools のインストール（Finder からダブルクリック）
-2. `setup.command` — ランタイム・ライブラリ・ツール設定（Finder からダブルクリック）
-
-以下の個別スクリプトはシェル再起動後に実行する必要がある（`setup.command` 参照）:
-- `.bin/link.sh` — dotfiles を `~` にシンボリックリンク
-- `.bin/setup_brew.sh` — `~/.Brewfile`（`.bin/.Brewfile` へのリンク）からパッケージをインストール
-- `zsh/setup.sh` / `zsh/setup_plugins.sh`
-- `mise/setup.sh` — mise 設定をシンボリックリンクしランタイムをインストール
-- `.config/link.sh`, `.aws/link.sh`, `ghostty/link.sh`, `vscode/setup.sh`
-- `.claude/setup.sh` — Claude Code 設定のシンボリックリンク作成とプラグインインストール
-- `.codex/link.sh` — Codex CLI 設定のシンボリックリンク作成
-- `.obsidian/setup.sh` — Obsidian 設定と CSS スニペットを Vault（`~/Obsidian/main/.obsidian/`）にシンボリックリンク（Vault 作成後、Obsidian を閉じた状態で実行）
-
 <a name="mise-tasks"></a>
 ## mise タスク
 
@@ -40,30 +24,36 @@ mise run vscode:ext:list  # vscode/extensions リストを再生成
 | ディレクトリ | 役割                                                                                                                                             |
 | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `.bin/`      | シェルコア設定（`.zshrc`, `.zprofile`, `.gitconfig`, `.Brewfile`）                                                                               |
-| `zsh/`       | Zsh プラグイン設定（エイリアス・キーバインド・オプション・autosuggestions）                                                                      |
+| `zsh/`       | Zsh のインストールとシェル設定（エイリアス・キーバインド・オプション・autosuggestions）。プラグインの定義は `.config/sheldon/plugins.toml`       |
 | `mise/`      | `mise_config.toml` — 言語ランタイムのバージョン管理                                                                                              |
-| `.config/`   | karabiner, sheldon, starship の設定                                                                                                              |
+| `.config/`   | starship, sheldon, uv の設定（`karabiner/` は `link.sh` でリンクしていない）                                                                     |
 | `.aws/`      | AWS CLI プロファイル設定（credentials は gitignore 済み）                                                                                        |
 | `.claude/`   | Claude Code の設定・フック・スキル・セットアップスクリプト                                                                                       |
-| `.codex/`    | Codex CLI の設定（`config.toml` — `~/.codex/config.toml` にシンボリックリンク）                                                                  |
+| `.codex/`    | Codex CLI の設定（`AGENTS.md` を `~/.codex/AGENTS.md` にリンク。`config.base.toml` は `sync.py` で `~/.codex/config.toml` にマージ）             |
 | `.obsidian/` | Obsidian の Vault 設定と CSS スニペット（`~/Obsidian/main/.obsidian/` にシンボリックリンク）、Vault の同期・バックアップ手順（`SYNC_BACKUP.md`） |
 | `vscode/`    | VSCode 設定・拡張リスト・プロジェクトマネージャー設定                                                                                            |
 | `ghostty/`   | Ghostty ターミナル設定                                                                                                                           |
+| `biome/`     | Biome のグローバル設定（`biome.jsonc`）。`$schema` のバージョンは mise の postinstall から `sync_schema.sh` で更新する                           |
 
 ## Claude Code 設定（`.claude/`）
 
 `.claude/setup.sh` がメインのエントリーポイント。以下を実行する:
 - `settings.json`、`CLAUDE.md`、`rules/`、`mcp.json` を `~/.claude/` にシンボリックリンク
 - `hooks/` ディレクトリを `~/.claude/hooks/` にシンボリックリンク
-- プラグインをインストール: `superpowers@claude-plugins-official`, `claude-code-setup@claude-plugins-official`, `gstack`
+- `scripts/statusline.sh`（ステータスライン）を `~/.claude/scripts/` にシンボリックリンク
+- プラグイン `superpowers@claude-plugins-official`, `claude-code-setup@claude-plugins-official` をインストールし、gstack を `~/.claude/skills/gstack` に clone してセットアップ
 - `skills/*/` を `~/.claude/skills/` にシンボリックリンク
 
 ### フック
 
-| ファイル                       | トリガー          | 動作                                                     |
-| ------------------------------ | ----------------- | -------------------------------------------------------- |
-| `hooks/validate-command.sh`    | PreToolUse (Bash) | `rm -rf` および `prod`/`prd` を含むコマンドをブロック    |
-| `hooks/protect-main-branch.sh` | PreToolUse (Bash) | `main`, `master`, `staging` への `git commit` をブロック |
+| ファイル                       | トリガー          | 動作                                                                                                                        |
+| ------------------------------ | ----------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `hooks/validate-command.sh`    | PreToolUse (Bash) | `rm -rf` および `prod`/`prd` を含むコマンドをブロック（`sf devops` の参照系コマンドと PR 作成は、単独のコマンドに限り許可） |
+| `hooks/protect-main-branch.sh` | PreToolUse (Bash) | `main`, `master`, `staging` への `git commit` をブロック                                                                    |
+| `hooks/precompact-context.sh`  | PreCompact        | ブランチ名・`git status --short`・直近 5 件のコミットを `additionalContext` として渡す                                      |
+| `hooks/herdr-agent-state.sh`   | SessionStart      | herdr にセッション開始を通知する。herdr が生成・上書きするファイルのため編集しない                                          |
+
+上記のほか、通知（Notification / Stop）や PR 作成時の URL 表示（PostToolUse）のフックは `settings.json` に直接記述している。
 
 フックが exit code `2` を返すとツール実行がブロックされ、stderr の内容が Claude に表示される。
 
