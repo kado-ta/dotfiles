@@ -81,7 +81,7 @@ use = ["{!sync,*}.zsh"]
 
 1. macOS であることを確認する。
 2. `brew install zsh` で Zsh をインストールする。
-3. `$(brew --prefix)/bin/zsh` を `/etc/shells` に追記する。
+3. `$(brew --prefix)/bin/zsh` を `/etc/shells` に追記する（`sudo tee -a`）。
 4. `chsh -s` でログインシェルを Homebrew の Zsh に変更する。
 
 ```bash
@@ -195,17 +195,10 @@ exec zsh
 <a name="limitations"></a>
 ## 既知の制約・注意点
 
-1. **`setup.sh` の `/etc/shells` 追記は root 権限が必要。** スクリプトは `sudo` を付けずに `echo ... >> /etc/shells` を実行するため、通常ユーザーでは書き込みに失敗し、`bash -e` によりそこで終了する。その場合は手動で追記してから `chsh` を実行する。
-
-   ```bash
-   echo "$(brew --prefix)/bin/zsh" | sudo tee -a /etc/shells
-   chsh -s "$(brew --prefix)/bin/zsh"
-   ```
-
-2. **`setup.sh` は `/etc/shells` の重複を確認しない。** 再実行すると同じパスが追記される。
-3. **`setup.command` の実行順序。** `zsh/setup_plugins.sh` が `.bin/setup_brew.sh`（`sheldon` のインストール）や `.config/link.sh`（`plugins.toml` のリンク）より前に実行される。新しい Mac では [新しい Mac での実行順序](#setup) に従う。
-4. **mise の二重初期化。** `.bin/.zshrc` と `plugins.toml` の `mise-activate` の両方で `mise activate zsh` を実行している。
-5. **自動テストはない。** 変更後は新しいシェルを起動して動作を確認する。
+1. **`setup.sh` は `/etc/shells` の重複を確認しない。** 再実行すると同じパスが追記される。
+2. **`setup.command` の実行順序。** `zsh/setup_plugins.sh` が `.bin/setup_brew.sh`（`sheldon` のインストール）や `.config/link.sh`（`plugins.toml` のリンク）より前に実行される。新しい Mac では [新しい Mac での実行順序](#setup) に従う。
+3. **mise の二重初期化。** `.bin/.zshrc` と `plugins.toml` の `mise-activate` の両方で `mise activate zsh` を実行している。
+4. **自動テストはない。** 変更後は新しいシェルを起動して動作を確認する。
 
 <a name="troubleshooting"></a>
 ## トラブルシューティング
@@ -226,7 +219,12 @@ exec zsh
 
 **ログインシェルが `/bin/zsh`（macOS 標準）のまま**
 
-- `echo $SHELL` と `cat /etc/shells` を確認し、[既知の制約・注意点](#limitations) の 1. の手順で変更する。
+- `echo $SHELL` と `cat /etc/shells` を確認する。`/etc/shells` に Homebrew の Zsh がなければ追記してから、ログインシェルを変更する。
+
+  ```bash
+  echo "$(brew --prefix)/bin/zsh" | sudo tee -a /etc/shells   # /etc/shells にない場合のみ
+  chsh -s "$(brew --prefix)/bin/zsh"
+  ```
 
 **プロンプト表示直後にエイリアスやキーバインドが効かない**
 
