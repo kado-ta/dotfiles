@@ -98,7 +98,7 @@
 | `newLinkFormat` | `"relative"` | New link format: Relative path to file | 新しく作るリンクのパスを、リンク元ノートからの相対パスにする |
 | `alwaysUpdateLinks` | `true` | Automatically update internal links: ON | ファイルの移動・リネーム時に、確認なしで内部リンクを更新する |
 
-`useMarkdownLinks` と `newLinkFormat` は、ノートを GitHub・Typora でも同じように読めるようにするための設定（[MARKDOWN.md](../.claude/rules/MARKDOWN.md) の方針に合わせている）。相対パスにするのは、GitHub・Typora がリンクをリンク元ファイルからの相対パスとして解決するため。
+`useMarkdownLinks` と `newLinkFormat` は、ノートを GitHub・Typora でも同じように読めるようにするための設定（[MARKDOWN.md](../claude/rules/MARKDOWN.md) の方針に合わせている）。相対パスにするのは、GitHub・Typora がリンクをリンク元ファイルからの相対パスとして解決するため。
 
 <a name="appearance-json"></a>
 ### `appearance.json`: 外観
@@ -213,4 +213,4 @@ git -C ~/dotfiles diff -- .obsidian/
 
 - [SYNC_BACKUP.md](SYNC_BACKUP.md): Vault の端末間同期（Remotely Save + Cloudflare R2）と Git/GitHub によるバックアップ
 - [snippets/README.md](snippets/README.md): Typora 風表示の CSS スニペット
-- [.claude/rules/MARKDOWN.md](../.claude/rules/MARKDOWN.md): Markdown の記法ルール
+- [claude/rules/MARKDOWN.md](../claude/rules/MARKDOWN.md): Markdown の記法ルール
