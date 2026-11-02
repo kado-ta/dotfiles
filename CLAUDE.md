@@ -28,16 +28,16 @@ mise run vscode:ext:list  # vscode/extensions リストを再生成
 | `mise/`      | `mise_config.toml` — 言語ランタイムのバージョン管理                                                                                              |
 | `.config/`   | starship, sheldon, uv の設定（`karabiner/` は `link.sh` でリンクしていない）                                                                     |
 | `.aws/`      | AWS CLI プロファイル設定（credentials は gitignore 済み）                                                                                        |
-| `.claude/`   | Claude Code の設定・フック・スキル・セットアップスクリプト                                                                                       |
+| `claude/`    | Claude Code の設定・フック・スキル・セットアップスクリプト                                                                                       |
 | `.codex/`    | Codex CLI の設定（`AGENTS.md` を `~/.codex/AGENTS.md` にリンク。`config.base.toml` は `sync.py` で `~/.codex/config.toml` にマージ）             |
 | `.obsidian/` | Obsidian の Vault 設定と CSS スニペット（`~/Obsidian/main/.obsidian/` にシンボリックリンク）、Vault の同期・バックアップ手順（`SYNC_BACKUP.md`） |
 | `vscode/`    | VSCode 設定・拡張リスト・プロジェクトマネージャー設定                                                                                            |
 | `ghostty/`   | Ghostty ターミナル設定                                                                                                                           |
 | `biome/`     | Biome のグローバル設定（`biome.jsonc`）。`$schema` のバージョンは mise の postinstall から `sync_schema.sh` で更新する                           |
 
-## Claude Code 設定（`.claude/`）
+## Claude Code 設定（`claude/`）
 
-`.claude/setup.sh` がメインのエントリーポイント。以下を実行する:
+`claude/setup.sh` がメインのエントリーポイント。以下を実行する:
 - `settings.json`、`CLAUDE.md`、`rules/`、`mcp.json` を `~/.claude/` にシンボリックリンク
 - `hooks/` ディレクトリを `~/.claude/hooks/` にシンボリックリンク
 - `scripts/statusline.sh`（ステータスライン）を `~/.claude/scripts/` にシンボリックリンク
@@ -65,7 +65,7 @@ mise run vscode:ext:list  # vscode/extensions リストを再生成
 
 ## 規約
 
-- テストは `.claude/hooks/tests/` のフック回帰テストのみ。フックを変更したら `bash .claude/hooks/tests/test-protect-main-branch.sh` を実行する。それ以外の動作確認はセットアップスクリプトを手動実行して行う。
+- テストは `claude/hooks/tests/` のフック回帰テストのみ。フックを変更したら `bash claude/hooks/tests/test-protect-main-branch.sh` を実行する。それ以外の動作確認はセットアップスクリプトを手動実行して行う。
 - Homebrew のパッケージリストの正規版は `.bin/.Brewfile`。リポジトリルートの `Brewfile` は `mise run brew:dump` で生成し、`.bin/.Brewfile` を最新化するためのベースとして使う。
 - `vscode/extensions` は `mise run vscode:ext:list` で生成するため手動編集しない。
 - `.aws/credentials` は gitignore 済み。credentials をコミットしない。

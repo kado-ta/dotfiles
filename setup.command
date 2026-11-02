@@ -24,7 +24,7 @@ zsh/setup_plugins.sh
 mise/setup.sh
 
 # Claude Code 設定のシンボリックリンクを作成する。
-.claude/setup.sh
+claude/setup.sh
 
 # Codex 設定のシンボリックリンクを作成する。
 .codex/setup.sh
