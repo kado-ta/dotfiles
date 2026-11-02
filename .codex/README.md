@@ -91,7 +91,7 @@ Codex のユーザー設定 `~/.codex/config.toml` は、モデルや MCP の設
 
 - macOS（`setup.sh` は macOS 以外では終了する）。
 - Codex CLI がインストール済みであること（`.bin/.Brewfile` の `cask "codex"`）。
-- `.claude/setup.sh` で gstack（`~/.claude/skills/gstack`）をインストール済みであること。`setup.sh` はこの gstack を Codex 向けにセットアップする。
+- `claude/setup.sh` で gstack（`~/.claude/skills/gstack`）をインストール済みであること。`setup.sh` はこの gstack を Codex 向けにセットアップする。
 - `uv` が利用可能であること（`mise` 管理の場合は `uv --version` が成功すること）。
 - Python 3.11 以上と `tomlkit` を使用する。Python は `mise` 管理のものを使う（`.config/uv/uv.toml` で `uv` による Python のダウンロードを無効にしている）。`tomlkit` は `uv` が取得するため、個別の `pip install` や `.venv` 作成は不要。初回はネットワークが必要な場合がある。
 - `zsh/alias.zsh` が読み込まれていること（Sheldon が `~/dotfiles/zsh/*.zsh` を読み込む）。
@@ -163,7 +163,7 @@ Codex の動作をカスタマイズする2種類の指示。主な違いは**�
 - **`developer_instructions` は安全ガードレールに限定する**：未コミット変更の保護、保護ブランチへの直接コミット禁止、破壊的操作・本番操作の承認、シークレットの非出力、Sandbox の非迂回など、リポジトリの指示や会話中の依頼より優先させたいルールだけを置く。
 - 安全ルールを変更するときは、`AGENTS.md` の Safety / Git セクションと `developer_instructions` の**両方**を更新する。
 - プロジェクト固有の指示は各リポジトリの `AGENTS.md` に記述する。
-- Claude Code 側の `~/dotfiles/.claude/CLAUDE.md` と作業ルールの内容を揃える。片方を変更したら、もう片方への反映要否を確認する。
+- Claude Code 側の `~/dotfiles/claude/CLAUDE.md` と作業ルールの内容を揃える。片方を変更したら、もう片方への反映要否を確認する。
 
 ### 編集の指針
 
