@@ -31,6 +31,15 @@ echo "UV_DIR: $UV_DIR"
 if [ ! -d $UV_DIR ]; then mkdir $UV_DIR; fi
 ln -snfv "$SCRIPT_DIR/uv/uv.toml" "$UV_DIR/"
 
+# sf
+# ~/.config/sf/ には sf の設定や状態ファイルも置かれるため、ファイル単位でリンクする。
+SF_DIR="$CONFIG_DIR/sf"
+echo "SF_DIR: $SF_DIR"
+if [ ! -d $SF_DIR ]; then mkdir $SF_DIR; fi
+ln -snfv "$SCRIPT_DIR/sf/plugins.txt" "$SF_DIR/"
+ln -snfv "$SCRIPT_DIR/sf/sync-plugins.sh" "$SF_DIR/"
+ln -snfv "$SCRIPT_DIR/sf/unsignedPluginAllowList.json" "$SF_DIR/"
+
 # NOTE: karabiner は使用していないので、関連コマンドをコメントアウトする。
 # KARABINER_DIR="$CONFIG_DIR/karabiner"
 # echo "KARABINER_DIR: $KARABINER_DIR"

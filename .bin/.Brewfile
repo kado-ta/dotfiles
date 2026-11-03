@@ -15,7 +15,6 @@ brew "gnupg"             # Terraform で IAM ユーザーを管理するため�
 brew "grep"              # grep コマンド。当たり前に必要。
 brew "herdr"             # Agent multiplexer that lives in your terminal
 brew "imagemagick"       # rmagick gem をインストールするために、ImageMagick@7 が必要。
-brew "jq"                # JSON データの加工／整形コマンド。
 brew "libyaml"
 brew "mise"              # 言語やツールのバージョンを管理する。
 # brew "mysql@8.0"         # MySQL クライアント。バージョンをアプリケーションで使用中の MySQL 8.0 に合わせる。
@@ -68,6 +67,5 @@ cask "visual-studio-code"
 # cask "slack"
 # cask "zoom"
 
-npm "@salesforce/cli"
 npm "corepack"
 npm "vercel"

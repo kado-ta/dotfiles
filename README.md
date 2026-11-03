@@ -44,7 +44,7 @@ Finder で `init.command` をダブルクリックする（ターミナルから
 | --- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
 | 1   | `.bin/link.sh`         | `.bin/` の dotfiles（`.zshrc`・`.zprofile`・`.gitconfig`・`.Brewfile` など）を `~` にリンクする                                 |
 | 2   | `.bin/setup_brew.sh`   | `~/.Brewfile` のパッケージをインストールする（`brew bundle --global`）                                                          |
-| 3   | `.config/link.sh`      | Starship・Sheldon・uv の設定を `~/.config/` にリンクする                                                                        |
+| 3   | `.config/link.sh`      | Starship・Sheldon・uv・sf の設定を `~/.config/` にリンクする                                                                    |
 | 4   | `zsh/setup_plugins.sh` | Sheldon で Zsh プラグインをインストールする                                                                                     |
 | 5   | `.aws/link.sh`         | AWS CLI の設定（`config`・`credentials`）をリンクする                                                                           |
 | 6   | `mise/setup.sh`        | mise の設定を `~/.config/mise/config.toml` にリンクし、言語ランタイム・ツールをインストールする                                 |
@@ -63,6 +63,7 @@ Finder で `init.command` をダブルクリックする（ターミナルから
 - **Codex の設定の反映**: `codex-config-sync --dry-run` で差分を確認し、`codex-config-sync` で `~/.codex/config.toml` に反映する（[.codex/README.md](.codex/README.md#setup)）。
 - **Obsidian のプラグイン**: コミュニティプラグインをインストールし、同期・バックアップを設定する（[.obsidian/README.md](.obsidian/README.md#setup)）。
 - **Salesforce 拡張用の JDK**: mise でインストールした JDK を `JavaVirtualMachines` にリンクし、VSCode を設定する（[mise/JAVA.md](mise/JAVA.md#jvm-symlink)）。
+- **Salesforce CLI のプラグイン**: `mise run sf:plugins` で `.config/sf/plugins.txt` のプラグインをインストールする。
 - **AWS Session Manager プラグイン**: Staging / Production 環境への SSH 接続に使う。macOS（Apple Silicon）では次のコマンドでインストールする。他のプラットフォームは [公式ドキュメント](https://docs.aws.amazon.com/ja_jp/systems-manager/latest/userguide/session-manager-working-with-install-plugin.html) を参照する。
 
   ```shell
@@ -80,7 +81,7 @@ Finder で `init.command` をダブルクリックする（ターミナルから
 | ------------ | -------------------------------------------------------------------------------------- | ------------------------------------------ | ------------------------------------------ |
 | `.bin/`      | Zsh・Git・Homebrew の設定（`.zshrc`・`.zprofile`・`.gitconfig`・`.Brewfile`）          | `~/`                                       | —                                          |
 | `zsh/`       | Zsh 本体のインストールと、エイリアス・キーバインド・オプション。Sheldon が直接読み込む | なし                                       | [zsh/README.md](zsh/README.md)             |
-| `.config/`   | Starship・Sheldon・uv の設定（`karabiner/` は現在リンクしていない）                    | `~/.config/`                               | —                                          |
+| `.config/`   | Starship・Sheldon・uv・sf の設定（`karabiner/` は現在リンクしていない）                | `~/.config/`                               | —                                          |
 | `mise/`      | 言語ランタイム・ツールのグローバルバージョン（`mise_config.toml`）                     | `~/.config/mise/config.toml`               | [mise/JAVA.md](mise/JAVA.md)               |
 | `.aws/`      | AWS CLI のプロファイル設定（`credentials` は Git 管理外）                              | `~/.aws/`                                  | —                                          |
 | `claude/`    | Claude Code の設定・フック・ルール・個人スキル                                         | `~/.claude/`                               | [Claude Code 設定](#claude-code)           |
@@ -129,19 +130,21 @@ bash claude/hooks/tests/test-protect-main-branch.sh
 <a name="mise-tasks"></a>
 ### mise タスク
 
-保守用のタスクをリポジトリルートの `mise.toml` に定義している。`mise tasks` で一覧を表示する。
+保守用のタスクをリポジトリルートの `mise.toml` に、どのディレクトリからでも使うタスクを `mise/mise_config.toml` に定義している。`mise tasks` で一覧を表示する。
 
 | コマンド                   | 内容                                                                   |
 | -------------------------- | ---------------------------------------------------------------------- |
 | `mise run brew:deps:show`  | Homebrew の依存関係をツリー形式で表示する                              |
 | `mise run brew:dump`       | インストール済みのパッケージをリポジトリルートの `Brewfile` に書き出す |
 | `mise run vscode:ext:list` | インストール済みの VSCode 拡張を `vscode/extensions` に書き出す        |
+| `mise run sf:plugins`      | sf のプラグインを `plugins.txt` に同期する（グローバルタスク）         |
 
 <a name="update-package-lists"></a>
 ### パッケージリストの更新
 
 - **Homebrew**: 正本は `.bin/.Brewfile`。`mise run brew:dump` で生成した `Brewfile`（Git 管理外）と見比べて、`.bin/.Brewfile` に反映する。
 - **VSCode 拡張**: `vscode/extensions` は `mise run vscode:ext:list` で生成する。手で編集しない。
+- **Salesforce CLI のプラグイン**: `.config/sf/plugins.txt` を編集して `mise run sf:plugins` を実行する。一覧から消してもアンインストールはしないので、`sf plugins uninstall` で手動で削除する。署名のないプラグインを入れるときは `.config/sf/unsignedPluginAllowList.json` にも追加する。
 
 <a name="other-operations"></a>
 ### その他の運用
