@@ -117,10 +117,13 @@ Finder で `init.command` をダブルクリックする（ターミナルから
 
 このほか、入力待ちや応答完了の通知、PR 作成時の URL 表示などのフックを `settings.json` に直接記述している。ステータスライン（`scripts/statusline.sh`）は、カレントディレクトリ・ブランチ・コンテキスト使用率・利用上限の使用率・モデル・effort を表示する。
 
-フックを変更したら、回帰テストを実行する。
+`validate-command.sh` と `protect-main-branch.sh` は、jq が動かないなどでコマンドを検査できないときもブロックする。この状態では Bash ツールがすべて止まるので、メッセージに従って Claude Code を再起動するか、`mise trust` を実行する。
+
+フックを変更したら、新しいシェルで回帰テストを実行する（`jq` が mise の shim に解決される PATH では、`HOME` を変えて実行するテストが失敗する）。
 
 ```shell
 bash claude/hooks/tests/test-protect-main-branch.sh
+bash claude/hooks/tests/test-validate-command.sh
 ```
 
 <a name="operations"></a>
