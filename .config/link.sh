@@ -38,6 +38,7 @@ echo "SF_DIR: $SF_DIR"
 if [ ! -d $SF_DIR ]; then mkdir $SF_DIR; fi
 ln -snfv "$SCRIPT_DIR/sf/plugins.txt" "$SF_DIR/"
 ln -snfv "$SCRIPT_DIR/sf/sync-plugins.sh" "$SF_DIR/"
+ln -snfv "$SCRIPT_DIR/sf/unsignedPluginAllowList.json" "$SF_DIR/"
 
 # NOTE: karabiner は使用していないので、関連コマンドをコメントアウトする。
 # KARABINER_DIR="$CONFIG_DIR/karabiner"
