@@ -5,9 +5,9 @@
 
 set -euo pipefail
 
-if ! command -v jq &>/dev/null; then
-  exit 0
-fi
+# Under `set -e` an unexpected failure (a broken jq, for example) would exit 1, which does not
+# block the tool, so the check would be skipped. Block instead (fail closed).
+trap 'echo "BLOCKED: This hook failed, so the command cannot be checked. If jq is failing, restart Claude Code, or run mise trust if this directory has an untrusted mise.toml." >&2; exit 2' ERR
 
 INPUT=$(cat)
 COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command // empty')
