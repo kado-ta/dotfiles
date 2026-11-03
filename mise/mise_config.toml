@@ -14,6 +14,8 @@ aws-cli = { version = "latest", symlink_bins = "true" }
 # MISE_CONFIG_FILE は `mise install biome@x` のようにバージョンを明示すると空になるため使わない。
 biome = { version = "latest", postinstall = 'bash "$(dirname "$(readlink -f "$HOME/.config/mise/config.toml")")/../biome/sync_schema.sh"' }
 go = "1.27.3"
+# JSON データの加工／整形コマンド。 sf:plugins タスクでも使用する。
+jq = "latest"
 node = "26.13.0"
 pnpm = "latest"
 python = "3.15.2"
@@ -23,3 +25,8 @@ terraform = "1.17.1"
 uv = "latest"
 # VSCode 用 Apex拡張が Java 21 に依存しているので、ここで指定する。詳細は ./JAVA.md を参照。
 java = "temurin-21"
+
+# スクリプトの実体は .config/sf/sync-plugins.sh 。 .config/link.sh でリンクする。
+[tasks."sf:plugins"]
+description = "Salesforce CLI のプラグインを ~/.config/sf/plugins.txt に同期する"
+run = '"$HOME/.config/sf/sync-plugins.sh"'

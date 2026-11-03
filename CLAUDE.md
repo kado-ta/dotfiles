@@ -9,12 +9,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 <a name="mise-tasks"></a>
 ## mise タスク
 
-タスクはリポジトリルートの `mise.toml` に定義する。`mise tasks` で一覧を表示する。
+リポジトリ保守用のタスクはリポジトリルートの `mise.toml` に定義する。どのディレクトリからでも使うタスクは `mise/mise_config.toml` にグローバルタスクとして定義する。`mise tasks` で一覧を表示する。
 
 ```sh
 mise run brew:deps:show   # Homebrew の依存関係ツリーを表示
 mise run brew:dump        # インストール済みパッケージから Brewfile を再生成
 mise run vscode:ext:list  # vscode/extensions リストを再生成
+mise run sf:plugins       # sf のプラグインを .config/sf/plugins.txt に同期（グローバルタスク）
 ```
 
 ## アーキテクチャ
@@ -26,7 +27,7 @@ mise run vscode:ext:list  # vscode/extensions リストを再生成
 | `.bin/`      | シェルコア設定（`.zshrc`, `.zprofile`, `.gitconfig`, `.Brewfile`）                                                                               |
 | `zsh/`       | Zsh のインストールとシェル設定（エイリアス・キーバインド・オプション・autosuggestions）。プラグインの定義は `.config/sheldon/plugins.toml`       |
 | `mise/`      | `mise_config.toml` — 言語ランタイムのバージョン管理                                                                                              |
-| `.config/`   | starship, sheldon, uv の設定（`karabiner/` は `link.sh` でリンクしていない）                                                                     |
+| `.config/`   | starship, sheldon, uv, sf の設定（`karabiner/` は `link.sh` でリンクしていない）                                                                 |
 | `.aws/`      | AWS CLI プロファイル設定（credentials は gitignore 済み）                                                                                        |
 | `claude/`    | Claude Code の設定・フック・スキル・セットアップスクリプト                                                                                       |
 | `.codex/`    | Codex CLI の設定（`AGENTS.md` を `~/.codex/AGENTS.md` にリンク。`config.base.toml` は `sync.py` で `~/.codex/config.toml` にマージ）             |
