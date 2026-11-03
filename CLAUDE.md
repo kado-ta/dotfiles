@@ -63,13 +63,15 @@ dotfiles で起動したときだけ必要な設定（`denyWrite`、`claudeMdExc
 
 `protect-main-branch.sh` は、フックの cwd と、コマンド中のすべての `git commit` について `cd <dir>` と `git -C <dir>` から解決したリポジトリのブランチを判定し、いずれかが保護ブランチならブロックする。移動先を解決できない場合（変数を含むパス、存在しないディレクトリなど）もブロックする。
 
+`validate-command.sh` と `protect-main-branch.sh` は、jq が動かないなどでコマンドを検査できないときもブロックする（fail closed）。この状態では Bash ツールがすべて止まるので、メッセージに従って Claude Code を再起動するか、`mise trust` を実行する。
+
 ### 個人スキル
 
 `skills/*/` 配下の個人スキルは `~/.claude/skills/` にグローバルシンボリックリンクされ、全プロジェクトで使える。各スキルの用途は `SKILL.md` の `description` を参照する。
 
 ## 規約
 
-- テストは `claude/hooks/tests/` のフック回帰テストのみ。フックを変更したら `bash claude/hooks/tests/test-protect-main-branch.sh` を実行する。それ以外の動作確認はセットアップスクリプトを手動実行して行う。
+- テストは `claude/hooks/tests/` のフック回帰テストのみ。フックを変更したら `bash claude/hooks/tests/test-protect-main-branch.sh` と `bash claude/hooks/tests/test-validate-command.sh` を実行する。`jq` が mise の shim に解決される PATH では `HOME` を変えて実行するテストが失敗するので、新しいシェルで実行する。それ以外の動作確認はセットアップスクリプトを手動実行して行う。
 - Homebrew のパッケージリストの正規版は `.bin/.Brewfile`。リポジトリルートの `Brewfile` は `mise run brew:dump` で生成し、`.bin/.Brewfile` を最新化するためのベースとして使う。
 - `vscode/extensions` は `mise run vscode:ext:list` で生成するため手動編集しない。
 - `.aws/credentials` は gitignore 済み。credentials をコミットしない。

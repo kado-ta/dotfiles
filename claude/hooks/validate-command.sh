@@ -1,6 +1,10 @@
 #!/bin/bash
 
-COMMAND=$(jq -r '.tool_input.command' < /dev/stdin)
+# jq が動かないとコマンドを検査できないので、素通りさせずにブロックする。
+COMMAND=$(jq -r '.tool_input.command' < /dev/stdin) || {
+  echo "Blocked: jq failed, so this command cannot be checked. Restart Claude Code, or run mise trust if this directory has an untrusted mise.toml." >&2
+  exit 2
+}
 
 # rm -rf をブロック
 if echo "$COMMAND" | grep -q 'rm -rf'; then

@@ -28,7 +28,7 @@ check() {
   local expected="$1" cwd="$2" cmd="$3" desc="${4:-$3}"
   local input actual
   input=$(jq -n --arg cmd "$cmd" --arg cwd "$cwd" '{tool_input: {command: $cmd}, cwd: $cwd}')
-  HOME="$T" bash "$HOOK" <<<"$input" >/dev/null 2>&1
+  HOME="$T" PATH="${HOOK_PATH:-$PATH}" "$BASH" "$HOOK" <<<"$input" >/dev/null 2>&1
   actual=$?
   if [ "$actual" = "$expected" ]; then
     pass=$((pass + 1))
@@ -97,6 +97,37 @@ check 2 "$FEAT" "cat <<EOF"$'\n'"\$( git -C $MAIN commit -m x )"$'\n'"EOF" 'comm
 check 2 "$FEAT" 'git -C "$REPO" commit -m x' 'variable in -C'
 check 2 "$FEAT" 'cd "$REPO" && git commit -m x' 'variable in cd'
 check 2 "$FEAT" "git -C $T/missing commit -m x" 'nonexistent -C directory'
+
+# A broken or missing jq blocks every command, because it cannot be inspected (fail closed)
+BROKEN_JQ="$T/broken-jq"
+NO_JQ="$T/no-jq"
+BROKEN_CAT="$T/broken-cat"
+mkdir -p "$BROKEN_JQ" "$NO_JQ" "$BROKEN_CAT"
+printf '#!/bin/sh\nexit 1\n' >"$BROKEN_JQ/jq"
+printf '#!/bin/sh\nexit 1\n' >"$BROKEN_CAT/cat"
+chmod +x "$BROKEN_JQ/jq" "$BROKEN_CAT/cat"
+for tool in cat git grep; do
+  ln -s "$(command -v "$tool")" "$NO_JQ/$tool"
+done
+
+HOOK_PATH="$BROKEN_JQ:$PATH" check 2 "$MAIN" 'git commit -m x' 'broken jq: commit on main'
+HOOK_PATH="$BROKEN_JQ:$PATH" check 2 "$FEAT" 'git commit -m x' 'broken jq: commit on feature branch'
+HOOK_PATH="$BROKEN_JQ:$PATH" check 2 "$FEAT" 'git status' 'broken jq: non-commit command'
+HOOK_PATH="$NO_JQ" check 2 "$MAIN" 'git commit -m x' 'missing jq: commit on main'
+HOOK_PATH="$NO_JQ" check 2 "$FEAT" 'git status' 'missing jq: non-commit command'
+
+# Other unexpected failures are blocked too, not only jq
+HOOK_PATH="$BROKEN_CAT:$PATH" check 2 "$FEAT" 'git status' 'broken cat: stdin cannot be read'
+
+# The block message tells how to recover
+message=$(HOME="$T" PATH="$BROKEN_JQ:$PATH" "$BASH" "$HOOK" <<<'{}' 2>&1 >/dev/null)
+if [[ "$message" == *'mise trust'* ]]; then
+  pass=$((pass + 1))
+  echo "PASS block message mentions the recovery"
+else
+  fail=$((fail + 1))
+  echo "FAIL block message mentions the recovery: $message"
+fi
 
 echo "---"
 echo "pass=$pass fail=$fail"
