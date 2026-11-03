@@ -18,6 +18,11 @@
       "expand": "always"
     }
   },
+  "markdown": {
+    "parser": {
+      "frontmatter": true
+    }
+  },
   "overrides": [
     {
       "includes": [
