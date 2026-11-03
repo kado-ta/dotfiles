@@ -1,0 +1,5 @@
+# sf のユーザープラグイン一覧。`mise run sf:plugins` で同期する。
+# 1 行に `name` または `name@version` を書く。`#` で始まる行はコメント、空行は無視する。
+# name は npm のパッケージ名で書く（`code-analyzer` のような短縮名は一致せず、毎回インストールし直す）。
+# version は数値で書く（`5`、`5.16`、`5.16.0`）。`latest` や `^5` は一致せず、毎回インストールし直す。
+@salesforce/plugin-code-analyzer@5
