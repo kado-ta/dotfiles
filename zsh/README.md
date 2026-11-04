@@ -159,6 +159,14 @@ exec zsh
 | `z-shell/H-S-MW`                   | 遅延     | `Ctrl-R` で複数キーワード AND 検索               |
 | `dotfile-defers`（local）          | 遅延     | `~/dotfiles/zsh/*.zsh`                           |
 
+<a name="completions"></a>
+### コマンドの補完
+
+`mise` の補完に手動の設定は要らない。Homebrew の `mise` が `$(brew --prefix)/share/zsh/site-functions/_mise` を配置し、`.zprofile` の `brew shellenv` がこのディレクトリを `fpath` に追加するので、`compinit` が読み込む。
+
+- `.zprofile` を読まない非ログインシェルでは `fpath` に入らないため、補完は効かない。
+- `mise completion zsh --install` は実行しなくてよい。書き出し先の `~/.local/share/zsh/site-functions/` は `fpath` に入っておらず、読み込まれない。コマンドが表示する `fpath` の行も、Homebrew 版で足りるので追加しない。
+
 <a name="operations"></a>
 ## 日常運用
 
