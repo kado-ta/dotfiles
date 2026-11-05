@@ -255,13 +255,20 @@
     "superpowers@claude-plugins-official": true,
     "claude-code-setup@claude-plugins-official": true,
     "ruby-lsp@claude-plugins-official": true,
-    "understand-anything@understand-anything": true
+    "understand-anything@understand-anything": true,
+    "crit@crit": true
   },
   "extraKnownMarketplaces": {
     "understand-anything": {
       "source": {
         "source": "github",
         "repo": "Egonex-AI/Understand-Anything"
+      }
+    },
+    "crit": {
+      "source": {
+        "source": "github",
+        "repo": "tomasz-tomczyk/crit"
       }
     }
   },
@@ -297,6 +304,6 @@
     }
   },
   "theme": "dark-daltonized",
-  "agentPushNotifEnabled": true,
-  "inputNeededNotifEnabled": true
+  "inputNeededNotifEnabled": true,
+  "agentPushNotifEnabled": true
 }

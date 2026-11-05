@@ -46,7 +46,7 @@ dotfiles で起動したときだけ必要な設定（`denyWrite`、`claudeMdExc
 - `settings.json`、`CLAUDE.md`、`rules/`、`mcp.json` を `~/.claude/` にシンボリックリンク
 - `hooks/` ディレクトリを `~/.claude/hooks/` にシンボリックリンク
 - `scripts/statusline.sh`（ステータスライン）を `~/.claude/scripts/` にシンボリックリンク
-- プラグイン `superpowers@claude-plugins-official`, `claude-code-setup@claude-plugins-official` をインストールし、gstack を `~/.claude/skills/gstack` に clone してセットアップ
+- プラグイン `superpowers@claude-plugins-official`, `claude-code-setup@claude-plugins-official`, `crit@crit` をインストールし、gstack を `~/.claude/skills/gstack` に clone してセットアップ
 - `skills/*/` を `~/.claude/skills/` にシンボリックリンク
 
 ### フック
