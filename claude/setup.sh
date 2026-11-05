@@ -47,6 +47,15 @@ else
   claude plugins install claude-code-setup@claude-plugins-official
 fi
 
+# Install crit
+# settings.json の extraKnownMarketplaces だけではマーケットプレイスが取得されず、install が失敗する。
+if claude plugins list 2>/dev/null | grep -q " crit@crit$"; then
+  echo "crit plugin already installed, skipping"
+else
+  claude plugins marketplace add tomasz-tomczyk/crit
+  claude plugins install crit@crit
+fi
+
 # Install gstack
 GSTACK_DIR="${CLAUDE_DIR}/skills/gstack"
 [ -d "${CLAUDE_DIR}/skills" ] || mkdir -p "${CLAUDE_DIR}/skills"
