@@ -7,6 +7,7 @@ brew "actionlint"        # Static checker for GitHub Actions workflow files
 brew "atuin"             # Improved shell history for zsh, bash, fish and nushell
 brew "bun"               # Incredibly fast JavaScript runtime, bundler, test runner, and package manager
 brew "coreutils"         # mise や Ruby の bundle install でも必要とするライブラリを含む。
+brew "crit"              # Your feedback loop with the AI agent: review plans and code locally
 brew "curl"              # データ送受信コマンド。
 brew "gh"                # GitHub CLI
 brew "git"               # Git コマンドは、Mac デフォルトではなく、 Homebrew でインストールする。
