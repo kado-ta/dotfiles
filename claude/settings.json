@@ -54,6 +54,7 @@
       "WebFetch(domain:docs.cloud.google.com)",
       "WebFetch(domain:support.google.com)",
       "WebFetch(domain:github.com)",
+      "WebFetch(domain:docs.github.com)",
       "WebFetch(domain:api.github.com)",
       "WebFetch(domain:raw.githubusercontent.com)",
       "WebFetch(domain:registry.terraform.io)",
