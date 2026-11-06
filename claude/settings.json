@@ -282,7 +282,8 @@
         "*.githubusercontent.com",
         "*.npmjs.org",
         "registry.yarnpkg.com",
-        "pypi.org"
+        "pypi.org",
+        "help.salesforce.com"
       ]
     },
     "filesystem": {
