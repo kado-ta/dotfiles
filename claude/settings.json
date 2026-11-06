@@ -291,6 +291,9 @@
         "~/.aws/credentials",
         "~/.ssh/id_*",
         "~/.ssh/config"
+      ],
+      "allowWrite": [
+        "~/.gstack/projects"
       ]
     },
     "enableWeakerNetworkIsolation": true,
