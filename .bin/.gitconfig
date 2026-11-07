@@ -12,7 +12,7 @@
 	ff = only
 [user]
 	name = kado-ta
-	email = hideaki.kdt+github@gmail.com
+	email = 13118071+kado-ta@users.noreply.github.com
 [secrets]
 	providers = git secrets --aws-provider
 	patterns = (A3T[A-Z0-9]|AKIA|AGPA|AIDA|AROA|AIPA|ANPA|ANVA|ASIA)[A-Z0-9]{16}
