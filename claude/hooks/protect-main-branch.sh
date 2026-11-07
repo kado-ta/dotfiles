@@ -119,6 +119,10 @@ for target in "$CWD" ${TARGETS[@]+"${TARGETS[@]}"}; do
   BRANCH=$(git -C "$target" symbolic-ref --short HEAD 2>/dev/null || true)
   if [ "$BRANCH" = "main" ] || [ "$BRANCH" = "master" ] || [ "$BRANCH" = "staging" ]; then
     echo "BLOCKED: Direct commit to '$BRANCH' branch is not allowed ($target). Create a feature branch first." >&2
+    # 検査はコマンドの実行前のブランチで行うため、同じコマンド内でブランチを作っても通らない
+    if grep -qE 'git(\s+\S+)*\s+(switch\s+(-c|-C|--create)|checkout\s+(-b|-B))(\s|$)' <<<"$COMMAND"; then
+      echo "このフックはコマンドの実行前のブランチで判定します。'git switch -c <branch>' を別の Bash 呼び出しで実行してから、コミットしてください。" >&2
+    fi
     exit 2
   fi
 done
