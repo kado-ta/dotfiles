@@ -7,7 +7,7 @@ if [ "$(uname)" != "Darwin" ] ; then
 fi
 
 # セッション中に ~/.claude のリンクを張り直すと、Claude Code のサンドボックスがリンクを削除し、
-# deny ルール・フック・サンドボックスが無効になる。経緯は DOUBLE_LOAD_WARNING.md を参照する。
+# deny ルール・フック・サンドボックスが無効になる。
 # CLAUDECODE は IDE の統合ターミナルにも設定されるが、IDE にセッションが残っている可能性が高いので拒否する。
 if [ -n "${CLAUDECODE:-}" ]; then
   echo "Run this from a plain terminal (not an IDE-integrated one) with all Claude Code sessions closed."
@@ -19,19 +19,30 @@ CLAUDE_DIR="$HOME/.claude"
 echo "SCRIPT_DIR: $SCRIPT_DIR"
 echo "CLAUDE_DIR: $CLAUDE_DIR"
 
-ln -snfv "${SCRIPT_DIR}/settings.json" "${CLAUDE_DIR}/settings.json"
-ln -snfv "${SCRIPT_DIR}/CLAUDE.md" "${CLAUDE_DIR}/CLAUDE.md"
-ln -snfv "${SCRIPT_DIR}/rules" "${CLAUDE_DIR}/rules"
-ln -snfv "${SCRIPT_DIR}/mcp.json" "${CLAUDE_DIR}/mcp.json"
+# リンク先が実体（シンボリックリンク以外）のときは止める。
+# ln -snf は、実ディレクトリならその中にリンクを作り、実ファイルなら黙って上書きするため。
+link() {
+  local src="$1" dest="$2"
+  if [ -e "${dest}" ] && [ ! -L "${dest}" ]; then
+    echo "Not a symlink: ${dest}. Move or remove it, then rerun." >&2
+    exit 1
+  fi
+  ln -snfv "${src}" "${dest}"
+}
+
+link "${SCRIPT_DIR}/settings.json" "${CLAUDE_DIR}/settings.json"
+link "${SCRIPT_DIR}/CLAUDE.md" "${CLAUDE_DIR}/CLAUDE.md"
+link "${SCRIPT_DIR}/rules" "${CLAUDE_DIR}/rules"
+link "${SCRIPT_DIR}/mcp.json" "${CLAUDE_DIR}/mcp.json"
 
 if [ -d "${CLAUDE_DIR}/hooks" ] && [ ! -L "${CLAUDE_DIR}/hooks" ]; then
   echo "Removing existing Claude Code hooks directory: ${CLAUDE_DIR}/hooks"
   rm -rf "${CLAUDE_DIR}/hooks"
 fi
-ln -snfv "${SCRIPT_DIR}/hooks" "${CLAUDE_DIR}/hooks"
+link "${SCRIPT_DIR}/hooks" "${CLAUDE_DIR}/hooks"
 
 [ -d "${CLAUDE_DIR}/scripts" ] || mkdir -p "${CLAUDE_DIR}/scripts"
-ln -snfv "${SCRIPT_DIR}/scripts/statusline.sh" "${CLAUDE_DIR}/scripts/statusline.sh"
+link "${SCRIPT_DIR}/scripts/statusline.sh" "${CLAUDE_DIR}/scripts/statusline.sh"
 
 # Install Superpowers
 if claude plugins list 2>/dev/null | grep -q " superpowers@claude-plugins-official$"; then
@@ -72,7 +83,7 @@ fi
 for skill_dir in "${SCRIPT_DIR}/skills"/*/; do
   [ -d "$skill_dir" ] || continue
   skill_name=$(basename "${skill_dir}")
-  ln -snfv "${skill_dir}" "${CLAUDE_DIR}/skills/${skill_name}"
+  link "${skill_dir}" "${CLAUDE_DIR}/skills/${skill_name}"
 done
 
 echo "Success!"
