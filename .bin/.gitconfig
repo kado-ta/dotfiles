@@ -10,6 +10,9 @@
 	ff = false
 [pull]
 	ff = only
+[push]
+# git push で自動的に upstream が紐づく。 git push origin <branch_name> の場合は、この設定は効かない。
+	autoSetupRemote = true
 [user]
 	name = kado-ta
 	email = 13118071+kado-ta@users.noreply.github.com
