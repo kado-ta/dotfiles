@@ -44,6 +44,19 @@ check 0 "$FEAT" 'git commit -m x' 'commit in cwd on feature branch'
 check 2 "$MAIN" 'git commit -m x' 'commit in cwd on main'
 check 0 "$MAIN" 'git status' 'non-commit command'
 
+# 同名のタグがあると symbolic-ref --short は heads/main を返す
+TAGGED="$T/tagged-repo"
+git init -q -b main "$TAGGED"
+git -C "$TAGGED" -c user.name=t -c user.email=t@example.com -c commit.gpgsign=false commit -q --allow-empty -m init
+git -C "$TAGGED" tag main
+check 2 "$TAGGED" 'git commit -m x' 'commit on main with a tag of the same name'
+
+# 大文字・小文字を区別しないファイルシステムでは、refs/heads/MAIN も main と同じファイルを更新する
+UPPER="$T/upper-repo"
+git init -q -b main "$UPPER"
+git -C "$UPPER" symbolic-ref HEAD refs/heads/MAIN
+check 2 "$UPPER" 'git commit -m x' 'commit with HEAD on a case variant of main'
+
 # git -C selects the repository
 check 2 "$MAIN" "git -C $FEAT commit -m x" '-C to feature repo from main cwd (cwd is still checked)'
 check 2 "$FEAT" "git -C $MAIN commit -m x" '-C to main repo from feature cwd'
