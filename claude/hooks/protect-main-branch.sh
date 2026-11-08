@@ -116,7 +116,10 @@ done
 # The hook's cwd is always checked in addition to the resolved targets, so a misparsed
 # command can only add blocks, never skip the check that applies without parsing.
 for target in "$CWD" ${TARGETS[@]+"${TARGETS[@]}"}; do
-  BRANCH=$(git -C "$target" symbolic-ref --short HEAD 2>/dev/null || true)
+  # --short は同名のタグがあると heads/main を返すので使わない。
+  # 大文字・小文字を区別しないファイルシステムでは refs/heads/MAIN も main と同じファイルを更新するので、小文字で比較する。
+  BRANCH=$(git -C "$target" symbolic-ref HEAD 2>/dev/null || true)
+  BRANCH=$(printf %s "${BRANCH#refs/heads/}" | tr '[:upper:]' '[:lower:]')
   if [ "$BRANCH" = "main" ] || [ "$BRANCH" = "master" ] || [ "$BRANCH" = "staging" ]; then
     echo "BLOCKED: Direct commit to '$BRANCH' branch is not allowed ($target). Create a feature branch first." >&2
     exit 2
