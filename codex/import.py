@@ -3,7 +3,7 @@
 """Codex設定を dotfiles へ取り込む。
 
 Codex が変更した ~/.codex/config.toml の内容を
-選択的に ~/dotfiles/.codex/config.base.toml へ反映する。
+選択的に ~/dotfiles/codex/config.base.toml へ反映する。
 ホームディレクトリの絶対パスは ~/ に置き換えて取り込む。
 
 変更候補を確認(差分のみ表示)
@@ -252,7 +252,7 @@ def atomic_write(path, content):
 
 def main():
     """# Codex が変更した ~/.codex/config.toml の内容を
-    ~/dotfiles/.codex/config.base.toml へ反映する。"""
+    ~/dotfiles/codex/config.base.toml へ反映する。"""
 
     parser = argparse.ArgumentParser(
         description="Codex の設定変更を dotfiles に取り込む"

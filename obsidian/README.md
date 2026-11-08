@@ -24,7 +24,7 @@
 ## ディレクトリ構成
 
 ```text
-~/dotfiles/.obsidian/
+~/dotfiles/obsidian/
 ├── README.md
 ├── SYNC_BACKUP.md            # Vault の端末間同期・バックアップの方針と手順
 ├── setup.sh                  # 設定ファイルと snippets/ を Vault へシンボリックリンクする
@@ -44,13 +44,13 @@
 
 ```text
 ~/Obsidian/main/.obsidian/
-├── app.json -> ~/dotfiles/.obsidian/app.json
-├── appearance.json -> ~/dotfiles/.obsidian/appearance.json
-├── community-plugins.json -> ~/dotfiles/.obsidian/community-plugins.json
-├── core-plugins.json -> ~/dotfiles/.obsidian/core-plugins.json
-├── graph.json -> ~/dotfiles/.obsidian/graph.json
-├── hotkeys.json -> ~/dotfiles/.obsidian/hotkeys.json
-├── snippets -> ~/dotfiles/.obsidian/snippets
+├── app.json -> ~/dotfiles/obsidian/app.json
+├── appearance.json -> ~/dotfiles/obsidian/appearance.json
+├── community-plugins.json -> ~/dotfiles/obsidian/community-plugins.json
+├── core-plugins.json -> ~/dotfiles/obsidian/core-plugins.json
+├── graph.json -> ~/dotfiles/obsidian/graph.json
+├── hotkeys.json -> ~/dotfiles/obsidian/hotkeys.json
+├── snippets -> ~/dotfiles/obsidian/snippets
 ├── plugins/                  # 管理対象外
 ├── workspace.json            # 管理対象外
 └── ...
@@ -63,7 +63,7 @@
 ### 前提条件
 
 - macOS（`setup.sh` は macOS 以外では終了する）。
-- Obsidian がインストール済みであること（`.bin/.Brewfile` の `cask "obsidian"`）。
+- Obsidian がインストール済みであること（`bin/.Brewfile` の `cask "obsidian"`）。
 - `~/Obsidian/main/` に Vault を作成済みで、`~/Obsidian/main/.obsidian/` が存在すること。`setup.sh` はディレクトリを作成しないため、存在しないとリンクの作成に失敗して終了する。
 
 <a name="setup-steps"></a>
@@ -73,7 +73,7 @@
 2. `setup.sh` を実行する。何度実行してもよい。
 
    ```bash
-   ~/dotfiles/.obsidian/setup.sh
+   ~/dotfiles/obsidian/setup.sh
    ```
 
 3. Obsidian を起動し、`Settings → Community plugins → Browse` から [コミュニティプラグイン](#community-plugins) をインストールする。
@@ -179,7 +179,7 @@ Obsidian の本文と Mermaid 図を Typora 風（ライトは GitHub テーマ�
 リンク済みのファイルは、Obsidian がリンク先（このディレクトリのファイル）を直接書き換える。変更後は差分を確認してコミットする。
 
 ```bash
-git -C ~/dotfiles diff -- .obsidian/
+git -C ~/dotfiles diff -- obsidian/
 ```
 
 <a name="edit-snippets"></a>
