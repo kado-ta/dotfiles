@@ -21,18 +21,18 @@
 - プラグインは [Sheldon](https://github.com/rossmacarthur/sheldon) で管理する（`setup_plugins.sh`）。
 - `zsh/*.zsh` は Sheldon のローカルプラグインとして、[zsh-defer](https://github.com/romkatv/zsh-defer) により**遅延読み込み**される。
 
-`.zshrc` 本体（環境変数・プロンプト・履歴・Sheldon / Starship / mise の初期化）は `.bin/.zshrc` で管理しており、このディレクトリには含まれない。
+`.zshrc` 本体（環境変数・プロンプト・履歴・Sheldon / Starship / mise の初期化）は `bin/.zshrc` で管理しており、このディレクトリには含まれない。
 
 <a name="directory-structure"></a>
 ## ディレクトリ構成
 
 ```text
 ~/dotfiles/
-├── .bin/
-│   ├── .zshrc                      # ~/.zshrc へリンク（.bin/link.sh）。sheldon source を実行する
+├── bin/
+│   ├── .zshrc                      # ~/.zshrc へリンク（bin/link.sh）。sheldon source を実行する
 │   └── .zprofile                   # ~/.zprofile へリンク。brew shellenv を実行する
-├── .config/
-│   └── sheldon/plugins.toml        # ~/.config/sheldon/plugins.toml へリンク（.config/link.sh）
+├── config/
+│   └── sheldon/plugins.toml        # ~/.config/sheldon/plugins.toml へリンク（config/link.sh）
 └── zsh/                            # このディレクトリ
     ├── README.md
     ├── setup.sh                    # Zsh のインストールとログインシェル変更
@@ -64,7 +64,7 @@ use = ["{!sync,*}.zsh"]
 
 - `plugins.toml` のデフォルトが `apply = ["defer"]` のため、`zsh/*.zsh` は `zsh-defer source` で**プロンプト表示後に**読み込まれる。
 - `use` のグロブに一致したファイル一覧は、`sheldon lock` 実行時に `~/.local/share/sheldon/plugins.lock` へ記録される。**ファイルを追加・削除・リネームしたときは再ロックが必要**（[日常運用](#operations) 参照）。
-- 起動時に即時読み込みが必要な設定は `sync.zsh` に書く想定だが、現在 `plugins.toml` の該当設定はコメントアウトされており、`sync.zsh` も存在しない。即時に必要な設定は `.bin/.zshrc` に書く。
+- 起動時に即時読み込みが必要な設定は `sync.zsh` に書く想定だが、現在 `plugins.toml` の該当設定はコメントアウトされており、`sync.zsh` も存在しない。即時に必要な設定は `bin/.zshrc` に書く。
 
 <a name="setup"></a>
 ## セットアップ
@@ -72,8 +72,8 @@ use = ["{!sync,*}.zsh"]
 ### 前提条件
 
 - macOS（`setup.sh` は macOS 以外では終了する）。
-- Homebrew がインストール済みであること（`.bin/init.sh` / `init.command`）。
-- `setup_plugins.sh` の実行時点で、`sheldon` がインストール済み（`.bin/.Brewfile`）、かつ `~/.config/sheldon/plugins.toml` がリンク済み（`.config/link.sh`）であること。
+- Homebrew がインストール済みであること（`bin/init.sh` / `init.command`）。
+- `setup_plugins.sh` の実行時点で、`sheldon` がインストール済み（`bin/.Brewfile`）、かつ `~/.config/sheldon/plugins.toml` がリンク済み（`config/link.sh`）であること。
 
 ### 1. `setup.sh`：Zsh のインストールとログインシェル変更
 
@@ -105,14 +105,14 @@ exec zsh
 
 ```bash
 # 1. Homebrew・Xcode CLI Tools・Zsh（init.command 経由でも可）
-~/dotfiles/.bin/init.sh
+~/dotfiles/bin/init.sh
 ~/dotfiles/zsh/setup.sh
 # → ターミナルを再起動
 
 # 2. Sheldon 本体と設定ファイルを用意してからプラグインを入れる（setup.command 経由でも可）
-~/dotfiles/.bin/link.sh          # ~/.Brewfile, ~/.zshrc などをリンク
-~/dotfiles/.bin/setup_brew.sh    # sheldon / starship / mise などをインストール
-~/dotfiles/.config/link.sh       # ~/.config/sheldon/plugins.toml をリンク
+~/dotfiles/bin/link.sh          # ~/.Brewfile, ~/.zshrc などをリンク
+~/dotfiles/bin/setup_brew.sh    # sheldon / starship / mise などをインストール
+~/dotfiles/config/link.sh       # ~/.config/sheldon/plugins.toml をリンク
 ~/dotfiles/zsh/setup_plugins.sh
 exec zsh
 ```
@@ -139,11 +139,11 @@ exec zsh
 | `typora <file>`                             | Typora でファイルを開く（`open -a Typora`、macOS のみ）                    |
 | `sudo`                                      | `sudo ` 後のコマンドでもエイリアスを展開                                   |
 | `L` / `G`（グローバル）                     | `\| less` / `\| grep`                                                      |
-| `codex-config-sync` / `codex-config-import` | Codex 設定の同期・取り込み（[.codex/README.md](../.codex/README.md) 参照） |
+| `codex-config-sync` / `codex-config-import` | Codex 設定の同期・取り込み（[codex/README.md](../codex/README.md) 参照）   |
 | `ua-dashboard [dir]`                        | Understand Anything のダッシュボードを起動（関数）                         |
 | `gstack-upgrade [--check]`                  | gstack を最新版へ更新（`--check` は確認のみ）（関数）                      |
 
-### プラグイン（`.config/sheldon/plugins.toml`）
+### プラグイン（`config/sheldon/plugins.toml`）
 
 プラグインの追加・削除は `plugins.toml` で行う。現在の構成は以下のとおり（記載順に読み込まれる）。
 
@@ -184,11 +184,11 @@ exec zsh
 ```
 
 - `sync.zsh` という名前のファイルは `use` のグロブで除外されるため読み込まれない。
-- 遅延読み込みのため、プロンプト表示前に必要な設定（`PROMPT` など）は `.bin/.zshrc` に書く。
+- 遅延読み込みのため、プロンプト表示前に必要な設定（`PROMPT` など）は `bin/.zshrc` に書く。
 
 ### プラグインを追加・削除した
 
-`~/dotfiles/.config/sheldon/plugins.toml` を編集し、プラグインを再取得する。
+`~/dotfiles/config/sheldon/plugins.toml` を編集し、プラグインを再取得する。
 
 ```bash
 ~/dotfiles/zsh/setup_plugins.sh   # sheldon lock --reinstall
@@ -208,7 +208,7 @@ exec zsh
 
 **`command not found: sheldon`**
 
-- `.bin/setup_brew.sh` で Brewfile のパッケージをインストールする。
+- `bin/setup_brew.sh` で Brewfile のパッケージをインストールする。
 
 **追加した `.zsh` ファイルが読み込まれない**
 
@@ -231,7 +231,7 @@ exec zsh
 
 **プロンプト表示直後にエイリアスやキーバインドが効かない**
 
-- `zsh/*.zsh` は遅延読み込みのため、起動直後のわずかな間は未適用になる。即時に必要な設定は `.bin/.zshrc` に移す。
+- `zsh/*.zsh` は遅延読み込みのため、起動直後のわずかな間は未適用になる。即時に必要な設定は `bin/.zshrc` に移す。
 
 <a name="references"></a>
 ## 参考資料

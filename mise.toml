@@ -5,7 +5,7 @@
 description = "Homebrew の依存関係をツリー形式で表示する"
 run = "brew deps --installed --tree"
 
-# 生成される Brewfile をベースに .bin/.Brewfile を最新化する。
+# 生成される Brewfile をベースに bin/.Brewfile を最新化する。
 [tasks."brew:dump"]
 description = "インストール済みパッケージを Brewfile に書き出す"
 run = ["rm -rf Brewfile", "brew bundle dump"]

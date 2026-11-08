@@ -6,7 +6,7 @@ if [ "$(basename $(pwd))" != "dotfiles" ]; then
 fi
 
 # xcode-select の実行, Homebrew のインストールなど、開発環境のベースを整える。
-.bin/init.sh
+bin/init.sh
 
 # Homebrew から zsh をインストールし、デフォルト・シェルをその zsh へ変更する。
 zsh/setup.sh

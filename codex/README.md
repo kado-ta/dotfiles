@@ -37,7 +37,7 @@ Codex のユーザー設定 `~/.codex/config.toml` は、モデルや MCP の設
 
 ```text
 ~/dotfiles/
-├── .codex/                         # Git 管理
+├── codex/                         # Git 管理
 │   ├── README.md
 │   ├── AGENTS.md                   # グローバル指示（~/.codex/AGENTS.md へリンク）
 │   ├── config.base.toml            # 共通設定
@@ -48,14 +48,14 @@ Codex のユーザー設定 `~/.codex/config.toml` は、モデルや MCP の設
     └── alias.zsh                   # codex-config-sync / codex-config-import を定義
 
 ~/.codex/                           # Codex のユーザーデータ（CODEX_HOME）
-├── AGENTS.md                       # → ~/dotfiles/.codex/AGENTS.md（シンボリックリンク）
+├── AGENTS.md                       # → ~/dotfiles/codex/AGENTS.md（シンボリックリンク）
 ├── config.toml                     # Codex の実設定（通常ファイル・Git 管理しない）
 ├── config.local.toml               # 端末固有設定（任意・Git 管理しない）
 ├── auth.json                       # 認証情報（Git 管理しない）
 └── ...
 ```
 
-### `.codex/` 内のファイル
+### `codex/` 内のファイル
 
 | ファイル           | 役割                                                                                                                          | `~/.codex/` への反映方法              |
 | ------------------ | ----------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
@@ -68,18 +68,18 @@ Codex のユーザー設定 `~/.codex/config.toml` は、モデルや MCP の設
 
 > **重要**
 >
-> `~/.codex/config.toml` は**通常ファイル**にする。`~/dotfiles/.codex/config.base.toml` や別の Git 追跡ファイルへのシンボリックリンクにしない。また、`~/.codex/` ディレクトリ全体を `~/dotfiles/.codex/` へのシンボリックリンクにしない。
+> `~/.codex/config.toml` は**通常ファイル**にする。`~/dotfiles/codex/config.base.toml` や別の Git 追跡ファイルへのシンボリックリンクにしない。また、`~/.codex/` ディレクトリ全体を `~/dotfiles/codex/` へのシンボリックリンクにしない。
 >
-> `~/dotfiles/.codex/` は dotfiles リポジトリ内の格納場所であり、Codex がプロジェクトごとに読み込む `<repository>/.codex/config.toml` とは役割が異なる。
+> `~/dotfiles/codex/` は dotfiles リポジトリ内の格納場所であり、Codex がプロジェクトごとに読み込む `<repository>/.codex/config.toml` とは役割が異なる。
 
 ### ファイルと変更権限
 
 | ファイル                             | 主な変更者         | Git 管理 | 備考                                  |
 | ------------------------------------ | ------------------ | -------- | ------------------------------------- |
-| `~/dotfiles/.codex/AGENTS.md`        | 人                 | する     | `~/.codex/AGENTS.md` からリンクされる |
-| `~/dotfiles/.codex/config.base.toml` | 人（編集・import） | する     | `[projects]` は記述しない             |
-| `~/dotfiles/.codex/sync.py`          | 人                 | する     | Codex 設定反映スクリプト              |
-| `~/dotfiles/.codex/import.py`        | 人                 | する     | Codex 設定取込スクリプト              |
+| `~/dotfiles/codex/AGENTS.md`         | 人                 | する     | `~/.codex/AGENTS.md` からリンクされる |
+| `~/dotfiles/codex/config.base.toml`  | 人（編集・import） | する     | `[projects]` は記述しない             |
+| `~/dotfiles/codex/sync.py`           | 人                 | する     | Codex 設定反映スクリプト              |
+| `~/dotfiles/codex/import.py`         | 人                 | する     | Codex 設定取込スクリプト              |
 | `~/.codex/config.local.toml`         | 人                 | しない   | 必要な端末だけ作成                    |
 | `~/.codex/config.toml`               | Codex / sync.py    | しない   | `[projects]` を保持                   |
 | `~/.codex/auth.json`                 | Codex              | しない   | **絶対に Git へ追加しない**           |
@@ -90,17 +90,17 @@ Codex のユーザー設定 `~/.codex/config.toml` は、モデルや MCP の設
 ### 前提条件
 
 - macOS（`setup.sh` は macOS 以外では終了する）。
-- Codex CLI がインストール済みであること（`.bin/.Brewfile` の `cask "codex"`）。
+- Codex CLI がインストール済みであること（`bin/.Brewfile` の `cask "codex"`）。
 - `claude/setup.sh` で gstack（`~/.claude/skills/gstack`）をインストール済みであること。`setup.sh` はこの gstack を Codex 向けにセットアップする。
 - `uv` が利用可能であること（`mise` 管理の場合は `uv --version` が成功すること）。
-- Python 3.11 以上と `tomlkit` を使用する。Python は `mise` 管理のものを使う（`.config/uv/uv.toml` で `uv` による Python のダウンロードを無効にしている）。`tomlkit` は `uv` が取得するため、個別の `pip install` や `.venv` 作成は不要。初回はネットワークが必要な場合がある。
+- Python 3.11 以上と `tomlkit` を使用する。Python は `mise` 管理のものを使う（`config/uv/uv.toml` で `uv` による Python のダウンロードを無効にしている）。`tomlkit` は `uv` が取得するため、個別の `pip install` や `.venv` 作成は不要。初回はネットワークが必要な場合がある。
 - `zsh/alias.zsh` が読み込まれていること（Sheldon が `~/dotfiles/zsh/*.zsh` を読み込む）。
 
 ### `setup.sh` が行うこと
 
 1. macOS であることを確認する。
 2. `~/.codex/` がなければ作成する。
-3. `~/dotfiles/.codex/AGENTS.md` を `~/.codex/AGENTS.md` へシンボリックリンクする（`ln -snfv`）。
+3. `~/dotfiles/codex/AGENTS.md` を `~/.codex/AGENTS.md` へシンボリックリンクする（`ln -snfv`）。
 4. superpowers プラグインを追加する（`codex plugin add superpowers@openai-curated`）。
 5. Understand Anything スキルを Codex 向けにインストールする（GitHub の `install.sh` を `curl | bash` で実行）。
 6. Claude Code 用にインストールした gstack を、Codex でも使えるようにセットアップする（`~/.claude/skills/gstack/setup --host codex`）。
@@ -111,7 +111,7 @@ Codex のユーザー設定 `~/.codex/config.toml` は、モデルや MCP の設
 
 ```bash
 # 1. AGENTS.md のリンク、プラグインとスキルのインストール
-~/dotfiles/.codex/setup.sh
+~/dotfiles/codex/setup.sh
 
 # 2. エイリアスを読み込む（新しいシェルを開いてもよい）
 exec zsh
@@ -187,8 +187,8 @@ Codex の動作をカスタマイズする2種類の指示。主な違いは**�
 `zsh/alias.zsh` に以下のエイリアスを定義している。Sheldon 経由で読み込まれるため、追加・変更後は新しいシェルを開くか `exec zsh` を実行する。
 
 ```zsh
-alias codex-config-sync='uv run --no-project --with "tomlkit>=0.13,<1" python "$HOME/dotfiles/.codex/sync.py"'
-alias codex-config-import='uv run --no-project --with "tomlkit>=0.13,<1" python "$HOME/dotfiles/.codex/import.py"'
+alias codex-config-sync='uv run --no-project --with "tomlkit>=0.13,<1" python "$HOME/dotfiles/codex/sync.py"'
+alias codex-config-import='uv run --no-project --with "tomlkit>=0.13,<1" python "$HOME/dotfiles/codex/import.py"'
 ```
 
 | エイリアス            | 実行内容                                                          | 主なオプション                                      |
@@ -201,7 +201,7 @@ alias codex-config-import='uv run --no-project --with "tomlkit>=0.13,<1" python 
 - エイリアスを使わない場合は、PEP 723 メタデータを利用して直接実行できる。
 
   ```bash
-  uv run --no-project "$HOME/dotfiles/.codex/sync.py" --dry-run
+  uv run --no-project "$HOME/dotfiles/codex/sync.py" --dry-run
   ```
 
 ### チートシート
@@ -215,7 +215,7 @@ alias codex-config-import='uv run --no-project --with "tomlkit>=0.13,<1" python 
 | 複数項目を取り込む               | `codex-config-import --key model --key model_reasoning_effort --apply` | `config.base.toml`     |
 | Git 管理済み項目を一括で取り込む | `codex-config-import --all-managed --apply`                            | `config.base.toml`     |
 | 新しい項目を明示的に取り込む     | `codex-config-import --key features.some_flag --apply`                 | `config.base.toml`     |
-| 取り込み後の Git 差分を確認      | `git -C "$HOME/dotfiles" diff -- .codex/config.base.toml`              | なし                   |
+| 取り込み後の Git 差分を確認      | `git -C "$HOME/dotfiles" diff -- codex/config.base.toml`               | なし                   |
 
 `features.some_flag` は指定方法を示す**仮のキー名**であり、実際に利用できる Codex 設定であることを意味しない。
 
@@ -259,7 +259,7 @@ Stow / chezmoi などでリンクを自動作成している場合、その設�
 
 ### 3. 共通設定・端末固有設定を用意する
 
-`~/dotfiles/.codex/config.base.toml` に、共有したい設定だけを記述する。
+`~/dotfiles/codex/config.base.toml` に、共有したい設定だけを記述する。
 
 ```toml
 model_reasoning_effort = "high"
@@ -288,16 +288,16 @@ codex-config-sync
 `config.toml` や、その一時バックアップを dotfiles リポジトリに置いた場合は、追跡されていないことを確認する。
 
 ```bash
-git -C "$HOME/dotfiles" ls-files -- .codex/config.toml
-git -C "$HOME/dotfiles" status --short -- .codex/
+git -C "$HOME/dotfiles" ls-files -- codex/config.toml
+git -C "$HOME/dotfiles" status --short -- codex/
 ```
 
 必要に応じて dotfiles リポジトリ直下の `.gitignore` に追加する。
 
 ```gitignore
-/.codex/config.toml
-/.codex/config.toml.bak
-/.codex/config.local.toml
+/codex/config.toml
+/codex/config.toml.bak
+/codex/config.local.toml
 ```
 
 `.gitignore` は**既に追跡されているファイルには効かない**（`git rm --cached` が必要）。また、過去のコミットに残った信頼設定や秘密情報も削除されないため、公開履歴への混入があれば別途対処が必要。
@@ -318,7 +318,7 @@ trust_level = "trusted"
 
 ### B. 共通設定（`developer_instructions` を含む）を変更した
 
-1. `~/dotfiles/.codex/config.base.toml` を編集する。
+1. `~/dotfiles/codex/config.base.toml` を編集する。
 2. Codex を終了する。
 3. `codex-config-sync --dry-run` で確認する。
 4. `codex-config-sync` で反映する。
@@ -327,12 +327,12 @@ trust_level = "trusted"
 ```bash
 codex-config-sync --dry-run
 codex-config-sync
-git -C "$HOME/dotfiles" diff -- .codex/config.base.toml
+git -C "$HOME/dotfiles" diff -- codex/config.base.toml
 ```
 
 ### C. `AGENTS.md` を変更した
 
-`~/dotfiles/.codex/AGENTS.md` を編集し、Codex を再起動する。シンボリックリンク経由で読み込まれるため、`sync` は不要。
+`~/dotfiles/codex/AGENTS.md` を編集し、Codex を再起動する。シンボリックリンク経由で読み込まれるため、`sync` は不要。
 
 ### D. Codex Desktop App / CLI で共通設定を変更した
 
@@ -348,7 +348,7 @@ git -C "$HOME/dotfiles" diff -- .codex/config.base.toml
 codex-config-import
 codex-config-import --key model_reasoning_effort --apply
 
-git -C "$HOME/dotfiles" diff -- .codex/config.base.toml
+git -C "$HOME/dotfiles" diff -- codex/config.base.toml
 ```
 
 `--all-managed --apply` は一括取り込みのため、共有設定の未反映変更がないことを確認できた場合だけ使用する。

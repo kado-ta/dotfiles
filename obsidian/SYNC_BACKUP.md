@@ -15,7 +15,7 @@
 |---|---|---|
 | 端末間同期 | Remotely Save + Cloudflare R2 | ノート・添付ファイル |
 | ローカルでの意図しない変更（誤削除・誤編集・同期事故）からの復旧 | Git（obsidian-git プラグイン）+ GitHub | ノート・添付ファイル |
-| Obsidian 設定（`.obsidian/`）の共有 | この dotfiles リポジトリの `.obsidian/setup.sh` | 設定ファイル・CSS スニペット |
+| Obsidian 設定（`.obsidian/`）の共有 | この dotfiles リポジトリの `obsidian/setup.sh`  | 設定ファイル・CSS スニペット |
 
 - 同期の仕組みは Remotely Save の 1 つだけにする。Git は同期には使わない。
 - Remotely Save の同期はバックアップの代わりにならない（削除や競合結果もそのまま他端末へ伝播するため）。
@@ -29,7 +29,7 @@ MacBook A                                   MacBook B
   │                       Cloudflare R2 (obsidian-sync)
   ├── .git/ ── obsidian-git ─┐          ┌─ obsidian-git ── .git/
   │                          └─ GitHub ─┘
-  └── .obsidian/ ← dotfiles/.obsidian/setup.sh (symlink) → .obsidian/
+  └── .obsidian/ ← dotfiles/obsidian/setup.sh (symlink) → .obsidian/
 ```
 
 <a name="sync"></a>
@@ -203,7 +203,7 @@ git push -u origin backup/<device-name>
 
 1. Obsidian で `~/Obsidian/main/` に**空の** Vault を作成し、いったん Obsidian を閉じる（`.obsidian/` ディレクトリが作られる）。
    - 初回同期時に既存ファイルがあると、意図しない統合や競合が起きる。
-2. この dotfiles リポジトリの `.obsidian/setup.sh` を実行し、設定ファイルと `snippets/` をシンボリックリンクする。
+2. この dotfiles リポジトリの `obsidian/setup.sh` を実行し、設定ファイルと `snippets/` をシンボリックリンクする。
 3. Obsidian を起動し、`community-plugins.json` に記載のコミュニティプラグイン（Remotely Save, obsidian-git など）を `Settings → Community plugins → Browse` からインストールする。
    - dotfiles が管理するのは有効化リストだけで、プラグイン本体と各プラグインの `data.json` は管理しない。
 4. Remotely Save を [Remotely Save の設定](#sync-remotely-save) のとおり設定し、`Check Connectivity` を実行する。

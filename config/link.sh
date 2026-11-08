@@ -1,11 +1,11 @@
 #!/bin/bash -e
 
 if [ "$(uname)" != "Darwin" ] ; then
-	echo "This is not macOS! .config setup is failed ;("
+	echo "This is not macOS! config setup is failed ;("
 	exit 1
 fi
 
-# NOTE: この .config/ ディレクトリ内の管理対象が増えた場合は ln コマンドを追加すること。
+# NOTE: この config/ ディレクトリ内の管理対象が増えた場合は ln コマンドを追加すること。
 
 # 共通コマンド
 SCRIPT_DIR=$(cd $(dirname $0) && pwd)
@@ -46,4 +46,4 @@ ln -snfv "$SCRIPT_DIR/sf/unsignedPluginAllowList.json" "$SF_DIR/"
 # if [ ! -d $KARABINER_DIR ]; then mkdir $KARABINER_DIR; fi
 # ln -snfv "$SCRIPT_DIR/karabiner/karabiner.json" "$KARABINER_DIR/"
 
-echo ".config setup is succeeded!"
+echo "config setup is succeeded!"

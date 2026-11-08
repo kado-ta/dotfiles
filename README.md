@@ -30,13 +30,13 @@ Finder で `init.command` をダブルクリックする（ターミナルから
 
 | スクリプト     | 内容                                                       |
 | -------------- | ---------------------------------------------------------- |
-| `.bin/init.sh` | Xcode Command Line Tools と Homebrew をインストールする    |
+| `bin/init.sh`  | Xcode Command Line Tools と Homebrew をインストールする    |
 | `zsh/setup.sh` | Homebrew の Zsh をインストールし、ログインシェルに設定する |
 
 完了したらターミナルを再起動する。
 
 > [!WARNING]
-> `.bin/init.sh` は、インストール済みの Command Line Tools（`/Library/Developer/CommandLineTools`）を削除してから再インストールする。既存の Mac で再実行するときは注意する。
+> `bin/init.sh` は、インストール済みの Command Line Tools（`/Library/Developer/CommandLineTools`）を削除してから再インストールする。既存の Mac で再実行するときは注意する。
 
 <a name="setup-tools"></a>
 
@@ -46,18 +46,18 @@ Finder で `init.command` をダブルクリックする（ターミナルから
 
 | #   | スクリプト             | 内容                                                                                                                            |
 | --- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | `.bin/link.sh`         | `.bin/` の dotfiles（`.zshrc`・`.zprofile`・`.gitconfig`・`.Brewfile` など）を `~` にリンクする                                 |
-| 2   | `.bin/setup_brew.sh`   | `~/.Brewfile` のパッケージをインストールする（`brew bundle --global`）                                                          |
-| 3   | `.config/link.sh`      | Starship・Sheldon・uv・sf の設定を `~/.config/` にリンクする                                                                    |
+| 1   | `bin/link.sh`          | `bin/` の dotfiles（`.zshrc`・`.zprofile`・`.gitconfig`・`.Brewfile` など）を `~` にリンクする                                  |
+| 2   | `bin/setup_brew.sh`    | `~/.Brewfile` のパッケージをインストールする（`brew bundle --global`）                                                          |
+| 3   | `config/link.sh`       | Starship・Sheldon・uv・sf の設定を `~/.config/` にリンクする                                                                    |
 | 4   | `zsh/setup_plugins.sh` | Sheldon で Zsh プラグインをインストールする                                                                                     |
 | 5   | `aws/link.sh`          | AWS CLI の設定（`config`・`credentials`）をリンクする                                                                           |
 | 6   | `mise/setup.sh`        | mise の設定を `~/.config/mise/config.toml` にリンクし、言語ランタイム・ツールをインストールする                                 |
 | 7   | `claude/setup.sh`      | Claude Code の設定をリンクし、プラグインと gstack をインストールする（[詳細](#claude-code)）                                    |
-| 8   | `.codex/setup.sh`      | Codex の `AGENTS.md` をリンクし、プラグインとスキルをインストールする。7 でインストールした gstack を使うため、7 の後に実行する |
+| 8   | `codex/setup.sh`       | Codex の `AGENTS.md` をリンクし、プラグインとスキルをインストールする。7 でインストールした gstack を使うため、7 の後に実行する |
 | 9   | `vscode/setup.sh`      | VSCode の設定をリンクし、拡張をインストールする                                                                                 |
 | 10  | `ghostty/link.sh`      | Ghostty の設定を `~/.config/ghostty/` にリンクする                                                                              |
 | 11  | `biome/setup.sh`       | Biome のグローバル設定を `~/Library/Application Support/biome/` にリンクする                                                    |
-| 12  | `.obsidian/setup.sh`   | Obsidian の設定を Vault（`~/Obsidian/main/.obsidian/`）にリンクする。Vault を作成し、Obsidian を閉じてから実行する              |
+| 12  | `obsidian/setup.sh`    | Obsidian の設定を Vault（`~/Obsidian/main/.obsidian/`）にリンクする。Vault を作成し、Obsidian を閉じてから実行する              |
 
 <a name="setup-manual"></a>
 
@@ -66,10 +66,10 @@ Finder で `init.command` をダブルクリックする（ターミナルから
 スクリプトで自動化していない作業。
 
 - **AWS CLI の設定**: `aws/config` と `aws/credentials` は Git で管理していない。`aws/link.sh` が作成したファイルを編集する（[aws/README.md](aws/README.md#setup)）。
-- **Codex の設定の反映**: `codex-config-sync --dry-run` で差分を確認し、`codex-config-sync` で `~/.codex/config.toml` に反映する（[.codex/README.md](.codex/README.md#setup)）。
-- **Obsidian のプラグイン**: コミュニティプラグインをインストールし、同期・バックアップを設定する（[.obsidian/README.md](.obsidian/README.md#setup)）。
+- **Codex の設定の反映**: `codex-config-sync --dry-run` で差分を確認し、`codex-config-sync` で `~/.codex/config.toml` に反映する（[codex/README.md](codex/README.md#setup)）。
+- **Obsidian のプラグイン**: コミュニティプラグインをインストールし、同期・バックアップを設定する（[obsidian/README.md](obsidian/README.md#setup)）。
 - **Salesforce 拡張用の JDK**: mise でインストールした JDK を `JavaVirtualMachines` にリンクし、VSCode を設定する（[mise/JAVA.md](mise/JAVA.md#jvm-symlink)）。
-- **Salesforce CLI のプラグイン**: `mise run sf:plugins` で `.config/sf/plugins.txt` のプラグインをインストールする。
+- **Salesforce CLI のプラグイン**: `mise run sf:plugins` で `config/sf/plugins.txt` のプラグインをインストールする。
 - **AWS Session Manager プラグイン**: Staging / Production 環境への SSH 接続に使う。macOS（Apple Silicon）では次のコマンドでインストールする。他のプラットフォームは [公式ドキュメント](https://docs.aws.amazon.com/ja_jp/systems-manager/latest/userguide/session-manager-working-with-install-plugin.html) を参照する。
 
   ```shell
@@ -86,17 +86,17 @@ Finder で `init.command` をダブルクリックする（ターミナルから
 
 | ディレクトリ | 内容                                                                                   | 主なリンク先                               | 詳細                                       |
 | ------------ | -------------------------------------------------------------------------------------- | ------------------------------------------ | ------------------------------------------ |
-| `.bin/`      | Zsh・Git・Homebrew の設定（`.zshrc`・`.zprofile`・`.gitconfig`・`.Brewfile`）          | `~/`                                       | —                                          |
+| `bin/`       | Zsh・Git・Homebrew の設定（`.zshrc`・`.zprofile`・`.gitconfig`・`.Brewfile`）          | `~/`                                       | —                                          |
 | `zsh/`       | Zsh 本体のインストールと、エイリアス・キーバインド・オプション。Sheldon が直接読み込む | なし                                       | [zsh/README.md](zsh/README.md)             |
-| `.config/`   | Starship・Sheldon・uv・sf の設定（`karabiner/` は現在リンクしていない）                | `~/.config/`                               | —                                          |
+| `config/`    | Starship・Sheldon・uv・sf の設定（`karabiner/` は現在リンクしていない）                | `~/.config/`                               | —                                          |
 | `mise/`      | 言語ランタイム・ツールのグローバルバージョン（`mise_config.toml`）                     | `~/.config/mise/config.toml`               | [mise/JAVA.md](mise/JAVA.md)               |
 | `aws/`       | AWS CLI の設定（`config`・`credentials` は Git 管理外）                                | `~/.aws/`                                  | [aws/README.md](aws/README.md)             |
 | `claude/`    | Claude Code の設定・フック・ルール・個人スキル                                         | `~/.claude/`                               | [Claude Code 設定](#claude-code)           |
-| `.codex/`    | Codex CLI のグローバル指示（`AGENTS.md`）と共通設定（`config.base.toml`）              | `~/.codex/`                                | [.codex/README.md](.codex/README.md)       |
+| `codex/`     | Codex CLI のグローバル指示（`AGENTS.md`）と共通設定（`config.base.toml`）              | `~/.codex/`                                | [codex/README.md](codex/README.md)         |
 | `vscode/`    | VSCode の設定・キーバインド・タスク・拡張リスト・Project Manager 拡張の設定            | `~/Library/Application Support/Code/User/` | —                                          |
 | `ghostty/`   | Ghostty の設定                                                                         | `~/.config/ghostty/`                       | —                                          |
 | `biome/`     | Biome のグローバル設定。`$schema` のバージョンは mise の postinstall で自動更新する    | `~/Library/Application Support/biome/`     | —                                          |
-| `.obsidian/` | Obsidian の Vault 設定と CSS スニペット                                                | `~/Obsidian/main/.obsidian/`               | [.obsidian/README.md](.obsidian/README.md) |
+| `obsidian/`  | Obsidian の Vault 設定と CSS スニペット                                                | `~/Obsidian/main/.obsidian/`               | [obsidian/README.md](obsidian/README.md)   |
 | `docs/`      | 設計・計画などの作業文書                                                               | —                                          | —                                          |
 | `.github/`   | `init.command` を macOS ランナーで実行する CI（GitHub 上で無効化している）             | —                                          | —                                          |
 
@@ -157,15 +157,15 @@ bash claude/hooks/tests/test-validate-command.sh
 
 ### パッケージリストの更新
 
-- **Homebrew**: 正本は `.bin/.Brewfile`。`mise run brew:dump` で生成した `Brewfile`（Git 管理外）と見比べて、`.bin/.Brewfile` に反映する。
+- **Homebrew**: 正本は `bin/.Brewfile`。`mise run brew:dump` で生成した `Brewfile`（Git 管理外）と見比べて、`bin/.Brewfile` に反映する。
 - **VSCode 拡張**: `vscode/extensions` は `mise run vscode:ext:list` で生成する。手で編集しない。
-- **Salesforce CLI のプラグイン**: `.config/sf/plugins.txt` を編集して `mise run sf:plugins` を実行する。一覧から消してもアンインストールはしないので、`sf plugins uninstall` で手動で削除する。署名のないプラグインを入れるときは `.config/sf/unsignedPluginAllowList.json` にも追加する。
+- **Salesforce CLI のプラグイン**: `config/sf/plugins.txt` を編集して `mise run sf:plugins` を実行する。一覧から消してもアンインストールはしないので、`sf plugins uninstall` で手動で削除する。署名のないプラグインを入れるときは `config/sf/unsignedPluginAllowList.json` にも追加する。
 
 <a name="other-operations"></a>
 
 ### その他の運用
 
 - Zsh の設定・プラグインの変更: [zsh/README.md](zsh/README.md#operations)
-- Codex の設定の同期・取り込み（`codex-config-sync` / `codex-config-import`）: [.codex/README.md](.codex/README.md#operations)
-- Obsidian の設定の変更: [.obsidian/README.md](.obsidian/README.md#operations)
+- Codex の設定の同期・取り込み（`codex-config-sync` / `codex-config-import`）: [codex/README.md](codex/README.md#operations)
+- Obsidian の設定の変更: [obsidian/README.md](obsidian/README.md#operations)
 - gstack の更新: `gstack-upgrade`（`--check` で確認のみ）

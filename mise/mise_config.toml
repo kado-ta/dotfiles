@@ -26,7 +26,7 @@ uv = "latest"
 # VSCode 用 Apex拡張が Java 21 に依存しているので、ここで指定する。詳細は ./JAVA.md を参照。
 java = "temurin-21"
 
-# スクリプトの実体は .config/sf/sync-plugins.sh 。 .config/link.sh でリンクする。
+# スクリプトの実体は config/sf/sync-plugins.sh 。 config/link.sh でリンクする。
 [tasks."sf:plugins"]
 description = "Salesforce CLI のプラグインを ~/.config/sf/plugins.txt に同期する"
 run = '"$HOME/.config/sf/sync-plugins.sh"'

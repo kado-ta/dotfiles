@@ -5,8 +5,8 @@
   "permissions": {
     "ask": [
       "Edit(/zsh/**)",
-      "Edit(/.config/sheldon/**)",
-      "Edit(/.config/starship/**)",
+      "Edit(/config/sheldon/**)",
+      "Edit(/config/starship/**)",
       "Edit(/mise/**)",
       "Edit(/mise.toml)",
       "Edit(/ghostty/config)",
@@ -18,8 +18,8 @@
       "denyWrite": [
         "./claude",
         "./zsh",
-        "./.config/sheldon",
-        "./.config/starship",
+        "./config/sheldon",
+        "./config/starship",
         "./mise",
         "./mise.toml",
         "./ghostty/config",
