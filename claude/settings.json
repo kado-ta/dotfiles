@@ -130,6 +130,7 @@
       "Read(~/.ssh/**)",
       "Read(**/.ssh/**)",
       "Read(**/.aws/**)",
+      "Read(**/aws/credentials)",
       "Read(./secrets/**)",
       "Read(**/credentials/**)",
       "Read(**/*.key)",
@@ -296,6 +297,7 @@
     "filesystem": {
       "denyRead": [
         "~/.aws/credentials",
+        "~/dotfiles/aws/credentials",
         "~/.ssh/id_*",
         "~/.ssh/config"
       ],

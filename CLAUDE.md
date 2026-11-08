@@ -7,6 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 シェル・エディタ・開発ツールの設定を管理する macOS dotfiles リポジトリ。各ディレクトリの `link.sh` / `setup.sh` を通じて設定ファイルを `~` にシンボリックリンクする。ビルド手順は存在せず、テストはフックの回帰テストのみ。
 
 <a name="mise-tasks"></a>
+
 ## mise タスク
 
 リポジトリ保守用のタスクはリポジトリルートの `mise.toml` に定義する。どのディレクトリからでも使うタスクは `mise/mise_config.toml` にグローバルタスクとして定義する。`mise tasks` で一覧を表示する。
@@ -28,7 +29,7 @@ mise run sf:plugins       # sf のプラグインを .config/sf/plugins.txt に�
 | `zsh/`       | Zsh のインストールとシェル設定（エイリアス・キーバインド・オプション・autosuggestions）。プラグインの定義は `.config/sheldon/plugins.toml`       |
 | `mise/`      | `mise_config.toml` — 言語ランタイムのバージョン管理                                                                                              |
 | `.config/`   | starship, sheldon, uv, sf の設定（`karabiner/` は `link.sh` でリンクしていない）                                                                 |
-| `.aws/`      | AWS CLI プロファイル設定（credentials は gitignore 済み）                                                                                        |
+| `aws/`       | AWS CLI プロファイル設定（config, credentials は gitignore 済み）                                                                                |
 | `claude/`    | Claude Code の設定・フック・スキル・セットアップスクリプト                                                                                       |
 | `.codex/`    | Codex CLI の設定（`AGENTS.md` を `~/.codex/AGENTS.md` にリンク。`config.base.toml` は `sync.py` で `~/.codex/config.toml` にマージ）             |
 | `.obsidian/` | Obsidian の Vault 設定と CSS スニペット（`~/Obsidian/main/.obsidian/` にシンボリックリンク）、Vault の同期・バックアップ手順（`SYNC_BACKUP.md`） |
@@ -43,6 +44,7 @@ mise run sf:plugins       # sf のプラグインを .config/sf/plugins.txt に�
 dotfiles で起動したときだけ必要な設定（`denyWrite`、`claudeMdExcludes`）は、`.claude/settings.json` に置く。
 
 `claude/setup.sh` がメインのエントリーポイント。Claude Code のセッション内と IDE の統合ターミナルでは実行を拒否する（セッション中にリンクを張り直すと、Claude Code のサンドボックスがリンクを削除し、deny ルール・フック・サンドボックスが無効になるため）。通常のターミナルで、すべてのセッションを閉じてから実行する。以下を実行する:
+
 - `settings.json`、`CLAUDE.md`、`rules/`、`mcp.json` を `~/.claude/` にシンボリックリンク
 - `hooks/` ディレクトリを `~/.claude/hooks/` にシンボリックリンク
 - `scripts/statusline.sh`（ステータスライン）を `~/.claude/scripts/` にシンボリックリンク
@@ -70,11 +72,11 @@ dotfiles で起動したときだけ必要な設定（`denyWrite`、`claudeMdExc
 
 Claude からの push は、`claude/bin/cc-safe-push` を root 所有でインストールしたラッパーだけで行う。`settings.json` は、引数なしの完全一致だけを `permissions.allow` と `sandbox.excludedCommands` に入れ、`git push` を deny にしている。判定はすべてラッパーで行い、フックには依存しない。
 
-| 状況                                                                                                       | 結果                                   |
-| ---------------------------------------------------------------------------------------------------------- | -------------------------------------- |
-| 許可リストのリポジトリの、保護されていないブランチ                                                         | 確認なしで push する                   |
-| 許可リストにないリポジトリ                                                                                 | 拒否する。人間が自分の端末で push する |
-| `main`, `master`, `staging`（大文字・小文字を区別しない）                                                  | 拒否する                               |
+| 状況                                                                                                          | 結果                                   |
+| ------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
+| 許可リストのリポジトリの、保護されていないブランチ                                                            | 確認なしで push する                   |
+| 許可リストにないリポジトリ                                                                                    | 拒否する。人間が自分の端末で push する |
+| `main`, `master`, `staging`（大文字・小文字を区別しない）                                                     | 拒否する                               |
 | 判定できない場合（detached HEAD、origin が `git@github.com:OWNER/REPO.git` の形でない、許可リストの異常など） | 拒否する                               |
 
 push は、元のリポジトリの設定とフックを読まないように、macOS のユーザー専用の一時ディレクトリに作った空のリポジトリから行う（作業ディレクトリと `$TMPDIR` は sandbox から書けるので使わない）。元のリポジトリには書き込まないので、upstream は設定されない。
@@ -90,5 +92,5 @@ push は、元のリポジトリの設定とフックを読まないように、
 - テストは `claude/hooks/tests/` のフック回帰テストのみ。フックを変更したら `bash claude/hooks/tests/test-protect-main-branch.sh` と `bash claude/hooks/tests/test-validate-command.sh` を実行する。`claude/bin/cc-safe-push` を変更したら `/usr/bin/python3 -B claude/hooks/tests/test-cc-safe-push.py` を実行する。`jq` が mise の shim に解決される PATH では `HOME` を変えて実行するテストが失敗するので、新しいシェルで実行する。それ以外の動作確認はセットアップスクリプトを手動実行して行う。
 - Homebrew のパッケージリストの正規版は `.bin/.Brewfile`。リポジトリルートの `Brewfile` は `mise run brew:dump` で生成し、`.bin/.Brewfile` を最新化するためのベースとして使う。
 - `vscode/extensions` は `mise run vscode:ext:list` で生成するため手動編集しない。
-- `.aws/credentials` は gitignore 済み。credentials をコミットしない。
+- `aws/config` , `aws/credentials` は gitignore 済み。公開リポジトリであるため、AWS CLI 設定も credentials もコミットしない。
 - Markdown ファイル名（`.md` を除く部分）は英大文字と `_` のみで構成する（例: `README.md`, `SYNC_BACKUP.md`）。新規作成・リネーム時に適用する。`docs/` 配下は例外とし、グローバル規約の保存パスに従う。
