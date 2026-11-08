@@ -18,7 +18,7 @@ fi
 zsh/setup_plugins.sh
 
 # AWS CLI の設定と Credentils のシンボリックリンクを作成する。
-.aws/link.sh
+aws/link.sh
 
 # mise で管理する言語・プラグインをインストールする。
 mise/setup.sh

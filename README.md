@@ -11,6 +11,7 @@ macOS の開発環境の設定を管理する dotfiles。シェル（Zsh）・�
 - [日常運用](#operations)
 
 <a name="prerequisites"></a>
+
 ## 前提
 
 - macOS。各スクリプトは macOS 以外では終了する。
@@ -18,9 +19,11 @@ macOS の開発環境の設定を管理する dotfiles。シェル（Zsh）・�
 - 管理者権限。セットアップの途中で `sudo` と `chsh` を実行する。
 
 <a name="setup"></a>
+
 ## セットアップ
 
 <a name="setup-init"></a>
+
 ### 1. 基盤のインストール（`init.command`）
 
 Finder で `init.command` をダブルクリックする（ターミナルから `~/dotfiles/init.command` を実行してもよい）。次のスクリプトが順に実行される。
@@ -36,6 +39,7 @@ Finder で `init.command` をダブルクリックする（ターミナルから
 > `.bin/init.sh` は、インストール済みの Command Line Tools（`/Library/Developer/CommandLineTools`）を削除してから再インストールする。既存の Mac で再実行するときは注意する。
 
 <a name="setup-tools"></a>
+
 ### 2. 設定のリンクとツールのインストール（`setup.command`）
 
 ターミナルを再起動したら、Finder で `setup.command` をダブルクリックする（ターミナルから `~/dotfiles/setup.command` を実行してもよい）。下表の 1〜9 が順に実行される。10〜12 は必要に応じて個別に実行する。
@@ -46,7 +50,7 @@ Finder で `init.command` をダブルクリックする（ターミナルから
 | 2   | `.bin/setup_brew.sh`   | `~/.Brewfile` のパッケージをインストールする（`brew bundle --global`）                                                          |
 | 3   | `.config/link.sh`      | Starship・Sheldon・uv・sf の設定を `~/.config/` にリンクする                                                                    |
 | 4   | `zsh/setup_plugins.sh` | Sheldon で Zsh プラグインをインストールする                                                                                     |
-| 5   | `.aws/link.sh`         | AWS CLI の設定（`config`・`credentials`）をリンクする                                                                           |
+| 5   | `aws/link.sh`          | AWS CLI の設定（`config`・`credentials`）をリンクする                                                                           |
 | 6   | `mise/setup.sh`        | mise の設定を `~/.config/mise/config.toml` にリンクし、言語ランタイム・ツールをインストールする                                 |
 | 7   | `claude/setup.sh`      | Claude Code の設定をリンクし、プラグインと gstack をインストールする（[詳細](#claude-code)）                                    |
 | 8   | `.codex/setup.sh`      | Codex の `AGENTS.md` をリンクし、プラグインとスキルをインストールする。7 でインストールした gstack を使うため、7 の後に実行する |
@@ -56,10 +60,12 @@ Finder で `init.command` をダブルクリックする（ターミナルから
 | 12  | `.obsidian/setup.sh`   | Obsidian の設定を Vault（`~/Obsidian/main/.obsidian/`）にリンクする。Vault を作成し、Obsidian を閉じてから実行する              |
 
 <a name="setup-manual"></a>
+
 ### 3. 手動で行う作業
 
 スクリプトで自動化していない作業。
 
+- **AWS CLI の設定**: `aws/config` と `aws/credentials` は Git で管理していない。`aws/link.sh` が作成したファイルを編集する（[aws/README.md](aws/README.md#setup)）。
 - **Codex の設定の反映**: `codex-config-sync --dry-run` で差分を確認し、`codex-config-sync` で `~/.codex/config.toml` に反映する（[.codex/README.md](.codex/README.md#setup)）。
 - **Obsidian のプラグイン**: コミュニティプラグインをインストールし、同期・バックアップを設定する（[.obsidian/README.md](.obsidian/README.md#setup)）。
 - **Salesforce 拡張用の JDK**: mise でインストールした JDK を `JavaVirtualMachines` にリンクし、VSCode を設定する（[mise/JAVA.md](mise/JAVA.md#jvm-symlink)）。
@@ -73,6 +79,7 @@ Finder で `init.command` をダブルクリックする（ターミナルから
   ```
 
 <a name="directory-structure"></a>
+
 ## ディレクトリ構成
 
 各ディレクトリは独立しており、それぞれのスクリプトでセットアップする。
@@ -83,7 +90,7 @@ Finder で `init.command` をダブルクリックする（ターミナルから
 | `zsh/`       | Zsh 本体のインストールと、エイリアス・キーバインド・オプション。Sheldon が直接読み込む | なし                                       | [zsh/README.md](zsh/README.md)             |
 | `.config/`   | Starship・Sheldon・uv・sf の設定（`karabiner/` は現在リンクしていない）                | `~/.config/`                               | —                                          |
 | `mise/`      | 言語ランタイム・ツールのグローバルバージョン（`mise_config.toml`）                     | `~/.config/mise/config.toml`               | [mise/JAVA.md](mise/JAVA.md)               |
-| `.aws/`      | AWS CLI のプロファイル設定（`credentials` は Git 管理外）                              | `~/.aws/`                                  | —                                          |
+| `aws/`       | AWS CLI の設定（`config`・`credentials` は Git 管理外）                                | `~/.aws/`                                  | [aws/README.md](aws/README.md)             |
 | `claude/`    | Claude Code の設定・フック・ルール・個人スキル                                         | `~/.claude/`                               | [Claude Code 設定](#claude-code)           |
 | `.codex/`    | Codex CLI のグローバル指示（`AGENTS.md`）と共通設定（`config.base.toml`）              | `~/.codex/`                                | [.codex/README.md](.codex/README.md)       |
 | `vscode/`    | VSCode の設定・キーバインド・タスク・拡張リスト・Project Manager 拡張の設定            | `~/Library/Application Support/Code/User/` | —                                          |
@@ -96,6 +103,7 @@ Finder で `init.command` をダブルクリックする（ターミナルから
 リポジトリルートには、セットアップのエントリーポイント（`init.command`・`setup.command`）、保守用タスク（`mise.toml`）、AI エージェント向けのリポジトリガイド（[CLAUDE.md](CLAUDE.md)・`AGENTS.md`）を置いている。
 
 <a name="claude-code"></a>
+
 ## Claude Code 設定
 
 `claude/setup.sh` は次を行う。
@@ -107,6 +115,7 @@ Finder で `init.command` をダブルクリックする（ターミナルから
 `settings.json` のセキュリティ設定は、[【2026年最新版】Claude Codeで行うべきセキュリティ設定 10選 - Qiita](https://qiita.com/miruky/items/51db293a7a7d0d277a5d) を参考にしている。
 
 <a name="claude-code-hooks"></a>
+
 ### フック
 
 | ファイル                       | イベント           | 動作                                                                                                                                        |
@@ -128,9 +137,11 @@ bash claude/hooks/tests/test-validate-command.sh
 ```
 
 <a name="operations"></a>
+
 ## 日常運用
 
 <a name="mise-tasks"></a>
+
 ### mise タスク
 
 保守用のタスクをリポジトリルートの `mise.toml` に、どのディレクトリからでも使うタスクを `mise/mise_config.toml` に定義している。`mise tasks` で一覧を表示する。
@@ -143,6 +154,7 @@ bash claude/hooks/tests/test-validate-command.sh
 | `mise run sf:plugins`      | sf のプラグインを `plugins.txt` に同期する（グローバルタスク）         |
 
 <a name="update-package-lists"></a>
+
 ### パッケージリストの更新
 
 - **Homebrew**: 正本は `.bin/.Brewfile`。`mise run brew:dump` で生成した `Brewfile`（Git 管理外）と見比べて、`.bin/.Brewfile` に反映する。
@@ -150,6 +162,7 @@ bash claude/hooks/tests/test-validate-command.sh
 - **Salesforce CLI のプラグイン**: `.config/sf/plugins.txt` を編集して `mise run sf:plugins` を実行する。一覧から消してもアンインストールはしないので、`sf plugins uninstall` で手動で削除する。署名のないプラグインを入れるときは `.config/sf/unsignedPluginAllowList.json` にも追加する。
 
 <a name="other-operations"></a>
+
 ### その他の運用
 
 - Zsh の設定・プラグインの変更: [zsh/README.md](zsh/README.md#operations)
