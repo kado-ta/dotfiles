@@ -62,9 +62,9 @@ dotfiles で起動したときだけ必要な設定（`denyWrite`、`claudeMdExc
 
 フックが exit code `2` を返すとツール実行がブロックされ、stderr の内容が Claude に表示される。
 
-`protect-main-branch.sh` は、フックの cwd と、コマンド中のすべての `git commit` について `cd <dir>` と `git -C <dir>` から解決したリポジトリのブランチを判定し、いずれかが保護ブランチならブロックする。移動先を解決できない場合（変数を含むパス、存在しないディレクトリなど）もブロックする。
+`protect-main-branch.sh` は、フックの cwd と、コマンド中のすべての `git commit` について `cd <dir>` と `git -C <dir>` から解決したリポジトリのブランチを判定し、いずれかが保護ブランチならブロックする。移動先を解決できない場合（変数を含むパス、存在しないディレクトリなど）もブロックする。`commit` に展開される git のエイリアス（`-c alias.*` を含む）も検査する。エイリアスは移動先のリポジトリの設定で解決し、多段のエイリアスもたどる（循環などでたどりきれなければ、commit とみなす）。移動先を解決できない場合は、git の組み込みコマンド以外をブロックする。シェルエイリアス（`!` で始まるもの）とオプションで始まるエイリアスは commit とみなす。同じ呼び出しの中で commit より前にブランチを切り替えるコマンド（`checkout`、`switch`、`branch`、`symbolic-ref`、`rebase`）があれば、フックは実行前のブランチで判定するため、ブロックする。
 
-`validate-command.sh` と `protect-main-branch.sh` は、jq が動かないなどでコマンドを検査できないときもブロックする（fail closed）。この状態では Bash ツールがすべて止まるので、メッセージに従って Claude Code を再起動するか、`mise trust` を実行する。
+`validate-command.sh` と `protect-main-branch.sh` は、jq や git が動かないなどでコマンドを検査できないときもブロックする（fail closed）。この状態では Bash ツールがすべて止まるので、メッセージに従って Claude Code を再起動するか、`mise trust` を実行する。
 
 ### git push
 

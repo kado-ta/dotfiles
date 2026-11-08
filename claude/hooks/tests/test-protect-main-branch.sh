@@ -43,7 +43,11 @@ check() {
 check 0 "$FEAT" 'git commit -m x' 'commit in cwd on feature branch'
 check 2 "$MAIN" 'git commit -m x' 'commit in cwd on main'
 check 0 "$MAIN" 'git status' 'non-commit command'
-check 0 "$FEAT" 'git switch -c y && git commit -m x' 'branch creation and commit in one command on feature branch'
+check 2 "$FEAT" 'git switch -c y && git commit -m x' 'branch creation and commit in one command on feature branch'
+check 2 "$FEAT" 'git checkout main && git commit -m x' 'switching branches before a commit in the same call'
+check 0 "$FEAT" 'git commit -m x && git switch main' 'switching branches after a commit'
+check 2 "$FEAT" 'git rebase feature/x main && git commit -m x' 'rebase before a commit in the same call'
+check 0 "$FEAT" 'git commit -m x && git rebase main' 'rebase after a commit'
 
 # 同名のタグがあると symbolic-ref --short は heads/main を返す
 TAGGED="$T/tagged-repo"
@@ -77,6 +81,14 @@ check 2 "$FEAT" "cd $MAIN"$'\n'"git commit -m x" 'cd on a previous line'
 check 2 "$FEAT" "(cd $MAIN && git commit)" 'cd in a subshell'
 check 2 "$FEAT" "cd $MAIN && git commit; echo done" 'commit followed by semicolon'
 
+# Separators without surrounding spaces
+check 2 "$FEAT" 'git checkout main&&git commit -m x' 'switching branches before a commit without spaces around &&'
+check 2 "$FEAT" 'git checkout main;git commit -m x' 'switching branches before a commit without spaces around ;'
+check 2 "$FEAT" "cd $MAIN&&git commit -m x" 'cd to main repo without spaces around &&'
+check 0 "$FEAT" "cd $FEAT&&git commit -m x" 'cd to feature repo without spaces around &&'
+check 0 "$FEAT" 'git commit -m x&&git switch main' 'switching branches after a commit without spaces'
+check 0 "$FEAT" 'git commit -m "a;b&&c" 2>&1' 'separators inside a message and a redirect'
+
 # -C on another git command does not apply to the commit
 check 0 "$FEAT" "git -C $MAIN status && git commit -m x" '-C on preceding non-commit git'
 check 2 "$MAIN" "git -C $FEAT status && git commit -m x" '-C on preceding non-commit git (main cwd)'
@@ -85,7 +97,50 @@ check 0 "$FEAT" 'git -C "$REPO" status && git commit -m x' 'unresolvable -C on n
 # Every commit is checked, not only the first one
 check 2 "$FEAT" "git commit -m x; git -C $MAIN commit -m y" 'second commit to main repo'
 
+# Commits through git aliases are checked too
+git -C "$MAIN" config alias.cm commit
+git -C "$MAIN" config alias.sc '!git commit'
+git -C "$MAIN" config alias.st status
+git -C "$FEAT" config alias.cm commit
+check 2 "$MAIN" 'git cm -m x' 'alias of commit on main'
+check 2 "$MAIN" 'git sc -m x' 'shell alias of commit on main'
+check 2 "$MAIN" 'git -c alias.c=commit c -m x' 'alias given with -c on main'
+check 2 "$FEAT" "git -C $MAIN cm -m x" 'alias of commit to main repo'
+check 0 "$FEAT" 'git cm -m x' 'alias of commit on feature branch'
+check 0 "$MAIN" 'git st' 'alias of a non-commit command on main'
+# Aliases are looked up in the repository the command runs in
+git -C "$MAIN" config alias.mainonly commit
+check 2 "$FEAT" "git -C $MAIN mainonly -m x" 'alias defined only in the target repository'
+check 2 "$FEAT" 'git -C "$REPO" mainonly -m x' 'possible alias in an unresolvable repository'
+check 0 "$FEAT" 'git -C "$REPO" status' 'built-in command in an unresolvable repository'
+# Aliases of aliases are followed, and alias names are case-insensitive
+git -C "$MAIN" config alias.outer inner
+git -C "$MAIN" config alias.inner commit
+git -C "$MAIN" config alias.loopa loopb
+git -C "$MAIN" config alias.loopb loopa
+git -C "$MAIN" config alias.st2 st
+check 2 "$MAIN" 'git -c alias.inner2=commit -c alias.outer2=inner2 outer2 -m x' 'alias chain given with -c'
+check 2 "$MAIN" 'git outer -m x' 'alias chain in the config'
+check 2 "$MAIN" 'git loopa' 'alias loop is treated as a commit'
+check 0 "$MAIN" 'git st2' 'alias chain to a non-commit command'
+check 2 "$MAIN" 'git CM -m x' 'alias name in upper case'
+check 2 "$MAIN" "git -c 'alias.qc=commit' qc -m x" 'quoted -c alias'
+git -C "$MAIN" config alias.addcm '!git add -A && git commit'
+check 2 "$MAIN" 'git addcm -m x' 'shell alias is treated as a commit'
+git -C "$FEAT" config alias.co checkout
+check 2 "$FEAT" 'git co main && git commit -m x' 'alias of checkout before a commit'
+check 2 "$FEAT" 'git -c alias.rb=rebase rb feature/x main && git commit -m x' 'alias of rebase before a commit'
+# Aliases starting with an option cannot be analyzed, so they are treated as commits
+git -C "$MAIN" config alias.optcm '-c user.name=x commit'
+check 2 "$MAIN" 'git optcm -m x' 'alias starting with an option'
+check 2 "$MAIN" 'git -c "alias.oc=-c user.name=x commit" oc -m y' 'double-quoted -c alias with spaces'
+check 2 "$MAIN" "git -c 'alias.oc=-c user.name=x commit' oc -m y" 'single-quoted -c alias with spaces'
+check 0 "$FEAT" 'git -c "alias.oc=-c user.name=x commit" oc -m y' 'quoted -c alias with spaces on feature branch'
+check 2 "$FEAT" "git -c \"user.name=a b\" -C $MAIN commit -m x" 'quoted -c value with spaces before -C'
+
 # Misparsed context never skips the cwd check
+check 2 "$MAIN" '(git commit -m x)' 'commit at the start of a subshell'
+check 2 "$MAIN" '`git commit -m x`' 'commit in backticks'
 check 2 "$MAIN" "git -C $FEAT commit -m x; git commit -m y" 'commit in main cwd after -C commit'
 check 2 "$MAIN" "(cd $FEAT && true); git commit -m x" 'cd in a finished subshell'
 check 2 "$MAIN" "true || cd $FEAT; git commit -m x" 'cd in a skipped branch'
@@ -132,6 +187,28 @@ HOOK_PATH="$NO_JQ" check 2 "$FEAT" 'git status' 'missing jq: non-commit command'
 
 # Other unexpected failures are blocked too, not only jq
 HOOK_PATH="$BROKEN_CAT:$PATH" check 2 "$FEAT" 'git status' 'broken cat: stdin cannot be read'
+# A failing grep or sed is not taken as "no commit"
+BROKEN_GREP="$T/broken-grep"
+BROKEN_SED="$T/broken-sed"
+mkdir -p "$BROKEN_GREP" "$BROKEN_SED"
+printf '#!/bin/sh\nexit 2\n' >"$BROKEN_GREP/grep"
+printf '#!/bin/sh\nexit 1\n' >"$BROKEN_SED/sed"
+chmod +x "$BROKEN_GREP/grep" "$BROKEN_SED/sed"
+HOOK_PATH="$BROKEN_GREP:$PATH" check 2 "$MAIN" 'git commit -m x' 'broken grep: commit on main'
+HOOK_PATH="$BROKEN_GREP:$PATH" check 2 "$FEAT" 'git status' 'broken grep: non-commit command'
+HOOK_PATH="$BROKEN_SED:$PATH" check 2 "$FEAT" "git -C $MAIN commit -m x" 'broken sed: commit to main repo'
+# A failing git is not taken as "not on a protected branch", but a detached HEAD is not a branch
+BROKEN_GIT="$T/broken-git"
+DETACHED="$T/detached-repo"
+mkdir -p "$BROKEN_GIT"
+printf '#!/bin/sh\nexit 128\n' >"$BROKEN_GIT/git"
+chmod +x "$BROKEN_GIT/git"
+git init -q -b main "$DETACHED"
+git -C "$DETACHED" -c user.name=t -c user.email=t@example.com commit -q --allow-empty -m init
+git -C "$DETACHED" switch -q --detach
+HOOK_PATH="$BROKEN_GIT:$PATH" check 2 "$MAIN" 'git commit -m x' 'broken git: commit on main'
+HOOK_PATH="$BROKEN_GIT:$PATH" check 2 "$FEAT" 'git commit -m x' 'broken git: commit on feature branch'
+check 0 "$DETACHED" 'git commit -m x' 'commit on a detached HEAD'
 
 # The block message tells how to recover
 message=$(HOME="$T" PATH="$BROKEN_JQ:$PATH" "$BASH" "$HOOK" <<<'{}' 2>&1 >/dev/null)
