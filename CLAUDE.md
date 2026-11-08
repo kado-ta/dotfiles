@@ -66,13 +66,46 @@ dotfiles で起動したときだけ必要な設定（`denyWrite`、`claudeMdExc
 
 `validate-command.sh` と `protect-main-branch.sh` は、jq が動かないなどでコマンドを検査できないときもブロックする（fail closed）。この状態では Bash ツールがすべて止まるので、メッセージに従って Claude Code を再起動するか、`mise trust` を実行する。
 
+### git push
+
+Claude からの push は、`claude/bin/cc-safe-push` を root 所有でインストールしたラッパーだけで行う。`settings.json` は、引数なしの完全一致だけを `permissions.allow` と `sandbox.excludedCommands` に入れ、`git push` を deny にしている。判定はすべてラッパーで行い、フックには依存しない。
+
+| 状況                                                                                                       | 結果                                   |
+| ---------------------------------------------------------------------------------------------------------- | -------------------------------------- |
+| 許可リストのリポジトリの、保護されていないブランチ                                                         | 確認なしで push する                   |
+| 許可リストにないリポジトリ                                                                                 | 拒否する。人間が自分の端末で push する |
+| `main`, `master`, `staging`（大文字・小文字を区別しない）                                                  | 拒否する                               |
+| 判定できない場合（detached HEAD、origin が `git@github.com:OWNER/REPO.git` の形でない、許可リストの異常など） | 拒否する                               |
+
+push は、元のリポジトリの設定とフックを読まないように、macOS のユーザー専用の一時ディレクトリに作った空のリポジトリから行う（作業ディレクトリと `$TMPDIR` は sandbox から書けるので使わない）。元のリポジトリには書き込まないので、upstream は設定されない。
+
+ラッパーと許可リストは、Claude が書き換えられないように root 所有にする。ラッパーを変更したら、再度インストールする。
+
+```sh
+sudo install -d -o root -g wheel -m 0755 /usr/local/libexec/claude-push /usr/local/etc/claude-push
+sudo install -o root -g wheel -m 0755 claude/bin/cc-safe-push /usr/local/libexec/claude-push/cc-safe-push
+sudo install -o root -g wheel -m 0644 <編集した allowlist.jsonc> /usr/local/etc/claude-push/allowlist.jsonc
+```
+
+許可リストは Git の管理対象外で、`gitCommonDir`（`git rev-parse --path-format=absolute --git-common-dir` の値）と `github`（`OWNER/REPO`）の組を書く。コメントは行全体の `//` だけを書ける。行末のコメント、`/* */`、末尾のカンマを書くと、すべての push が拒否される。
+
+```jsonc
+{
+  "version": 1,
+  "allowList": [
+    // 確認なしで push を許可する理由
+    { "gitCommonDir": "/Users/<user>/src/example/.git", "github": "<owner>/<repo>" }
+  ]
+}
+```
+
 ### 個人スキル
 
 `skills/*/` 配下の個人スキルは `~/.claude/skills/` にグローバルシンボリックリンクされ、全プロジェクトで使える。各スキルの用途は `SKILL.md` の `description` を参照する。
 
 ## 規約
 
-- テストは `claude/hooks/tests/` のフック回帰テストのみ。フックを変更したら `bash claude/hooks/tests/test-protect-main-branch.sh` と `bash claude/hooks/tests/test-validate-command.sh` を実行する。`jq` が mise の shim に解決される PATH では `HOME` を変えて実行するテストが失敗するので、新しいシェルで実行する。それ以外の動作確認はセットアップスクリプトを手動実行して行う。
+- テストは `claude/hooks/tests/` のフック回帰テストのみ。フックを変更したら `bash claude/hooks/tests/test-protect-main-branch.sh` と `bash claude/hooks/tests/test-validate-command.sh` を実行する。`claude/bin/cc-safe-push` を変更したら `/usr/bin/python3 -B claude/hooks/tests/test-cc-safe-push.py` を実行する。`jq` が mise の shim に解決される PATH では `HOME` を変えて実行するテストが失敗するので、新しいシェルで実行する。それ以外の動作確認はセットアップスクリプトを手動実行して行う。
 - Homebrew のパッケージリストの正規版は `.bin/.Brewfile`。リポジトリルートの `Brewfile` は `mise run brew:dump` で生成し、`.bin/.Brewfile` を最新化するためのベースとして使う。
 - `vscode/extensions` は `mise run vscode:ext:list` で生成するため手動編集しない。
 - `.aws/credentials` は gitignore 済み。credentials をコミットしない。
