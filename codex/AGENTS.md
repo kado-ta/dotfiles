@@ -76,6 +76,7 @@
 ## Markdown
 
 Markdown ファイルを作成・編集するときに適用する。
+
 - GitHub Flavored Markdown を基準とし、GitHub と Typora の両方で正しく表示されること。
 - ドキュメント内リンクは `[表示名](#anchor-id)` を使う。Obsidian の Wikilink（`[[...]]`）は使わない。
 - コールアウトは GitHub Alerts（`> [!NOTE]` / `[!TIP]` / `[!IMPORTANT]` / `[!WARNING]` / `[!CAUTION]`）のみ使う。種類は大文字で 1 行に単独で書き、タイトルが必要なら次行に太字で書く。Obsidian 独自のコールアウト（`> [!info] タイトル`、上記以外の種類、折りたたみ `[!note]-` / `[!note]+`）は使わない。
@@ -149,4 +150,5 @@ docs/
 ## Completion report
 
 完了時は次を簡潔に報告する（軽微な変更は 1〜2 行で可）:
+
 - What changed / Why / Impact（リスク・後方互換性。破壊的操作は影響範囲、セキュリティ変更は攻撃面の変化） / Validation（実行したコマンドと結果） / Discrepancies（作業中に見つけたドキュメントとコードの食い違い、リポジトリ規約との矛盾、非推奨・脆弱な用法。場所と内容）

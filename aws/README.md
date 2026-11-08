@@ -1,4 +1,4 @@
-# aws
+# AWS
 
 AWS CLI の設定を管理するディレクトリ。このリポジトリは公開しているので、`config` と `credentials` は Git で管理しない。
 
@@ -41,4 +41,16 @@ mfa_serial = arn:aws:iam::XXXXXXXXXXXX:mfa/{user}
 
 [default]
 region = ap-northeast-1
+```
+
+<a name="session-manager"></a>
+
+## AWS Session Manager プラグイン
+
+Staging / Production 環境への SSH 接続に使う。macOS（Apple Silicon）では次のコマンドでインストールする。他のプラットフォームは [公式ドキュメント](https://docs.aws.amazon.com/ja_jp/systems-manager/latest/userguide/session-manager-working-with-install-plugin.html) を参照する。
+
+```shell
+curl "https://s3.amazonaws.com/session-manager-downloads/plugin/latest/mac_arm64/sessionmanager-bundle.zip" -o "sessionmanager-bundle.zip"
+unzip sessionmanager-bundle.zip
+sudo ./sessionmanager-bundle/install -i /usr/local/sessionmanagerplugin -b /usr/local/bin/session-manager-plugin
 ```

@@ -13,6 +13,7 @@
 - [参考資料](#references)
 
 <a name="overview"></a>
+
 ## 概要
 
 このディレクトリでは、Zsh 本体のインストールと、エイリアス・キーバインド・オプションなどの**シェル設定**を管理する。
@@ -24,6 +25,7 @@
 `.zshrc` 本体（環境変数・プロンプト・履歴・Sheldon / Starship / mise の初期化）は `bin/.zshrc` で管理しており、このディレクトリには含まれない。
 
 <a name="directory-structure"></a>
+
 ## ディレクトリ構成
 
 ```text
@@ -47,6 +49,7 @@
 `zsh/` 内のファイルは `~` へシンボリックリンクしない。Sheldon が `~/dotfiles/zsh` を直接参照する。
 
 <a name="loading"></a>
+
 ## 読み込みの仕組み
 
 シェル起動時の流れは以下のとおり。
@@ -67,6 +70,7 @@ use = ["{!sync,*}.zsh"]
 - 起動時に即時読み込みが必要な設定は `sync.zsh` に書く想定だが、現在 `plugins.toml` の該当設定はコメントアウトされており、`sync.zsh` も存在しない。即時に必要な設定は `bin/.zshrc` に書く。
 
 <a name="setup"></a>
+
 ## セットアップ
 
 ### 前提条件
@@ -118,6 +122,7 @@ exec zsh
 ```
 
 <a name="config-files"></a>
+
 ## 設定ファイル
 
 | ファイル                  | 内容                                                                                                                                    |
@@ -130,18 +135,18 @@ exec zsh
 
 ### `alias.zsh` の主な定義
 
-| 名前                                        | 内容                                                                       |
-| ------------------------------------------- | -------------------------------------------------------------------------- |
-| `ls` / `la` / `ll`                          | OS 別の色付き表示（macOS は `ls -G -F`）                                   |
-| `rm` / `cp` / `mv`                          | `-i` で上書き・削除前に確認                                                |
-| `mkdir`                                     | `-p` で親ディレクトリも作成                                                |
-| `be`                                        | `bundle exec`                                                              |
-| `typora <file>`                             | Typora でファイルを開く（`open -a Typora`、macOS のみ）                    |
-| `sudo`                                      | `sudo ` 後のコマンドでもエイリアスを展開                                   |
-| `L` / `G`（グローバル）                     | `\| less` / `\| grep`                                                      |
-| `codex-config-sync` / `codex-config-import` | Codex 設定の同期・取り込み（[codex/README.md](../codex/README.md) 参照）   |
-| `ua-dashboard [dir]`                        | Understand Anything のダッシュボードを起動（関数）                         |
-| `gstack-upgrade [--check]`                  | gstack を最新版へ更新（`--check` は確認のみ）（関数）                      |
+| 名前                                        | 内容                                                                     |
+| ------------------------------------------- | ------------------------------------------------------------------------ |
+| `ls` / `la` / `ll`                          | OS 別の色付き表示（macOS は `ls -G -F`）                                 |
+| `rm` / `cp` / `mv`                          | `-i` で上書き・削除前に確認                                              |
+| `mkdir`                                     | `-p` で親ディレクトリも作成                                              |
+| `be`                                        | `bundle exec`                                                            |
+| `typora <file>`                             | Typora でファイルを開く（`open -a Typora`、macOS のみ）                  |
+| `sudo`                                      | `sudo ` 後のコマンドでもエイリアスを展開                                 |
+| `L` / `G`（グローバル）                     | `\| less` / `\| grep`                                                    |
+| `codex-config-sync` / `codex-config-import` | Codex 設定の同期・取り込み（[codex/README.md](../codex/README.md) 参照） |
+| `ua-dashboard [dir]`                        | Understand Anything のダッシュボードを起動（関数）                       |
+| `gstack-upgrade [--check]`                  | gstack を最新版へ更新（`--check` は確認のみ）（関数）                    |
 
 ### プラグイン（`config/sheldon/plugins.toml`）
 
@@ -160,6 +165,7 @@ exec zsh
 | `dotfile-defers`（local）          | 遅延     | `~/dotfiles/zsh/*.zsh`                           |
 
 <a name="completions"></a>
+
 ### コマンドの補完
 
 `mise` の補完に手動の設定は要らない。Homebrew の `mise` が `$(brew --prefix)/share/zsh/site-functions/_mise` を配置し、`.zprofile` の `brew shellenv` がこのディレクトリを `fpath` に追加するので、`compinit` が読み込む。
@@ -168,6 +174,7 @@ exec zsh
 - `mise completion zsh --install` は実行しなくてよい。書き出し先の `~/.local/share/zsh/site-functions/` は `fpath` に入っておらず、読み込まれない。コマンドが表示する `fpath` の行も、Homebrew 版で足りるので追加しない。
 
 <a name="operations"></a>
+
 ## 日常運用
 
 ### 既存の `.zsh` ファイルを編集した
@@ -198,12 +205,14 @@ exec zsh
 `plugins.toml` は**記載順に読み込まれる**。`zsh-defer` は先頭、`dotfile-defers` は末尾に置く。
 
 <a name="limitations"></a>
+
 ## 既知の制約・注意点
 
 1. **`setup.sh` は `/etc/shells` の重複を確認しない。** 再実行すると同じパスが追記される。
 2. **自動テストはない。** 変更後は新しいシェルを起動して動作を確認する。
 
 <a name="troubleshooting"></a>
+
 ## トラブルシューティング
 
 **`command not found: sheldon`**
@@ -234,6 +243,7 @@ exec zsh
 - `zsh/*.zsh` は遅延読み込みのため、起動直後のわずかな間は未適用になる。即時に必要な設定は `bin/.zshrc` に移す。
 
 <a name="references"></a>
+
 ## 参考資料
 
 - [Sheldon: GitHub](https://github.com/rossmacarthur/sheldon)

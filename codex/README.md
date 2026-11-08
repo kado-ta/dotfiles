@@ -18,6 +18,7 @@
 - [参考資料](#references)
 
 <a name="overview"></a>
+
 ## 概要
 
 Codex のユーザー設定 `~/.codex/config.toml` は、モデルや MCP の設定に加えて、プロジェクトの信頼設定（`[projects."..."]`）などを Codex 自身が更新する。そのまま Git 管理すると、プロジェクトを信頼するたびに差分が発生し、端末固有のパスまで Git に混入する。
@@ -33,6 +34,7 @@ Codex のユーザー設定 `~/.codex/config.toml` は、モデルや MCP の設
 **基本原則：自動的な双方向同期は行わない。** 通常は `sync`、Codex アプリ側の変更を共有したいときだけ `import` を実行する。
 
 <a name="directory-structure"></a>
+
 ## ディレクトリ構成
 
 ```text
@@ -74,17 +76,18 @@ Codex のユーザー設定 `~/.codex/config.toml` は、モデルや MCP の設
 
 ### ファイルと変更権限
 
-| ファイル                             | 主な変更者         | Git 管理 | 備考                                  |
-| ------------------------------------ | ------------------ | -------- | ------------------------------------- |
-| `~/dotfiles/codex/AGENTS.md`         | 人                 | する     | `~/.codex/AGENTS.md` からリンクされる |
-| `~/dotfiles/codex/config.base.toml`  | 人（編集・import） | する     | `[projects]` は記述しない             |
-| `~/dotfiles/codex/sync.py`           | 人                 | する     | Codex 設定反映スクリプト              |
-| `~/dotfiles/codex/import.py`         | 人                 | する     | Codex 設定取込スクリプト              |
-| `~/.codex/config.local.toml`         | 人                 | しない   | 必要な端末だけ作成                    |
-| `~/.codex/config.toml`               | Codex / sync.py    | しない   | `[projects]` を保持                   |
-| `~/.codex/auth.json`                 | Codex              | しない   | **絶対に Git へ追加しない**           |
+| ファイル                            | 主な変更者         | Git 管理 | 備考                                  |
+| ----------------------------------- | ------------------ | -------- | ------------------------------------- |
+| `~/dotfiles/codex/AGENTS.md`        | 人                 | する     | `~/.codex/AGENTS.md` からリンクされる |
+| `~/dotfiles/codex/config.base.toml` | 人（編集・import） | する     | `[projects]` は記述しない             |
+| `~/dotfiles/codex/sync.py`          | 人                 | する     | Codex 設定反映スクリプト              |
+| `~/dotfiles/codex/import.py`        | 人                 | する     | Codex 設定取込スクリプト              |
+| `~/.codex/config.local.toml`        | 人                 | しない   | 必要な端末だけ作成                    |
+| `~/.codex/config.toml`              | Codex / sync.py    | しない   | `[projects]` を保持                   |
+| `~/.codex/auth.json`                | Codex              | しない   | **絶対に Git へ追加しない**           |
 
 <a name="setup"></a>
+
 ## セットアップ（setup.sh）
 
 ### 前提条件
@@ -156,7 +159,6 @@ Codex の動作をカスタマイズする2種類の指示。主な違いは**�
 > Desktop では `developer_instructions` が適用されない不具合が報告されているため、動作確認が必要。
 > [GitHub - developer_instructions の不具合報告](https://github.com/openai/codex/issues/33238)
 
-
 ### 運用方針
 
 - **`AGENTS.md` を正本とする**：CLI・Desktop 共通の指示をすべて集約する。Desktop で `developer_instructions` が適用されない場合に備え、安全ルールも `AGENTS.md` の Safety セクションに記述する。
@@ -180,8 +182,8 @@ Codex の動作をカスタマイズする2種類の指示。主な違いは**�
 
 変更後に Codex を再起動し、作業中のリポジトリのルートで「現在読み込まれている指示を要約して」と依頼する。`AGENTS.md` と `developer_instructions` の両方の内容が要約に含まれることを確認する。
 
-
 <a name="commands"></a>
+
 ## コマンド（zsh エイリアス）
 
 `zsh/alias.zsh` に以下のエイリアスを定義している。Sheldon 経由で読み込まれるため、追加・変更後は新しいシェルを開くか `exec zsh` を実行する。
@@ -222,6 +224,7 @@ alias codex-config-import='uv run --no-project --with "tomlkit>=0.13,<1" python 
 `--apply` を付けなければ `import.py` はプレビューのみ。`sync.py` では `--dry-run` がプレビューに相当する。
 
 <a name="migration"></a>
+
 ## 初期移行
 
 既存の `~/.codex/config.toml` がある端末で、この仕組みへ移行するときの手順。新規環境では手順 3 以降のみでよい。
@@ -305,6 +308,7 @@ git -C "$HOME/dotfiles" status --short -- codex/
 コミットするのは `README.md`、`AGENTS.md`、`config.base.toml`、`setup.sh`、`sync.py`、`import.py` などの共有ファイルだけ。
 
 <a name="operations"></a>
+
 ## 日常運用
 
 ### A. Codex が新しい `[projects]` を追加した
@@ -366,6 +370,7 @@ git -C "$HOME/dotfiles" diff -- codex/config.base.toml
 端末 A の `[projects]` は端末 B へ自動同期されない。
 
 <a name="merge-spec"></a>
+
 ## マージ仕様
 
 ### sync.py：base/local → config
@@ -407,6 +412,7 @@ git -C "$HOME/dotfiles" diff -- codex/config.base.toml
 **注意：** 保護ルールはキー名に基づくヒューリスティックであり、秘密情報の完全な検出はできない。特に MCP の `command`、`args`、URL などの**値**に秘密情報や端末固有のパスが埋め込まれる場合がある。取り込み後は必ず Git 差分を確認する。
 
 <a name="limitations"></a>
+
 ## 既知の制約
 
 1. **双方向の自動同期はしない。** `sync` と `import` は明示的に実行する。
@@ -418,6 +424,7 @@ git -C "$HOME/dotfiles" diff -- codex/config.base.toml
 7. **自動テストはない。** 個々の環境・Codex バージョンに対する回帰テストは未整備。
 
 <a name="backup"></a>
+
 ## バックアップ・復元
 
 | 操作                 | バックアップ先                                                |
@@ -444,6 +451,7 @@ chmod 600 "$HOME/.codex/config.toml"
 インポート後の共通設定は Git 履歴からも復元できる。バックアップには端末固有情報や秘密情報が含まれる可能性があるため、共有・Git 管理しない。
 
 <a name="troubleshooting"></a>
+
 ## トラブルシューティング
 
 **`codex-config-sync: command not found`**
@@ -491,6 +499,7 @@ chmod 600 "$HOME/.codex/config.toml"
 - `setup.sh` は `~/.codex` 固定でリンクを作成する点に注意する。
 
 <a name="security"></a>
+
 ## セキュリティ上の注意
 
 - `auth.json`、API キー、アクセストークン、秘密鍵を Git に登録しない。
@@ -502,6 +511,7 @@ chmod 600 "$HOME/.codex/config.toml"
 - 組織のセキュリティ要件に関わる場合は、専門家への確認が必要。
 
 <a name="future-work"></a>
+
 ## 今後の改善候補
 
 - 前回同期状態をローカルに保持した **3-way merge** と競合検出。
@@ -512,6 +522,7 @@ chmod 600 "$HOME/.codex/config.toml"
 - 破壊的コマンドを `~/.codex/rules/*.rules` で `forbidden` / `prompt` にし、`developer_instructions` の文章による指示を補強する（Rules は experimental）。
 
 <a name="references"></a>
+
 ## 参考資料
 
 - [OpenAI Codex: Configuration Reference](https://developers.openai.com/codex/config-reference)
