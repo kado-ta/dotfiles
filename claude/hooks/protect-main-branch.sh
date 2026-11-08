@@ -1,25 +1,25 @@
 #!/bin/bash
-# Prevent git commit on main/master/staging branch.
-# Used as a Claude Code PreToolUse hook for the Bash tool.
-# Exit code 2 blocks the tool execution and shows stderr to Claude.
+# main / master / staging ブランチへの git commit を防ぐ。
+# Claude Code の Bash ツール用の PreToolUse フックとして使う。
+# 終了コード 2 を返すとツールの実行がブロックされ、stderr の内容が Claude に表示される。
 
 set -euo pipefail
 
-# Under `set -e` an unexpected failure (a broken jq, for example) would exit 1, which does not
-# block the tool, so the check would be skipped. Block instead (fail closed).
+# `set -e` のもとで想定外の失敗（jq が壊れているなど）が起きると終了コード 1 で終わる。1 ではツールが
+# ブロックされず、検査が飛ばされてしまう。そのため代わりにブロックする（fail closed）。
 trap 'echo "BLOCKED: This hook failed, so the command cannot be checked. If jq is failing, restart Claude Code, or run mise trust if this directory has an untrusted mise.toml." >&2; exit 2' ERR
 
 INPUT=$(cat)
 COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command // empty')
 
-# Only check git commit commands (including `git -C <path> commit` form)
-# Use a here-string, not a pipe: `grep -q` exits on the first match, and the writer's SIGPIPE
-# would fail the pipeline under pipefail and skip the check.
+# git commit コマンドだけを検査する（`git -C <path> commit` の形も含む）
+# パイプではなくヒアストリングを使う。`grep -q` は最初の一致で終了するため、書き込み側が SIGPIPE を受けて
+# pipefail のもとでパイプラインが失敗し、検査が飛ばされてしまう。
 if ! grep -qE '(^|\s|&&|\||\;)git(\s+\S+)*\s+commit(\s|$|[;&|)])' <<<"$COMMAND"; then
   exit 0
 fi
 
-# Determine the working directory from hook input, fallback to CLAUDE_PROJECT_DIR
+# 作業ディレクトリをフックの入力から決める。なければ CLAUDE_PROJECT_DIR を使う
 CWD=$(echo "$INPUT" | jq -r '.cwd // empty')
 CWD="${CWD:-${CLAUDE_PROJECT_DIR:-}}"
 
@@ -32,14 +32,14 @@ block_unresolved() {
   exit 2
 }
 
-# Resolve a path token from the command against a base directory.
-# Fails if the token cannot be resolved statically (variables, quotes, missing dir).
+# コマンド中のパスのトークンを、基準ディレクトリからの相対で解決する。
+# 静的に解決できない場合（変数・クォート・存在しないディレクトリ）は失敗する。
 resolve_path() {
   local base="$1" path="$2"
   case "$path" in
     \'*\' | \"*\") path="${path:1:${#path}-2}" ;;
   esac
-  # shellcheck disable=SC2088 # match a literal tilde from the command text
+  # shellcheck disable=SC2088 # コマンドの文字列中のチルダを文字どおりに照合する
   case "$path" in
     '' | -* | *\$* | *\`* | *\'* | *\"*) return 1 ;;
     '~') path="$HOME" ;;
@@ -53,8 +53,8 @@ resolve_path() {
   echo "$path"
 }
 
-# Resolve the repository of every git commit invocation from the `cd <dir>` commands
-# before it and its `-C <dir>` options. Tokens are split on whitespace, so this is a heuristic.
+# すべての git commit の呼び出しについて、それより前の `cd <dir>` コマンドと、その呼び出しの
+# `-C <dir>` オプションからリポジトリを解決する。トークンは空白で区切るだけなので、ヒューリスティックである。
 set -f
 # shellcheck disable=SC2206
 TOKENS=(${COMMAND//$'\n'/ ; })
@@ -113,8 +113,8 @@ while [ "$i" -lt "${#TOKENS[@]}" ]; do
   TARGETS+=("$target")
 done
 
-# The hook's cwd is always checked in addition to the resolved targets, so a misparsed
-# command can only add blocks, never skip the check that applies without parsing.
+# 解決した対象に加えて、フックの cwd も常に検査する。これにより、コマンドを誤って解析しても
+# ブロックが増えるだけで、解析なしで適用される検査が飛ばされることはない。
 for target in "$CWD" ${TARGETS[@]+"${TARGETS[@]}"}; do
   # --short は同名のタグがあると heads/main を返すので使わない。
   # 大文字・小文字を区別しないファイルシステムでは refs/heads/MAIN も main と同じファイルを更新するので、小文字で比較する。
@@ -122,6 +122,10 @@ for target in "$CWD" ${TARGETS[@]+"${TARGETS[@]}"}; do
   BRANCH=$(printf %s "${BRANCH#refs/heads/}" | tr '[:upper:]' '[:lower:]')
   if [ "$BRANCH" = "main" ] || [ "$BRANCH" = "master" ] || [ "$BRANCH" = "staging" ]; then
     echo "BLOCKED: Direct commit to '$BRANCH' branch is not allowed ($target). Create a feature branch first." >&2
+    # 検査はコマンドの実行前のブランチで行うため、同じコマンド内でブランチを作っても通らない
+    if grep -qE 'git(\s+\S+)*\s+(switch\s+(-c|-C|--create)|checkout\s+(-b|-B))(\s|$)' <<<"$COMMAND"; then
+      echo "このフックはコマンドの実行前のブランチで判定します。'git switch -c <branch>' を別の Bash 呼び出しで実行してから、コミットしてください。" >&2
+    fi
     exit 2
   fi
 done

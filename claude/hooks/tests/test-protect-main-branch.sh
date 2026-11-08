@@ -43,6 +43,7 @@ check() {
 check 0 "$FEAT" 'git commit -m x' 'commit in cwd on feature branch'
 check 2 "$MAIN" 'git commit -m x' 'commit in cwd on main'
 check 0 "$MAIN" 'git status' 'non-commit command'
+check 0 "$FEAT" 'git switch -c y && git commit -m x' 'branch creation and commit in one command on feature branch'
 
 # 同名のタグがあると symbolic-ref --short は heads/main を返す
 TAGGED="$T/tagged-repo"
@@ -141,6 +142,26 @@ else
   fail=$((fail + 1))
   echo "FAIL block message mentions the recovery: $message"
 fi
+
+# Creating a branch in the same command does not help on main, and the message says so
+# check_hint <expected: yes|no> <command> [description]
+check_hint() {
+  local expected="$1" cmd="$2" desc="${3:-$2}" input message actual=no
+  input=$(jq -n --arg cmd "$cmd" --arg cwd "$MAIN" '{tool_input: {command: $cmd}, cwd: $cwd}')
+  message=$(HOME="$T" "$BASH" "$HOOK" <<<"$input" 2>&1 >/dev/null)
+  [[ "$message" == *'別の Bash 呼び出し'* ]] && actual=yes
+  if [ "$actual" = "$expected" ]; then
+    pass=$((pass + 1))
+    echo "PASS [hint $expected] $desc"
+  else
+    fail=$((fail + 1))
+    echo "FAIL [want hint $expected, got $actual] $desc"
+  fi
+}
+check_hint yes 'git switch -c x && git commit -m x'
+check_hint yes 'git checkout -b x; git commit -m x'
+check_hint yes "git -C $MAIN switch --create x"$'\n'"git -C $MAIN commit -m x" 'switch --create with -C on a previous line'
+check_hint no 'git commit -m x'
 
 echo "---"
 echo "pass=$pass fail=$fail"

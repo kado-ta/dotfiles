@@ -3,7 +3,7 @@
 <!--
 メンテナンス方針 （HTMLコメントはコンテキストに注入されない）
 
-- ここには「全リポジトリ共通の私の働き方」だけを書く。目標 80 行以内。
+- ここには「全リポジトリ共通の私の働き方」だけを書く。目標: 非HTMLコメント・非空行で 80行以内とする。
 - プロジェクト固有の規約・コマンド・構成 → 各リポジトリの CLAUDE.md / AGENTS.md
 - 複数手順のワークフロー → ~/.claude/skills/
 - 特定ファイル種別だけのルール → ~/.claude/rules/（paths でスコープ）
@@ -64,7 +64,7 @@ https://x.com/ai_database/status/2114184481951330365?s=12
 
 ## Git / GitHub
 
-- main / master / staging に直接コミットしない。コミット前に現在のブランチを確認し、必要なら作業ブランチを切る。
+- main / master / staging に直接コミットしない。コミット前に現在のブランチを確認し、必要なら作業ブランチを切る。`git switch -c` と `git commit` は別の Bash 呼び出しにする（protect-main-branch フックは実行前のブランチで判定するため）。
 - コミットメッセージは Conventional Commits（`feat:` `fix:` `refactor:` `test:` `docs:` `chore:` など）。タイトルは英語、本文は日本語。OSS はそのリポジトリの慣習に従う。
 - 1 コミット = 1 論理変更。大きな変更はレビュー可能な単位に分割する。自動生成ファイルを含む場合は理由を明記する。
 - GitHub 操作には `gh` CLI を使う（GitHub MCP は使わない）。
@@ -103,4 +103,5 @@ gstack の CLAUDE.md へのルーティング規則の追記案内は routing_de
 ## Completion report
 
 完了時は次を簡潔に報告する（軽微な変更は 1〜2 行で可）:
+
 - What changed / Why / Impact（リスク・後方互換性。破壊的操作は影響範囲、セキュリティ変更は攻撃面の変化） / Validation（実行したコマンドと結果） / Discrepancies（作業中に見つけたドキュメントとコードの食い違い、リポジトリ規約との矛盾、非推奨・脆弱な用法。場所と内容）
