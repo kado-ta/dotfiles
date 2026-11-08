@@ -1,0 +1,256 @@
+#!/usr/bin/python3 -I
+"""Claude Code から git push するための、固定形式の判定と実行。
+
+/usr/local/libexec/claude-push/cc-safe-push に root 所有でインストールする。
+Claude Code が承認して sandbox の外で動かすのは引数なしの完全一致だけなので、
+判定はフックや permission ルールではなく、すべてここで行う。
+"""
+from __future__ import annotations
+
+import json
+import os
+import pwd
+import re
+import shlex
+import shutil
+import signal
+import stat
+import subprocess
+import sys
+import tempfile
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Literal
+
+CONFIG = Path("/usr/local/etc/claude-push/allowlist.jsonc")
+GIT = "/usr/bin/git"
+SSH = "/usr/bin/ssh"
+PROTECTED = frozenset(("main", "master", "staging"))
+HEADS = "refs/heads/"
+TRANSPORT = "ssh"
+PUSH_TIMEOUT = 600
+EXIT_FAILED = 1
+EXIT_DENIED = 2
+SLUG = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]*/[A-Za-z0-9][A-Za-z0-9_.-]*\Z")
+REMOTE = re.compile(r"git@github\.com:([A-Za-z0-9][A-Za-z0-9_.-]*/[A-Za-z0-9][A-Za-z0-9_.-]*)\.git\Z")
+FAILURE_HINTS = (
+    ("fetch first", "the remote branch has new commits"),
+    ("non-fast-forward", "not a fast-forward"),
+    ("GH013", "rejected by a GitHub rule"),
+    ("Permission denied", "SSH authentication failed"),
+    ("Host key verification failed", "GitHub host key is not in known_hosts"),
+)
+
+
+class PolicyError(Exception):
+    pass
+
+
+@dataclass(frozen=True)
+class Decision:
+    kind: Literal["allow", "deny"]
+    reason: str
+    slug: str = ""
+    branch: str = ""
+    sha: str = ""
+    objects: str = ""
+
+
+def user_home() -> Path:
+    return Path(pwd.getpwuid(os.getuid()).pw_dir)
+
+
+def agent_socket(home: Path) -> Path:
+    if sys.platform == "darwin":
+        return home / "Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock"
+    return home / ".1password/agent.sock"
+
+
+def ssh_command(home: Path) -> str:
+    # ~/.ssh/config は読まない（ProxyCommand や Match exec を含みうるため）。
+    # エージェントの鍵を使うので、IdentityFile なしで IdentitiesOnly=yes にしない。
+    # ssh は -o を設定ファイルの行と同じように解釈するので、空白を含む値には二重引用符が必要。
+    return " ".join((
+        SSH, "-F", "/dev/null", "-o", "BatchMode=yes",
+        "-o", "StrictHostKeyChecking=yes", "-o", "ProxyCommand=none",
+        "-o", "IdentityFile=none",
+        "-o", shlex.quote(f'IdentityAgent="{agent_socket(home)}"'),
+        "-o", shlex.quote(f'UserKnownHostsFile="{home / ".ssh/known_hosts"}"'),
+    ))
+
+
+def clean_env(home: Path) -> dict[str, str]:
+    # GIT_*、DYLD_*、PYTHON*、PATH、SSH_ASKPASS などを引き継がない。
+    # GIT_NO_LAZY_FETCH は、オブジェクトが欠けているときにリポジトリの設定に従って fetch が動くのを止める。
+    return {
+        "HOME": str(home), "PATH": "/usr/bin:/bin", "LC_ALL": "C",
+        "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": "/dev/null",
+        "GIT_CONFIG_SYSTEM": "/dev/null", "GIT_TERMINAL_PROMPT": "0",
+        "GIT_ALLOW_PROTOCOL": TRANSPORT,
+        "GIT_NO_LAZY_FETCH": "1",
+        "GIT_SSH_COMMAND": ssh_command(home),
+        "SSH_AUTH_SOCK": str(agent_socket(home)),
+    }
+
+
+def run(cwd: Path, *args: str, timeout: int = 30) -> subprocess.CompletedProcess:
+    # text=True にしない。CR を LF に変換するので、CR を含むパスを別のパスと誤認する。
+    return subprocess.run(
+        [GIT, "-C", str(cwd), "-c", "core.hooksPath=/dev/null", *args],
+        env=clean_env(user_home()), stdin=subprocess.DEVNULL, check=False,
+        capture_output=True, timeout=timeout,
+    )
+
+
+def git(cwd: Path, *args: str) -> str:
+    cp = run(cwd, *args)
+    # stderr はメッセージに含めない。リポジトリ内のリンク先のファイルの内容が出ることがある。
+    if cp.returncode:
+        raise PolicyError(f"git {args[0]} failed ({cp.returncode})")
+    return os.fsdecode(cp.stdout)
+
+
+def strip_comments(text: str) -> str:
+    # 行全体の // コメントだけを許す。JSON の文字列は改行を含めないので、
+    # そのような行が値の一部になることはなく、字句解析は要らない。
+    return "\n".join(line for line in text.split("\n") if not line.lstrip().startswith("//"))
+
+
+def load_allowlist(path: Path = CONFIG) -> dict[str, str]:
+    # 本番の許可リストは管理者のポリシーで、プロジェクトの設定ではない。
+    # 単体テストでは、ユーザー所有の別のパスを明示的に渡す。
+    meta = path.lstat()
+    if not stat.S_ISREG(meta.st_mode) or meta.st_mode & 0o022:
+        raise PolicyError("allowlist must be a regular file, not group/world writable")
+    if path == CONFIG:
+        if meta.st_uid != 0:
+            raise PolicyError("production allowlist must be owned by root")
+        for ancestor in (path.parent, *path.parent.parents):
+            st = ancestor.lstat()
+            if not stat.S_ISDIR(st.st_mode) or st.st_uid != 0 or st.st_mode & 0o022:
+                raise PolicyError(f"unsafe allowlist parent directory: {ancestor}")
+    obj = json.loads(strip_comments(path.read_text(encoding="utf-8")))
+    if not isinstance(obj, dict) or set(obj) != {"version", "allowList"} or obj["version"] != 1:
+        raise PolicyError("invalid allowlist version/schema")
+    if not isinstance(obj["allowList"], list):
+        raise PolicyError("allowList must be an array")
+    result: dict[str, str] = {}
+    for item in obj["allowList"]:
+        if not isinstance(item, dict) or set(item) != {"gitCommonDir", "github"}:
+            raise PolicyError("invalid allowList repository entry")
+        pathstr, slug = item["gitCommonDir"], item["github"]
+        if not isinstance(pathstr, str) or not Path(pathstr).is_absolute():
+            raise PolicyError("gitCommonDir must be absolute")
+        if not isinstance(slug, str) or not SLUG.fullmatch(slug):
+            raise PolicyError("invalid github owner/repo")
+        # strict にしない。消したクローンが 1 つあるだけで、ほかの push まで拒否にならないように。
+        key = str(Path(pathstr).resolve())
+        if key in result:
+            raise PolicyError("duplicate gitCommonDir")
+        result[key] = slug
+    return result
+
+
+def inspect(cwd: Path, allowlist: dict[str, str]) -> Decision:
+    if git(cwd, "rev-parse", "--is-inside-work-tree").strip() != "true":
+        raise PolicyError("not a non-bare Git worktree")
+    # .strip() は使わない。末尾の空白だけが違う別のディレクトリを、登録済みのものと誤認する。
+    common = git(cwd, "rev-parse", "--path-format=absolute", "--git-common-dir").removesuffix("\n")
+    common_real = str(Path(common).resolve(strict=True))
+    # 未登録のリポジトリの設定とオブジェクトは信頼できないので、これ以上読まない。
+    if common_real not in allowlist:
+        return Decision("deny", f"{common_real} is not on the allowlist; a human must push it")
+    # --short は使わない。同名のタグがあると heads/<name> を返す。
+    ref = git(cwd, "symbolic-ref", "--quiet", "HEAD").strip()
+    if not ref.startswith(HEADS):
+        raise PolicyError("HEAD is not a branch")
+    branch = ref[len(HEADS):]
+    if branch.lower() in PROTECTED:
+        return Decision("deny", f"protected destination branch: {branch}", branch=branch)
+    # 曖昧な参照やオプションと解釈されるのを避ける。git より狭い文法にしているのは意図的。
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._/-]*", branch):
+        raise PolicyError("branch name outside restricted safe grammar")
+    git(cwd, "check-ref-format", "--branch", branch)
+    sha = git(cwd, "rev-parse", "--verify", "--quiet", ref + "^{commit}").strip()
+    objects = git(cwd, "rev-parse", "--path-format=absolute", "--git-path", "objects").removesuffix("\n")
+    if (Path(objects) / "info/alternates").exists():
+        raise PolicyError("objects/info/alternates is not supported")
+    urls = git(cwd, "config", "--null", "--get-all", "remote.origin.url").split("\0")[:-1]
+    if len(urls) != 1:
+        raise PolicyError("origin must have exactly one URL")
+    match = REMOTE.fullmatch(urls[0])
+    if not match:
+        raise PolicyError("origin URL must be literal git@github.com:OWNER/REPO.git")
+    slug = match.group(1)
+    if allowlist.get(common_real) != slug:
+        return Decision("deny", f"{slug} is not on the allowlist; a human must push it")
+    return Decision("allow", f"{slug}, {sha[:12]} -> {ref}", slug, branch, sha, objects)
+
+
+def evaluate(cwd: Path, path: Path = CONFIG) -> Decision:
+    try:
+        if not cwd.is_dir() or not cwd.is_absolute():
+            raise PolicyError("invalid absolute cwd")
+        allowed = load_allowlist(path)
+        return inspect(cwd.resolve(strict=True), allowed)
+    except (PolicyError, OSError, ValueError, TypeError, json.JSONDecodeError) as e:
+        return Decision("deny", str(e))
+    except subprocess.TimeoutExpired:
+        return Decision("deny", "Git validation timed out")
+
+
+def remote_url(slug: str) -> str:
+    return f"git@github.com:{slug}.git"
+
+
+def private_root() -> Path:
+    # $TMPDIR や作業ディレクトリと違い、Claude Code の sandbox から書けない。
+    return Path(subprocess.check_output(["/usr/bin/getconf", "DARWIN_USER_TEMP_DIR"], env={}, text=True).strip())
+
+
+def push(d: Decision) -> int:
+    """オブジェクトだけを借りる空のリポジトリから push する。
+
+    この push は作業リポジトリの設定とフックを読まないので、実行中でも送り先を変えられない。
+    作業リポジトリには書き込まない。設定や ref が別の場所へのリンクの可能性があるため。
+    """
+    work = Path(tempfile.mkdtemp(prefix="cc-safe-push.", dir=private_root()))
+    try:
+        git(work, "init", "--quiet", "--bare", "--template=", ".")
+        (work / "objects/info").mkdir(parents=True, exist_ok=True)
+        (work / "objects/info/alternates").write_text(d.objects + "\n", encoding="utf-8")
+        cp = run(work, "push", "--no-verify", "--",
+                 remote_url(d.slug), f"{d.sha}:{HEADS}{d.branch}", timeout=PUSH_TIMEOUT)
+    except (PolicyError, OSError, ValueError, subprocess.TimeoutExpired):
+        print("PUSH FAILED: git could not be run", file=sys.stderr)
+        return EXIT_FAILED
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+    if cp.returncode:
+        stderr = os.fsdecode(cp.stderr)
+        hint = next((text for needle, text in FAILURE_HINTS if needle in stderr), "unknown reason")
+        print(f"PUSH FAILED: {d.slug} {d.branch}: {hint}", file=sys.stderr)
+        return EXIT_FAILED
+    print(f"PUSHED: {d.reason}")
+    return 0
+
+
+def execute() -> int:
+    decision = evaluate(Path.cwd())
+    if decision.kind == "deny":
+        print("DENIED: " + decision.reason, file=sys.stderr)
+        return EXIT_DENIED
+    return push(decision)
+
+
+def main() -> int:
+    # これがないと、SIGTERM で push() の後始末が飛ばされる。
+    signal.signal(signal.SIGTERM, lambda *_: sys.exit(EXIT_FAILED))
+    if not sys.argv[1:]:
+        return execute()
+    print("DENIED: no arguments allowed", file=sys.stderr)
+    return EXIT_DENIED
+
+
+if __name__ == "__main__":
+    sys.exit(main())
