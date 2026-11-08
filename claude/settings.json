@@ -18,6 +18,7 @@
       "Bash(git log *)",
       "Bash(git commit *)",
       "Bash(git check-ignore *)",
+      "Bash(/usr/local/libexec/claude-push/cc-safe-push)",
       "Bash(gh *)",
       "Bash(npm run *)",
       "Bash(pnpm *)",
@@ -115,6 +116,10 @@
       "Bash(wget *)",
       "Bash(cat **)",
       "Bash(git reset --hard *)",
+      "Bash(git push)",
+      "Bash(git push *)",
+      "Bash(git -C * push *)",
+      "Bash(git -c * push *)",
       "Bash(sfdx org:deploy *)",
       "Bash(sf deploy *)",
       "Bash(terraform apply *)",
@@ -154,8 +159,8 @@
       "Bash(gh issue edit*)",
       "Bash(gh release create*)",
       "Bash(gh release delete*)",
-      "Bash(git push)",
-      "Bash(git push *)",
+      "Bash(gh repo sync*)",
+      "Bash(gh api *)",
       "Edit(~/dotfiles/claude/**)"
     ],
     "disableBypassPermissionsMode": "disable"
@@ -276,6 +281,7 @@
   "sandbox": {
     "enabled": true,
     "allowUnsandboxedCommands": false,
+    "failIfUnavailable": true,
     "network": {
       "allowedDomains": [
         "github.com",
@@ -299,7 +305,8 @@
     },
     "enableWeakerNetworkIsolation": true,
     "excludedCommands": [
-      "gh"
+      "gh",
+      "/usr/local/libexec/claude-push/cc-safe-push"
     ]
   },
   "effortLevel": "xhigh",

@@ -65,6 +65,8 @@ https://x.com/ai_database/status/2114184481951330365?s=12
 ## Git / GitHub
 
 - main / master / staging に直接コミットしない。コミット前に現在のブランチを確認し、必要なら作業ブランチを切る。`git switch -c` と `git commit` は別の Bash 呼び出しにする（protect-main-branch フックは実行前のブランチで判定するため）。
+- push は、対象リポジトリに移動してから `/usr/local/libexec/claude-push/cc-safe-push` を引数なし・単独で実行する（現在のブランチを origin に送る）。`git push` は deny ルールで実行できない。
+- `cc-safe-push` が拒否（終了コード 2）や失敗（1）を返したら、理由と、実行すべき `git push` のコマンドをユーザーに伝え、別の方法で push しない。upstream は設定されないので、PR は `gh pr create --head <branch>` で作る。
 - コミットメッセージは Conventional Commits（`feat:` `fix:` `refactor:` `test:` `docs:` `chore:` など）。タイトルは英語、本文は日本語。OSS はそのリポジトリの慣習に従う。
 - 1 コミット = 1 論理変更。大きな変更はレビュー可能な単位に分割する。自動生成ファイルを含む場合は理由を明記する。
 - GitHub 操作には `gh` CLI を使う（GitHub MCP は使わない）。
