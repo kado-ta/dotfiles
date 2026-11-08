@@ -12,6 +12,7 @@
 - [関連ドキュメント](#related-docs)
 
 <a name="overview"></a>
+
 ## 概要
 
 このディレクトリでは、Obsidian の Vault 設定ディレクトリ（`.obsidian/`）のうち、端末間で揃えたい**設定ファイルと CSS スニペット**を管理する。対象 Vault は `~/Obsidian/main/`。
@@ -21,6 +22,7 @@
 - ノート・添付ファイルは別の仕組みで扱う。端末間同期は Remotely Save + Cloudflare R2、バックアップは obsidian-git + GitHub で行い、`.obsidian/` はどちらの対象にもしない（[SYNC_BACKUP.md](SYNC_BACKUP.md) 参照）。
 
 <a name="directory-structure"></a>
+
 ## ディレクトリ構成
 
 ```text
@@ -57,9 +59,11 @@
 ```
 
 <a name="setup"></a>
+
 ## セットアップ
 
 <a name="setup-prerequisites"></a>
+
 ### 前提条件
 
 - macOS（`setup.sh` は macOS 以外では終了する）。
@@ -67,6 +71,7 @@
 - `~/Obsidian/main/` に Vault を作成済みで、`~/Obsidian/main/.obsidian/` が存在すること。`setup.sh` はディレクトリを作成しないため、存在しないとリンクの作成に失敗して終了する。
 
 <a name="setup-steps"></a>
+
 ### 手順
 
 1. Obsidian を閉じる。
@@ -87,9 +92,11 @@
 > `setup.sh` は、Vault 側の既存の設定ファイルを確認なしでシンボリックリンクに置き換える（`ln -snf`）。`snippets/` が実ディレクトリの場合は `rm -rf` で削除してからリンクする。Vault 側の設定やスニペットに残したい内容がある場合は、実行前にこのディレクトリへ反映する。
 
 <a name="managed-settings"></a>
+
 ## 管理している設定
 
 <a name="app-json"></a>
+
 ### `app.json`: ファイルとリンク
 
 | キー                | 値           | 設定画面（`Settings → Files and links`） | 内容                                                                                        |
@@ -101,6 +108,7 @@
 `useMarkdownLinks` と `newLinkFormat` は、ノートを GitHub・Typora でも同じように読めるようにするための設定（[MARKDOWN.md](../claude/rules/MARKDOWN.md) の方針に合わせている）。相対パスにするのは、GitHub・Typora がリンクをリンク元ファイルからの相対パスとして解決するため。
 
 <a name="appearance-json"></a>
+
 ### `appearance.json`: 外観
 
 `enabledCssSnippets` で `typora-like` と `typora-mermaid` を有効にする。
@@ -108,6 +116,7 @@
 テーマとフォントは指定せず、既定（Default テーマ・フォント指定なし）のままにしている。CSS スニペットはこの状態を前提にしている（[前提となる Obsidian の設定](snippets/README.md#prerequisites) 参照）。
 
 <a name="community-plugins"></a>
+
 ### `community-plugins.json`: コミュニティプラグイン
 
 有効にするプラグインの ID を列挙する。プラグイン本体は管理しないため、端末ごとにインストールする（未インストールのプラグインは有効にならない）。
@@ -120,6 +129,7 @@
 | `html-viewer`   | HTML Viewer   | Vault 内の `.html` ファイルをサンドボックス内で表示する                              |
 
 <a name="core-plugins-json"></a>
+
 ### `core-plugins.json`: コアプラグイン
 
 コアプラグインごとの ON/OFF を持つ。OFF にしているのは次のプラグインで、それ以外はすべて ON。
@@ -140,11 +150,13 @@
 `sync`（Obsidian Sync）を OFF にしているのは、端末間同期を Remotely Save に一本化しているため（[SYNC_BACKUP.md](SYNC_BACKUP.md#policy) 参照）。
 
 <a name="graph-json"></a>
+
 ### `graph.json`: グラフビュー
 
 グラフビューのフィルタ・表示・力学の設定。タグと添付ファイルを表示せず、孤立ノードを表示し、矢印を表示しない。リンク距離は `250`。
 
 <a name="hotkeys-json"></a>
+
 ### `hotkeys.json`: ホットキー
 
 既定から変更したホットキーだけを持つ。
@@ -154,11 +166,13 @@
 | `⌥⌘T` | Open in default app（現在のファイルを OS の既定アプリで開く） |
 
 <a name="snippets-dir"></a>
+
 ### `snippets/`: CSS スニペット
 
 Obsidian の本文と Mermaid 図を Typora 風（ライトは GitHub テーマ、ダークは Night テーマ相当）に表示する `typora-like.css` と `typora-mermaid.css`。詳細は [snippets/README.md](snippets/README.md) を参照。
 
 <a name="unmanaged-files"></a>
+
 ## 管理対象外のファイル
 
 `setup.sh` がリンクしないファイルは Vault 側にだけ保存され、他の端末には反映されない（Remotely Save の Sync Config Dir は無効で、Vault の `.gitignore` でも `.obsidian/` を除外しているため。[SYNC_BACKUP.md](SYNC_BACKUP.md#policy) 参照）。
@@ -171,9 +185,11 @@ Obsidian の本文と Mermaid 図を Typora 風（ライトは GitHub テーマ�
 | 上記以外（`daily-notes.json` など） | UI で設定すると Vault 側に作られる。端末間で揃えたい場合は [設定ファイルを管理対象に加える](#add-managed-file)                                                                      |
 
 <a name="operations"></a>
+
 ## 日常運用
 
 <a name="change-settings"></a>
+
 ### Obsidian の UI で設定を変更した
 
 リンク済みのファイルは、Obsidian がリンク先（このディレクトリのファイル）を直接書き換える。変更後は差分を確認してコミットする。
@@ -183,11 +199,13 @@ git -C ~/dotfiles diff -- obsidian/
 ```
 
 <a name="edit-snippets"></a>
+
 ### CSS スニペットを編集した
 
 `Settings → Appearance → CSS snippets` の再読み込みアイコンで反映する（[snippets/README.md](snippets/README.md#setup) 参照）。
 
 <a name="add-managed-file"></a>
+
 ### 設定ファイルを管理対象に加える
 
 1. Obsidian を閉じ、Vault の `.obsidian/` から対象ファイルをこのディレクトリへコピーする。
@@ -197,11 +215,13 @@ git -C ~/dotfiles diff -- obsidian/
 認証情報を含むファイル（`plugins/*/data.json` など）は加えない。
 
 <a name="other-vaults"></a>
+
 ### 他の Vault に設定を反映する
 
 `setup.sh` は `~/Obsidian/main/` だけを対象とする。他の Vault には、このディレクトリのファイルをその Vault の `.obsidian/` へコピーする。
 
 <a name="limitations"></a>
+
 ## 既知の制約・注意点
 
 1. **対象 Vault のパスは固定。** `setup.sh` の `OBSIDIAN_DIR`（`~/Obsidian/main/.obsidian`）に直書きしている。
@@ -209,6 +229,7 @@ git -C ~/dotfiles diff -- obsidian/
 3. **自動テストはない。** 変更後は Obsidian で表示と設定画面を確認する。
 
 <a name="related-docs"></a>
+
 ## 関連ドキュメント
 
 - [SYNC_BACKUP.md](SYNC_BACKUP.md): Vault の端末間同期（Remotely Save + Cloudflare R2）と Git/GitHub によるバックアップ
