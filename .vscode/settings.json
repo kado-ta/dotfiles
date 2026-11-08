@@ -1,0 +1,6 @@
+{
+  "files.associations": {
+    "**/dotfiles/aws/config": "ignore",
+    ".Brewfile": "ignore"
+  }
+}

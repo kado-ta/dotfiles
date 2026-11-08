@@ -41,8 +41,7 @@
         "*.schema": "ruby",
         "*.html.erb": "erb",
         "**/skills/**/SKILL.md": "markdown",
-        ".forceignore": "ignore",
-        ".Brewfile": "ignore"
+        ".forceignore": "ignore"
     },
     "files.watcherExclude": {
         "/vendor/bundle/**": true,
