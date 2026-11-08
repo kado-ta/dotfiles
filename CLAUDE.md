@@ -79,25 +79,7 @@ Claude からの push は、`claude/bin/cc-safe-push` を root 所有でイン�
 
 push は、元のリポジトリの設定とフックを読まないように、macOS のユーザー専用の一時ディレクトリに作った空のリポジトリから行う（作業ディレクトリと `$TMPDIR` は sandbox から書けるので使わない）。元のリポジトリには書き込まないので、upstream は設定されない。
 
-ラッパーと許可リストは、Claude が書き換えられないように root 所有にする。ラッパーを変更したら、再度インストールする。
-
-```sh
-sudo install -d -o root -g wheel -m 0755 /usr/local/libexec/claude-push /usr/local/etc/claude-push
-sudo install -o root -g wheel -m 0755 claude/bin/cc-safe-push /usr/local/libexec/claude-push/cc-safe-push
-sudo install -o root -g wheel -m 0644 <編集した allowlist.jsonc> /usr/local/etc/claude-push/allowlist.jsonc
-```
-
-許可リストは Git の管理対象外で、`gitCommonDir`（`git rev-parse --path-format=absolute --git-common-dir` の値）と `github`（`OWNER/REPO`）の組を書く。コメントは行全体の `//` だけを書ける。行末のコメント、`/* */`、末尾のカンマを書くと、すべての push が拒否される。
-
-```jsonc
-{
-  "version": 1,
-  "allowList": [
-    // 確認なしで push を許可する理由
-    { "gitCommonDir": "/Users/<user>/src/example/.git", "github": "<owner>/<repo>" }
-  ]
-}
-```
+ラッパーと許可リストは、Claude が書き換えられないように root 所有にする。ラッパーを変更したら、再度インストールする。インストール手順と許可リストの書き方は、[claude/README.md](claude/README.md#cc-safe-push-install) を参照する。
 
 ### 個人スキル
 
