@@ -1,0 +1,495 @@
+#!/usr/bin/python3 -I
+"""Claude Code から PR を作成・編集するための、固定形式の判定と実行。
+
+/usr/local/libexec/claude-push/cc-safe-pr に root 所有でインストールする。
+Claude Code が承認して sandbox の外で動かすのは create / edit の完全一致だけなので、
+判定はフックや permission ルールではなく、すべてここで行う。
+リポジトリの判定は同じディレクトリの cc-safe-push に任せ、ここでは git を実行しない。
+index を読む git は core.fsmonitor を起動し、core.hooksPath では止まらないため。
+"""
+from __future__ import annotations
+
+import contextlib
+import hashlib
+import http.client
+import importlib.machinery
+import importlib.util
+import json
+import os
+import pwd
+import re
+import signal
+import ssl
+import stat
+import subprocess
+import sys
+import urllib.parse
+import uuid
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+sys.dont_write_bytecode = True
+
+REQUEST = ".cc-pr-request.json"
+MAX_REQUEST = 512 * 1024
+MAX_TITLE = 256
+MAX_BODY = 65536
+GH = "/opt/homebrew/bin/gh"
+GH_TIMEOUT = 30
+API_HOST = "api.github.com"
+API_VERSION = "2026-03-10"
+API_TIMEOUT = 30
+CA_FILE = "/etc/ssl/cert.pem"
+MAX_RESPONSE = 4 * 1024 * 1024
+MAX_LOG = 5 * 1024 * 1024
+EXIT_FAILED = 1
+EXIT_DENIED = 2
+EXIT_UNKNOWN = 3
+BRANCH = re.compile(r"[A-Za-z0-9][A-Za-z0-9._/-]*\Z")
+TOKEN = re.compile(r"[A-Za-z0-9_]{20,255}\Z")
+CONTROL = re.compile(r"[\x00-\x1f\x7f]")
+FIELDS = {
+    "create": ({"version", "op", "head", "title", "body"}, {"base", "draft"}),
+    "edit": ({"version", "op", "head", "number"}, {"title", "body"}),
+}
+LOG_UNAVAILABLE = "the audit log cannot be opened; run this command alone so that it runs outside the sandbox"
+FAILURE_HINTS = {
+    401: "the GitHub token was rejected",
+    403: "permission denied or rate limited",
+    404: "not found, or the token has no access",
+    422: "rejected by GitHub (missing base branch, duplicate, or unsupported draft)",
+}
+
+sending = False
+
+
+class Stop(Exception):
+    label = "FAILED"
+    code = EXIT_FAILED
+    outcome = "failed"
+
+    def __init__(self, reason: str, status: int | None = None, github_request_id: str = "",
+                 pr_url: str = "", pr_number: int | None = None):
+        super().__init__(reason)
+        self.reason = reason
+        self.status = status
+        self.github_request_id = github_request_id
+        self.pr_url = pr_url
+        self.pr_number = pr_number
+
+
+class Failed(Stop):
+    pass
+
+
+class Denied(Stop):
+    label = "DENIED"
+    code = EXIT_DENIED
+    outcome = "deny"
+
+
+class Unknown(Stop):
+    label = "UNKNOWN"
+    code = EXIT_UNKNOWN
+    outcome = "unknown"
+
+
+@dataclass(frozen=True)
+class Response:
+    status: int
+    data: Any
+    request_id: str
+
+
+def load_push_policy() -> Any:
+    # 同じ root 所有ディレクトリの cc-safe-push を読み込み、判定を 1 か所に保つ。
+    path = Path(__file__).resolve().with_name("cc-safe-push")
+    loader = importlib.machinery.SourceFileLoader("cc_safe_push", str(path))
+    spec = importlib.util.spec_from_loader(loader.name, loader)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    loader.exec_module(module)
+    return module
+
+
+def log_path(home: Path) -> Path:
+    return home / "Library/Logs/cc-safe-pr/audit.jsonl"
+
+
+def open_log(path: Path) -> int:
+    path.parent.mkdir(mode=0o700, exist_ok=True)
+    with contextlib.suppress(FileNotFoundError):
+        if path.lstat().st_size > MAX_LOG:
+            os.replace(path, path.with_name(path.name + ".1"))
+    return os.open(path, os.O_WRONLY | os.O_APPEND | os.O_CREAT | os.O_NOFOLLOW | os.O_CLOEXEC, 0o600)
+
+
+class Audit:
+    """トークンと PR の本文は記録しない。突合に使う識別子と長さだけを残す。"""
+
+    def __init__(self, op: str, home: Path):
+        self.path = log_path(home)
+        self.fields: dict[str, Any] = {"request_id": uuid.uuid4().hex, "op": op}
+        with contextlib.suppress(OSError):
+            self.fields["wrapper_sha256"] = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
+
+    def update(self, **fields: Any) -> None:
+        self.fields.update(fields)
+
+    def check(self) -> None:
+        os.close(open_log(self.path))
+
+    def record(self, phase: str, outcome: str, reason: str = "", **fields: Any) -> None:
+        entry = {"ts": datetime.now(timezone.utc).isoformat(), **self.fields,
+                 "phase": phase, "outcome": outcome, "reason": reason, **fields}
+        data = memoryview((json.dumps(entry, ensure_ascii=False) + "\n").encode("utf-8"))
+        fd = open_log(self.path)
+        try:
+            # os.write は一部だけ書いて返すことがある。
+            while data:
+                written = os.write(fd, data)
+                if written <= 0:
+                    raise OSError("the audit log write made no progress")
+                data = data[written:]
+        finally:
+            os.close(fd)
+
+
+def read_claimed(claimed: str) -> bytes:
+    fd = os.open(claimed, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC)
+    try:
+        st = os.fstat(fd)
+        # ハードリンクで sandbox から読めないファイルを指せないように nlink も見る。
+        if not stat.S_ISREG(st.st_mode) or st.st_uid != os.getuid() or st.st_nlink != 1:
+            raise Denied("request must be a regular file you own, with one link")
+        if st.st_size > MAX_REQUEST:
+            raise Denied("request is too large")
+        return os.read(fd, MAX_REQUEST + 1)
+    finally:
+        os.close(fd)
+
+
+def claim_request() -> bytes:
+    # 固定名を一意の名前へ rename して確保する。同時実行や、あとから書かれた依頼を取り違えない。
+    # rename はリンクをたどらない。依頼は 1 回限りで、読んだらすぐ消す。
+    claimed = f"{REQUEST}.{uuid.uuid4().hex}"
+    try:
+        os.rename(REQUEST, claimed)
+    except OSError:
+        raise Denied(f"no readable {REQUEST} in the current directory")
+    try:
+        return read_claimed(claimed)
+    except OSError:
+        raise Denied("request must be a regular file you own, with one link")
+    finally:
+        with contextlib.suppress(OSError):
+            os.unlink(claimed)
+
+
+def unique_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result = dict(pairs)
+    if len(result) != len(pairs):
+        raise ValueError("duplicate key")
+    return result
+
+
+def reject_constant(name: str) -> None:
+    raise ValueError("non-finite number")
+
+
+def valid_title(value: Any) -> bool:
+    return isinstance(value, str) and 0 < len(value) <= MAX_TITLE and not CONTROL.search(value)
+
+
+def valid_body(value: Any) -> bool:
+    return isinstance(value, str) and len(value) <= MAX_BODY and "\0" not in value
+
+
+def valid_branch(value: Any) -> bool:
+    return isinstance(value, str) and BRANCH.fullmatch(value) is not None
+
+
+def parse_request(raw: bytes, op: str) -> dict[str, Any]:
+    # エラーメッセージに内容を含めない。リンク先のファイルの内容が出ることがある。
+    try:
+        obj = json.loads(raw.decode("utf-8"), object_pairs_hook=unique_keys, parse_constant=reject_constant)
+    except (ValueError, RecursionError):
+        raise Denied("request is not valid JSON")
+    if not isinstance(obj, dict):
+        raise Denied("request must be a JSON object")
+    required, optional = FIELDS[op]
+    if not required <= set(obj) <= required | optional:
+        raise Denied("request has missing or unknown fields")
+    if type(obj["version"]) is not int or obj["version"] != 1 or obj["op"] != op:
+        raise Denied("request version or op does not match")
+    if "title" in obj and not valid_title(obj["title"]):
+        raise Denied("invalid title")
+    if "body" in obj and not valid_body(obj["body"]):
+        raise Denied("invalid body")
+    if "base" in obj and not valid_branch(obj["base"]):
+        raise Denied("invalid base branch")
+    if "draft" in obj and type(obj["draft"]) is not bool:
+        raise Denied("draft must be true or false")
+    if op == "edit":
+        if type(obj["number"]) is not int or obj["number"] <= 0:
+            raise Denied("invalid pull request number")
+        if "title" not in obj and "body" not in obj:
+            raise Denied("edit needs a title or a body")
+    return obj
+
+
+def github_token() -> str:
+    # GH_TOKEN、GH_CONFIG_DIR などを引き継がない。リポジトリの外で動かし、出力はヘッダーにしか使わない。
+    env = {"HOME": pwd.getpwuid(os.getuid()).pw_dir, "PATH": "/usr/bin:/bin", "LC_ALL": "C"}
+    try:
+        cp = subprocess.run([GH, "auth", "token", "--hostname", "github.com"], env=env, cwd="/",
+                            stdin=subprocess.DEVNULL, capture_output=True, timeout=GH_TIMEOUT, check=False)
+    except (OSError, subprocess.TimeoutExpired):
+        raise Failed("gh could not be run to read the GitHub token")
+    token = cp.stdout.decode("ascii", "replace").removesuffix("\n")
+    if cp.returncode or not TOKEN.fullmatch(token):
+        raise Failed("gh did not return a GitHub token; run gh auth status")
+    return token
+
+
+def api(token: str, method: str, path: str, payload: dict[str, Any] | None = None) -> Response:
+    context = ssl.create_default_context(cafile=CA_FILE)
+    context.minimum_version = ssl.TLSVersion.TLSv1_2
+    # http.client はプロキシの環境変数を読まず、リダイレクトも追わない。
+    connection = http.client.HTTPSConnection(API_HOST, 443, context=context, timeout=API_TIMEOUT)
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": API_VERSION,
+        "User-Agent": "cc-safe-pr",
+    }
+    body = None
+    if payload is not None:
+        body = json.dumps(payload).encode("utf-8")
+        headers["Content-Type"] = "application/json"
+    try:
+        connection.request(method, path, body=body, headers=headers)
+        response = connection.getresponse()
+        raw = response.read(MAX_RESPONSE + 1)
+    finally:
+        connection.close()
+    try:
+        data = json.loads(raw)
+    except ValueError:
+        data = None
+    return Response(response.status, data, response.getheader("X-GitHub-Request-Id", ""))
+
+
+def get(token: str, path: str, also_ok: tuple[int, ...] = ()) -> Response:
+    try:
+        response = api(token, "GET", path)
+    except (OSError, http.client.HTTPException):
+        raise Failed("GitHub could not be reached; nothing was changed")
+    if response.status != 200 and response.status not in also_ok:
+        hint = FAILURE_HINTS.get(response.status, "unexpected answer")
+        raise Failed(f"GitHub answered {response.status}: {hint}; nothing was changed",
+                     status=response.status, github_request_id=response.request_id)
+    if response.data is None:
+        raise Failed("GitHub sent an unreadable answer; nothing was changed",
+                     status=response.status, github_request_id=response.request_id)
+    return response
+
+
+def send(token: str, method: str, path: str, payload: dict[str, Any], expected: int) -> Response:
+    global sending
+    sending = True
+    try:
+        response = api(token, method, path, payload)
+    except (OSError, http.client.HTTPException):
+        raise Unknown("no definite answer from GitHub; check the pull request before retrying")
+    if response.status == expected and isinstance(response.data, dict):
+        return response
+    # 2xx と 5xx は、GitHub 側で変更が適用された可能性を否定できない。
+    if 200 <= response.status < 300 or response.status >= 500:
+        raise Unknown(f"GitHub answered {response.status} without a usable result; check the pull request before retrying",
+                      status=response.status, github_request_id=response.request_id)
+    hint = FAILURE_HINTS.get(response.status, "unexpected answer")
+    raise Failed(f"GitHub answered {response.status}: {hint}",
+                 status=response.status, github_request_id=response.request_id)
+
+
+def dig(data: Any, *keys: str) -> Any:
+    for key in keys:
+        if not isinstance(data, dict):
+            return None
+        data = data.get(key)
+    return data
+
+
+def record_allow(audit: Audit) -> None:
+    try:
+        audit.record("decision", "allow")
+    except OSError:
+        raise Denied(LOG_UNAVAILABLE)
+
+
+def checked_url(slug: str, response: Response) -> str:
+    url = dig(response.data, "html_url")
+    if not isinstance(url, str) or not url.startswith(f"https://github.com/{slug}/pull/") \
+            or type(dig(response.data, "number")) is not int:
+        raise Unknown("GitHub answered without a usable pull request; check before retrying",
+                      status=response.status, github_request_id=response.request_id)
+    return url
+
+
+def succeeded(audit: Audit, url: str, response: Response) -> str:
+    try:
+        audit.record("result", "success", pr_url=url, pr_number=response.data["number"],
+                     http_status=response.status, github_request_id=response.request_id)
+    except OSError:
+        print("WARNING: the result could not be written to the audit log", file=sys.stderr)
+    return url
+
+
+def create_pull(token: str, d: Any, request: dict[str, Any], audit: Audit) -> str:
+    repo = f"/repos/{d.slug}"
+    info = get(token, repo).data
+    if dig(info, "full_name") != d.slug:
+        raise Denied(f"GitHub names this repository differently from the allowlist entry {d.slug}; match its exact name")
+    if dig(info, "archived") is not False:
+        raise Denied("the repository is archived")
+    base = request.get("base", dig(info, "default_branch"))
+    if not valid_branch(base):
+        raise Denied("the base branch could not be determined")
+    if base == d.branch:
+        raise Denied("head and base are the same branch")
+    ref = get(token, f"{repo}/git/ref/heads/{urllib.parse.quote(d.branch, safe='/')}", also_ok=(404,))
+    if ref.status == 404:
+        raise Denied(f"{d.branch} is not on GitHub; run cc-safe-push first")
+    remote = dig(ref.data, "object", "sha")
+    if remote != d.sha:
+        raise Denied(f"{d.branch} on GitHub differs from local HEAD; run cc-safe-push first")
+    audit.update(remote_sha=remote)
+    owner = d.slug.split("/")[0]
+    query = urllib.parse.urlencode({"head": f"{owner}:{d.branch}", "base": base, "state": "open"})
+    existing = get(token, f"{repo}/pulls?{query}").data
+    if not isinstance(existing, list):
+        raise Failed("GitHub sent an unreadable answer; nothing was changed")
+    if existing:
+        raise Denied(f"a pull request already exists: {dig(existing[0], 'html_url')}; use edit")
+    record_allow(audit)
+    payload = {"title": request["title"], "head": d.branch, "base": base,
+               "body": request["body"], "draft": request.get("draft", False)}
+    response = send(token, "POST", f"{repo}/pulls", payload, 201)
+    url = checked_url(d.slug, response)
+    # head は branch 名でしか指定できない。送信の直前に動いていないかを、作られた PR で確かめる。
+    if dig(response.data, "head", "sha") != d.sha or dig(response.data, "head", "ref") != d.branch \
+            or dig(response.data, "base", "ref") != base or dig(response.data, "base", "repo", "full_name") != d.slug:
+        raise Unknown("the pull request was created but does not match what was requested; check it",
+                      status=response.status, github_request_id=response.request_id, pr_url=url)
+    return succeeded(audit, url, response)
+
+
+def edit_pull(token: str, d: Any, request: dict[str, Any], audit: Audit) -> str:
+    login = dig(get(token, "/user").data, "login")
+    if not isinstance(login, str):
+        raise Failed("GitHub did not name the authenticated user; nothing was changed")
+    number = request["number"]
+    path = f"/repos/{d.slug}/pulls/{number}"
+    found = get(token, path, also_ok=(404,))
+    if found.status == 404:
+        raise Denied(f"pull request {number} was not found in {d.slug}")
+    pr = found.data
+    if dig(pr, "base", "repo", "full_name") != d.slug or dig(pr, "head", "repo", "full_name") != d.slug:
+        raise Denied(f"pull request {number} is not a branch of {d.slug}")
+    if dig(pr, "state") != "open" or dig(pr, "merged") is not False:
+        raise Denied(f"pull request {number} is not open")
+    if dig(pr, "head", "ref") != d.branch:
+        raise Denied(f"pull request {number} is not for the current branch {d.branch}")
+    if dig(pr, "user", "login") != login:
+        raise Denied(f"pull request {number} was opened by someone else")
+    audit.update(remote_sha=dig(pr, "head", "sha"))
+    record_allow(audit)
+    # state と base は送らない。PATCH は PR のクローズにも使えるため。
+    payload = {key: request[key] for key in ("title", "body") if key in request}
+    response = send(token, "PATCH", path, payload, 200)
+    url = checked_url(d.slug, response)
+    # GitHub に条件付き更新の手段はないので、open の確認は送信前と応答でしかできない。
+    if dig(response.data, "number") != number or dig(response.data, "state") != "open" \
+            or dig(response.data, "merged") is not False \
+            or dig(response.data, "base", "repo", "full_name") != d.slug or dig(response.data, "head", "ref") != d.branch:
+        raise Unknown("the pull request was updated but no longer matches what was checked; check it",
+                      status=response.status, github_request_id=response.request_id, pr_url=url)
+    return succeeded(audit, url, response)
+
+
+def allowed_repository(policy: Any, audit: Audit) -> Any:
+    try:
+        decision = policy.evaluate(Path.cwd())
+    except OSError:
+        raise Denied("the current directory cannot be read")
+    if decision.kind == "deny":
+        raise Denied(decision.reason)
+    audit.update(repo=decision.slug, branch=decision.branch, local_sha=decision.sha)
+    return decision
+
+
+def load_request(op: str, d: Any, audit: Audit) -> dict[str, Any]:
+    # 依頼は読むと消えるので、監査ログが使えないとわかっているときは確保しない。
+    try:
+        audit.check()
+    except OSError:
+        raise Denied(LOG_UNAVAILABLE)
+    raw = claim_request()
+    request = parse_request(raw, op)
+    if request["head"] != d.branch:
+        raise Denied(f"the request is for another branch; the current branch is {d.branch}")
+    audit.update(request_sha256=hashlib.sha256(raw).hexdigest(),
+                 title_len=len(request.get("title", "")), body_len=len(request.get("body", "")))
+    return request
+
+
+def report(audit: Audit, stop: Stop) -> int:
+    phase = "decision" if isinstance(stop, Denied) else "result"
+    try:
+        audit.record(phase, stop.outcome, stop.reason, pr_url=stop.pr_url, pr_number=stop.pr_number,
+                     http_status=stop.status, github_request_id=stop.github_request_id)
+    except OSError:
+        print("WARNING: the result could not be written to the audit log", file=sys.stderr)
+    # URL は stderr に出す。stdout に出すと、PostToolUse が作成済みと表示することがある。
+    print(f"{stop.label}: {stop.reason}" + (f": {stop.pr_url}" if stop.pr_url else ""), file=sys.stderr)
+    return stop.code
+
+
+def execute(op: str, policy: Any) -> int:
+    global sending
+    sending = False
+    audit = Audit(op, policy.user_home())
+    try:
+        decision = allowed_repository(policy, audit)
+        request = load_request(op, decision, audit)
+        token = github_token()
+        action = create_pull if op == "create" else edit_pull
+        url = action(token, decision, request, audit)
+    except Stop as stop:
+        return report(audit, stop)
+    print(f"{'CREATED' if op == 'create' else 'EDITED'}: {url}")
+    return 0
+
+
+def on_sigterm(signum: int, frame: Any) -> None:
+    sys.exit(EXIT_UNKNOWN if sending else EXIT_FAILED)
+
+
+def main() -> int:
+    signal.signal(signal.SIGTERM, on_sigterm)
+    if len(sys.argv) != 2 or sys.argv[1] not in FIELDS:
+        print("DENIED: exactly one argument is allowed: create or edit", file=sys.stderr)
+        return EXIT_DENIED
+    try:
+        policy = load_push_policy()
+    except Exception:
+        print("DENIED: cc-safe-push could not be loaded from the same directory", file=sys.stderr)
+        return EXIT_DENIED
+    return execute(sys.argv[1], policy)
+
+
+if __name__ == "__main__":
+    sys.exit(main())
