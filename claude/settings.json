@@ -22,7 +22,6 @@
       "Bash(/usr/local/libexec/claude-push/cc-safe-pr create)",
       "Bash(/usr/local/libexec/claude-push/cc-safe-pr edit)",
       "Bash(gh *)",
-      "Bash(npm run *)",
       "Bash(pnpm *)",
       "Bash(sfdx *)",
       "Bash(sf *)",
@@ -308,8 +307,8 @@
   },
   "sandbox": {
     "enabled": true,
-    "allowUnsandboxedCommands": false,
     "failIfUnavailable": true,
+    "allowUnsandboxedCommands": false,
     "network": {
       "allowedDomains": [
         "github.com",
@@ -322,14 +321,14 @@
       ]
     },
     "filesystem": {
+      "allowWrite": [
+        "~/.gstack/projects"
+      ],
       "denyRead": [
         "~/.aws/credentials",
         "~/dotfiles/aws/credentials",
         "~/.ssh/id_*",
         "~/.ssh/config"
-      ],
-      "allowWrite": [
-        "~/.gstack/projects"
       ]
     },
     "enableWeakerNetworkIsolation": true,
@@ -347,5 +346,39 @@
   },
   "theme": "dark-daltonized",
   "inputNeededNotifEnabled": true,
-  "agentPushNotifEnabled": true
+  "agentPushNotifEnabled": true,
+  "autoMode": {
+    "soft_deny": [
+      "$defaults",
+      "Bash(aws s3 rm:*) in ~/dotfiles — aws/credentials and aws/config are gitignored and must never be committed or uploaded",
+      "Bash(git push:*) in ~/dotfiles — repo policy requires the root-owned cc-safe-push wrapper instead of raw git push"
+    ],
+    "environment": [
+      "### Org-wide",
+      "**Organization**: None configured",
+      "**Cloud provider(s)**: None configured",
+      "**Repository visibility**: PUBLIC — kado-ta/dotfiles (github.com:kado-ta/dotfiles.git) is a public repository; treat any push there as publishing, and only this repo's own work belongs in it",
+      "**Internal sharing / snippet hosting**: None configured — treat public paste/gist services as outside the trust boundary",
+      "**Secrets management**: None configured",
+      "**Default / protected branches**: `main` is the default branch; protected via active ruleset `protect-main` (gh-verified) — a local hook (`protect-main-branch.sh`) also blocks direct commits to `main`/`master`/`staging`",
+      "**CI/CD deploy targets**: None configured",
+      "**Network posture**: None configured",
+      "**Host containment**: None configured — assume Claude Code runs on an ordinary developer machine with open internet",
+      "**Source control**: The trusted repo kado-ta/dotfiles and its origin remote only (no additional orgs configured)",
+      "**Trusted internal domains**: None configured",
+      "**Trusted cloud buckets**: None configured",
+      "**Key internal services**: None configured",
+      "**Internal package registry**: None configured",
+      "**Sensitive data locations & audiences**: `aws/credentials` and `aws/config` (gitignored, never to be committed to this public repo); `.env` files; this repo is public, so no confidential or secret material belongs in it at all",
+      "**Data retention / declassification**: None configured",
+      "**Sensitive remote targets**: any namespace, host, or container whose name carries `prod` or `production` as a whole word or name segment",
+      "**Protected deployment namespaces / environments**: None configured — fall back to the Sensitive remote targets heuristic",
+      "**Protected IaC scopes**: IAM, RBAC, networking, quota, and node-pool resources; anything whose name or tag carries `prod` or `production` as a whole word or name segment",
+      "### User-specific",
+      "**Primary use of Claude Code**: software development (dotfiles/tooling configuration for shell, editor, and AI coding agent setup)",
+      "**Trusted repo**: ~/dotfiles (github.com:kado-ta/dotfiles.git) — public repository; only this repo's own work should be pushed there, and secrets/credentials are never cleared into it regardless of visibility",
+      "**Org-specific CLIs**: None configured — `sf` (Salesforce CLI) and `mise` appear frequently in usage but are personal tooling, not org-specific",
+      "push is only performed via the repo's own `cc-safe-push` wrapper per CLAUDE.md; raw `git push` is denied by repo policy"
+    ]
+  }
 }
