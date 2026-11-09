@@ -24,6 +24,7 @@ gstack は `gstack-upgrade` で更新する（`--check` で確認のみ）。
 | ------------------------------ | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
 | `hooks/validate-command.sh`    | PreToolUse（Bash） | `rm -rf` と、本番環境（`prod` / `prd`）を含むコマンドをブロックする。`sf devops` の参照系コマンドと PR 作成は、単独のコマンドに限り許可する |
 | `hooks/protect-main-branch.sh` | PreToolUse（Bash） | `main`・`master`・`staging` ブランチへの `git commit` をブロックする                                                                        |
+| `hooks/ask-gh-pr-write.sh`     | PreToolUse（Bash） | `gh` の PR 書き込みと `gh api` を、表記ゆれも含めて人間の承認に回す                                                                         |
 | `hooks/precompact-context.sh`  | PreCompact         | ブランチ名・未コミットの変更・直近のコミットを、コンテキスト圧縮後も残す情報として Claude に渡す                                            |
 | `hooks/herdr-agent-state.sh`   | SessionStart       | herdr 上で起動したセッションの開始を herdr に通知する。herdr が生成・管理するため、直接編集しない                                           |
 
@@ -36,7 +37,9 @@ gstack は `gstack-upgrade` で更新する（`--check` で確認のみ）。
 ```shell
 bash claude/hooks/tests/test-protect-main-branch.sh
 bash claude/hooks/tests/test-validate-command.sh
+bash claude/hooks/tests/test-ask-gh-pr-write.sh
 /usr/bin/python3 -B claude/hooks/tests/test-cc-safe-push.py
+/usr/bin/python3 -B claude/hooks/tests/test-cc-safe-pr.py
 ```
 
 ## cc-safe-push
@@ -149,3 +152,76 @@ Claude は実行ユーザーの権限で動くので、root 所有にすると�
   ```sh
   sudo vi /usr/local/etc/claude-push/allowlist.jsonc
   ```
+
+<a name="cc-safe-pr"></a>
+
+## cc-safe-pr
+
+Claude Code から PR を作成・編集するためのラッパー。`cc-safe-push` と同じ許可リストのリポジトリでは、承認なしで動く。許可リストにないリポジトリでは拒否するので、`gh pr create` を使う（`permissions.ask` とフックで人間の承認が必要になる）。マージとクローズの機能はない。
+
+> [!WARNING]
+> セキュリティ境界ではない。`gh` のトークンは sandbox の中からも読めるので、Claude が意図的に別の手段で GitHub API を呼ぶことは止められない。強制力があるのは GitHub 側のルールセットだけ。
+
+<a name="cc-safe-pr-usage"></a>
+
+### 使い方
+
+カレントディレクトリに `.cc-pr-request.json` を書き、そのディレクトリで次のコマンドを単独で実行する。ほかのコマンドと連結すると sandbox の中で動き、監査ログを開けずに拒否される。
+
+```sh
+/usr/local/libexec/claude-push/cc-safe-pr create  # または edit
+```
+
+```json
+{ "version": 1, "op": "create", "head": "feature/x", "title": "fix: …", "body": "…", "base": "main", "draft": false }
+{ "version": 1, "op": "edit", "head": "feature/x", "number": 123, "title": "…", "body": "…" }
+```
+
+| キー      | create | edit | 内容                                                                 |
+| --------- | ------ | ---- | -------------------------------------------------------------------- |
+| `version` | 必須   | 必須 | `1`                                                                  |
+| `op`      | 必須   | 必須 | コマンドの引数と同じ値                                               |
+| `head`    | 必須   | 必須 | 現在のブランチ名。違うと拒否する                                     |
+| `title`   | 必須   | 任意 | 制御文字なし、1〜256 文字                                            |
+| `body`    | 必須   | 任意 | 65536 文字以下。`edit` では `title` と `body` の少なくとも一方が必要 |
+| `base`    | 任意   | なし | 省略するとリポジトリの既定ブランチ                                   |
+| `draft`   | 任意   | なし | `true` または `false`                                                |
+| `number`  | なし   | 必須 | PR の番号                                                            |
+
+依頼ファイルは 1 回限りで、ラッパーが読むとすぐに消える。拒否や失敗のあとに再実行するときは書き直す。
+
+終了コードは、0 が成功、1 が失敗（変更なし）、2 が拒否、3 が要確認（PR が作成・変更された可能性があり、再実行せずに状態を確認する）。
+
+<a name="cc-safe-pr-policy"></a>
+
+### 拒否する条件
+
+- `cc-safe-push` が拒否する条件（許可リストにない、保護ブランチ、detached HEAD など）
+- `create`: ブランチが GitHub にない、ローカルの HEAD と SHA が違う（先に `cc-safe-push` を実行する）、同じ head と base の open な PR がある、リポジトリがアーカイブされている
+- `edit`: PR が同じリポジトリのブランチでない（fork）、open でない、現在のブランチの PR でない、自分が作った PR でない
+- GitHub が返すリポジトリ名が許可リストの `github` と違う（大文字・小文字も区別する。push は通るのに PR だけ拒否されるときは、許可リストの表記を確認する）
+
+<a name="cc-safe-pr-install"></a>
+
+### インストール
+
+通常のターミナルで行う。`cc-safe-push` がインストール済みであることが前提で、`gh auth login` の認証を使う。
+
+```sh
+cd ~/dotfiles
+sudo install -o root -g wheel -m 0755 claude/bin/cc-safe-pr /usr/local/libexec/claude-push/cc-safe-pr
+# 依頼ファイルをグローバルの ignore に追加する（すでに書かれていれば何もしない）
+grep -qxF '.cc-pr-request.json' ~/.config/git/ignore || echo '.cc-pr-request.json' >> ~/.config/git/ignore
+```
+
+ラッパーか `cc-safe-push` を変更したら、再度インストールして両方のテストを実行する。`cc-safe-pr` は同じディレクトリの `cc-safe-push` を読み込むので、片方だけ古いと動かないことがある。
+
+アンインストールは、`settings.json` の `cc-safe-pr` の行を消して `sudo rm /usr/local/libexec/claude-push/cc-safe-pr` を実行する。`cc-safe-push` と許可リストには影響しない。
+
+<a name="cc-safe-pr-audit"></a>
+
+### 監査ログ
+
+`~/Library/Logs/cc-safe-pr/audit.jsonl` に、判定と結果を 1 行ずつ記録する。5 MiB を超えると `audit.jsonl.1` に置き換える（1 世代）。トークン、タイトル、本文は記録しない（長さとハッシュのみ）。書き込めないときは送信しない。
+
+ユーザーの権限で書かれるので、改ざんを防ぐものではない。GitHub 側の記録との突合には `github_request_id`（`X-GitHub-Request-Id`）と PR の URL を使う。

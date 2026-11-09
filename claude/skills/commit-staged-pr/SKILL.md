@@ -68,11 +68,22 @@ description: Use when the user asks to commit only the currently staged git chan
    - `cc-safe-push` で push した場合は、`PUSHED:` の行の SHA が `git rev-parse --short=12 HEAD` と一致すること
    - ユーザーが push した場合は、`gh api 'repos/{owner}/{repo}/git/ref/heads/<branch>' --jq .object.sha` が `git rev-parse HEAD` と一致すること（`git ls-remote` は sandbox の中で SSH が失敗する）
 2. 同じ head の open な PR があれば、その URL を伝えて終了する。`gh` が失敗して確認できなければ、作成に進まずに確認する。
-3. PR を作る。ユーザーが push した場合は、フェーズ 1 で示した案を使う。`cc-safe-push` で push した場合は、ここで案を作る（`.github/pull_request_template.md` などのテンプレートがあれば従う）。フェーズ 2 から始めた場合は、案を示して確認してから作る。本文は一時ファイルに書く。
+3. PR を作る。ユーザーが push した場合は、フェーズ 1 で示した案を使う。`cc-safe-push` で push した場合は、ここで案を作る（`.github/pull_request_template.md` などのテンプレートがあれば従う）。フェーズ 2 から始めた場合は、案を示して確認してから作る。カレントディレクトリに `.cc-pr-request.json` を書き、そのディレクトリで次のコマンドを単独で実行する（ほかのコマンドと連結すると sandbox の中で失敗する）。
+
+   ```json
+   { "version": 1, "op": "create", "head": "<branch>", "title": "<title>", "body": "<body>", "base": "<base>" }
+   ```
 
    ```sh
-   gh pr create --base <base> --head <branch> --title "<title>" --body-file <file>
+   /usr/local/libexec/claude-push/cc-safe-pr create
    ```
+
+   | 結果 | 対応 |
+   |---|---|
+   | 成功（終了コード 0） | `CREATED:` の行の URL を使って次に進む |
+   | 拒否（2）で、許可リストにないリポジトリ | 本文を一時ファイルに書き、`gh pr create --base <base> --head <branch> --title "<title>" --body-file <file>` を実行する（人間の承認が必要） |
+   | そのほかの拒否（2）、失敗（1） | 理由を伝えて止まる |
+   | 要確認（3） | 再実行せず、`gh pr list --head <branch> --state all` で状態を確認して伝える |
 
 4. `gh pr checks <number>` の結果を伝える。`cc-safe-push` で push した場合は、コミットと、コミットしなかった未ステージ・未追跡のファイルも伝える。ブランチを切り替えた場合は、元のブランチ名と切り替えた理由も伝える。
 

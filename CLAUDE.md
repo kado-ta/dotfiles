@@ -57,6 +57,7 @@ dotfiles で起動したときだけ必要な設定（`denyWrite`、`claudeMdExc
 | ------------------------------ | ----------------- | --------------------------------------------------------------------------------------------------------------------------- |
 | `hooks/validate-command.sh`    | PreToolUse (Bash) | `rm -rf` および `prod`/`prd` を含むコマンドをブロック（`sf devops` の参照系コマンドと PR 作成は、単独のコマンドに限り許可） |
 | `hooks/protect-main-branch.sh` | PreToolUse (Bash) | `main`, `master`, `staging` への `git commit` をブロック                                                                    |
+| `hooks/ask-gh-pr-write.sh`     | PreToolUse (Bash) | `gh` の PR 書き込みと `gh api` を、表記ゆれも含めて人間の承認に回す                                                         |
 | `hooks/precompact-context.sh`  | PreCompact        | ブランチ名・`git status --short`・直近 5 件のコミットを `additionalContext` として渡す                                      |
 | `hooks/herdr-agent-state.sh`   | SessionStart      | herdr にセッション開始を通知する。herdr が生成・上書きするファイルのため編集しない                                          |
 
@@ -83,13 +84,23 @@ push は、元のリポジトリの設定とフックを読まないように、
 
 ラッパーと許可リストは、Claude が書き換えられないように root 所有にする。ラッパーを変更したら、再度インストールする。インストール手順と許可リストの書き方は、[claude/README.md](claude/README.md#cc-safe-push-install) を参照する。
 
+### PR の作成・編集
+
+Claude からの PR の作成・編集は、`claude/bin/cc-safe-pr` を root 所有でインストールしたラッパーで行う。`settings.json` は、`create` / `edit` の完全一致だけを `permissions.allow` と `sandbox.excludedCommands` に入れている。許可リストは `cc-safe-push` と共通で、リポジトリの判定には `cc-safe-push` の `evaluate()` をそのまま使う。
+
+許可リストにないリポジトリでは拒否するので、`gh pr create` を使う。`permissions.ask` と `hooks/ask-gh-pr-write.sh` により、人間の承認が必要になる。
+
+ラッパーは `evaluate()` の外で git を実行しない。index を読む git は `core.fsmonitor` を起動し、`core.hooksPath` では止まらないので、sandbox の外で任意のコードが動く経路になる。
+
+これはセキュリティ境界ではない。`gh` のトークンは sandbox の中からも読めるので、Claude が意図的に別の手段で GitHub API を呼ぶことは止められない。詳細は [claude/README.md](claude/README.md#cc-safe-pr) を参照する。
+
 ### 個人スキル
 
 `skills/*/` 配下の個人スキルは `~/.claude/skills/` にグローバルシンボリックリンクされ、全プロジェクトで使える。各スキルの用途は `SKILL.md` の `description` を参照する。
 
 ## 規約
 
-- テストは `claude/hooks/tests/` のフック回帰テストのみ。フックを変更したら `bash claude/hooks/tests/test-protect-main-branch.sh` と `bash claude/hooks/tests/test-validate-command.sh` を実行する。`claude/bin/cc-safe-push` を変更したら `/usr/bin/python3 -B claude/hooks/tests/test-cc-safe-push.py` を実行する。`jq` が mise の shim に解決される PATH では `HOME` を変えて実行するテストが失敗するので、新しいシェルで実行する。それ以外の動作確認はセットアップスクリプトを手動実行して行う。
+- テストは `claude/hooks/tests/` のフック回帰テストのみ。フックを変更したら `bash claude/hooks/tests/test-protect-main-branch.sh`、`bash claude/hooks/tests/test-validate-command.sh`、`bash claude/hooks/tests/test-ask-gh-pr-write.sh` を実行する。`claude/bin/cc-safe-push` か `claude/bin/cc-safe-pr` を変更したら `/usr/bin/python3 -B claude/hooks/tests/test-cc-safe-push.py` と `/usr/bin/python3 -B claude/hooks/tests/test-cc-safe-pr.py` を実行する。`jq` が mise の shim に解決される PATH では `HOME` を変えて実行するテストが失敗するので、新しいシェルで実行する。それ以外の動作確認はセットアップスクリプトを手動実行して行う。
 - Homebrew のパッケージリストの正規版は `bin/.Brewfile`。リポジトリルートの `Brewfile` は `mise run brew:dump` で生成し、`bin/.Brewfile` を最新化するためのベースとして使う。
 - `vscode/extensions` は `mise run vscode:ext:list` で生成するため手動編集しない。
 - `aws/config` , `aws/credentials` は gitignore 済み。公開リポジトリであるため、AWS CLI 設定も credentials もコミットしない。

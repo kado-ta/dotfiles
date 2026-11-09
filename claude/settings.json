@@ -19,6 +19,8 @@
       "Bash(git commit *)",
       "Bash(git check-ignore *)",
       "Bash(/usr/local/libexec/claude-push/cc-safe-push)",
+      "Bash(/usr/local/libexec/claude-push/cc-safe-pr create)",
+      "Bash(/usr/local/libexec/claude-push/cc-safe-pr edit)",
       "Bash(gh *)",
       "Bash(npm run *)",
       "Bash(pnpm *)",
@@ -38,6 +40,7 @@
       "Edit(*.config.*)",
       "Edit(package.json)",
       "Edit(tsconfig.json)",
+      "Edit(**/.cc-pr-request.json)",
       "Skill(claude-code-setup:claude-automation-recommender)",
       "Skill(gstack-upgrade)",
       "Skill(superpowers:brainstorming)",
@@ -120,6 +123,10 @@
       "Bash(git push *)",
       "Bash(git -C * push *)",
       "Bash(git -c * push *)",
+      "Bash(gh auth token*)",
+      "Bash(gh auth status*--show-token*)",
+      "Bash(gh auth status* -t*)",
+      "Bash(gh auth git-credential*)",
       "Bash(sfdx org:deploy *)",
       "Bash(sf deploy *)",
       "Bash(terraform apply *)",
@@ -153,7 +160,8 @@
       "Edit(**/biome.json)",
       "Edit(**/.eslintrc)",
       "Edit(**/.eslintrc.*)",
-      "Edit(**/.tflint.hcl)"
+      "Edit(**/.tflint.hcl)",
+      "Edit(~/Library/Logs/cc-safe-pr/**)"
     ],
     "ask": [
       "Bash(gh pr create*)",
@@ -194,6 +202,17 @@
             "command": "~/.claude/hooks/protect-main-branch.sh"
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/bin/bash ~/.claude/hooks/ask-gh-pr-write.sh",
+            "timeout": 30,
+            "onFailure": "block"
+          }
+        ]
       }
     ],
     "PostToolUse": [
@@ -202,7 +221,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "jq -r 'if (.tool_input.command // \"\" | test(\"gh pr create\")) then (.tool_response.stdout // \"\" | match(\"https://github\\\\.com/\\\\S+\") | .string) // empty else empty end' | { read -r url; [ -n \"$url\" ] && echo \"{\\\"systemMessage\\\": \\\"PR が作成されました: $url\\\"}\"; } 2>/dev/null || true"
+            "command": "jq -r 'if (.tool_input.command // \"\" | test(\"gh pr create|cc-safe-pr create\")) then (.tool_response.stdout // \"\" | match(\"https://github\\\\.com/\\\\S+\") | .string) // empty else empty end' | { read -r url; [ -n \"$url\" ] && echo \"{\\\"systemMessage\\\": \\\"PR が作成されました: $url\\\"}\"; } 2>/dev/null || true"
           }
         ]
       }
@@ -315,8 +334,9 @@
     },
     "enableWeakerNetworkIsolation": true,
     "excludedCommands": [
-      "gh",
-      "/usr/local/libexec/claude-push/cc-safe-push"
+      "/usr/local/libexec/claude-push/cc-safe-push",
+      "/usr/local/libexec/claude-push/cc-safe-pr create",
+      "/usr/local/libexec/claude-push/cc-safe-pr edit"
     ]
   },
   "effortLevel": "xhigh",
