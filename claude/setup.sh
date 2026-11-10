@@ -30,6 +30,7 @@ link() {
   ln -snfv "${src}" "${dest}"
 }
 
+[ -d "${CLAUDE_DIR}" ] || mkdir -p "${CLAUDE_DIR}"
 link "${SCRIPT_DIR}/settings.json" "${CLAUDE_DIR}/settings.json"
 link "${SCRIPT_DIR}/CLAUDE.md" "${CLAUDE_DIR}/CLAUDE.md"
 link "${SCRIPT_DIR}/rules" "${CLAUDE_DIR}/rules"
@@ -63,7 +64,7 @@ fi
 if claude plugins list 2>/dev/null | grep -q " crit@crit$"; then
   echo "crit plugin already installed, skipping"
 else
-  claude plugins marketplace add tomasz-tomczyk/crit
+  claude plugins marketplace list 2>/dev/null | grep -q " crit$" || claude plugins marketplace add tomasz-tomczyk/crit
   claude plugins install crit@crit
 fi
 
@@ -71,13 +72,15 @@ fi
 GSTACK_DIR="${CLAUDE_DIR}/skills/gstack"
 [ -d "${CLAUDE_DIR}/skills" ] || mkdir -p "${CLAUDE_DIR}/skills"
 if [ -d "${GSTACK_DIR}" ]; then
-  echo "gstack already installed, skipping"
+  echo "gstack already cloned, skipping clone"
 else
   git clone --single-branch --depth 1 https://github.com/garrytan/gstack.git "${GSTACK_DIR}"
-  # "${GSTACK_DIR}/setup" は GSTACK_DIR 内で実行しないと正常終了しない。
-  # サブシェル (...) 内での cd はスクリプト本体のカレントディレクトリに影響しない。
-  (cd "${GSTACK_DIR}" && ./setup)
 fi
+# clone 後の setup が途中で失敗しても、再実行で回復できるように毎回実行する。
+# "${GSTACK_DIR}/setup" は GSTACK_DIR 内で実行しないと正常終了しない。
+# サブシェル (...) 内での cd はスクリプト本体のカレントディレクトリに影響しない。
+# plan-tune のフックは導入しない。確認で止まらず、claude/settings.json も書き換えないようにする。
+(cd "${GSTACK_DIR}" && ./setup --no-plan-tune-hooks)
 
 # Link personal skills (global, available in all projects)
 for skill_dir in "${SCRIPT_DIR}/skills"/*/; do

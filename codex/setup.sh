@@ -1,4 +1,6 @@
 #!/bin/bash -e
+# curl | bash で、curl の失敗を検出するため。
+set -o pipefail
 
 if [ "$(uname)" != "Darwin" ] ; then
     echo "This is not macOS! codex setup is failed ;("
@@ -15,10 +17,20 @@ if [ ! -d $CODEX_DIR ]; then mkdir -p $CODEX_DIR; fi
 ln -snfv "$SCRIPT_DIR/AGENTS.md" "$CODEX_DIR/AGENTS.md"
 
 # superpowers プラグイン
-codex plugin add superpowers@openai-curated
+# pipefail 下の grep -q は、一覧の出力中にパイプを閉じて失敗扱いになりうるので使わない。
+if codex plugin list 2>/dev/null | grep -E '^superpowers@openai-curated +installed' >/dev/null; then
+  echo "superpowers plugin already installed, skipping"
+else
+  codex plugin add superpowers@openai-curated
+fi
 
 # Understand Anything スキルをインストールする。
-curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/install.sh | bash -s codex
+# install.sh は最後に ~/.understand-anything-plugin を作るので、完了の目印にする。
+if [ -e "$HOME/.understand-anything-plugin" ]; then
+  echo "Understand Anything already installed, skipping"
+else
+  curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/install.sh | bash -s codex
+fi
 
 # Claude Code でインストール済みの gstack を Codex でも使用できるようにする。
 # 先に Claude Code で gstack をインストールしていることを前提とする。

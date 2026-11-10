@@ -104,8 +104,8 @@ Codex のユーザー設定 `~/.codex/config.toml` は、モデルや MCP の設
 1. macOS であることを確認する。
 2. `~/.codex/` がなければ作成する。
 3. `~/dotfiles/codex/AGENTS.md` を `~/.codex/AGENTS.md` へシンボリックリンクする（`ln -snfv`）。
-4. superpowers プラグインを追加する（`codex plugin add superpowers@openai-curated`）。
-5. Understand Anything スキルを Codex 向けにインストールする（GitHub の `install.sh` を `curl | bash` で実行）。
+4. superpowers プラグインが未インストールなら追加する（`codex plugin add superpowers@openai-curated`）。
+5. Understand Anything スキルが未インストールなら、Codex 向けにインストールする（GitHub の `install.sh` を `curl | bash` で実行）。`~/.understand-anything-plugin` があればインストール済みとみなす。
 6. Claude Code 用にインストールした gstack を、Codex でも使えるようにセットアップする（`~/.claude/skills/gstack/setup --host codex`）。
 
 **`setup.sh` は `config.toml` を作成・変更しない。** 設定の反映は後述の `codex-config-sync` で行う。
@@ -126,7 +126,7 @@ codex-config-sync --dry-run
 codex-config-sync
 ```
 
-`setup.sh` は何度実行してもよい（リンクは `ln -snfv` で張り直す）。ただし、Understand Anything スキルは実行のたびにリモートの最新版を取得する。
+`setup.sh` は何度実行してもよい（リンクは `ln -snfv` で張り直し、インストール済みのプラグインとスキルは飛ばす）。Understand Anything スキルを更新するときは `git -C ~/.understand-anything/repo pull --ff-only` を実行する（`install.sh --update` と同じ）。
 
 <a name="instructions"></a>
 

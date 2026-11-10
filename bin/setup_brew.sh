@@ -5,4 +5,4 @@ if [ "$(uname)" != "Darwin" ] ; then
 	exit 1
 fi
 
-brew bundle --global
+brew bundle install --global --no-upgrade

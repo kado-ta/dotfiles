@@ -1,9 +1,10 @@
 #!/bin/bash -e
 
-# ターミナルから実行した場合と、Finder から実行した場合とで、実行ディレクトリを一致させる。
-if [ "$(basename $(pwd))" != "dotfiles" ]; then
-		cd ~/dotfiles
-fi
+# 実行方法や実行場所によらず、~/dotfiles を対象にする。
+cd ~/dotfiles
+
+# bin/link.sh でリンクする .zprofile は実行中のプロセスに反映されないので、ここで PATH を通す。
+eval "$(/opt/homebrew/bin/brew shellenv)"
 
 # dotfile 系のシンボリックリンクを作成する。
 bin/link.sh
