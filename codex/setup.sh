@@ -17,8 +17,9 @@ if [ ! -d $CODEX_DIR ]; then mkdir -p $CODEX_DIR; fi
 ln -snfv "$SCRIPT_DIR/AGENTS.md" "$CODEX_DIR/AGENTS.md"
 
 # superpowers プラグイン
-# pipefail 下の grep -q は、一覧の出力中にパイプを閉じて失敗扱いになりうるので使わない。
-if codex plugin list 2>/dev/null | grep -E '^superpowers@openai-curated +installed' >/dev/null; then
+# codex plugin list はオンラインだとリモートのカタログを返し、インストール済みでもこのプラグインを含まない。
+# そのため、codex plugin add が作るインストール先の有無で判定する。
+if [ -d "$CODEX_DIR/plugins/cache/openai-curated/superpowers" ]; then
   echo "superpowers plugin already installed, skipping"
 else
   codex plugin add superpowers@openai-curated

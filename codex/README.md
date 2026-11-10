@@ -104,7 +104,7 @@ Codex のユーザー設定 `~/.codex/config.toml` は、モデルや MCP の設
 1. macOS であることを確認する。
 2. `~/.codex/` がなければ作成する。
 3. `~/dotfiles/codex/AGENTS.md` を `~/.codex/AGENTS.md` へシンボリックリンクする（`ln -snfv`）。
-4. superpowers プラグインが未インストールなら追加する（`codex plugin add superpowers@openai-curated`）。
+4. superpowers プラグインが未インストールなら追加する（`codex plugin add superpowers@openai-curated`）。`~/.codex/plugins/cache/openai-curated/superpowers` があればインストール済みとみなす。
 5. Understand Anything スキルが未インストールなら、Codex 向けにインストールする（GitHub の `install.sh` を `curl | bash` で実行）。`~/.understand-anything-plugin` があればインストール済みとみなす。
 6. Claude Code 用にインストールした gstack を、Codex でも使えるようにセットアップする（`~/.claude/skills/gstack/setup --host codex`）。
 
