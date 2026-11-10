@@ -15,7 +15,7 @@ AWS CLI の設定を管理するディレクトリ。このリポジトリは公
 
 `config` と `credentials` はマシンごとにこのディレクトリで作成し、`~/.aws/` にシンボリックリンクする。
 
-1. `link.sh` を実行する。`config`（`[default]` の `region` だけ）と空の `credentials` がなければ作成し、`~/.aws/` にリンクする。`setup.command` からも実行される。
+1. `link.sh` を実行する。`config`（`[default]` の `region` だけ）と空の `credentials` がなければ作成し、`~/.aws/` にリンクする。`setup.command` からも実行される。`~/.aws/` に実ファイルの `config` や `credentials` があれば、上書きせずに止まる。その場合は、そのファイルをこのディレクトリに移してから再実行する。
 
    ```sh
    ~/dotfiles/aws/link.sh
