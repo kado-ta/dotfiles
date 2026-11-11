@@ -214,7 +214,13 @@ def push(d: Decision) -> int:
     この push は作業リポジトリの設定とフックを読まないので、実行中でも送り先を変えられない。
     作業リポジトリには書き込まない。設定や ref が別の場所へのリンクの可能性があるため。
     """
-    work = Path(tempfile.mkdtemp(prefix="cc-safe-push.", dir=private_root()))
+    try:
+        work = Path(tempfile.mkdtemp(prefix="cc-safe-push.", dir=private_root()))
+    except OSError:
+        # sandbox.excludedCommands と完全一致せず、sandbox 内で動いたときにここで失敗する。
+        print("PUSH FAILED: cannot create a private temporary directory;"
+              " run cc-safe-push alone so that it runs outside the sandbox", file=sys.stderr)
+        return EXIT_FAILED
     try:
         git(work, "init", "--quiet", "--bare", "--template=", ".")
         (work / "objects/info").mkdir(parents=True, exist_ok=True)

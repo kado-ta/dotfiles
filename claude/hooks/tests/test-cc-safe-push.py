@@ -441,6 +441,14 @@ class RealPushTests(Base):
                 self.assertEqual(policy.push(d), policy.EXIT_FAILED)
         self.assertNotIn("CANARY", err.getvalue())
 
+    def test_unwritable_private_root_is_reported_without_a_traceback(self):
+        d = self.evaluate()
+        err = io.StringIO()
+        with mock.patch.object(policy.tempfile, "mkdtemp", side_effect=PermissionError(1, "Operation not permitted")):
+            with contextlib.redirect_stderr(err):
+                self.assertEqual(policy.push(d), policy.EXIT_FAILED)
+        self.assertIn("run cc-safe-push alone", err.getvalue())
+
     def test_refused_transport_does_not_push(self):
         with mock.patch.object(policy, "TRANSPORT", "ssh"):
             self.assertEqual(self.push()[0], policy.EXIT_FAILED)
