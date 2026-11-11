@@ -58,12 +58,13 @@ class CheckRepoTests(unittest.TestCase):
     def git(self, *args):
         subprocess.run(["git", "-C", str(self.root), *args], check=True, capture_output=True)
 
-    def write(self, rel, text, mode=0o644):
+    def write(self, rel, text, mode=0o644, add=True):
         path = self.root / rel
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text, encoding="utf-8")
         path.chmod(mode)
-        self.git("add", "--", rel)
+        if add:
+            self.git("add", "--", rel)
 
     def write_settings(self, data):
         self.write("claude/settings.json", json.dumps(data, indent=2))
@@ -90,6 +91,16 @@ class CheckRepoTests(unittest.TestCase):
         # 検査対象のこのファイル自体が一致しないよう、連結で組み立てる。
         self.write("notes.txt", "/Users/" + "alice/x\n")
         self.assert_fails("FAIL local-paths", "notes.txt:1:")
+
+    def test_untracked_file_with_user_path_fails(self):
+        # push する前に手元で実行したとき、まだ git add していないファイルも検査する。
+        self.write("notes.txt", "/Users/" + "alice/x\n", add=False)
+        self.assert_fails("FAIL local-paths", "notes.txt:1:")
+
+    def test_ignored_file_with_user_path_passes(self):
+        self.write(".gitignore", "local.txt\n")
+        self.write("local.txt", "/Users/" + "alice/x\n", add=False)
+        self.assert_passes()
 
     def test_placeholder_user_path_passes(self):
         self.write("notes.txt", "/Users/example/x\n/Users/some one/x\n")
@@ -161,6 +172,15 @@ class CheckRepoTests(unittest.TestCase):
     def test_link_in_code_ignored(self):
         self.write("README.md", README + "```\n[x](NOPE.md)\n```\n\n`[x](NOPE.md)`\n")
         self.assert_passes()
+
+    def test_nested_fence_keeps_checking(self):
+        # 短いフェンスや別の文字のフェンスは、外側のフェンスを閉じない。
+        inner = "````md\n```bash\n[y](NOPE2.md)\n```\n~~~\n````\n\n"
+        self.write("README.md", README + inner + "[x](NOPE.md)\n")
+        code, out = self.check()
+        self.assertEqual(code, 1, out)
+        self.assertIn("NOPE.md", out)
+        self.assertNotIn("NOPE2.md", out)
 
     def test_explicit_anchor_passes(self):
         self.write("README.md", README + '<a name="setup"></a>\n\n## セットアップ\n\n[x](#setup)\n')

@@ -2,7 +2,8 @@
 
 使い方: python3 -B .github/scripts/check-repo.py [ROOT]
 検査ごとに PASS / FAIL を出し、1 件でも失敗すれば終了コード 1 を返す。
-対象は git が追跡しているファイル（index）に限る。
+対象は git が追跡しているファイルと、無視されていない未追跡のファイル。
+CI は push の後に動くので、公開前に防ぐには push する前に手元で実行する。そのとき git add 前のファイルも見る。
 """
 
 import json
@@ -30,6 +31,7 @@ JSONC_FILES = {"vscode/settings.json", "vscode/keybindings.json"}
 SETTINGS = "claude/settings.json"
 
 LOCAL_PATH = re.compile(r"/(?:Users|home)/([A-Za-z0-9._-]+)")
+FENCE = re.compile(r"^\s*(`{3,}|~{3,})(.*)$")
 INLINE_CODE = re.compile(r"(`+).+?(?<!`)\1(?!`)")
 HEADING = re.compile(r"^ {0,3}#{1,6}\s+(.*?)(?:\s+#+)?\s*$")
 EXPLICIT_ANCHOR = re.compile(r'<a\s+(?:name|id)="([^"]+)"')
@@ -41,8 +43,8 @@ def git(root, *args):
     return subprocess.run(["git", "-C", str(root), *args], check=True, capture_output=True, text=True).stdout
 
 
-def tracked_files(root):
-    return [f for f in git(root, "ls-files", "-z").split("\0") if f]
+def repo_files(root):
+    return [f for f in git(root, "ls-files", "-z", "--cached", "--others", "--exclude-standard").split("\0") if f]
 
 
 def tracked_modes(root):
@@ -60,7 +62,7 @@ def load_settings(root):
 
 def check_local_paths(root):
     errors = []
-    for rel in tracked_files(root):
+    for rel in repo_files(root):
         try:
             text = (root / rel).read_text(encoding="utf-8")
         except UnicodeDecodeError:
@@ -73,7 +75,7 @@ def check_local_paths(root):
 
 
 def check_secret_files(root):
-    tracked = set(tracked_files(root))
+    tracked = set(repo_files(root))
     return [f"{rel}: must not be tracked" for rel in FORBIDDEN_FILES if rel in tracked]
 
 
@@ -126,7 +128,7 @@ def check_push_permissions(root):
 
 def check_syntax(root):
     errors = []
-    for rel in tracked_files(root):
+    for rel in repo_files(root):
         if rel.endswith(".json") and rel not in JSONC_FILES:
             try:
                 json.loads((root / rel).read_text(encoding="utf-8"))
@@ -143,20 +145,28 @@ def check_syntax(root):
 def check_markdown_names(root):
     return [
         f"{rel}: Markdown file names outside docs/ use only A-Z and _"
-        for rel in tracked_files(root)
+        for rel in repo_files(root)
         if rel.endswith(".md") and not rel.startswith("docs/") and not re.fullmatch(r"[A-Z_]+", PurePosixPath(rel).stem)
     ]
 
 
 def prose_lines(text):
-    """フェンスの中を空行にした行のリストを返す（行番号は保つ）。"""
-    lines, fenced = [], False
+    """フェンスの中を空行にした行のリストを返す（行番号は保つ）。
+
+    CommonMark と同じく、開いたフェンスと同じ文字で、同じか長いフェンスだけが閉じる。
+    リストの中のフェンスも扱うため、インデントの深さは問わない。
+    """
+    lines, fence = [], None
     for line in text.splitlines():
-        if line.lstrip().startswith(("```", "~~~")):
-            fenced = not fenced
-            lines.append("")
+        m = FENCE.match(line)
+        if fence is None:
+            if m and not (m.group(1)[0] == "`" and "`" in m.group(2)):
+                fence = m.group(1)
+            lines.append("" if fence else line)
         else:
-            lines.append("" if fenced else line)
+            if m and m.group(1)[0] == fence[0] and len(m.group(1)) >= len(fence) and not m.group(2).strip():
+                fence = None
+            lines.append("")
     return lines
 
 
@@ -183,7 +193,7 @@ def anchors(lines):
 
 
 def check_markdown_links(root):
-    files = tracked_files(root)
+    files = repo_files(root)
     tracked = set(files)
     dirs = {str(p) for f in files for p in PurePosixPath(f).parents} - {"."}
     lines_cache, anchors_cache = {}, {}
