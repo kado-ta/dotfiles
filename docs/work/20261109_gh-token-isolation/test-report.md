@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: done
 created: 2026-11-11
 ---
 
@@ -57,7 +57,7 @@ created: 2026-11-11
 | V1 | Sandbox ON + auto | `gh` は `GH_TOKEN`（93 文字）で認証。`(default)` の Keychain は失敗。`gh pr view` とパイプ付きの `gh pr list` が成功。`GITHUB_TOKEN` は未設定 | 合格 |
 | V2 | Sandbox ON + Manual | `security find-generic-password -s gh:github.com` は sandbox 内で exit 44、sandbox 外では exit 0。`find-internet-password -s github.com` は sandbox 外でも exit 44（項目なし） | 合格 |
 | V3 | Sandbox ON + auto | 同じタイトルでの `gh api -X PATCH` を人間が承認して実行し、403 | 合格 |
-| V4 | 組織のリポジトリで始めたセッション | 未実施（組織トークンの承認後に実施） | 未実施 |
+| V4 | 組織のリポジトリ（`mortgage-products/sf-conn-api-spec`）で始めたセッション、Sandbox ON | `gh auth status` は `(GH_TOKEN)` の `github_pat_` で成功し、`(default)` の Keychain は失敗。`gh repo view` で `PRIVATE` のリポジトリを読めた（`kado-ta` 用のトークンでは読めないので、owner 用のトークンが選ばれている）。`gh pr list` もエラーなし | 合格 |
 | V5 | トークンのない owner | 単体テストで確認（`GH_TOKEN` が空になり、`GITHUB_TOKEN` なども消える） | 合格 |
 | V6 | Sandbox ON | この作業のコミット後の `cc-safe-push` と `cc-safe-pr create` が成功し、PR #9 を作成。依頼ファイルは消費された | 合格 |
 | V7 | 通常のターミナル | `gh auth status` は `(keyring)` で成功 | 合格 |
