@@ -160,7 +160,9 @@
       "Edit(**/.eslintrc)",
       "Edit(**/.eslintrc.*)",
       "Edit(**/.tflint.hcl)",
-      "Edit(~/Library/Logs/cc-safe-pr/**)"
+      "Edit(~/Library/Logs/cc-safe-pr/**)",
+      "Read(~/Library/Keychains/**)",
+      "Edit(~/.config/cc-gh-read/**)"
     ],
     "ask": [
       "Bash(gh pr create*)",
@@ -277,6 +279,16 @@
             "timeout": 10
           }
         ]
+      },
+      {
+        "matcher": "^(startup|resume|clear|compact|fork)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/bin/bash ~/.claude/hooks/gh-read-token.sh install",
+            "timeout": 10
+          }
+        ]
       }
     ]
   },
@@ -328,7 +340,15 @@
         "~/.aws/credentials",
         "~/dotfiles/aws/credentials",
         "~/.ssh/id_*",
-        "~/.ssh/config"
+        "~/.ssh/config",
+        "~/Library/Keychains"
+      ]
+    },
+    "credentials": {
+      "envVars": [
+        { "name": "GITHUB_TOKEN", "mode": "deny" },
+        { "name": "GH_ENTERPRISE_TOKEN", "mode": "deny" },
+        { "name": "GITHUB_ENTERPRISE_TOKEN", "mode": "deny" }
       ]
     },
     "enableWeakerNetworkIsolation": true,

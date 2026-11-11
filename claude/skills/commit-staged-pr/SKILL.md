@@ -81,7 +81,7 @@ description: Use when the user asks to commit only the currently staged git chan
    | 結果 | 対応 |
    |---|---|
    | 成功（終了コード 0） | `CREATED:` の行の URL を使って次に進む |
-   | 拒否（2）で、許可リストにないリポジトリ | 本文を一時ファイルに書き、`gh pr create --base <base> --head <branch> --title "<title>" --body-file <file>` を実行する（人間の承認が必要） |
+   | 拒否（2）で、許可リストにないリポジトリ | 本文と `gh pr create --base <base> --head <branch> --title "<title>" --body-file <file>` を示して止まり、人間に自分の端末で実行してもらう（sandbox 内の `gh` は書き込めない） |
    | そのほかの拒否（2）、失敗（1） | 理由を伝えて止まる |
    | 要確認（3） | 再実行せず、`gh pr list --head <branch> --state all` で状態を確認して伝える |
 

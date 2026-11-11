@@ -27,6 +27,7 @@ gstack は `gstack-upgrade` で更新する（`--check` で確認のみ）。
 | `hooks/ask-gh-pr-write.sh`     | PreToolUse（Bash） | `gh` の PR 書き込みと `gh api` を、表記ゆれも含めて人間の承認に回す                                                                         |
 | `hooks/precompact-context.sh`  | PreCompact         | ブランチ名・未コミットの変更・直近のコミットを、コンテキスト圧縮後も残す情報として Claude に渡す                                            |
 | `hooks/herdr-agent-state.sh`   | SessionStart       | herdr 上で起動したセッションの開始を herdr に通知する。herdr が生成・管理するため、直接編集しない                                           |
+| `hooks/gh-read-token.sh`       | SessionStart       | sandbox 内の Bash に、作業中のリポジトリの owner 用の読み取り専用トークンを `GH_TOKEN` として渡す                                           |
 
 このほか、入力待ちや応答完了の通知、PR 作成時の URL 表示などのフックを `settings.json` に直接記述している。ステータスライン（`scripts/statusline.sh`）は、カレントディレクトリ・ブランチ・コンテキスト使用率・利用上限の使用率・モデル・effort を表示する。
 
@@ -38,6 +39,7 @@ gstack は `gstack-upgrade` で更新する（`--check` で確認のみ）。
 bash claude/hooks/tests/test-protect-main-branch.sh
 bash claude/hooks/tests/test-validate-command.sh
 bash claude/hooks/tests/test-ask-gh-pr-write.sh
+bash claude/hooks/tests/test-gh-read-token.sh
 /usr/bin/python3 -B claude/hooks/tests/test-cc-safe-push.py
 /usr/bin/python3 -B claude/hooks/tests/test-cc-safe-pr.py
 ```
@@ -157,10 +159,10 @@ Claude は実行ユーザーの権限で動くので、root 所有にすると�
 
 ## cc-safe-pr
 
-Claude Code から PR を作成・編集するためのラッパー。`cc-safe-push` と同じ許可リストのリポジトリでは、承認なしで動く。許可リストにないリポジトリでは拒否するので、`gh pr create` を使う（`permissions.ask` とフックで人間の承認が必要になる）。マージとクローズの機能はない。
+Claude Code から PR を作成・編集するためのラッパー。`cc-safe-push` と同じ許可リストのリポジトリでは、承認なしで動く。許可リストにないリポジトリでは拒否するので、人間が自分の端末で `gh pr create` を実行する。マージとクローズの機能はない。
 
-> [!WARNING]
-> セキュリティ境界ではない。`gh` のトークンは sandbox の中からも読めるので、Claude が意図的に別の手段で GitHub API を呼ぶことは止められない。強制力があるのは GitHub 側のルールセットだけ。
+> [!NOTE]
+> sandbox 内の `gh` は読み取り専用トークンで動き、書き込みのできるトークンには届かない（[sandbox 内の gh](#gh-read-token)）。フックと `ask` ルールはセキュリティ境界ではないが、sandbox 内からの書き込みは GitHub が 403 で拒否する。
 
 <a name="cc-safe-pr-usage"></a>
 
@@ -225,3 +227,40 @@ grep -qxF '.cc-pr-request.json' ~/.config/git/ignore || echo '.cc-pr-request.jso
 `~/Library/Logs/cc-safe-pr/audit.jsonl` に、判定と結果を 1 行ずつ記録する。5 MiB を超えると `audit.jsonl.1` に置き換える（1 世代）。トークン、タイトル、本文は記録しない（長さとハッシュのみ）。書き込めないときは送信しない。
 
 ユーザーの権限で書かれるので、改ざんを防ぐものではない。GitHub 側の記録との突合には `github_request_id`（`X-GitHub-Request-Id`）と PR の URL を使う。
+
+<a name="gh-read-token"></a>
+
+## sandbox 内の gh
+
+sandbox 内の Bash からは Keychain を読めない（`sandbox.filesystem.denyRead` に `~/Library/Keychains`）。`gh auth login` で保存した書き込みのできるトークンを使えるのは、sandbox の外で動く `cc-safe-push` と `cc-safe-pr`、人間の端末だけ。
+
+起動元のシェルから引き継いだ `GITHUB_TOKEN`、`GH_ENTERPRISE_TOKEN`、`GITHUB_ENTERPRISE_TOKEN` は、`sandbox.credentials.envVars` の `deny` で sandbox 内から除き、下の 1 行でも消す。`gh` は `GH_TOKEN` が空のときにこれらを使うため。`GH_TOKEN` を `export` したシェルから Claude Code を起動しない（フックが動かなかった場合に残る）。
+
+sandbox 内の `gh` には、`hooks/gh-read-token.sh` が owner ごとの読み取り専用トークンを `GH_TOKEN` として渡す。SessionStart で `CLAUDE_ENV_FILE` に 1 行を追記し、その 1 行が Bash コマンドのたびに、カレントディレクトリの origin の owner に対応するトークンを選ぶ。
+
+| 操作 | 結果 |
+| --- | --- |
+| 読み取り（`gh pr view`、`gh pr list`、`gh run list` など） | 成功する |
+| 書き込み（PR の作成・編集・マージ、Issue の作成など） | 403 で失敗する。許可リストのリポジトリの PR は `cc-safe-pr` で、それ以外は人間が自分の端末で行う |
+| トークンを置いていない owner、origin のないディレクトリ | `GH_TOKEN` が空になり未認証になる（private リポジトリは読めない） |
+
+トークンは cwd の origin で選ぶので、`-R` で別の owner のリポジトリを指定しても、その owner のトークンは使われない。
+
+`gh pr checks` は、Fine-grained PAT の制限で CI のチェック結果を読めない可能性がある（CI のあるリポジトリでは未確認）。
+
+<a name="gh-read-token-setup"></a>
+
+### トークンの作成と配置
+
+1. GitHub の Fine-grained tokens で、owner ごとにトークンを作る。権限は Actions、Commit statuses、Contents、Issues、Pull requests を Read-only にする（Metadata は自動で付く）。組織の owner では管理者の承認が必要な場合がある。
+2. 1Password に「API 認証情報」として保存し、「Copy Secret Reference」で参照をコピーする。Vault 名と項目名はこのリポジトリに書かない。
+3. 通常のターミナルで配置する。ファイル名の owner は小文字にする。
+
+   ```sh
+   umask 077; mkdir -p ~/.config/cc-gh-read
+   op read 'op://<Vault>/<Item>/credential' > ~/.config/cc-gh-read/<owner>.token
+   ```
+
+更新するときは 1〜3 をやり直す。Bash コマンドのたびにファイルを読むので、Claude Code の再起動は要らない。owner を追加するときも、トークンを置くだけでよい。
+
+`settings.json` の変更を戻すと、次のセッションから `GH_TOKEN` は設定されず、sandbox 内の `gh` は Keychain のトークンを使うようになる。
