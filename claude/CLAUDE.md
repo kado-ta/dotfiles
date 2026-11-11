@@ -68,7 +68,8 @@ https://x.com/ai_database/status/2114184481951330365?s=12
 - push は、対象リポジトリに移動してから `/usr/local/libexec/claude-push/cc-safe-push` を引数なし・単独で実行する（現在のブランチを origin に送る）。`git push` は deny ルールで実行できない。
 - `cc-safe-push` が拒否（終了コード 2）や失敗（1）を返したら、理由と、実行すべき `git push` のコマンドをユーザーに伝え、別の方法で push しない。
 - PR の作成・編集は、カレントディレクトリに `.cc-pr-request.json` を書き、そのディレクトリで `/usr/local/libexec/claude-push/cc-safe-pr create`（または `edit`）を単独で実行する。形式は `claude/README.md` の cc-safe-pr の節を参照する。
-- `cc-safe-pr` が拒否（2）や失敗（1）を返したら、理由を伝える。依頼ファイルは実行のたびに消えるので、再実行するときは書き直す。許可リストにないリポジトリでは `gh pr create --head <branch>` を使う（upstream は設定されないので `--head` が必要。人間の承認が必要）。
+- `cc-safe-pr` が拒否（2）や失敗（1）を返したら、理由を伝える。依頼ファイルは実行のたびに消えるので、再実行するときは書き直す。許可リストにないリポジトリでは、`gh pr create --head <branch>` のコマンドを示して、人間に自分の端末で実行してもらう（upstream は設定されないので `--head` が必要）。
+- sandbox 内の `gh` は読み取り専用トークンで動く。PR の作成・編集・マージ、Issue の作成などの書き込みは 403 になるので試さない。許可リストのリポジトリの PR は `cc-safe-pr` を使い、それ以外は人間に依頼する。
 - `cc-safe-pr` が要確認（3）を返したら再実行せず、`create` は `gh pr list`、`edit` は `gh pr view <番号>` で状態を確認して伝える。PR のマージとクローズはしない。
 - コミットメッセージは Conventional Commits（`feat:` `fix:` `refactor:` `test:` `docs:` `chore:` など）。タイトルは英語、本文は日本語。OSS はそのリポジトリの慣習に従う。
 - 1 コミット = 1 論理変更。大きな変更はレビュー可能な単位に分割する。自動生成ファイルを含む場合は理由を明記する。
