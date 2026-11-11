@@ -118,6 +118,22 @@ class CheckRepoTests(unittest.TestCase):
         self.git("rm", "-q", "--cached", "claude/hooks/viabash.sh")
         self.assert_fails("FAIL hook-scripts", "claude/hooks/viabash.sh")
 
+    def test_unresolvable_hook_command_fails(self):
+        # パスを特定できない書き方は、黙って飛ばさず失敗にする。
+        data = settings()
+        data["hooks"]["PreToolUse"][0]["hooks"].append(
+            {"type": "command", "command": "/usr/bin/env bash ~/.claude/hooks/viabash.sh"}
+        )
+        self.write_settings(data)
+        self.assert_fails("FAIL hook-scripts", "cannot resolve")
+
+    def test_braced_home_hook_is_checked(self):
+        # ${HOME} の形もパスを特定し、直接実行するなら実行権限まで検査する。
+        data = settings()
+        data["hooks"]["PreToolUse"][0]["hooks"].append({"type": "command", "command": "${HOME}/.claude/hooks/viabash.sh"})
+        self.write_settings(data)
+        self.assert_fails("FAIL hook-scripts", "claude/hooks/viabash.sh: mode 100644")
+
     def test_missing_settings_fails(self):
         self.git("rm", "-q", "--cached", "claude/settings.json")
         (self.root / "claude/settings.json").unlink()

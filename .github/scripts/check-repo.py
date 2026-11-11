@@ -20,6 +20,7 @@ from pathlib import Path, PurePosixPath
 PLACEHOLDER_USERS = {"example", "some"}
 FORBIDDEN_FILES = ("aws/config", "aws/credentials")
 INTERPRETERS = {"bash", "/bin/bash", "sh", "/bin/sh"}
+CLAUDE_HOME = ("~/.claude/", "$HOME/.claude/", "${HOME}/.claude/")
 # sandbox と権限の境界なので、完全一致で検査する。広げるときはここも一緒に変える。
 WRAPPER_COMMANDS = (
     "/usr/local/libexec/claude-push/cc-safe-push",
@@ -30,6 +31,7 @@ DENY_PUSH = ("Bash(git push)", "Bash(git push *)", "Bash(git -C * push *)", "Bas
 JSONC_FILES = {"vscode/settings.json", "vscode/keybindings.json"}
 SETTINGS = "claude/settings.json"
 
+HOOK_SCRIPT = re.compile(r"\.claude/(?:hooks|scripts)/")
 LOCAL_PATH = re.compile(r"/(?:Users|home)/([A-Za-z0-9._-]+)")
 FENCE = re.compile(r"^\s*(`{3,}|~{3,})(.*)$")
 INLINE_CODE = re.compile(r"(`+).+?(?<!`)\1(?!`)")
@@ -94,13 +96,15 @@ def check_hook_scripts(root):
     modes = tracked_modes(root)
     errors = []
     for command in hook_commands(settings):
-        if ".claude/" not in command:
+        if not HOOK_SCRIPT.search(command):
             continue
         tokens = shlex.split(command)
         direct = tokens[0] not in INTERPRETERS
-        script = tokens[0] if direct else tokens[1]
-        rest = next((script[len(p):] for p in ("~/.claude/", "$HOME/.claude/") if script.startswith(p)), None)
+        script = tokens[0] if direct else (tokens[1] if len(tokens) > 1 else "")
+        rest = next((script[len(p):] for p in CLAUDE_HOME if script.startswith(p)), None)
         if rest is None or not rest.startswith(("hooks/", "scripts/")):
+            # 飛ばすと、フックがなくても実行権限がなくても通ってしまう。
+            errors.append(f"{SETTINGS}: cannot resolve the script path of a hook command: {command}")
             continue
         path = f"claude/{rest}"
         if path not in modes:
