@@ -26,8 +26,10 @@ else
 fi
 
 # Understand Anything スキルをインストールする。
-# install.sh は最後に ~/.understand-anything-plugin を作るので、完了の目印にする。
-if [ -e "$HOME/.understand-anything-plugin" ]; then
+# Codex 用のスキルのリンクと、install.sh が最後に作る ~/.understand-anything-plugin の両方を完了の目印にする。
+# ~/.understand-anything-plugin は他のホスト向けのインストールでも作られるため、それだけでは判定しない。
+# -e はリンク先をたどるので、リンク切れは未インストールとみなし、install.sh で張り直す。
+if [ -e "$HOME/.agents/skills/understand" ] && [ -e "$HOME/.understand-anything-plugin" ]; then
   echo "Understand Anything already installed, skipping"
 else
   curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/install.sh | bash -s codex

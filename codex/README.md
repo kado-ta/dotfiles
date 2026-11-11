@@ -105,7 +105,7 @@ Codex のユーザー設定 `~/.codex/config.toml` は、モデルや MCP の設
 2. `~/.codex/` がなければ作成する。
 3. `~/dotfiles/codex/AGENTS.md` を `~/.codex/AGENTS.md` へシンボリックリンクする（`ln -snfv`）。
 4. superpowers プラグインが未インストールなら追加する（`codex plugin add superpowers@openai-curated`）。`~/.codex/plugins/cache/openai-curated/superpowers` があればインストール済みとみなす。
-5. Understand Anything スキルが未インストールなら、Codex 向けにインストールする（GitHub の `install.sh` を `curl | bash` で実行）。`~/.understand-anything-plugin` があればインストール済みとみなす。
+5. Understand Anything スキルが未インストールなら、Codex 向けにインストールする（GitHub の `install.sh` を `curl | bash` で実行）。Codex 用のスキルのリンク `~/.agents/skills/understand` と `~/.understand-anything-plugin` の両方があれば、インストール済みとみなす。
 6. Claude Code 用にインストールした gstack を、Codex でも使えるようにセットアップする（`~/.claude/skills/gstack/setup --host codex`）。
 
 **`setup.sh` は `config.toml` を作成・変更しない。** 設定の反映は後述の `codex-config-sync` で行う。
