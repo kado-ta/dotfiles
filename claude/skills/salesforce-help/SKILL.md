@@ -43,7 +43,7 @@ https://help.salesforce.com/s/articleView?id=<id>&language=<language>&type=<type
 ## 本文を読めないとき
 
 1. WebSearch（`allowed_domains: ["help.salesforce.com"]`）で概要を探す。結果は検索の要約なので、そう明記して使う。
-2. 正確な本文が必要なら、次のコマンドを Ghostty で実行するようユーザーに依頼して待つ。Sandbox の中では Chromium が起動しない。
+2. 正確な本文が必要なら、次のコマンドを Ghostty で実行するか、Claude Code のプロンプトで先頭に `!` を付けて実行するようユーザーに依頼して待つ。`!` なら出力が会話に直接入る。Sandbox の中では Chromium が起動しない。
 
    ```sh
    B=~/.claude/skills/gstack/browse/dist/browse
