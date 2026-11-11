@@ -59,6 +59,7 @@ WebFetch で本文を読めたのは 20 件中 5 件（25%）だった。本文�
 - TOC_ONLY の途中の回のヘッダは `truncated to the first N from character M`、最後の回は `shown from character M` で、`truncated` は出なかった。判定表の停止条件は機能する。
 - 判定表の「全体が 150 字前後」は 2,352 字のシェルに当てはまらない。ただし、変更前の Skill を使うエージェントにこの結果を判定させるテストは 3 回とも正しく「本文を読めない」と判定したため、判定表は変えていない。
 - browse で描画した `sf.flow_builder.htm` の `document.body.innerText` は 5,976 字だった（2026-11-09、Ghostty で実行）。描画後の本文には目次が入らないので、`!` で出力を会話に入れても大きくならない。
+- 2026-11-11 に同じ記事を Claude Code 2.1.311 の `!` で描画した。Chromium は起動し、`document.body.innerText` は 6,004 字だった。
 
 <a name="decision"></a>
 ## 判断
@@ -80,7 +81,6 @@ WebFetch で本文を読めたのは 20 件中 5 件（25%）だった。本文�
 <a name="open-items"></a>
 ## 未解決
 
-- `!` で browse のコマンドを実行する動作は、まだ実機で確認していない（Ghostty では確認済み）。
 - background session では `!` も Sandbox の中で動くので、browse の Chromium は起動しないと考えられる（推測。未確認）。
 - 判定表の「全体が 150 字前後」の文面は、2,352 字のシェルに合わせて直していない。
 - `!` の出力に文字数の上限があるかは、ドキュメントに記載がない。
