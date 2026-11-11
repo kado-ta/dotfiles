@@ -3,6 +3,7 @@
 	br = branch -vv
 	df = diff
 	co = checkout
+	sw = switch
 	cm = commit
 	gr = grep
 	re = remote -v
