@@ -18,6 +18,25 @@ WRAPPER_COMMANDS = [
     "/usr/local/libexec/claude-push/cc-safe-pr edit",
 ]
 DENY_PUSH = ["Bash(git push)", "Bash(git push *)", "Bash(git -C * push *)", "Bash(git -c * push *)"]
+PROJECT_ASK = [
+    "Edit(/zsh/**)",
+    "Edit(/config/sheldon/**)",
+    "Edit(/config/starship/**)",
+    "Edit(/mise/**)",
+    "Edit(/mise.toml)",
+    "Edit(/ghostty/config)",
+    "Edit(/vscode/tasks.json)",
+]
+PROJECT_DENY_WRITE = [
+    "./claude",
+    "./zsh",
+    "./config/sheldon",
+    "./config/starship",
+    "./mise",
+    "./mise.toml",
+    "./ghostty/config",
+    "./vscode/tasks.json",
+]
 README = "## Foo Bar\n\n[x](#foo-bar)\n\n"
 
 
@@ -43,6 +62,14 @@ def settings():
     }
 
 
+def project_settings():
+    return {
+        "claudeMdExcludes": ["**/dotfiles/claude/CLAUDE.md"],
+        "permissions": {"ask": list(PROJECT_ASK)},
+        "sandbox": {"filesystem": {"denyWrite": list(PROJECT_DENY_WRITE)}},
+    }
+
+
 class CheckRepoTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory(prefix="check-repo-")
@@ -50,6 +77,7 @@ class CheckRepoTests(unittest.TestCase):
         self.root = Path(self.tmp.name)
         self.git("init", "-q")
         self.write_settings(settings())
+        self.write_project_settings(project_settings())
         self.write("claude/hooks/direct.sh", "#!/bin/bash\n", 0o755)
         self.write("claude/hooks/viabash.sh", "#!/bin/bash\n")
         self.write("claude/scripts/status.sh", "#!/bin/bash\n", 0o755)
@@ -68,6 +96,9 @@ class CheckRepoTests(unittest.TestCase):
 
     def write_settings(self, data):
         self.write("claude/settings.json", json.dumps(data, indent=2))
+
+    def write_project_settings(self, data):
+        self.write(".claude/settings.json", json.dumps(data, indent=2))
 
     def check(self):
         cp = subprocess.run([sys.executable, "-B", str(SCRIPT), str(self.root)], capture_output=True, text=True)
@@ -118,6 +149,22 @@ class CheckRepoTests(unittest.TestCase):
         self.git("rm", "-q", "--cached", "claude/hooks/viabash.sh")
         self.assert_fails("FAIL hook-scripts", "claude/hooks/viabash.sh")
 
+    def test_unresolvable_hook_command_fails(self):
+        # パスを特定できない書き方は、黙って飛ばさず失敗にする。
+        data = settings()
+        data["hooks"]["PreToolUse"][0]["hooks"].append(
+            {"type": "command", "command": "/usr/bin/env bash ~/.claude/hooks/viabash.sh"}
+        )
+        self.write_settings(data)
+        self.assert_fails("FAIL hook-scripts", "cannot resolve")
+
+    def test_braced_home_hook_is_checked(self):
+        # ${HOME} の形もパスを特定し、直接実行するなら実行権限まで検査する。
+        data = settings()
+        data["hooks"]["PreToolUse"][0]["hooks"].append({"type": "command", "command": "${HOME}/.claude/hooks/viabash.sh"})
+        self.write_settings(data)
+        self.assert_fails("FAIL hook-scripts", "claude/hooks/viabash.sh: mode 100644")
+
     def test_missing_settings_fails(self):
         self.git("rm", "-q", "--cached", "claude/settings.json")
         (self.root / "claude/settings.json").unlink()
@@ -140,6 +187,52 @@ class CheckRepoTests(unittest.TestCase):
         data["permissions"]["deny"].remove("Bash(git -C * push *)")
         self.write_settings(data)
         self.assert_fails("FAIL push-permissions", "Bash(git -C * push *)")
+
+    def test_project_allow_rule_fails(self):
+        data = project_settings()
+        data["permissions"]["allow"] = ["Bash(*)"]
+        self.write_project_settings(data)
+        self.assert_fails("FAIL project-permissions", "permissions.allow")
+
+    def test_project_excluded_commands_fails(self):
+        data = project_settings()
+        data["sandbox"]["excludedCommands"] = ["git"]
+        self.write_project_settings(data)
+        self.assert_fails("FAIL project-permissions", "sandbox.excludedCommands")
+
+    def test_project_unknown_key_fails(self):
+        # 中身が空でも、許可していないキーは失敗にする。
+        data = project_settings()
+        data["hooks"] = {}
+        self.write_project_settings(data)
+        self.assert_fails("FAIL project-permissions", "hooks")
+
+    def test_project_removed_deny_write_fails(self):
+        data = project_settings()
+        data["sandbox"]["filesystem"]["denyWrite"].remove("./claude")
+        self.write_project_settings(data)
+        self.assert_fails("FAIL project-permissions", "./claude")
+
+    def test_project_removed_ask_fails(self):
+        data = project_settings()
+        data["permissions"]["ask"].remove("Edit(/mise.toml)")
+        self.write_project_settings(data)
+        self.assert_fails("FAIL project-permissions", "Edit(/mise.toml)")
+
+    def test_project_added_restrictions_pass(self):
+        # 制限を強める方向の追加は通す。
+        data = project_settings()
+        data["permissions"]["ask"].append("Edit(/bin/**)")
+        data["permissions"]["deny"] = ["Bash(rm *)"]
+        data["sandbox"]["filesystem"]["denyWrite"].append("./bin")
+        data["sandbox"]["filesystem"]["denyRead"] = ["./secrets"]
+        self.write_project_settings(data)
+        self.assert_passes()
+
+    def test_missing_project_settings_fails(self):
+        self.git("rm", "-q", "--cached", ".claude/settings.json")
+        (self.root / ".claude/settings.json").unlink()
+        self.assert_fails("FAIL project-permissions")
 
     def test_invalid_json_fails(self):
         self.write("x.json", "{,}")

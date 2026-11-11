@@ -41,7 +41,7 @@ mise run sf:plugins       # sf のプラグインを config/sf/plugins.txt に�
 
 このディレクトリを `.claude/` という名前にしない。dotfiles で起動したときに、`~/.claude/` のリンク先と同じファイルが Project 設定としても読み込まれるため。
 
-dotfiles で起動したときだけ必要な設定（`denyWrite`、`claudeMdExcludes`）は、`.claude/settings.json` に置く。
+dotfiles で起動したときだけ必要な設定（`denyWrite`、`claudeMdExcludes`）は、`.claude/settings.json` に置く。ここには制限を足す設定（`claudeMdExcludes`、`permissions.ask` / `deny`、`sandbox.filesystem.denyWrite` / `denyRead`）だけを置く。ほかのキーを足したり、今の ask と denyWrite の項目を消したりすると、`check-repo.py` の `project-permissions` が失敗する。外すときは検査の定数も一緒に変える。
 
 `claude/setup.sh` がメインのエントリーポイント。Claude Code のセッション内と IDE の統合ターミナルでは実行を拒否する（セッション中にリンクを張り直すと、Claude Code のサンドボックスがリンクを削除し、deny ルール・フック・サンドボックスが無効になるため）。通常のターミナルで、すべてのセッションを閉じてから実行する。以下を実行する:
 
