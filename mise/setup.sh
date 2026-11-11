@@ -8,7 +8,7 @@ if [ "$(uname)" != "Darwin" ] ; then
 	exit 1
 fi
 
-SCRIPT_DIR=$(cd $(dirname $0) && pwd)
+SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 CONFIG_DIR="$HOME/.config"
 
 echo "SCRIPT_DIR: $SCRIPT_DIR"

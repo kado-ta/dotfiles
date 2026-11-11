@@ -1,0 +1,91 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Repository checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      SHELLCHECK_VERSION: v0.11.0
+      SHELLCHECK_SHA256: 8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198
+      ACTIONLINT_VERSION: 1.7.12
+      ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # 手元（Homebrew）と同じ版に固定し、チェックサムを確かめてから使う。
+      - name: Install shellcheck and actionlint
+        run: |
+          bin="$RUNNER_TEMP/bin"
+          mkdir -p "$bin"
+          cd "$RUNNER_TEMP"
+          curl -fsSLo shellcheck.tar.xz "https://github.com/koalaman/shellcheck/releases/download/${SHELLCHECK_VERSION}/shellcheck-${SHELLCHECK_VERSION}.linux.x86_64.tar.xz"
+          echo "${SHELLCHECK_SHA256}  shellcheck.tar.xz" | sha256sum -c -
+          tar -xJf shellcheck.tar.xz
+          mv "shellcheck-${SHELLCHECK_VERSION}/shellcheck" "$bin/"
+          curl -fsSLo actionlint.tar.gz "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          echo "${ACTIONLINT_SHA256}  actionlint.tar.gz" | sha256sum -c -
+          tar -xzf actionlint.tar.gz -C "$bin" actionlint
+          echo "$bin" >> "$GITHUB_PATH"
+
+      - name: Repository checks
+        run: python3 -B .github/scripts/check-repo.py
+
+      - name: Tests for repository checks
+        run: python3 -B .github/scripts/test-check-repo.py
+
+      # herdr-agent-state.sh は herdr が生成・上書きするので対象外。
+      - name: shellcheck
+        run: git ls-files -z '*.sh' '*.command' ':!:claude/hooks/herdr-agent-state.sh' | xargs -0 shellcheck -S warning
+
+      - name: actionlint
+        run: actionlint
+
+  hook-tests:
+    name: Hook regression tests
+    runs-on: macos-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # 本番と同じインタプリタで動いたことをログに残す。
+      - name: Show interpreters
+        run: |
+          /bin/bash --version | head -n 1
+          /usr/bin/python3 --version
+          command -v jq git
+
+      # テストは "$BASH" でフックを起動するので、本番と同じ /bin/bash で実行する。
+      - name: Shell hook tests
+        run: |
+          rc=0
+          for t in claude/hooks/tests/test-*.sh; do
+            echo "== $t"
+            /bin/bash "$t" || rc=1
+          done
+          exit "$rc"
+
+      - name: Python wrapper tests
+        run: |
+          rc=0
+          for t in claude/hooks/tests/test-*.py; do
+            echo "== $t"
+            /usr/bin/python3 -B "$t" || rc=1
+          done
+          exit "$rc"

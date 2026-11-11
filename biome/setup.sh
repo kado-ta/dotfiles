@@ -7,7 +7,7 @@ fi
 
 # スクリプト内で実行した場合、$0 はスクリプトのパス（例: ./biome/setup.sh）になる。
 # ターミナルで直接実行した場合、$0 はシェル自身の名前になため、$0 は -/bin/zsh のような先頭にハイフンが付いた値となる。
-SCRIPT_DIR=$(cd $(dirname $0) && pwd)
+SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 BIOME_DIR="$HOME/Library/Application Support/biome"
 
 echo "SCRIPT_DIR: $SCRIPT_DIR"

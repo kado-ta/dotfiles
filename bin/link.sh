@@ -5,7 +5,7 @@ if [ "$(uname)" != "Darwin" ] ; then
 	exit 1
 fi
 
-SCRIPT_DIR=$(cd $(dirname $0) && pwd)
+SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 echo "SCRIPT_DIR is $SCRIPT_DIR"
 
 for dotfile in "${SCRIPT_DIR}"/.??* ; do

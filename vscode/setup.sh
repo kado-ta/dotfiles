@@ -5,7 +5,7 @@ if [ "$(uname)" != "Darwin" ] ; then
 	exit 1
 fi
 
-SCRIPT_DIR=$(cd $(dirname $0) && pwd)
+SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 VSCODE_DIR="$HOME/Library/Application Support/Code/User"
 PJMANAGER_EXT_DIR="$HOME/Library/Application Support/Code/User/globalStorage/alefragnani.project-manager"
 
