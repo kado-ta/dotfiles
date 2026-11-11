@@ -59,5 +59,5 @@ created: 2026-11-11
 | V3 | Sandbox ON + auto | 同じタイトルでの `gh api -X PATCH` を人間が承認して実行し、403 | 合格 |
 | V4 | 組織のリポジトリで始めたセッション | 未実施（組織トークンの承認後に実施） | 未実施 |
 | V5 | トークンのない owner | 単体テストで確認（`GH_TOKEN` が空になり、`GITHUB_TOKEN` なども消える） | 合格 |
-| V6 | Sandbox ON | この作業のコミット後の `cc-safe-push` と `cc-safe-pr create` | 下記 |
+| V6 | Sandbox ON | この作業のコミット後の `cc-safe-push` と `cc-safe-pr create` が成功し、PR #9 を作成。依頼ファイルは消費された | 合格 |
 | V7 | 通常のターミナル | `gh auth status` は `(keyring)` で成功 | 合格 |
