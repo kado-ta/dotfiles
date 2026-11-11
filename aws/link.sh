@@ -1,6 +1,6 @@
 #!/bin/bash -e
 
-SCRIPT_DIR=$(cd $(dirname $0) && pwd)
+SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 AWS_CONFIG_DIR="$HOME/.aws"
 
 echo "SCRIPT_DIR:     $SCRIPT_DIR"

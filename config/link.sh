@@ -8,7 +8,7 @@ fi
 # NOTE: この config/ ディレクトリ内の管理対象が増えた場合は ln コマンドを追加すること。
 
 # 共通コマンド
-SCRIPT_DIR=$(cd $(dirname $0) && pwd)
+SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 CONFIG_DIR="$HOME/.config"
 
 echo "SCRIPT_DIR: $SCRIPT_DIR"

@@ -1,7 +1,7 @@
 #!/bin/bash -e
 
 # ターミナルから実行した場合と、Finder から実行した場合とで、実行ディレクトリを一致させる。
-if [ "$(basename $(pwd))" != "dotfiles" ]; then
+if [ "$(basename "$(pwd)")" != "dotfiles" ]; then
 		cd ~/dotfiles
 fi
 

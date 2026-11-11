@@ -7,7 +7,7 @@ if [ "$(uname)" != "Darwin" ] ; then
     exit 1
 fi
 
-SCRIPT_DIR=$(cd $(dirname $0) && pwd)
+SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 CODEX_DIR="$HOME/.codex"
 
 echo "SCRIPT_DIR: $SCRIPT_DIR"
