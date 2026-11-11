@@ -30,6 +30,35 @@ WRAPPER_COMMANDS = (
 DENY_PUSH = ("Bash(git push)", "Bash(git push *)", "Bash(git -C * push *)", "Bash(git -c * push *)")
 JSONC_FILES = {"vscode/settings.json", "vscode/keybindings.json"}
 SETTINGS = "claude/settings.json"
+PROJECT_SETTINGS = ".claude/settings.json"
+# プロジェクト側には制限を足す設定だけを置く。権限を広げるキーは、未知のものも含めて失敗にする。
+PROJECT_ALLOWED_KEYS = {
+    "claudeMdExcludes",
+    "permissions.ask",
+    "permissions.deny",
+    "sandbox.filesystem.denyWrite",
+    "sandbox.filesystem.denyRead",
+}
+# 消すと dotfiles で起動したときの権限が広がる。外すときはここも一緒に変える。
+PROJECT_ASK = (
+    "Edit(/zsh/**)",
+    "Edit(/config/sheldon/**)",
+    "Edit(/config/starship/**)",
+    "Edit(/mise/**)",
+    "Edit(/mise.toml)",
+    "Edit(/ghostty/config)",
+    "Edit(/vscode/tasks.json)",
+)
+PROJECT_DENY_WRITE = (
+    "./claude",
+    "./zsh",
+    "./config/sheldon",
+    "./config/starship",
+    "./mise",
+    "./mise.toml",
+    "./ghostty/config",
+    "./vscode/tasks.json",
+)
 
 HOOK_SCRIPT = re.compile(r"\.claude/(?:hooks|scripts)/")
 LOCAL_PATH = re.compile(r"/(?:Users|home)/([A-Za-z0-9._-]+)")
@@ -127,6 +156,31 @@ def check_push_permissions(root):
         errors.append(f"{SETTINGS}: sandbox.excludedCommands is {excluded}, expected {sorted(WRAPPER_COMMANDS)}")
     deny = set(permissions.get("deny", []))
     errors += [f"{SETTINGS}: permissions.deny lacks {rule}" for rule in DENY_PUSH if rule not in deny]
+    return errors
+
+
+def key_paths(value, prefix=""):
+    """dict を末端のキーのパス（a.b.c）に展開する。空の dict も末端として返す。"""
+    if isinstance(value, dict) and value:
+        for key, child in value.items():
+            yield from key_paths(child, f"{prefix}.{key}" if prefix else key)
+    elif prefix:
+        yield prefix
+
+
+def check_project_permissions(root):
+    settings = json.loads((root / PROJECT_SETTINGS).read_text(encoding="utf-8"))
+    errors = [
+        f"{PROJECT_SETTINGS}: {path} is not allowed (only settings that add restrictions belong here)"
+        for path in key_paths(settings)
+        if path not in PROJECT_ALLOWED_KEYS
+    ]
+    ask = set(settings.get("permissions", {}).get("ask", []))
+    errors += [f"{PROJECT_SETTINGS}: permissions.ask lacks {rule}" for rule in PROJECT_ASK if rule not in ask]
+    deny_write = set(settings.get("sandbox", {}).get("filesystem", {}).get("denyWrite", []))
+    errors += [
+        f"{PROJECT_SETTINGS}: sandbox.filesystem.denyWrite lacks {path}" for path in PROJECT_DENY_WRITE if path not in deny_write
+    ]
     return errors
 
 
@@ -238,6 +292,7 @@ CHECKS = (
     ("secret-files", check_secret_files),
     ("hook-scripts", check_hook_scripts),
     ("push-permissions", check_push_permissions),
+    ("project-permissions", check_project_permissions),
     ("syntax", check_syntax),
     ("markdown-names", check_markdown_names),
     ("markdown-links", check_markdown_links),
