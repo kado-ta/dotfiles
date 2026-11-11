@@ -44,6 +44,8 @@ bash claude/hooks/tests/test-gh-read-token.sh
 /usr/bin/python3 -B claude/hooks/tests/test-cc-safe-pr.py
 ```
 
+PR と main への push では、GitHub Actions が macOS の `/bin/bash` と `/usr/bin/python3` で同じテストを実行する。
+
 ## cc-safe-push
 
 Claude Code から `git push` するためのラッパー。`settings.json` で `git push` を deny にしているので、Claude はこのラッパーでしか push できない。どのリポジトリのどのブランチに送れるかは、root 所有のラッパーと許可リストで決める。
