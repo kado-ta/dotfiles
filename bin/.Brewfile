@@ -67,6 +67,3 @@ cask "visual-studio-code"
 # cask "postman"
 # cask "slack"
 # cask "zoom"
-
-npm "corepack"
-npm "vercel"

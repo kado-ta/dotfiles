@@ -45,7 +45,7 @@ Finder で `init.command` をダブルクリックする（ターミナルから
 | #   | スクリプト             | 内容                                                                                                                            |
 | --- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
 | 1   | `bin/link.sh`          | `bin/` の dotfiles（`.zshrc`・`.zprofile`・`.gitconfig`・`.Brewfile` など）を `~` にリンクする                                  |
-| 2   | `bin/setup_brew.sh`    | `~/.Brewfile` のパッケージをインストールする（`brew bundle --global`）                                                          |
+| 2   | `bin/setup_brew.sh`    | `~/.Brewfile` のパッケージをインストールする（`brew bundle install --global --no-upgrade`）                                     |
 | 3   | `config/link.sh`       | Starship・Sheldon・uv・sf の設定を `~/.config/` にリンクする                                                                    |
 | 4   | `zsh/setup_plugins.sh` | Sheldon で Zsh プラグインをインストールする                                                                                     |
 | 5   | `aws/link.sh`          | AWS CLI の設定（`config`・`credentials`）をリンクする                                                                           |

@@ -15,6 +15,7 @@ echo "PJMANAGER_EXT_DIR: $PJMANAGER_EXT_DIR"
 
 # VSCode
 # Create symbolic link of settings.json
+mkdir -p "${VSCODE_DIR}"
 ln -snfv "${SCRIPT_DIR}/settings.json" "${VSCODE_DIR}/settings.json"
 ln -snfv "${SCRIPT_DIR}/keybindings.json" "${VSCODE_DIR}/keybindings.json"
 ln -snfv "${SCRIPT_DIR}/tasks.json" "${VSCODE_DIR}/tasks.json"
@@ -29,6 +30,7 @@ if [ "$(which code)" != "" ]; then
   fi
 
   # VSCode PROJECT MANAGER 拡張の設定ファイルのシンボリックリンクを作成する。
+  mkdir -p "${PJMANAGER_EXT_DIR}"
   ln -snfv "${SCRIPT_DIR}/projects.json" "${PJMANAGER_EXT_DIR}/projects.json"
 else
   echo "Install 'code' command from VSCode command palette to install your extensions."

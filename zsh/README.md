@@ -98,7 +98,7 @@ use = ["{!sync,*}.zsh"]
 
 `setup.command` から呼ばれる。単独で実行してもよい。
 
-`sheldon lock --reinstall` を実行し、`plugins.toml` に記載したプラグインを取得し直してロックファイルを再生成する。何度実行してもよい。
+`sheldon lock` を実行し、`plugins.toml` に記載したプラグインのうち未取得のものを取得して、ロックファイルを再生成する。取得済みのプラグインは取り直さないので、何度実行してもよい。プラグインを取り直すときは `sheldon lock --reinstall` を手動で実行する。
 
 ```bash
 ~/dotfiles/zsh/setup_plugins.sh
@@ -195,10 +195,10 @@ exec zsh
 
 ### プラグインを追加・削除した
 
-`~/dotfiles/config/sheldon/plugins.toml` を編集し、プラグインを再取得する。
+`~/dotfiles/config/sheldon/plugins.toml` を編集し、未取得のプラグインを取得する。
 
 ```bash
-~/dotfiles/zsh/setup_plugins.sh   # sheldon lock --reinstall
+~/dotfiles/zsh/setup_plugins.sh   # sheldon lock
 exec zsh
 ```
 
