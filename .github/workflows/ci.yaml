@@ -69,7 +69,9 @@ jobs:
         run: |
           /bin/bash --version | head -n 1
           /usr/bin/python3 --version
-          command -v jq git
+          # 1 行にまとめると、どちらかがなくても成功する。
+          command -v jq
+          command -v git
 
       # テストは "$BASH" でフックを起動するので、本番と同じ /bin/bash で実行する。
       - name: Shell hook tests
