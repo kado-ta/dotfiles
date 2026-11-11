@@ -253,8 +253,8 @@ sandbox 内の `gh` には、`hooks/gh-read-token.sh` が owner ごとの読み�
 ### トークンの作成と配置
 
 1. GitHub の Fine-grained tokens で、owner ごとにトークンを作る。権限は Actions、Commit statuses、Contents、Issues、Pull requests を Read-only にする（Metadata は自動で付く）。組織の owner では管理者の承認が必要な場合がある。
-2. 1Password に「API 認証情報」として保存し、「Copy Secret Reference」で参照をコピーする。Vault 名と項目名はこのリポジトリに書かない。
-3. 通常のターミナルで配置する。ファイル名の owner は小文字にする。
+2. 1Password に「API 認証情報」として保存し、「秘密参照をコピーする」(`'op://<Vault>/<Item>/credential'`) で参照をコピーする。Vault 名と項目名はこのリポジトリに書かない。
+3. 通常のターミナルで配置する。ファイル名の **owner は小文字**にする。
 
    ```sh
    umask 077; mkdir -p ~/.config/cc-gh-read
