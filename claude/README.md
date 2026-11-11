@@ -20,14 +20,14 @@ gstack は `gstack-upgrade` で更新する（`--check` で確認のみ）。
 
 ## フック
 
-| ファイル                       | イベント           | 動作                                                                                                                                        |
-| ------------------------------ | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| `hooks/validate-command.sh`    | PreToolUse（Bash） | `rm -rf` と、本番環境（`prod` / `prd`）を含むコマンドをブロックする。`sf devops` の参照系コマンドと PR 作成は、単独のコマンドに限り許可する |
-| `hooks/protect-main-branch.sh` | PreToolUse（Bash） | `main`・`master`・`staging` ブランチへの `git commit` をブロックする                                                                        |
-| `hooks/ask-gh-pr-write.sh`     | PreToolUse（Bash） | `gh` の PR 書き込みと `gh api` を、表記ゆれも含めて人間の承認に回す                                                                         |
-| `hooks/precompact-context.sh`  | PreCompact         | ブランチ名・未コミットの変更・直近のコミットを、コンテキスト圧縮後も残す情報として Claude に渡す                                            |
-| `hooks/herdr-agent-state.sh`   | SessionStart       | herdr 上で起動したセッションの開始を herdr に通知する。herdr が生成・管理するため、直接編集しない                                           |
-| `hooks/gh-read-token.sh`       | SessionStart       | sandbox 内の Bash に、作業中のリポジトリの owner 用の読み取り専用トークンを `GH_TOKEN` として渡す                                           |
+| ファイル                       | イベント           | 動作                                                                                                                                                                                                                          |
+| ------------------------------ | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `hooks/validate-command.sh`    | PreToolUse（Bash） | `rm -rf` と、本番環境（`prod` / `prd`）を含むコマンドをブロックする。`sf devops` の参照系コマンドと PR 作成は、単独のコマンドに限り許可する。`cc-safe-push` / `cc-safe-pr` は、前後にコマンドや引数を付けた実行をブロックする |
+| `hooks/protect-main-branch.sh` | PreToolUse（Bash） | `main`・`master`・`staging` ブランチへの `git commit` をブロックする                                                                                                                                                          |
+| `hooks/ask-gh-pr-write.sh`     | PreToolUse（Bash） | `gh` の PR 書き込みと `gh api` を、表記ゆれも含めて人間の承認に回す                                                                                                                                                           |
+| `hooks/precompact-context.sh`  | PreCompact         | ブランチ名・未コミットの変更・直近のコミットを、コンテキスト圧縮後も残す情報として Claude に渡す                                                                                                                              |
+| `hooks/herdr-agent-state.sh`   | SessionStart       | herdr 上で起動したセッションの開始を herdr に通知する。herdr が生成・管理するため、直接編集しない                                                                                                                             |
+| `hooks/gh-read-token.sh`       | SessionStart       | sandbox 内の Bash に、作業中のリポジトリの owner 用の読み取り専用トークンを `GH_TOKEN` として渡す                                                                                                                             |
 
 このほか、入力待ちや応答完了の通知、PR 作成時の URL 表示などのフックを `settings.json` に直接記述している。ステータスライン（`scripts/statusline.sh`）は、カレントディレクトリ・ブランチ・コンテキスト使用率・利用上限の使用率・モデル・effort を表示する。
 
@@ -55,6 +55,8 @@ Claude Code から `git push` するためのラッパー。`settings.json` で 
 ### 動作
 
 対象リポジトリに移動して、`/usr/local/libexec/claude-push/cc-safe-push` を引数なし・単独で実行する。現在のブランチを origin の同じ名前のブランチに送る。
+
+`cd` や `; echo` などを前後に付けると `sandbox.excludedCommands` と一致せず、sandbox 内で動いて一時ディレクトリを作れずに失敗する（終了コード 1）。`hooks/validate-command.sh` は、この形の実行をブロックする。
 
 | 状況                                                                                                          | 結果                                   |
 | ------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
@@ -240,11 +242,11 @@ sandbox 内の Bash からは Keychain を読めない（`sandbox.filesystem.den
 
 sandbox 内の `gh` には、`hooks/gh-read-token.sh` が owner ごとの読み取り専用トークンを `GH_TOKEN` として渡す。SessionStart で `CLAUDE_ENV_FILE` に 1 行を追記し、その 1 行が Bash コマンドのたびに、カレントディレクトリの origin の owner に対応するトークンを選ぶ。
 
-| 操作 | 結果 |
-| --- | --- |
-| 読み取り（`gh pr view`、`gh pr list`、`gh run list` など） | 成功する |
-| 書き込み（PR の作成・編集・マージ、Issue の作成など） | 403 で失敗する。許可リストのリポジトリの PR は `cc-safe-pr` で、それ以外は人間が自分の端末で行う |
-| トークンを置いていない owner、origin のないディレクトリ | `GH_TOKEN` が空になり未認証になる（private リポジトリは読めない） |
+| 操作                                                       | 結果                                                                                             |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| 読み取り（`gh pr view`、`gh pr list`、`gh run list` など） | 成功する                                                                                         |
+| 書き込み（PR の作成・編集・マージ、Issue の作成など）      | 403 で失敗する。許可リストのリポジトリの PR は `cc-safe-pr` で、それ以外は人間が自分の端末で行う |
+| トークンを置いていない owner、origin のないディレクトリ    | `GH_TOKEN` が空になり未認証になる（private リポジトリは読めない）                                |
 
 トークンは cwd の origin で選ぶので、`-R` で別の owner のリポジトリを指定しても、その owner のトークンは使われない。
 

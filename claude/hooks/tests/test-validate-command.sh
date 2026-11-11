@@ -48,6 +48,17 @@ check 0 'echo prdx' 'prd inside a longer word'
 check 0 'sf devops pipeline list --target-org prod-hub'
 check 2 'sf devops pipeline list --target-org prod-hub; ls' 'chained after an allowed command'
 
+# cc-safe-push / cc-safe-pr run outside the sandbox only when they match sandbox.excludedCommands exactly
+check 0 '/usr/local/libexec/claude-push/cc-safe-push'
+check 0 '/usr/local/libexec/claude-push/cc-safe-pr create'
+check 0 '/usr/local/libexec/claude-push/cc-safe-pr edit'
+check 2 '/usr/local/libexec/claude-push/cc-safe-push; echo "push_exit=$?"' 'cc-safe-push with a command after it'
+check 2 'cd /tmp && /usr/local/libexec/claude-push/cc-safe-push' 'cc-safe-push after cd'
+check 2 '/usr/local/libexec/claude-push/cc-safe-push origin main' 'cc-safe-push with arguments'
+check 2 '/usr/local/libexec/claude-push/cc-safe-pr create && echo done' 'cc-safe-pr with a command after it'
+check 2 '/usr/local/libexec/claude-push/cc-safe-pr' 'cc-safe-pr without a subcommand'
+check 0 '/usr/bin/python3 -B claude/hooks/tests/test-cc-safe-push.py' 'the wrapper tests'
+
 # A broken or missing jq blocks every command, because it cannot be inspected (fail closed)
 BROKEN_JQ="$T/broken-jq"
 NO_JQ="$T/no-jq"

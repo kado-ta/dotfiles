@@ -53,14 +53,14 @@ dotfiles で起動したときだけ必要な設定（`denyWrite`、`claudeMdExc
 
 ### フック
 
-| ファイル                       | トリガー          | 動作                                                                                                                        |
-| ------------------------------ | ----------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `hooks/validate-command.sh`    | PreToolUse (Bash) | `rm -rf` および `prod`/`prd` を含むコマンドをブロック（`sf devops` の参照系コマンドと PR 作成は、単独のコマンドに限り許可） |
-| `hooks/protect-main-branch.sh` | PreToolUse (Bash) | `main`, `master`, `staging` への `git commit` をブロック                                                                    |
-| `hooks/ask-gh-pr-write.sh`     | PreToolUse (Bash) | `gh` の PR 書き込みと `gh api` を、表記ゆれも含めて人間の承認に回す                                                         |
-| `hooks/precompact-context.sh`  | PreCompact        | ブランチ名・`git status --short`・直近 5 件のコミットを `additionalContext` として渡す                                      |
-| `hooks/herdr-agent-state.sh`   | SessionStart      | herdr にセッション開始を通知する。herdr が生成・上書きするファイルのため編集しない                                          |
-| `hooks/gh-read-token.sh`       | SessionStart      | sandbox 内の Bash に、作業中のリポジトリの owner 用の読み取り専用トークンを `GH_TOKEN` として渡す                           |
+| ファイル                       | トリガー          | 動作                                                                                                                                                                           |
+| ------------------------------ | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `hooks/validate-command.sh`    | PreToolUse (Bash) | `rm -rf` および `prod`/`prd` を含むコマンドと、単独でない `cc-safe-push` / `cc-safe-pr` の実行をブロック（`sf devops` の参照系コマンドと PR 作成は、単独のコマンドに限り許可） |
+| `hooks/protect-main-branch.sh` | PreToolUse (Bash) | `main`, `master`, `staging` への `git commit` をブロック                                                                                                                       |
+| `hooks/ask-gh-pr-write.sh`     | PreToolUse (Bash) | `gh` の PR 書き込みと `gh api` を、表記ゆれも含めて人間の承認に回す                                                                                                            |
+| `hooks/precompact-context.sh`  | PreCompact        | ブランチ名・`git status --short`・直近 5 件のコミットを `additionalContext` として渡す                                                                                         |
+| `hooks/herdr-agent-state.sh`   | SessionStart      | herdr にセッション開始を通知する。herdr が生成・上書きするファイルのため編集しない                                                                                             |
+| `hooks/gh-read-token.sh`       | SessionStart      | sandbox 内の Bash に、作業中のリポジトリの owner 用の読み取り専用トークンを `GH_TOKEN` として渡す                                                                              |
 
 上記のほか、通知（Notification / Stop）や PR 作成時の URL 表示（PostToolUse）のフックは `settings.json` に直接記述している。
 
