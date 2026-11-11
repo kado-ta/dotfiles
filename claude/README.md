@@ -65,7 +65,7 @@ Claude Code から `git push` するためのラッパー。`settings.json` で 
 
 終了コードは、0 が成功、1 が push の失敗、2 が拒否。
 
-upstream は設定されないので、PR は `gh pr create --head <branch>` で作る。
+upstream は設定されないので、PR は `gh pr create --head <branch>` で作る。upstream が必要なときは、人間が自分の端末で、そのブランチに切り替えて引数なしの `git push` を実行する。`bin/.gitconfig` の `push.autoSetupRemote = true` により、送るコミットがなくても upstream が設定される（未 push のコミットがあれば、それも送られる）。`git push origin <branch>` のように送り先を指定すると設定されない。
 
 <a name="cc-safe-push-install"></a>
 
