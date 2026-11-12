@@ -1,0 +1,177 @@
+#!/usr/bin/python3 -I
+"""Claude Code から Crit の対話レビューを開くための、固定形式の判定と実行。
+
+/usr/local/libexec/claude-crit/cc-crit に root 所有でインストールする。
+Claude Code が sandbox の外で動かすのは review / reply の完全一致だけなので、
+判定はフックや permission ルールではなく、すべてここで行う。
+crit は同じディレクトリの cc-crit.sb（Crit 専用の Seatbelt profile）と専用の HOME の中で動かす。
+ここでは git を実行しない。index を読む git は core.fsmonitor を起動し、core.hooksPath では止まらないため。
+設計: docs/work/20261111_crit-sandbox/design.md
+"""
+from __future__ import annotations
+
+import contextlib
+import json
+import os
+import re
+import stat
+import sys
+import uuid
+from pathlib import Path
+from typing import Any
+
+sys.dont_write_bytecode = True
+
+REQUEST = ".cc-crit-request.json"
+MAX_REQUEST = 512 * 1024
+MAX_FILES = 20
+MAX_REPLIES = 50
+MAX_BODY = 65536
+EXIT_FAILED = 1
+EXIT_DENIED = 2
+SESSION = re.compile(r"[0-9a-f]{12}\Z")
+COMMENT_ID = re.compile(r"c_[0-9a-f]{6,16}\Z")
+# 返信の本文では、改行とタブ以外の制御文字を拒否する。端末の制御シーケンスなどを入れさせない。
+CONTROL = re.compile(r"[\x00-\x08\x0b-\x1f\x7f]")
+# ファイル名では、改行とタブも含めて制御文字を拒否する。
+CONTROL_ANY = re.compile(r"[\x00-\x1f\x7f]")
+FIELDS = {"review": {"files"}, "reply": {"session", "replies"}}
+REPLY_FIELDS = {"reply_to", "body"}
+
+
+class Stop(Exception):
+    label = "FAILED"
+    code = EXIT_FAILED
+
+    def __init__(self, reason: str):
+        super().__init__(reason)
+        self.reason = reason
+
+
+class Failed(Stop):
+    pass
+
+
+class Denied(Stop):
+    label = "DENIED"
+    code = EXIT_DENIED
+
+
+def read_claimed(claimed: str) -> bytes:
+    fd = os.open(claimed, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC)
+    try:
+        st = os.fstat(fd)
+        # ハードリンクで sandbox から読めないファイルを指せないように nlink も見る。
+        if not stat.S_ISREG(st.st_mode) or st.st_uid != os.getuid() or st.st_nlink != 1:
+            raise Denied("request must be a regular file you own, with one link")
+        if st.st_size > MAX_REQUEST:
+            raise Denied("request is too large")
+        return os.read(fd, MAX_REQUEST + 1)
+    finally:
+        os.close(fd)
+
+
+def claim_request() -> bytes:
+    # 固定名を一意の名前へ rename して確保する。同時実行や、あとから書かれた依頼を取り違えない。
+    # rename はリンクをたどらない。依頼は 1 回限りで、読んだらすぐ消す。
+    claimed = f"{REQUEST}.{uuid.uuid4().hex}"
+    try:
+        os.rename(REQUEST, claimed)
+    except OSError:
+        raise Denied(f"no readable {REQUEST} in the current directory")
+    try:
+        return read_claimed(claimed)
+    except OSError:
+        raise Denied("request must be a regular file you own, with one link")
+    finally:
+        with contextlib.suppress(OSError):
+            os.unlink(claimed)
+
+
+def unique_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result = dict(pairs)
+    if len(result) != len(pairs):
+        raise ValueError("duplicate key")
+    return result
+
+
+def reject_constant(name: str) -> None:
+    raise ValueError("non-finite number")
+
+
+def parse_files(value: Any) -> list[str]:
+    if not isinstance(value, list) or len(value) > MAX_FILES:
+        raise Denied(f"files must be a list of at most {MAX_FILES} paths")
+    for name in value:
+        if not isinstance(name, str) or not name or CONTROL_ANY.search(name):
+            raise Denied("each file must be a non-empty path without control characters")
+    return list(value)
+
+
+def parse_replies(obj: dict[str, Any]) -> dict[str, Any]:
+    session = obj["session"]
+    if not isinstance(session, str) or not SESSION.match(session):
+        raise Denied("session must be 12 lowercase hex characters")
+    replies = obj["replies"]
+    if not isinstance(replies, list) or not 0 < len(replies) <= MAX_REPLIES:
+        raise Denied(f"replies must be a list of 1 to {MAX_REPLIES} replies")
+    result = []
+    for reply in replies:
+        # 返信だけを受け付ける。解決済みへの変更、author の指定、新しいコメントの追加はさせない。
+        if not isinstance(reply, dict) or set(reply) != REPLY_FIELDS:
+            raise Denied("each reply must have exactly reply_to and body")
+        if not isinstance(reply["reply_to"], str) or not COMMENT_ID.match(reply["reply_to"]):
+            raise Denied("reply_to must be a comment id such as c_73f150")
+        body = reply["body"]
+        if not isinstance(body, str) or not 0 < len(body) <= MAX_BODY or CONTROL.search(body):
+            raise Denied(f"body must be 1 to {MAX_BODY} characters without control characters")
+        result.append({"reply_to": reply["reply_to"], "body": body})
+    return {"session": session, "replies": result}
+
+
+def parse_request(raw: bytes, op: str) -> dict[str, Any]:
+    # エラーメッセージに内容を含めない。リンク先のファイルの内容が出ることがある。
+    try:
+        obj = json.loads(raw.decode("utf-8"), object_pairs_hook=unique_keys, parse_constant=reject_constant)
+    except (ValueError, RecursionError):
+        raise Denied("request is not valid JSON")
+    if not isinstance(obj, dict):
+        raise Denied("request must be a JSON object")
+    if op == "review":
+        if not set(obj) <= FIELDS["review"]:
+            raise Denied("request has unknown fields")
+        return {"files": parse_files(obj.get("files", []))}
+    if set(obj) != FIELDS["reply"]:
+        raise Denied("request has missing or unknown fields")
+    return parse_replies(obj)
+
+
+def find_toplevel(cwd: Path) -> Path:
+    # git を実行せずに、.git（ディレクトリか、worktree のファイル）がある最も近い祖先を返す。
+    for directory in (cwd, *cwd.parents):
+        if os.path.lexists(directory / ".git"):
+            return directory
+    raise Denied("run cc-crit inside a git repository")
+
+
+def resolve_files(files: list[str], cwd: Path, top: Path) -> list[str]:
+    top = Path(os.path.realpath(top))
+    result = []
+    for name in files:
+        if name.startswith("-"):
+            raise Denied("file names must not start with -")
+        path = Path(os.path.realpath(cwd / name))
+        try:
+            rel = path.relative_to(top)
+        except ValueError:
+            raise Denied("files must be inside the repository")
+        if not rel.parts or rel.parts[0] == ".git":
+            raise Denied("files must be inside the repository and outside .git")
+        try:
+            st = os.stat(path)
+        except OSError:
+            raise Denied("files must exist")
+        if not stat.S_ISREG(st.st_mode):
+            raise Denied("files must be regular files")
+        result.append(str(path))
+    return result
