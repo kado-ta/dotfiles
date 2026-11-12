@@ -157,10 +157,14 @@ Claude（Bash ツール）
 | --- | --- |
 | 書き込み | 専用 HOME の `.crit` 配下と、ラッパーが作る専用の一時ディレクトリだけ。`~/.crit` は書けない |
 | 読み取り | 全体。ただし、Claude の `sandbox.filesystem.denyRead` に相当するパスと `~/Library/Keychains`、`~/.crit` は拒否する |
-| ネットワーク | `localhost` の専用ポート範囲（例: 47800〜47819）での bind・inbound・outbound だけ。外部への通信はすべて拒否 |
+| ネットワーク | 専用ポート範囲（47800〜47819）での bind・inbound・outbound だけ。外部への通信はすべて拒否。**待ち受けのアドレスは制限できない**（下記） |
 | プロセス | `crit` と `git`（とその内部ツール）の実行 |
 | mach-lookup | 動作に必要な最小限。LaunchServices と Apple Events は拒否 |
 
+- **Seatbelt の限界【実測】（2026-11-12、タスク 1 の検証）:** `(local ip "localhost:N")` はアドレスを区別せず、範囲内のポートなら `0.0.0.0`、`::`、LAN のアドレスでも待ち受けられる。接続相手を `(remote ip "localhost:*")` で条件にすると、listen 自体が拒否される。profile で制限できるのはポートだけなので、待ち受けのアドレスは次の 3 つで守る（2026-11-12 に人間が決定）。
+  - crit の設定: 専用 HOME の設定で `host` を `127.0.0.1` に固定し、`--host` と `CRIT_HOST` は渡さない。プロジェクトの設定からは `host` を変えられない【コード】。crit が LAN のアドレスから届かないことを、profile のテストで確かめる。
+  - 実行の制限: profile の中で実行できるのは crit と git だけで、git のグローバル・システム設定も読ませない。任意のコードで `0.0.0.0` に待ち受けるのは難しい。
+  - ファイアウォール（有効）: crit と git は ad-hoc 署名なので、「署名されたソフトウェアを自動で許可」の対象外。loopback 以外のアドレスで外から接続を受けるときは、確認されるか遮断される【推測】。
 - 専用ポート範囲で待ち受けているのは、cc-crit の daemon だけである必要がある。ラッパーは、範囲内の待ち受けのうち、専用 HOME の session ファイルに記録されていないものが 1 つでもあれば、実行を拒否する。
 - `denyRead` との対応: ラッパーは実行時にユーザー設定とプロジェクト設定の `denyRead` を読み、profile の固定の拒否リストで覆えないものがあれば、実行を拒否する。
 - profile の各規則は、実装時に crit と git を実際に動かして必要最小限まで詰める。互換性のために、ワイルドカードの bind や広い mach-lookup を足す必要が出たら、この設計を見直す。
@@ -183,7 +187,7 @@ sandbox の外への書き込みとコード実行、機密ファイル（`denyR
 | T2 | crit や git に機密ファイルを読ませる | profile で `denyRead` 相当を拒否する。ファイルは git toplevel の配下に限る。`denyRead` を覆えない設定なら実行を拒否する | 検証後の差し替え。読めるのは profile が許す範囲まで |
 | T3 | リポジトリの設定で git にコードを実行させる | `.git/config` と `.git/hooks` は sandbox から書けない【実測】。グローバル設定とシステム設定を読ませないので、`.gitattributes` から使えるドライバーがない | 実行されても profile の中に閉じ、専用 HOME の外に書けない |
 | T4 | 外部へ持ち出す | profile で外部への通信をすべて拒否する。更新確認は止める | ブラウザ経由（[5.3](#residual)） |
-| T5 | LAN に露出する | bind は `localhost` の専用範囲だけ。`--host` と `CRIT_HOST` は渡さず、専用 HOME の設定で host を固定する | なし |
+| T5 | LAN に露出する | profile で待ち受けをポート範囲に限る。アドレスは、crit の設定（`127.0.0.1` に固定。`--host` と `CRIT_HOST` は渡さない）、profile の中の実行の制限、ファイアウォールで守る（4.4） | profile の中で任意のコードを実行され、かつファイアウォールの確認を許可した場合は、範囲内のポートで LAN から届く |
 | T6 | localhost のほかのサービスに接続する | outbound は専用範囲だけ。範囲内に cc-crit 以外の待ち受けがあれば実行を拒否する | なし【推測】 |
 | T7 | `~/.crit` のグローバル設定（hooks・prompts・custom.css）を書き換える | Claude の sandbox からも profile からも書けない | なし |
 | T8 | session ファイルを偽造して、sandbox の外の plan-hook を別のサーバーに向ける | plan-hook の `~/.crit/sessions` には、Claude の sandbox からも profile からも書けない。cc-crit の session は専用 HOME に分ける | なし |
@@ -233,8 +237,9 @@ sandbox の外への書き込みとコード実行、機密ファイル（`denyR
 2. インストール後、Claude の Bash ツールから `cc-crit` でファイルと差分のレビューを開き、コメント → Finish → 再実行 → 承認まで通す
 3. profile の拒否の確認: crit の子プロセスから次の操作がすべて失敗すること
    - 外部への接続
-   - 待ち受け: `127.0.0.1`、`::1`、IPv4-mapped、`0.0.0.0`、`::`、LAN のアドレス、範囲外のポート
+   - 待ち受け: 範囲外のポート（`127.0.0.1` と `::1`）。範囲内のポートでのアドレスの制限は、Seatbelt ではできない（4.4）
    - 接続: 範囲外の localhost のポート
+   - crit が LAN のアドレスから届かないこと（crit が `127.0.0.1` だけで待ち受けていること）
    - 書き込み: `~/.crit` と専用 HOME の外
 4. 信頼の固定（T11）: `.crit/hooks` を置いたリポジトリで、Finish が止まらず、hook も実行されないこと
    - テスト用のリポジトリに `.crit/hooks/on_finish_approved.sh` と `on_finish_unresolved.sh` を置く。中身は、実行されたら一時ディレクトリに印のファイルを作るだけにする
