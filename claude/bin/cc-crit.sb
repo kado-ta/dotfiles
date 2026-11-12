@@ -1,0 +1,139 @@
+(version 1)
+; cc-crit が crit を動かすための Seatbelt profile。既定は拒否で、crit と git に要るものだけを許可する。
+; /usr/local/libexec/claude-crit/cc-crit.sb に root 所有でインストールし、cc-crit が sandbox-exec -f で使う。
+; 値は sandbox-exec -D で受け取る:
+;   HOME_REAL    ユーザーの本当の HOME
+;   CRIT_HOME    crit に HOME として渡す専用のディレクトリ（~/.cc-crit/crit-home）
+;   PRIVATE_TMP  crit に TMPDIR として渡す専用の一時ディレクトリ
+; 設計: docs/work/20261111_crit-sandbox/design.md の 4.4
+(deny default)
+
+(define (home-path p) (string-append (param "HOME_REAL") p))
+
+; --- プロセス ---
+; 実行できるのは crit と git だけ。シェル、open、osascript などは実行できない。
+(allow process-exec
+  (literal "/opt/homebrew/bin/crit")
+  (subpath "/opt/homebrew/Cellar/crit")
+  (literal "/opt/homebrew/bin/git")
+  (subpath "/opt/homebrew/Cellar/git"))
+(allow process-fork)
+(allow process-info* (target same-sandbox))
+(allow signal (target same-sandbox))
+
+; --- Mach サービス ---
+; ユーザー情報の参照とログだけ。LaunchServices、Apple Events、Keychain（securityd）は許可しない。
+(allow mach-lookup
+  (global-name "com.apple.system.opendirectoryd.libinfo")
+  (global-name "com.apple.system.opendirectoryd.membership")
+  (global-name "com.apple.system.logger")
+  (global-name "com.apple.logd")
+  (global-name "com.apple.bsd.dirhelper"))
+
+; --- sysctl（読み取りだけ。sandbox-runtime の基本規則と同じ一覧） ---
+(allow sysctl-read
+  (sysctl-name "hw.activecpu")
+  (sysctl-name "hw.byteorder")
+  (sysctl-name "hw.cacheconfig")
+  (sysctl-name "hw.cachelinesize_compat")
+  (sysctl-name "hw.cpufamily")
+  (sysctl-name "hw.cputype")
+  (sysctl-name "hw.logicalcpu")
+  (sysctl-name "hw.logicalcpu_max")
+  (sysctl-name "hw.machine")
+  (sysctl-name "hw.memsize")
+  (sysctl-name "hw.ncpu")
+  (sysctl-name "hw.nperflevels")
+  (sysctl-name "hw.pagesize")
+  (sysctl-name "hw.pagesize_compat")
+  (sysctl-name "hw.physicalcpu")
+  (sysctl-name "hw.physicalcpu_max")
+  (sysctl-name "kern.argmax")
+  (sysctl-name "kern.hostname")
+  (sysctl-name "kern.maxfiles")
+  (sysctl-name "kern.maxfilesperproc")
+  (sysctl-name "kern.maxproc")
+  (sysctl-name "kern.ngroups")
+  (sysctl-name "kern.osproductversion")
+  (sysctl-name "kern.osrelease")
+  (sysctl-name "kern.ostype")
+  (sysctl-name "kern.osvariant_status")
+  (sysctl-name "kern.osversion")
+  (sysctl-name "kern.secure_kernel")
+  (sysctl-name "kern.usrstack64")
+  (sysctl-name "kern.version")
+  (sysctl-name "machdep.cpu.brand_string")
+  (sysctl-name "machdep.ptrauth_enabled")
+  (sysctl-name "security.mac.lockdown_mode_state")
+  (sysctl-name "sysctl.proc_cputype")
+  (sysctl-name "vm.loadavg")
+  (sysctl-name-prefix "hw.optional.")
+  (sysctl-name-prefix "hw.perflevel")
+  (sysctl-name-prefix "kern.proc.all")
+  (sysctl-name-prefix "kern.proc.pgrp.")
+  (sysctl-name-prefix "kern.proc.pid.")
+  (sysctl-name-prefix "machdep.cpu."))
+
+; --- 読み取り ---
+; 全体を許可し、Claude Code の sandbox が読ませないものと、本物の crit の状態を拒否する。
+; 「; denyRead: 」の行は、claude/settings.json の sandbox.filesystem.denyRead のどの項目をその規則が覆うかを示す。
+; cc-crit の COVERED_DENY_READ と同じ内容にする（テストで照合する）。
+(allow file-read*)
+; denyRead: ~/.ssh/id_*
+; denyRead: ~/.ssh/config
+(deny file-read* (regex #"/\.ssh(/|$)"))
+; denyRead: ~/.aws/credentials
+(deny file-read* (regex #"/\.aws(/|$)"))
+; denyRead: ~/dotfiles/aws/credentials
+(deny file-read* (regex #"/credentials(/|$)"))
+; denyRead: ~/Library/Keychains
+(deny file-read* (subpath (home-path "/Library/Keychains")))
+; 以下は permissions.deny の Read(...) に相当する。
+(deny file-read*
+  (regex #"/\.env[^/]*$")
+  (regex #"/id_rsa[^/]*$")
+  (regex #"/id_ed25519[^/]*$")
+  (regex #"\.key$")
+  (regex #"\.pem$")
+  (regex #"/\.pgpass$")
+  (regex #"/secrets(/|$)")
+  (literal (home-path "/dotfiles/aws/config")))
+; 本物の crit の状態（plan-hook が使う）と、Claude Code の IDE 連携の情報。
+(deny file-read*
+  (subpath (home-path "/.crit"))
+  (literal (home-path "/.crit.config.json"))
+  (subpath (home-path "/.claude/ide")))
+
+; --- 書き込み ---
+; 専用 HOME の .crit 配下と、専用の一時ディレクトリだけ。専用 HOME の .crit.config.json には書けない。
+(allow file-write*
+  (subpath (string-append (param "CRIT_HOME") "/.crit"))
+  (subpath (param "PRIVATE_TMP"))
+  (literal "/dev/null")
+  (literal "/dev/dtracehelper"))
+(allow file-ioctl
+  (literal "/dev/null")
+  (literal "/dev/dtracehelper"))
+
+; --- ネットワーク ---
+; ポート 47800〜47819 だけ。外部への接続と、範囲外のポートでの待ち受け・接続はできない。
+; (local ip "localhost:N") はアドレスを区別しないので、範囲内なら 0.0.0.0 や LAN のアドレスでも待ち受けられる。
+; 接続相手を条件にすると listen 自体が拒否されるので、待ち受けのアドレスは crit の設定（127.0.0.1）で決める。
+(allow network-bind
+  (local ip "localhost:47800") (local ip "localhost:47801") (local ip "localhost:47802") (local ip "localhost:47803")
+  (local ip "localhost:47804") (local ip "localhost:47805") (local ip "localhost:47806") (local ip "localhost:47807")
+  (local ip "localhost:47808") (local ip "localhost:47809") (local ip "localhost:47810") (local ip "localhost:47811")
+  (local ip "localhost:47812") (local ip "localhost:47813") (local ip "localhost:47814") (local ip "localhost:47815")
+  (local ip "localhost:47816") (local ip "localhost:47817") (local ip "localhost:47818") (local ip "localhost:47819"))
+(allow network-inbound
+  (local ip "localhost:47800") (local ip "localhost:47801") (local ip "localhost:47802") (local ip "localhost:47803")
+  (local ip "localhost:47804") (local ip "localhost:47805") (local ip "localhost:47806") (local ip "localhost:47807")
+  (local ip "localhost:47808") (local ip "localhost:47809") (local ip "localhost:47810") (local ip "localhost:47811")
+  (local ip "localhost:47812") (local ip "localhost:47813") (local ip "localhost:47814") (local ip "localhost:47815")
+  (local ip "localhost:47816") (local ip "localhost:47817") (local ip "localhost:47818") (local ip "localhost:47819"))
+(allow network-outbound
+  (remote ip "localhost:47800") (remote ip "localhost:47801") (remote ip "localhost:47802") (remote ip "localhost:47803")
+  (remote ip "localhost:47804") (remote ip "localhost:47805") (remote ip "localhost:47806") (remote ip "localhost:47807")
+  (remote ip "localhost:47808") (remote ip "localhost:47809") (remote ip "localhost:47810") (remote ip "localhost:47811")
+  (remote ip "localhost:47812") (remote ip "localhost:47813") (remote ip "localhost:47814") (remote ip "localhost:47815")
+  (remote ip "localhost:47816") (remote ip "localhost:47817") (remote ip "localhost:47818") (remote ip "localhost:47819"))
