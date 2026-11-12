@@ -232,6 +232,56 @@ grep -qxF '.cc-pr-request.json' ~/.config/git/ignore || echo '.cc-pr-request.jso
 
 ユーザーの権限で書かれるので、改ざんを防ぐものではない。GitHub 側の記録との突合には `github_request_id`（`X-GitHub-Request-Id`）と PR の URL を使う。
 
+<a name="cc-crit"></a>
+
+## cc-crit
+
+Claude Code から Crit の対話レビューを開くためのラッパー。sandbox の中の crit は `~/.crit` に書けず、localhost でも待ち受けられない。そこで `cc-crit` が sandbox の外で、Crit 専用の Seatbelt profile（`cc-crit.sb`）と専用の HOME（`~/.cc-crit/crit-home`）の中で crit を動かす。設計とセキュリティレビューは [docs/work/20261111_crit-sandbox/design.md](../docs/work/20261111_crit-sandbox/design.md) を参照する。
+
+Plan Mode の plan のレビューは、Crit プラグインの hook（sandbox の外で動く）が行うので、`cc-crit` は使わない。
+
+<a name="cc-crit-usage"></a>
+
+### 使い方
+
+Claude は個人スキル `/crit-review`（`claude/skills/crit-review/SKILL.md`）の手順に従う。作業ディレクトリに `.cc-crit-request.json` を書き、次のどちらかを単独で実行する。
+
+| コマンド | 依頼ファイル | 動作 |
+| --- | --- | --- |
+| `/usr/local/libexec/claude-crit/cc-crit review` | `{"files": ["path"]}`、ブランチの差分なら `{}` | crit をポート 47800〜47819 で起動してブラウザを開き、Finish Review まで待つ |
+| `/usr/local/libexec/claude-crit/cc-crit reply` | `{"session": "<id>", "replies": [{"reply_to": "c_…", "body": "…"}]}` | 既存のコメントに返信する。author は `Claude Code` に固定 |
+
+終了コードは、0 が成功、1 が失敗、2 が拒否。依頼ファイルは実行のたびに消える。
+
+<a name="cc-crit-install"></a>
+
+### インストール
+
+通常のターミナルで行う。crit（Homebrew）と Homebrew の git が前提。
+
+```sh
+cd ~/dotfiles
+sudo install -d -o root -g wheel -m 0755 /usr/local/libexec/claude-crit
+sudo install -o root -g wheel -m 0755 claude/bin/cc-crit /usr/local/libexec/claude-crit/cc-crit
+sudo install -o root -g wheel -m 0644 claude/bin/cc-crit.sb /usr/local/libexec/claude-crit/cc-crit.sb
+# 依頼ファイルをグローバルの ignore に追加する（すでに書かれていれば何もしない）
+grep -qxF '.cc-crit-request.json' ~/.config/git/ignore || echo '.cc-crit-request.json' >> ~/.config/git/ignore
+```
+
+インストールしたら、sandbox の外で profile のテストを実行する。Claude Code の sandbox の中では `sandbox-exec` を入れ子にできないので、スキップされる。
+
+```sh
+/usr/bin/python3 -B claude/hooks/tests/test-cc-crit-profile.py
+```
+
+<a name="cc-crit-update"></a>
+
+### 更新するとき
+
+`cc-crit` か `cc-crit.sb` を変更したら、再度インストールする。crit、git、macOS を更新したら、profile のテストをやり直す。profile は crit と git の実行ファイルの場所と、動作に要る権限に依存する。
+
+アンインストールは、`settings.json` の `cc-crit` の行を消して `sudo rm -r /usr/local/libexec/claude-crit` を実行する。専用 HOME の `~/.cc-crit` は残るので、要らなければ消す。
+
 <a name="gh-read-token"></a>
 
 ## sandbox 内の gh
