@@ -59,6 +59,15 @@ check 2 '/usr/local/libexec/claude-push/cc-safe-pr create && echo done' 'cc-safe
 check 2 '/usr/local/libexec/claude-push/cc-safe-pr' 'cc-safe-pr without a subcommand'
 check 0 '/usr/bin/python3 -B claude/hooks/tests/test-cc-safe-push.py' 'the wrapper tests'
 
+# cc-crit も、sandbox.excludedCommands と完全一致したときだけ sandbox の外で動く
+check 0 '/usr/local/libexec/claude-crit/cc-crit review'
+check 0 '/usr/local/libexec/claude-crit/cc-crit reply'
+check 2 '/usr/local/libexec/claude-crit/cc-crit review; echo "exit=$?"' 'cc-crit with a command after it'
+check 2 'cd /tmp && /usr/local/libexec/claude-crit/cc-crit review' 'cc-crit after cd'
+check 2 '/usr/local/libexec/claude-crit/cc-crit review docs/plan.md' 'cc-crit with an extra argument'
+check 2 '/usr/local/libexec/claude-crit/cc-crit' 'cc-crit without a subcommand'
+check 0 '/usr/bin/python3 -B claude/hooks/tests/test-cc-crit.py' 'the cc-crit tests'
+
 # A broken or missing jq blocks every command, because it cannot be inspected (fail closed)
 BROKEN_JQ="$T/broken-jq"
 NO_JQ="$T/no-jq"

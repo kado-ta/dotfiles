@@ -16,8 +16,10 @@ WRAPPER_COMMANDS = [
     "/usr/local/libexec/claude-push/cc-safe-push",
     "/usr/local/libexec/claude-push/cc-safe-pr create",
     "/usr/local/libexec/claude-push/cc-safe-pr edit",
+    "/usr/local/libexec/claude-crit/cc-crit review",
+    "/usr/local/libexec/claude-crit/cc-crit reply",
 ]
-DENY_PUSH = ["Bash(git push)", "Bash(git push *)", "Bash(git -C * push *)", "Bash(git -c * push *)"]
+DENY_PUSH =["Bash(git push)", "Bash(git push *)", "Bash(git -C * push *)", "Bash(git -c * push *)"]
 PROJECT_ASK = [
     "Edit(/zsh/**)",
     "Edit(/config/sheldon/**)",
@@ -179,6 +181,24 @@ class CheckRepoTests(unittest.TestCase):
     def test_broader_wrapper_allow_fails(self):
         data = settings()
         data["permissions"]["allow"].append("Bash(/usr/local/libexec/claude-push/cc-safe-pr *)")
+        self.write_settings(data)
+        self.assert_fails("FAIL push-permissions")
+
+    def test_broader_cc_crit_allow_fails(self):
+        data = settings()
+        data["permissions"]["allow"].append("Bash(/usr/local/libexec/claude-crit/cc-crit *)")
+        self.write_settings(data)
+        self.assert_fails("FAIL push-permissions")
+
+    def test_unknown_wrapper_allow_fails(self):
+        data = settings()
+        data["permissions"]["allow"].append("Bash(/usr/local/libexec/claude-other/tool)")
+        self.write_settings(data)
+        self.assert_fails("FAIL push-permissions")
+
+    def test_missing_cc_crit_excluded_command_fails(self):
+        data = settings()
+        data["sandbox"]["excludedCommands"].remove("/usr/local/libexec/claude-crit/cc-crit reply")
         self.write_settings(data)
         self.assert_fails("FAIL push-permissions")
 

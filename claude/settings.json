@@ -21,6 +21,8 @@
       "Bash(/usr/local/libexec/claude-push/cc-safe-push)",
       "Bash(/usr/local/libexec/claude-push/cc-safe-pr create)",
       "Bash(/usr/local/libexec/claude-push/cc-safe-pr edit)",
+      "Bash(/usr/local/libexec/claude-crit/cc-crit review)",
+      "Bash(/usr/local/libexec/claude-crit/cc-crit reply)",
       "Bash(gh *)",
       "Bash(pnpm *)",
       "Bash(sfdx *)",
@@ -40,6 +42,7 @@
       "Edit(package.json)",
       "Edit(tsconfig.json)",
       "Edit(**/.cc-pr-request.json)",
+      "Edit(**/.cc-crit-request.json)",
       "Skill(claude-code-setup:claude-automation-recommender)",
       "Skill(gstack-upgrade)",
       "Skill(superpowers:brainstorming)",
@@ -355,7 +358,9 @@
     "excludedCommands": [
       "/usr/local/libexec/claude-push/cc-safe-push",
       "/usr/local/libexec/claude-push/cc-safe-pr create",
-      "/usr/local/libexec/claude-push/cc-safe-pr edit"
+      "/usr/local/libexec/claude-push/cc-safe-pr edit",
+      "/usr/local/libexec/claude-crit/cc-crit review",
+      "/usr/local/libexec/claude-crit/cc-crit reply"
     ]
   },
   "effortLevel": "xhigh",

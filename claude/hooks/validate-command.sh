@@ -27,13 +27,15 @@ if ! is_allowed_devops_command && echo "$COMMAND" | grep -qE 'prod|(^|[^[:alnum:
   exit 2
 fi
 
-# cc-safe-push / cc-safe-pr は、sandbox.excludedCommands と完全一致したときだけ sandbox の外で動く。
+# cc-safe-push / cc-safe-pr / cc-crit は、sandbox.excludedCommands と完全一致したときだけ sandbox の外で動く。
 # 前後にコマンドや引数を付けると sandbox 内で動いて失敗するので、単独の実行だけを通す。
 CC_SAFE=/usr/local/libexec/claude-push
+CC_CRIT=/usr/local/libexec/claude-crit
 case "$COMMAND" in
   "$CC_SAFE/cc-safe-push" | "$CC_SAFE/cc-safe-pr create" | "$CC_SAFE/cc-safe-pr edit") ;;
-  *"$CC_SAFE/cc-safe-"*)
-    echo "Blocked: run $CC_SAFE/cc-safe-push, or cc-safe-pr create / edit, alone with nothing before or after it (no cd, ;, &&, echo). Otherwise it does not match sandbox.excludedCommands and fails inside the sandbox. To read the wrapper, use the Read tool." >&2
+  "$CC_CRIT/cc-crit review" | "$CC_CRIT/cc-crit reply") ;;
+  *"$CC_SAFE/cc-safe-"* | *"$CC_CRIT/"*)
+    echo "Blocked: run $CC_SAFE/cc-safe-push, cc-safe-pr create / edit, or $CC_CRIT/cc-crit review / reply, alone with nothing before or after it (no cd, ;, &&, echo). Otherwise it does not match sandbox.excludedCommands and fails inside the sandbox. To read the wrapper, use the Read tool." >&2
     exit 2
     ;;
 esac
