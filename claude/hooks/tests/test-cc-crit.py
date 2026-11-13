@@ -667,12 +667,26 @@ class PortTests(RunBase):
         self.assertEqual(self.review(), 2)
         self.assertEqual(self.recorded("crit"), [])
 
-    def test_no_free_port_fails(self):
+    def take_every_port(self):
         for port in self.ports:
             self.listen(port)
             self.register(port, os.getpid())
+
+    def test_no_free_port_still_reconnects(self):
+        # 同じ session の daemon が生きていれば、crit は -p を使わずにつなぐ。
+        self.take_every_port()
+        self.set_mode("connected")
+        self.assertEqual(self.review(), 0, self.stderr)
+        [call] = self.recorded("crit")
+        self.assertEqual(call["argv"][call["argv"].index("-p") + 1], str(self.ports[0]))
+
+    def test_no_free_port_without_a_session_explains(self):
+        self.take_every_port()
+        self.set_mode("fail")
         self.assertEqual(self.review(), 1)
-        self.assertEqual(self.recorded("crit"), [])
+        self.assertIn("no free port is left", self.stderr)
+        # 利用者の HOME の crit stop は、専用 HOME の daemon に届かない。
+        self.assertNotIn("crit stop", self.stderr)
 
 
 class LockTests(RunBase):

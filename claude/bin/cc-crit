@@ -436,8 +436,8 @@ def port_listening(port: int) -> bool:
     return True
 
 
-def check_ports(registry: Path) -> int:
-    """範囲内の待ち受けがすべて cc-crit の crit であることを確かめ、空いているポートを 1 つ返す。"""
+def check_ports(registry: Path) -> int | None:
+    """範囲内の待ち受けがすべて cc-crit の crit であることを確かめ、空いているポートを 1 つ返す。空きがなければ None。"""
     known = {port for port, pids in session_entries(registry).items()
              if any(pid_alive(pid) for pid in pids) and crit_health(port) is not None}
     free = None
@@ -447,8 +447,6 @@ def check_ports(registry: Path) -> int:
                 raise Denied(f"port {port} is in use by something other than cc-crit's crit; stop it and retry")
         elif free is None:
             free = port
-    if free is None:
-        raise Failed("no free port is left for cc-crit; stop old reviews with crit stop")
     return free
 
 
@@ -495,22 +493,31 @@ def sandbox_argv(home_real: Path, crit_home: Path, argv: list[str]) -> list[str]
 
 def run_review(files: list[str], top: Path, home_real: Path, crit_home: Path, lock: StartLock) -> int:
     registry = crit_home / ".crit" / "sessions"
-    port = check_ports(registry)
+    free = check_ports(registry)
+    # 空きがなくても、同じ session の daemon が生きていれば、crit は -p を使わずにつなぐ。
+    # 生きていなければ、範囲内の使用中のポートで待ち受けに失敗して終わる。
+    port = PORTS[0] if free is None else free
     argv = sandbox_argv(home_real, crit_home,
                         [CRIT, "--no-open", "-p", str(port), "-o", str(crit_home / ".crit"), *files])
     child = subprocess.Popen(argv, cwd=top, env=crit_env(crit_home), stdin=subprocess.DEVNULL,
                              stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     opened = False
+    started = False
     try:
         for line in child.stdout:
             sys.stdout.write(line)
             sys.stdout.flush()
             if STARTED.search(line) or CONNECTED.search(line):
                 # daemon がポートで待ち受けたか、既存の daemon につないだ。ほかの cc-crit を通す。
+                started = True
                 lock.release()
             if not opened:
                 opened = maybe_open(line, registry)
-        return child.wait()
+        code = child.wait()
+        if free is None and not started and code != 0:
+            # 承認されたレビューの daemon は止まる。止まっていないのは、まだ開いているレビュー。
+            raise Failed("no free port is left for cc-crit; approve or close the open reviews and retry")
+        return code
     finally:
         lock.release()
         # SIGTERM などで抜けたときは、crit の client を止める。daemon は次のラウンドのために残る。
