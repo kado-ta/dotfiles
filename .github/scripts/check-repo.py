@@ -43,7 +43,9 @@ CRIT_DENY_READ = ("~/.cc-crit",)
 # Colima（Lima）の VM に SSH で入る鍵。Colima は $HOME を書き込み可能でマウントするので、VM に入れると sandbox を抜けられる。
 LIMA_DENY = ("Read(~/.colima/_lima/_config/**)", "Read(~/.lima/_config/**)")
 LIMA_DENY_READ = ("~/.colima/_lima/_config", "~/.lima/_config")
-DENY_PUSH =("Bash(git push)", "Bash(git push *)", "Bash(git -C * push *)", "Bash(git -c * push *)")
+# Docker（Colima）のソケットや localhost の全ポートに、sandbox の中のすべてのコマンドから届くようにする設定。
+FORBIDDEN_NETWORK = ("allowUnixSockets", "allowAllUnixSockets", "allowLocalBinding")
+DENY_PUSH = ("Bash(git push)", "Bash(git push *)", "Bash(git -C * push *)", "Bash(git -c * push *)")
 JSONC_FILES = {"vscode/settings.json", "vscode/keybindings.json"}
 SETTINGS = "claude/settings.json"
 PROJECT_SETTINGS = ".claude/settings.json"
@@ -190,6 +192,8 @@ def check_push_permissions(root):
     deny_read = settings.get("sandbox", {}).get("filesystem", {}).get("denyRead", [])
     errors += [f"{SETTINGS}: sandbox.filesystem.denyRead lacks {path}" for path in CRIT_DENY_READ + LIMA_DENY_READ
                if path not in deny_read]
+    network = settings.get("sandbox", {}).get("network", {})
+    errors += [f"{SETTINGS}: sandbox.network.{key} must not be set" for key in FORBIDDEN_NETWORK if network.get(key)]
     return errors
 
 

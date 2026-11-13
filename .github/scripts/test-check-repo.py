@@ -249,6 +249,23 @@ class CheckRepoTests(unittest.TestCase):
         self.write_settings(data)
         self.assert_fails("FAIL push-permissions", "Read(~/.lima/_config/**)")
 
+    def test_rejects_unix_socket_and_local_binding(self):
+        # Docker（Colima）のソケットや localhost の全ポートに、sandbox の中のすべてのコマンドから届くようになる。
+        for key, value in (("allowUnixSockets", ["~/.colima/default/docker.sock"]),
+                           ("allowAllUnixSockets", True),
+                           ("allowLocalBinding", True)):
+            with self.subTest(key=key):
+                data = settings()
+                data["sandbox"]["network"] = {key: value}
+                self.write_settings(data)
+                self.assert_fails("FAIL push-permissions", key)
+
+    def test_disabled_local_binding_passes(self):
+        data = settings()
+        data["sandbox"]["network"] = {"allowLocalBinding": False, "allowUnixSockets": []}
+        self.write_settings(data)
+        self.assert_passes()
+
     def test_missing_push_deny_fails(self):
         data = settings()
         data["permissions"]["deny"].remove("Bash(git -C * push *)")
