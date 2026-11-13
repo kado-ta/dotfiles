@@ -10,33 +10,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## mise タスク
 
-リポジトリ保守用のタスクはリポジトリルートの `mise.toml` に定義する。どのディレクトリからでも使うタスクは `mise/mise_config.toml` にグローバルタスクとして定義する。`mise tasks` で一覧を表示する。
-
-```sh
-mise run brew:deps:show   # Homebrew の依存関係ツリーを表示
-mise run brew:dump        # インストール済みパッケージから Brewfile を再生成
-mise run vscode:ext:list  # vscode/extensions リストを再生成
-mise run crit:profile-test  # cc-crit の profile のテスト（sandbox の外で。crit・git・macOS の更新後に実行）
-mise run sf:plugins       # sf のプラグインを config/sf/plugins.txt に同期（グローバルタスク）
-```
-
-## アーキテクチャ
-
-各トップレベルディレクトリは独立しており、それぞれ `setup.sh` / `link.sh` を持つ:
-
-| ディレクトリ | 役割                                                                                                                                             |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `bin/`       | シェルコア設定（`.zshrc`, `.zprofile`, `.gitconfig`, `.Brewfile`）                                                                               |
-| `zsh/`       | Zsh のインストールとシェル設定（エイリアス・キーバインド・オプション・autosuggestions）。プラグインの定義は `config/sheldon/plugins.toml`        |
-| `mise/`      | `mise_config.toml` — 言語ランタイムのバージョン管理                                                                                              |
-| `config/`    | starship, sheldon, uv, sf の設定（`karabiner/` は `link.sh` でリンクしていない）                                                                 |
-| `aws/`       | AWS CLI プロファイル設定（config, credentials は gitignore 済み）                                                                                |
-| `claude/`    | Claude Code の設定・フック・スキル・セットアップスクリプト                                                                                       |
-| `codex/`     | Codex CLI の設定（`AGENTS.md` を `~/.codex/AGENTS.md` にリンク。`config.base.toml` は `sync.py` で `~/.codex/config.toml` にマージ）             |
-| `obsidian/`  | Obsidian の Vault 設定と CSS スニペット（`~/Obsidian/main/.obsidian/` にシンボリックリンク）、Vault の同期・バックアップ手順（`SYNC_BACKUP.md`） |
-| `vscode/`    | VSCode 設定・拡張リスト・プロジェクトマネージャー設定                                                                                            |
-| `ghostty/`   | Ghostty ターミナル設定                                                                                                                           |
-| `biome/`     | Biome のグローバル設定（`biome.jsonc`）。`$schema` のバージョンは mise の postinstall から `sync_schema.sh` で更新する                           |
+リポジトリ保守用のタスクはリポジトリルートの `mise.toml` に定義する。どのディレクトリからでも使うタスクは `mise/mise_config.toml` にグローバルタスクとして定義する。`mise tasks` で一覧を表示する。`mise run crit:profile-test` は sandbox の外で、crit・git・macOS を更新した後に実行する。
 
 ## Claude Code 設定（`claude/`）
 
@@ -44,30 +18,13 @@ mise run sf:plugins       # sf のプラグインを config/sf/plugins.txt に�
 
 dotfiles で起動したときだけ必要な設定（`denyWrite`、`claudeMdExcludes`）は、`.claude/settings.json` に置く。ここには制限を足す設定（`claudeMdExcludes`、`permissions.ask` / `deny`、`sandbox.filesystem.denyWrite` / `denyRead`）だけを置く。ほかのキーを足したり、今の ask と denyWrite の項目を消したりすると、`check-repo.py` の `project-permissions` が失敗する。外すときは検査の定数も一緒に変える。
 
-`claude/setup.sh` がメインのエントリーポイント。Claude Code のセッション内と IDE の統合ターミナルでは実行を拒否する（セッション中にリンクを張り直すと、Claude Code のサンドボックスがリンクを削除し、deny ルール・フック・サンドボックスが無効になるため）。通常のターミナルで、すべてのセッションを閉じてから実行する。以下を実行する:
+`claude/setup.sh` がメインのエントリーポイント。Claude Code のセッション内と IDE の統合ターミナルでは実行を拒否する（セッション中にリンクを張り直すと、Claude Code のサンドボックスがリンクを削除し、deny ルール・フック・サンドボックスが無効になるため）。通常のターミナルで、すべてのセッションを閉じてから実行する。
 
-- `settings.json`、`CLAUDE.md`、`rules/`、`mcp.json` を `~/.claude/` にシンボリックリンク
-- `hooks/` ディレクトリを `~/.claude/hooks/` にシンボリックリンク
-- `scripts/statusline.sh`（ステータスライン）を `~/.claude/scripts/` にシンボリックリンク
-- プラグイン `superpowers@claude-plugins-official`, `claude-code-setup@claude-plugins-official`, `crit@crit` をインストールし、gstack を `~/.claude/skills/gstack` に clone してセットアップ
-- `skills/*/` を `~/.claude/skills/` にシンボリックリンク
+`claude/`・`.claude/`・`.github/scripts/` を扱うときは、PR と Crit のラッパーと sandbox 設定の設計理由が [.claude/rules/CLAUDE_CONFIG.md](.claude/rules/CLAUDE_CONFIG.md) から読み込まれる。
 
 ### フック
 
-| ファイル                       | トリガー          | 動作                                                                                                                                                                           |
-| ------------------------------ | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `hooks/validate-command.sh`    | PreToolUse (Bash) | `rm -rf` および `prod`/`prd` を含むコマンドと、単独でない `cc-safe-push` / `cc-safe-pr` / `cc-crit` の実行をブロック（`sf devops` の参照系コマンドと PR 作成は、単独のコマンドに限り許可） |
-| `hooks/protect-main-branch.sh` | PreToolUse (Bash) | `main`, `master`, `staging` への `git commit` をブロック                                                                                                                       |
-| `hooks/ask-gh-pr-write.sh`     | PreToolUse (Bash) | `gh` の PR 書き込みと `gh api` を、表記ゆれも含めて人間の承認に回す                                                                                                            |
-| `hooks/precompact-context.sh`  | PreCompact        | ブランチ名・`git status --short`・直近 5 件のコミットを `additionalContext` として渡す                                                                                         |
-| `hooks/herdr-agent-state.sh`   | SessionStart      | herdr にセッション開始を通知する。herdr が生成・上書きするファイルのため編集しない                                                                                             |
-| `hooks/gh-read-token.sh`       | SessionStart      | sandbox 内の Bash に、作業中のリポジトリの owner 用の読み取り専用トークンを `GH_TOKEN` として渡す                                                                              |
-
-上記のほか、通知（Notification / Stop）や PR 作成時の URL 表示（PostToolUse）のフックは `settings.json` に直接記述している。
-
-フックが exit code `2` を返すとツール実行がブロックされ、stderr の内容が Claude に表示される。
-
-`protect-main-branch.sh` は、フックの cwd と、コマンド中のすべての `git commit` について `cd <dir>` と `git -C <dir>` から解決したリポジトリのブランチを判定し、いずれかが保護ブランチならブロックする。移動先を解決できない場合（変数を含むパス、存在しないディレクトリなど）もブロックする。`commit` に展開される git のエイリアス（`-c alias.*` を含む）も検査する。エイリアスは移動先のリポジトリの設定で解決し、多段のエイリアスもたどる（循環などでたどりきれなければ、commit とみなす）。移動先を解決できない場合は、git の組み込みコマンド以外をブロックする。シェルエイリアス（`!` で始まるもの）とオプションで始まるエイリアスは commit とみなす。同じ呼び出しの中で commit より前にブランチを切り替えるコマンド（`checkout`、`switch`、`branch`、`symbolic-ref`、`rebase`）があれば、フックは実行前のブランチで判定するため、ブロックする。
+`hooks/herdr-agent-state.sh` は herdr が生成・上書きするファイルのため編集しない。
 
 `validate-command.sh` と `protect-main-branch.sh` は、jq や git が動かないなどでコマンドを検査できないときもブロックする（fail closed）。この状態では Bash ツールがすべて止まるので、メッセージに従って Claude Code を再起動するか、`mise trust` を実行する。
 
@@ -75,40 +32,17 @@ dotfiles で起動したときだけ必要な設定（`denyWrite`、`claudeMdExc
 
 Claude からの push は、`claude/bin/cc-safe-push` を root 所有でインストールしたラッパーだけで行う。`settings.json` は、引数なしの完全一致だけを `permissions.allow` と `sandbox.excludedCommands` に入れ、`git push` を deny にしている。判定はすべてラッパーで行い、フックには依存しない。
 
-| 状況                                                                                                          | 結果                                   |
-| ------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
-| 許可リストのリポジトリの、保護されていないブランチ                                                            | 確認なしで push する                   |
-| 許可リストにないリポジトリ                                                                                    | 拒否する。人間が自分の端末で push する |
-| `main`, `master`, `staging`（大文字・小文字を区別しない）                                                     | 拒否する                               |
-| 判定できない場合（detached HEAD、origin が `git@github.com:OWNER/REPO.git` の形でない、許可リストの異常など） | 拒否する                               |
-
 push は、元のリポジトリの設定とフックを読まないように、macOS のユーザー専用の一時ディレクトリに作った空のリポジトリから行う（作業ディレクトリと `$TMPDIR` は sandbox から書けるので使わない）。元のリポジトリには書き込まないので、upstream は設定されない。
 
 ラッパーと許可リストは、Claude が書き換えられないように root 所有にする。ラッパーを変更したら、再度インストールする。インストール手順と許可リストの書き方は、[claude/README.md](claude/README.md#cc-safe-push-install) を参照する。
 
-### PR の作成・編集
+<a name="sandbox-prohibitions"></a>
 
-Claude からの PR の作成・編集は、`claude/bin/cc-safe-pr` を root 所有でインストールしたラッパーで行う。`settings.json` は、`create` / `edit` の完全一致だけを `permissions.allow` と `sandbox.excludedCommands` に入れている。許可リストは `cc-safe-push` と共通で、リポジトリの判定には `cc-safe-push` の `evaluate()` をそのまま使う。
+### sandbox と権限の禁止事項
 
-許可リストにないリポジトリでは拒否するので、人間が自分の端末で `gh pr create` を実行する。sandbox 内の `gh` は読み取り専用トークンで動くので、`permissions.ask` と `hooks/ask-gh-pr-write.sh` の承認画面で承認しても書き込めない（403）。
-
-ラッパーは `evaluate()` の外で git を実行しない。index を読む git は `core.fsmonitor` を起動し、`core.hooksPath` では止まらないので、sandbox の外で任意のコードが動く経路になる。
-
-sandbox 内からは Keychain を読めない（`sandbox.filesystem.denyRead`）ので、書き込みのできる `gh` のトークンを使えるのは、このラッパーと `cc-safe-push`、人間の端末だけ。sandbox 内の `gh` には `hooks/gh-read-token.sh` が読み取り専用トークンを渡す。詳細は [claude/README.md](claude/README.md#gh-read-token) を参照する。
-
-<a name="cc-crit"></a>
-
-### Crit のレビュー（cc-crit）
-
-Claude から Crit の対話レビューを開くときは、`claude/bin/cc-crit` を root 所有でインストールしたラッパーを使う（個人スキル `/crit-review`）。`settings.json` は、`review` / `reply` の完全一致だけを `permissions.allow` と `sandbox.excludedCommands` に入れている。ラッパーは、crit を Crit 専用の Seatbelt profile（`claude/bin/cc-crit.sb`）と専用の HOME（`~/.cc-crit/crit-home`）の中で動かす。
-
-`sandbox.filesystem.allowWrite` に `~/.crit` 配下を入れない。sandbox の外で動く crit（Crit プラグインの plan-hook と、人間が端末で実行する crit）は `~/.crit` の hooks・prompts・session・レビューを信頼するので、sandbox から書けると sandbox を抜ける経路になり、承認も偽造できる。`allowLocalBinding` も使わない（全インターフェースでの待ち受けと、localhost の全ポートへの接続を、sandbox 内のすべてのコマンドに許すことになる）。経緯は [docs/work/20261111_crit-sandbox/design.md](docs/work/20261111_crit-sandbox/design.md) を参照する。インストール手順は [claude/README.md](claude/README.md#cc-crit-install) を参照する。
-
-`sandbox.network` の `allowUnixSockets`・`allowAllUnixSockets`・`allowLocalBinding` は設定しない（`check-repo.py` の `push-permissions` が失敗する）。Colima は既定で `$HOME` を書き込み可能でマウントするので、Docker のソケットや VM の SSH に届くと、`$HOME` のどこにでも書けて sandbox を抜けられる。同じ理由で、Colima（Lima）の VM に入る鍵（`~/.colima/_lima/_config`）を `denyRead` で読ませない。経緯は [docs/work/20261113_sandbox-escape-hardening/research-sandbox-escape.md](docs/work/20261113_sandbox-escape-hardening/research-sandbox-escape.md#risk-colima) を参照する。
-
-### 個人スキル
-
-`skills/*/` 配下の個人スキルは `~/.claude/skills/` にグローバルシンボリックリンクされ、全プロジェクトで使える。各スキルの用途は `SKILL.md` の `description` を参照する。
+- `sandbox.filesystem.allowWrite` に `~/.crit` 配下を入れない。
+- `sandbox.network` の `allowUnixSockets`・`allowAllUnixSockets`・`allowLocalBinding` を設定しない（`check-repo.py` の `push-permissions` が失敗する）。
+- Colima（Lima）の VM に入る鍵（`~/.colima/_lima/_config`）を `denyRead` から外さない。
 
 ## 規約
 
