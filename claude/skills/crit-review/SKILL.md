@@ -1,6 +1,6 @@
 ---
 name: crit-review
-description: Use when the user invokes /crit-review or asks to review a file or the branch diff with Crit from Claude Code (e.g. 「crit でレビューしたい」「/crit-review docs/work/x/plan.md」). Runs Crit through the root-owned cc-crit wrapper, because crit itself cannot write ~/.crit or listen on localhost inside the sandbox.
+description: Use when the user invokes /crit-review or asks to review a file or the branch diff with Crit from Claude Code (e.g. 「crit でレビューしたい」「/crit-review docs/work/x/plan.md」), when a design or plan document is ready for the user's approval, or before pushing and opening a pull request. Runs Crit through the root-owned cc-crit wrapper, because crit itself cannot write ~/.crit or listen on localhost inside the sandbox.
 ---
 
 # Crit でレビューする（cc-crit）
@@ -16,7 +16,7 @@ Plan Mode の plan のレビューは、Crit プラグインの hook が ExitPla
 作業ディレクトリ（git リポジトリの中）に、Write ツールで `.cc-crit-request.json` を書く。依頼ファイルは実行のたびに消えるので、毎回書く。
 
 - ファイルをレビューする: `{"files": ["docs/work/x/plan.md"]}`。リポジトリの中の通常ファイルを 20 件まで。
-- ブランチの差分をレビューする: `{}`
+- ブランチの差分をレビューする: `{}`。default branch との merge-base から作業ツリーまでの差分なので、未コミットの変更と未追跡のファイルも含まれる。PR に含めない変更があれば、開く前にそのことを伝える。
 
 <a name="review"></a>
 
