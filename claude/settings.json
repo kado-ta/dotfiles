@@ -351,9 +351,18 @@
     },
     "credentials": {
       "envVars": [
-        { "name": "GITHUB_TOKEN", "mode": "deny" },
-        { "name": "GH_ENTERPRISE_TOKEN", "mode": "deny" },
-        { "name": "GITHUB_ENTERPRISE_TOKEN", "mode": "deny" }
+        {
+          "name": "GITHUB_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "GH_ENTERPRISE_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "GITHUB_ENTERPRISE_TOKEN",
+          "mode": "deny"
+        }
       ]
     },
     "enableWeakerNetworkIsolation": true,
