@@ -40,7 +40,6 @@
         "*.painless": "groovy",
         "*.schema": "ruby",
         "*.html.erb": "erb",
-        "**/skills/**/SKILL.md": "markdown",
         ".forceignore": "ignore"
     },
     "files.watcherExclude": {
