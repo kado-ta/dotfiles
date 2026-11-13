@@ -29,7 +29,9 @@ brew "telnet"            # RTX ルーターへの接続に使用する。
 brew "tree"              # ディレクトリ構造をツリー表示する。
 brew "trivy"             # コンテナイメージの脆弱性スキャンツール
 # brew "zsh"               # Zsh は Mac デフォルトを使用せず、 Homebrew でインストールする。
-brew "yukiarrr/tap/ecsk" # AWS ECS への SSH を簡単にするコマンド。
+
+# AWS ECS への SSH を簡単にするコマンド。
+brew "yukiarrr/tap/ecsk", trusted: true
 
 # Colima + Docker CLI で Docker Desktop を代替する。
 brew "colima"         # Container runtimes on MacOS (and Linux) with minimal setup
@@ -43,7 +45,7 @@ cask "atok"
 cask "bruno"              # Open source API Client
 cask "chatgpt"
 cask "claude"
-cask "claude-code"
+cask "claude-code@latest"
 cask "codex"              # OpenAI Codex CLI (Claude Code との協調動作用)
 cask "coteditor"
 cask "dbgate"             # Database manager for MySQL, PostgreSQL, SQL Server, MongoDB, SQLite and others
