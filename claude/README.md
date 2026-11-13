@@ -10,7 +10,7 @@ Claude Code の設定を管理するディレクトリ。`setup.sh` で `~/.clau
 
 - `settings.json`・`CLAUDE.md`・`rules/`・`mcp.json`・`hooks/`・`scripts/statusline.sh` を `~/.claude/` にリンクする。`~/.claude/hooks/` が実ディレクトリの場合は、削除してからリンクに置き換える。
 - `skills/*/` の個人スキルを `~/.claude/skills/` にリンクする（全プロジェクトで使える）。
-- プラグイン `superpowers`・`claude-code-setup`・`crit` と、スキル集 [gstack](https://github.com/garrytan/gstack) をインストールする（インストール済みならスキップする）。
+- プラグイン `superpowers`・`claude-code-setup`・`ruby-lsp`・`crit`・`understand-anything` と、スキル集 [gstack](https://github.com/garrytan/gstack) をインストールする（インストール済みならスキップする）。`ruby-lsp` プラグインは LSP サーバーを含まないので、`ruby-lsp` gem を別途入れて PATH に通す。
 
 `settings.json` のセキュリティ設定は、[【2026年最新版】Claude Codeで行うべきセキュリティ設定 10選 - Qiita](https://qiita.com/miruky/items/51db293a7a7d0d277a5d) を参考にしている。
 

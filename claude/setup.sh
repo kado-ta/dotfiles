@@ -59,6 +59,14 @@ else
   claude plugins install claude-code-setup@claude-plugins-official
 fi
 
+# Install ruby-lsp
+# LSP サーバーの ruby-lsp コマンドは含まれないので、別途 gem で入れて PATH に通す。
+if claude plugins list 2>/dev/null | grep -q " ruby-lsp@claude-plugins-official$"; then
+  echo "ruby-lsp plugin already installed, skipping"
+else
+  claude plugins install ruby-lsp@claude-plugins-official
+fi
+
 # Install crit
 # settings.json の extraKnownMarketplaces だけではマーケットプレイスが取得されず、install が失敗する。
 if claude plugins list 2>/dev/null | grep -q " crit@crit$"; then
@@ -66,6 +74,15 @@ if claude plugins list 2>/dev/null | grep -q " crit@crit$"; then
 else
   claude plugins marketplace list 2>/dev/null | grep -q " crit$" || claude plugins marketplace add tomasz-tomczyk/crit
   claude plugins install crit@crit
+fi
+
+# Install understand-anything
+# crit と同じく、マーケットプレイスを先に追加しないと install が失敗する。
+if claude plugins list 2>/dev/null | grep -q " understand-anything@understand-anything$"; then
+  echo "understand-anything plugin already installed, skipping"
+else
+  claude plugins marketplace list 2>/dev/null | grep -q " understand-anything$" || claude plugins marketplace add Egonex-AI/Understand-Anything
+  claude plugins install understand-anything@understand-anything
 fi
 
 # Install gstack
