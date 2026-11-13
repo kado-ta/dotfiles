@@ -77,8 +77,8 @@ Claude Code のセッションでは `sudo` を実行できないので、通常
 
 前提:
 
-- Xcode Command Line Tools がインストールされている（`/usr/bin/python3` と `/usr/bin/git` を使う）
-- `/usr/bin/git` が `GIT_NO_LAZY_FETCH` に対応している（2.54.0 で確認済み）
+- Xcode Command Line Tools がインストールされている。ラッパーは `/Library/Developer/CommandLineTools/usr/bin/` の `python3` と `git` を直接使う。`/usr/bin/python3` と `/usr/bin/git` は xcrun の shim で、`DEVELOPER_DIR` や xcrun のキャッシュで起動するプログラムが変わるため。shebang の `env -i` で、呼び出し元の環境変数も引き継がない。
+- CLT の git が `GIT_NO_LAZY_FETCH` に対応している（2.54.0 で確認済み）
 - 1Password の SSH Agent を使っている
 - `~/.ssh/known_hosts` に github.com が登録されている
 - 許可するリポジトリの origin が `git@github.com:OWNER/REPO.git` の形になっている
@@ -259,7 +259,7 @@ crit はレビュー中のファイルの全文を `~/.cc-crit` に書き出す�
 
 ### インストール
 
-通常のターミナルで行う。crit（Homebrew）と Homebrew の git が前提。
+通常のターミナルで行う。crit（Homebrew）と Homebrew の git、Xcode Command Line Tools（ラッパーの python3。cc-safe-push と同じ）が前提。
 
 ```sh
 cd ~/dotfiles

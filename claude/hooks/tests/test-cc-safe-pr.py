@@ -844,6 +844,28 @@ class InstallationTests(unittest.TestCase):
         self.assertIn("DENIED", cp.stderr)
 
 
+CLT = "/Library/Developer/CommandLineTools/usr/bin"
+
+
+class InterpreterTests(unittest.TestCase):
+    """xcrun の shim と呼び出し元の環境変数に、実行されるプログラムを左右させない。"""
+
+    def test_shebang_clears_env_and_skips_xcrun(self):
+        first = (BIN / "cc-safe-pr").read_text(encoding="utf-8").splitlines()[0]
+        self.assertEqual(first, f"#!/usr/bin/env -i {CLT}/python3 -I")
+
+    def test_ignores_caller_developer_dir(self):
+        with tempfile.TemporaryDirectory(prefix="claude-pr-") as tmp:
+            copy = Path(tmp) / "cc-safe-pr"
+            shutil.copy(BIN / "cc-safe-pr", copy)
+            copy.chmod(0o755)
+            cp = subprocess.run([str(copy), "bogus"], capture_output=True, text=True, cwd=tmp,
+                                env={"DEVELOPER_DIR": "/nonexistent", "PATH": "/usr/bin:/bin"})
+        self.assertNotIn("xcrun", cp.stderr)
+        self.assertEqual(cp.returncode, wrapper.EXIT_DENIED)
+        self.assertIn("DENIED: exactly one argument is allowed: create or edit", cp.stderr)
+
+
 REAL_GITHUB_TOKEN = wrapper.github_token
 
 if __name__ == "__main__":

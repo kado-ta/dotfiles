@@ -20,26 +20,42 @@ WRAPPER_COMMANDS = [
     "/usr/local/libexec/claude-crit/cc-crit reply",
 ]
 DENY_PUSH = ["Bash(git push)", "Bash(git push *)", "Bash(git -C * push *)", "Bash(git -c * push *)"]
-CRIT_DENY = ["Read(~/.cc-crit/**)"]
+CRIT_DENY = ["Read(~/.cc-crit/**)", "Edit(~/.crit/**)", "Edit(~/.crit.config.json)", "Edit(~/.cc-crit/**)"]
 CRIT_DENY_READ = ["~/.cc-crit"]
+LIMA_DENY = ["Read(~/.colima/_lima/_config/**)", "Read(~/.lima/_config/**)"]
+LIMA_DENY_READ = ["~/.colima/_lima/_config", "~/.lima/_config"]
 PROJECT_ASK = [
     "Edit(/zsh/**)",
-    "Edit(/config/sheldon/**)",
-    "Edit(/config/starship/**)",
+    "Edit(/config/**)",
     "Edit(/mise/**)",
     "Edit(/mise.toml)",
-    "Edit(/ghostty/config)",
-    "Edit(/vscode/tasks.json)",
+    "Edit(/ghostty/**)",
+    "Edit(/vscode/**)",
+    "Edit(/bin/**)",
+    "Edit(/codex/**)",
+    "Edit(/biome/**)",
+    "Edit(/obsidian/**)",
+    "Edit(/aws/**)",
+    "Edit(/init.command)",
+    "Edit(/setup.command)",
+    "Edit(/CLAUDE.md)",
 ]
 PROJECT_DENY_WRITE = [
     "./claude",
     "./zsh",
-    "./config/sheldon",
-    "./config/starship",
+    "./config",
     "./mise",
     "./mise.toml",
-    "./ghostty/config",
-    "./vscode/tasks.json",
+    "./ghostty",
+    "./vscode",
+    "./bin",
+    "./codex",
+    "./biome",
+    "./obsidian",
+    "./aws",
+    "./init.command",
+    "./setup.command",
+    "./CLAUDE.md",
 ]
 README = "## Foo Bar\n\n[x](#foo-bar)\n\n"
 
@@ -48,11 +64,11 @@ def settings():
     return {
         "permissions": {
             "allow": [f"Bash({c})" for c in WRAPPER_COMMANDS],
-            "deny": list(DENY_PUSH) + CRIT_DENY,
+            "deny": list(DENY_PUSH) + CRIT_DENY + LIMA_DENY,
         },
         "sandbox": {
             "excludedCommands": list(WRAPPER_COMMANDS),
-            "filesystem": {"denyRead": list(CRIT_DENY_READ)},
+            "filesystem": {"denyRead": CRIT_DENY_READ + LIMA_DENY_READ},
         },
         "hooks": {
             "PreToolUse": [
@@ -219,6 +235,36 @@ class CheckRepoTests(unittest.TestCase):
         data["permissions"]["deny"].remove("Read(~/.cc-crit/**)")
         self.write_settings(data)
         self.assert_fails("FAIL push-permissions", "Read(~/.cc-crit/**)")
+
+    def test_missing_lima_key_deny_read_fails(self):
+        # Colima は $HOME を書き込み可能でマウントするので、VM に入る鍵を sandbox から読ませない。
+        data = settings()
+        data["sandbox"]["filesystem"]["denyRead"].remove("~/.colima/_lima/_config")
+        self.write_settings(data)
+        self.assert_fails("FAIL push-permissions", "~/.colima/_lima/_config")
+
+    def test_missing_lima_key_read_deny_fails(self):
+        data = settings()
+        data["permissions"]["deny"].remove("Read(~/.lima/_config/**)")
+        self.write_settings(data)
+        self.assert_fails("FAIL push-permissions", "Read(~/.lima/_config/**)")
+
+    def test_rejects_unix_socket_and_local_binding(self):
+        # Docker（Colima）のソケットや localhost の全ポートに、sandbox の中のすべてのコマンドから届くようになる。
+        for key, value in (("allowUnixSockets", ["~/.colima/default/docker.sock"]),
+                           ("allowAllUnixSockets", True),
+                           ("allowLocalBinding", True)):
+            with self.subTest(key=key):
+                data = settings()
+                data["sandbox"]["network"] = {key: value}
+                self.write_settings(data)
+                self.assert_fails("FAIL push-permissions", key)
+
+    def test_disabled_local_binding_passes(self):
+        data = settings()
+        data["sandbox"]["network"] = {"allowLocalBinding": False, "allowUnixSockets": []}
+        self.write_settings(data)
+        self.assert_passes()
 
     def test_missing_push_deny_fails(self):
         data = settings()

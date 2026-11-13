@@ -32,8 +32,19 @@ WRAPPER_COMMANDS = (
 # ラッパーを置くディレクトリ。permissions.allow のうち、ここを指す規則はすべて WRAPPER_COMMANDS と一致させる。
 WRAPPER_RULE_PREFIX = "Bash(/usr/local/libexec/claude-"
 # cc-crit の crit は、レビュー中のファイルの全文を ~/.cc-crit に書き出す。Claude の sandbox から読ませない。
-CRIT_DENY = ("Read(~/.cc-crit/**)",)
+# sandbox の外で動く crit は ~/.crit の hooks・prompts・レビューを信頼する。sandbox を通らない Edit・Write ツールでも書かせない。
+CRIT_DENY = (
+    "Read(~/.cc-crit/**)",
+    "Edit(~/.crit/**)",
+    "Edit(~/.crit.config.json)",
+    "Edit(~/.cc-crit/**)",
+)
 CRIT_DENY_READ = ("~/.cc-crit",)
+# Colima（Lima）の VM に SSH で入る鍵。Colima は $HOME を書き込み可能でマウントするので、VM に入れると sandbox を抜けられる。
+LIMA_DENY = ("Read(~/.colima/_lima/_config/**)", "Read(~/.lima/_config/**)")
+LIMA_DENY_READ = ("~/.colima/_lima/_config", "~/.lima/_config")
+# Docker（Colima）のソケットや localhost の全ポートに、sandbox の中のすべてのコマンドから届くようにする設定。
+FORBIDDEN_NETWORK = ("allowUnixSockets", "allowAllUnixSockets", "allowLocalBinding")
 DENY_PUSH = ("Bash(git push)", "Bash(git push *)", "Bash(git -C * push *)", "Bash(git -c * push *)")
 JSONC_FILES = {"vscode/settings.json", "vscode/keybindings.json"}
 SETTINGS = "claude/settings.json"
@@ -49,22 +60,36 @@ PROJECT_ALLOWED_KEYS = {
 # 消すと dotfiles で起動したときの権限が広がる。外すときはここも一緒に変える。
 PROJECT_ASK = (
     "Edit(/zsh/**)",
-    "Edit(/config/sheldon/**)",
-    "Edit(/config/starship/**)",
+    "Edit(/config/**)",
     "Edit(/mise/**)",
     "Edit(/mise.toml)",
-    "Edit(/ghostty/config)",
-    "Edit(/vscode/tasks.json)",
+    "Edit(/ghostty/**)",
+    "Edit(/vscode/**)",
+    "Edit(/bin/**)",
+    "Edit(/codex/**)",
+    "Edit(/biome/**)",
+    "Edit(/obsidian/**)",
+    "Edit(/aws/**)",
+    "Edit(/init.command)",
+    "Edit(/setup.command)",
+    "Edit(/CLAUDE.md)",
 )
 PROJECT_DENY_WRITE = (
     "./claude",
     "./zsh",
-    "./config/sheldon",
-    "./config/starship",
+    "./config",
     "./mise",
     "./mise.toml",
-    "./ghostty/config",
-    "./vscode/tasks.json",
+    "./ghostty",
+    "./vscode",
+    "./bin",
+    "./codex",
+    "./biome",
+    "./obsidian",
+    "./aws",
+    "./init.command",
+    "./setup.command",
+    "./CLAUDE.md",
 )
 
 HOOK_SCRIPT = re.compile(r"\.claude/(?:hooks|scripts)/")
@@ -162,10 +187,13 @@ def check_push_permissions(root):
     if excluded != sorted(WRAPPER_COMMANDS):
         errors.append(f"{SETTINGS}: sandbox.excludedCommands is {excluded}, expected {sorted(WRAPPER_COMMANDS)}")
     deny = set(permissions.get("deny", []))
-    errors += [f"{SETTINGS}: permissions.deny lacks {rule}" for rule in DENY_PUSH + CRIT_DENY if rule not in deny]
+    errors += [f"{SETTINGS}: permissions.deny lacks {rule}" for rule in DENY_PUSH + CRIT_DENY + LIMA_DENY
+               if rule not in deny]
     deny_read = settings.get("sandbox", {}).get("filesystem", {}).get("denyRead", [])
-    errors += [f"{SETTINGS}: sandbox.filesystem.denyRead lacks {path}" for path in CRIT_DENY_READ
+    errors += [f"{SETTINGS}: sandbox.filesystem.denyRead lacks {path}" for path in CRIT_DENY_READ + LIMA_DENY_READ
                if path not in deny_read]
+    network = settings.get("sandbox", {}).get("network", {})
+    errors += [f"{SETTINGS}: sandbox.network.{key} must not be set" for key in FORBIDDEN_NETWORK if network.get(key)]
     return errors
 
 

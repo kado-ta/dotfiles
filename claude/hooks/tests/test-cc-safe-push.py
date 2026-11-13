@@ -455,5 +455,29 @@ class RealPushTests(Base):
         self.assertFalse(has_ref(self.dest, "refs/heads/feature/demo"))
 
 
+CLT = "/Library/Developer/CommandLineTools/usr/bin"
+
+
+class InterpreterTests(unittest.TestCase):
+    """xcrun の shim と呼び出し元の環境変数に、実行されるプログラムを左右させない。"""
+
+    def test_shebang_clears_env_and_skips_xcrun(self):
+        self.assertEqual(FILE.read_text(encoding="utf-8").splitlines()[0], f"#!/usr/bin/env -i {CLT}/python3 -I")
+
+    def test_git_skips_xcrun(self):
+        self.assertEqual(policy.GIT, f"{CLT}/git")
+
+    def test_ignores_caller_developer_dir(self):
+        with tempfile.TemporaryDirectory(prefix="claude-push-") as tmp:
+            copy = Path(tmp) / "cc-safe-push"
+            copy.write_bytes(FILE.read_bytes())
+            copy.chmod(0o755)
+            cp = subprocess.run([str(copy), "bogus"], capture_output=True, text=True, cwd=tmp,
+                                env={"DEVELOPER_DIR": "/nonexistent", "PATH": "/usr/bin:/bin"})
+        self.assertNotIn("xcrun", cp.stderr)
+        self.assertEqual(cp.returncode, policy.EXIT_DENIED)
+        self.assertIn("DENIED: no arguments allowed", cp.stderr)
+
+
 if __name__ == "__main__":
     unittest.main()

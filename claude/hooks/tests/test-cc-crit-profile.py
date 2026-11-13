@@ -251,6 +251,19 @@ class ProfileTests(unittest.TestCase):
         p = self.home_real / "Library" / "Keychains"
         self.assertDenied(f"attempt(lambda: os.listdir({str(p)!r}))")
 
+    def test_read_colima_lima_config_denied(self):
+        # Colima（Lima）の VM に SSH で入る鍵がある。Colima は $HOME を書き込み可能でマウントする。
+        p = self.home_real / ".colima" / "_lima" / "_config"
+        if not p.is_dir():
+            self.skipTest("~/.colima/_lima/_config does not exist")
+        self.assertDenied(f"attempt(lambda: os.listdir({str(p)!r}))")
+
+    def test_read_lima_config_denied(self):
+        p = self.home_real / ".lima" / "_config"
+        if not p.is_dir():
+            self.skipTest("~/.lima/_config does not exist")
+        self.assertDenied(f"attempt(lambda: os.listdir({str(p)!r}))")
+
     # --- 拒否すべきもの: ネットワーク ---
 
     def test_external_connect_denied(self):

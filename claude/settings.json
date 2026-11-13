@@ -166,7 +166,12 @@
       "Edit(~/Library/Logs/cc-safe-pr/**)",
       "Read(~/Library/Keychains/**)",
       "Read(~/.cc-crit/**)",
-      "Edit(~/.config/cc-gh-read/**)"
+      "Edit(~/.config/cc-gh-read/**)",
+      "Edit(~/.crit/**)",
+      "Edit(~/.crit.config.json)",
+      "Edit(~/.cc-crit/**)",
+      "Read(~/.colima/_lima/_config/**)",
+      "Read(~/.lima/_config/**)"
     ],
     "ask": [
       "Bash(gh pr create*)",
@@ -346,7 +351,9 @@
         "~/.ssh/id_*",
         "~/.ssh/config",
         "~/Library/Keychains",
-        "~/.cc-crit"
+        "~/.cc-crit",
+        "~/.colima/_lima/_config",
+        "~/.lima/_config"
       ]
     },
     "credentials": {

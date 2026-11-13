@@ -1,4 +1,5 @@
-#!/usr/bin/python3 -I
+#!/usr/bin/env -i /Library/Developer/CommandLineTools/usr/bin/python3 -I
+# 呼び出し元の環境変数を引き継がず、xcrun の shim（/usr/bin/python3）を通さずに起動する。
 """Claude Code から Crit の対話レビューを開くための、固定形式の判定と実行。
 
 /usr/local/libexec/claude-crit/cc-crit に root 所有でインストールする。
@@ -43,6 +44,8 @@ COVERED_DENY_READ = frozenset({
     "~/.aws/credentials",
     "~/dotfiles/aws/credentials",
     "~/Library/Keychains",
+    "~/.colima/_lima/_config",
+    "~/.lima/_config",
 })
 # Claude Code の sandbox から専用 HOME を読ませないための項目。crit 自身は読むので、profile では覆わない。
 OWN_DENY_READ = frozenset({"~/.cc-crit"})
