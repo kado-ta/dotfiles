@@ -62,7 +62,7 @@ EXIT_FAILED = 1
 EXIT_DENIED = 2
 # 起動のロックを待つ秒数。crit の起動は 1〜2 秒で終わる。
 LOCK_TIMEOUT = 30
-SESSION =re.compile(r"[0-9a-f]{12}\Z")
+SESSION = re.compile(r"[0-9a-f]{12}\Z")
 # c_ は行・ファイルへのコメント、r_ はレビュー全体へのコメント（crit の session.go）。
 COMMENT_ID = re.compile(r"[cr]_[0-9a-f]{6,16}\Z")
 # 返信の本文では、改行とタブ以外の制御文字を拒否する。端末の制御シーケンスなどを入れさせない。
