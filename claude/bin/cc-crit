@@ -1,0 +1,519 @@
+#!/usr/bin/python3 -I
+"""Claude Code から Crit の対話レビューを開くための、固定形式の判定と実行。
+
+/usr/local/libexec/claude-crit/cc-crit に root 所有でインストールする。
+Claude Code が sandbox の外で動かすのは review / reply の完全一致だけなので、
+判定はフックや permission ルールではなく、すべてここで行う。
+crit は同じディレクトリの cc-crit.sb（Crit 専用の Seatbelt profile）と専用の HOME の中で動かす。
+ここでは git を実行しない。index を読む git は core.fsmonitor を起動し、core.hooksPath では止まらないため。
+設計: docs/work/20261111_crit-sandbox/design.md
+"""
+from __future__ import annotations
+
+import contextlib
+import hashlib
+import http.client
+import json
+import os
+import pwd
+import re
+import signal
+import socket
+import stat
+import subprocess
+import sys
+import uuid
+from pathlib import Path
+from typing import Any
+
+sys.dont_write_bytecode = True
+
+SANDBOX_EXEC = "/usr/bin/sandbox-exec"
+CRIT = "/opt/homebrew/bin/crit"
+OPEN = "/usr/bin/open"
+PROFILE = Path(__file__).resolve().with_name("cc-crit.sb")
+# cc-crit.sb のネットワークの規則と同じ範囲。
+PORTS = range(47800, 47820)
+AUTHOR = "Claude Code"
+PATH_ENV = "/opt/homebrew/bin:/usr/bin:/bin"
+# cc-crit.sb が拒否で覆う、claude/settings.json の sandbox.filesystem.denyRead の項目（「; denyRead:」の行と同じ）。
+COVERED_DENY_READ = frozenset({
+    "~/.ssh/id_*",
+    "~/.ssh/config",
+    "~/.aws/credentials",
+    "~/dotfiles/aws/credentials",
+    "~/Library/Keychains",
+})
+# Claude Code の sandbox から専用 HOME を読ませないための項目。crit 自身は読むので、profile では覆わない。
+OWN_DENY_READ = frozenset({"~/.cc-crit"})
+STARTED = re.compile(r"Started crit daemon at http://localhost:(\d+) \(session [0-9a-f]{12}, PID (\d+)\)")
+CONNECTED = re.compile(r"Connected to crit daemon at http://localhost:(\d+) \(session [0-9a-f]{12}\)")
+REQUEST = ".cc-crit-request.json"
+MAX_REQUEST = 512 * 1024
+MAX_FILES = 20
+MAX_REPLIES = 50
+MAX_BODY = 65536
+EXIT_FAILED = 1
+EXIT_DENIED = 2
+SESSION = re.compile(r"[0-9a-f]{12}\Z")
+# c_ は行・ファイルへのコメント、r_ はレビュー全体へのコメント（crit の session.go）。
+COMMENT_ID = re.compile(r"[cr]_[0-9a-f]{6,16}\Z")
+# 返信の本文では、改行とタブ以外の制御文字を拒否する。端末の制御シーケンスなどを入れさせない。
+CONTROL = re.compile(r"[\x00-\x08\x0b-\x1f\x7f]")
+# ファイル名では、改行とタブも含めて制御文字を拒否する。
+CONTROL_ANY = re.compile(r"[\x00-\x1f\x7f]")
+FIELDS = {"review": {"files"}, "reply": {"session", "replies"}}
+REPLY_FIELDS = {"reply_to", "body"}
+
+
+class Stop(Exception):
+    label = "FAILED"
+    code = EXIT_FAILED
+
+    def __init__(self, reason: str):
+        super().__init__(reason)
+        self.reason = reason
+
+
+class Failed(Stop):
+    pass
+
+
+class Denied(Stop):
+    label = "DENIED"
+    code = EXIT_DENIED
+
+
+def read_claimed(claimed: str) -> bytes:
+    fd = os.open(claimed, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC)
+    try:
+        st = os.fstat(fd)
+        # ハードリンクで sandbox から読めないファイルを指せないように nlink も見る。
+        if not stat.S_ISREG(st.st_mode) or st.st_uid != os.getuid() or st.st_nlink != 1:
+            raise Denied("request must be a regular file you own, with one link")
+        if st.st_size > MAX_REQUEST:
+            raise Denied("request is too large")
+        return os.read(fd, MAX_REQUEST + 1)
+    finally:
+        os.close(fd)
+
+
+def claim_request() -> bytes:
+    # 固定名を一意の名前へ rename して確保する。同時実行や、あとから書かれた依頼を取り違えない。
+    # rename はリンクをたどらない。依頼は 1 回限りで、読んだらすぐ消す。
+    claimed = f"{REQUEST}.{uuid.uuid4().hex}"
+    try:
+        os.rename(REQUEST, claimed)
+    except OSError:
+        raise Denied(f"no readable {REQUEST} in the current directory")
+    try:
+        return read_claimed(claimed)
+    except OSError:
+        raise Denied("request must be a regular file you own, with one link")
+    finally:
+        with contextlib.suppress(OSError):
+            os.unlink(claimed)
+
+
+def unique_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result = dict(pairs)
+    if len(result) != len(pairs):
+        raise ValueError("duplicate key")
+    return result
+
+
+def reject_constant(name: str) -> None:
+    raise ValueError("non-finite number")
+
+
+def parse_files(value: Any) -> list[str]:
+    if not isinstance(value, list) or len(value) > MAX_FILES:
+        raise Denied(f"files must be a list of at most {MAX_FILES} paths")
+    for name in value:
+        if not isinstance(name, str) or not name or CONTROL_ANY.search(name):
+            raise Denied("each file must be a non-empty path without control characters")
+    return list(value)
+
+
+def parse_replies(obj: dict[str, Any]) -> dict[str, Any]:
+    session = obj["session"]
+    if not isinstance(session, str) or not SESSION.match(session):
+        raise Denied("session must be 12 lowercase hex characters")
+    replies = obj["replies"]
+    if not isinstance(replies, list) or not 0 < len(replies) <= MAX_REPLIES:
+        raise Denied(f"replies must be a list of 1 to {MAX_REPLIES} replies")
+    result = []
+    for reply in replies:
+        # 返信だけを受け付ける。解決済みへの変更、author の指定、新しいコメントの追加はさせない。
+        if not isinstance(reply, dict) or set(reply) != REPLY_FIELDS:
+            raise Denied("each reply must have exactly reply_to and body")
+        if not isinstance(reply["reply_to"], str) or not COMMENT_ID.match(reply["reply_to"]):
+            raise Denied("reply_to must be a comment id such as c_73f150 or r_b4c9e1")
+        body = reply["body"]
+        if not isinstance(body, str) or not 0 < len(body) <= MAX_BODY or CONTROL.search(body):
+            raise Denied(f"body must be 1 to {MAX_BODY} characters without control characters")
+        result.append({"reply_to": reply["reply_to"], "body": body})
+    return {"session": session, "replies": result}
+
+
+def parse_request(raw: bytes, op: str) -> dict[str, Any]:
+    # エラーメッセージに内容を含めない。リンク先のファイルの内容が出ることがある。
+    try:
+        obj = json.loads(raw.decode("utf-8"), object_pairs_hook=unique_keys, parse_constant=reject_constant)
+    except (ValueError, RecursionError):
+        raise Denied("request is not valid JSON")
+    if not isinstance(obj, dict):
+        raise Denied("request must be a JSON object")
+    if op == "review":
+        if not set(obj) <= FIELDS["review"]:
+            raise Denied("request has unknown fields")
+        return {"files": parse_files(obj.get("files", []))}
+    if set(obj) != FIELDS["reply"]:
+        raise Denied("request has missing or unknown fields")
+    return parse_replies(obj)
+
+
+def find_toplevel(cwd: Path) -> Path:
+    # git を実行せずに、.git（ディレクトリか、worktree のファイル）がある最も近い祖先を返す。
+    for directory in (cwd, *cwd.parents):
+        if os.path.lexists(directory / ".git"):
+            return directory
+    raise Denied("run cc-crit inside a git repository")
+
+
+def resolve_files(files: list[str], cwd: Path, top: Path) -> list[str]:
+    top = Path(os.path.realpath(top))
+    result = []
+    for name in files:
+        if name.startswith("-"):
+            raise Denied("file names must not start with -")
+        path = Path(os.path.realpath(cwd / name))
+        try:
+            rel = path.relative_to(top)
+        except ValueError:
+            raise Denied("files must be inside the repository")
+        if not rel.parts or rel.parts[0] == ".git":
+            raise Denied("files must be inside the repository and outside .git")
+        try:
+            st = os.stat(path)
+        except OSError:
+            raise Denied("files must exist")
+        if not stat.S_ISREG(st.st_mode):
+            raise Denied("files must be regular files")
+        result.append(str(path))
+    return result
+
+
+def real_home() -> Path:
+    # 呼び出し元の HOME は使わない。
+    return Path(pwd.getpwuid(os.getuid()).pw_dir)
+
+
+def private_tmp(crit_home: Path) -> Path:
+    return crit_home.parent / "tmp"
+
+
+def ensure_dir(path: Path) -> None:
+    with contextlib.suppress(FileExistsError):
+        os.mkdir(path, 0o700)
+    st = os.lstat(path)
+    if not stat.S_ISDIR(st.st_mode) or st.st_uid != os.getuid():
+        raise Denied(f"{path} must be a directory you own, not a link")
+
+
+def prepare_home(home_real: Path) -> Path:
+    """専用 HOME（~/.cc-crit/crit-home）と一時ディレクトリを用意する。どの段もリンクでないことを確かめる。"""
+    base = home_real / ".cc-crit"
+    crit_home = base / "crit-home"
+    try:
+        for directory in (base, crit_home, crit_home / ".crit", private_tmp(crit_home)):
+            ensure_dir(directory)
+    except PermissionError:
+        # sandbox.excludedCommands と完全一致せず、sandbox 内で動いたときにここで失敗する。
+        raise Failed("cannot create ~/.cc-crit; run cc-crit alone so that it runs outside the sandbox")
+    return crit_home
+
+
+def repo_root_hash(project_dir: Path) -> str:
+    # crit の RepoRootHash と同じ計算（internal/prompt/trust.go）。
+    return "sha256:" + hashlib.sha256(os.path.realpath(project_dir).encode("utf-8")).hexdigest()
+
+
+def read_trusted(path: Path) -> dict[str, Any]:
+    """既存の設定から、値がちょうど {"mode": "defaults"} の信頼の項目だけを返す。"""
+    try:
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC)
+    except FileNotFoundError:
+        return {}
+    except OSError:
+        raise Denied(f"cannot read {path}; it must be a regular file you own")
+    try:
+        st = os.fstat(fd)
+        # ハードリンクで、別のファイルを読ませたり置き換えさせたりしない。
+        if not stat.S_ISREG(st.st_mode) or st.st_uid != os.getuid() or st.st_nlink != 1:
+            raise Denied(f"{path} must be a regular file you own, with one link")
+        raw = os.read(fd, MAX_REQUEST + 1)
+    finally:
+        os.close(fd)
+    try:
+        trusted = json.loads(raw.decode("utf-8")).get("trusted_project_prompts")
+    except (ValueError, RecursionError, AttributeError):
+        # 壊れていれば作り直す。このファイルはラッパーだけが書く。
+        return {}
+    if not isinstance(trusted, dict):
+        return {}
+    return {key: {"mode": "defaults"} for key, value in trusted.items() if value == {"mode": "defaults"}}
+
+
+def write_config(crit_home: Path, project_dir: Path, author: str) -> None:
+    """crit のグローバル設定を書き直す。host を固定し、プロジェクトの hooks と prompts を使わせない。
+
+    ほかのリポジトリの defaults の項目は残す。並行するレビューの信頼の設定を消さないため。
+    """
+    path = crit_home / ".crit.config.json"
+    trusted = read_trusted(path)
+    trusted[repo_root_hash(project_dir)] = {"mode": "defaults"}
+    data = {
+        "host": "127.0.0.1",
+        "no_update_check": True,
+        "no_integration_check": True,
+        "author": author,
+        "trusted_project_prompts": trusted,
+    }
+    # crit は Finish のたびにこのファイルを読み直すので、途中まで書いた状態を見せない。
+    # rename は置き換え先のリンクをたどらない。
+    tmp = path.with_name(f"{path.name}.{uuid.uuid4().hex}")
+    try:
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_CLOEXEC, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
+        os.rename(tmp, path)
+    except OSError:
+        with contextlib.suppress(OSError):
+            os.unlink(tmp)
+        raise Denied(f"cannot write {path}")
+
+
+def crit_env(crit_home: Path) -> dict[str, str]:
+    """crit に渡す環境変数。許可リスト方式で、トークンや CRIT_*・GIT_* の指定は引き継がない。"""
+    user = pwd.getpwuid(os.getuid()).pw_name
+    return {
+        "HOME": str(crit_home),
+        "USER": user,
+        "LOGNAME": user,
+        "PATH": PATH_ENV,
+        "LANG": "en_US.UTF-8",
+        "TMPDIR": f"{private_tmp(crit_home)}/",
+        "CRIT_NO_UPDATE_CHECK": "1",
+        "CRIT_NO_INTEGRATION_CHECK": "1",
+        # ユーザーとシステムの git の設定を読ませない。リポジトリの .gitattributes から、
+        # そこにあるドライバー（git-lfs のフィルターなど）を使わせないため。
+        "GIT_CONFIG_GLOBAL": "/dev/null",
+        "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_CONFIG_COUNT": "2",
+        "GIT_CONFIG_KEY_0": "core.fsmonitor",
+        "GIT_CONFIG_VALUE_0": "false",
+        "GIT_CONFIG_KEY_1": "core.hooksPath",
+        "GIT_CONFIG_VALUE_1": "/dev/null",
+    }
+
+
+def check_deny_read(home_real: Path, top: Path) -> None:
+    """Claude Code の denyRead の項目を、cc-crit.sb がすべて覆っていることを確かめる。"""
+    for path in (home_real / ".claude" / "settings.json",
+                 top / ".claude" / "settings.json",
+                 top / ".claude" / "settings.local.json"):
+        if not path.exists():
+            continue
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            entries = data.get("sandbox", {}).get("filesystem", {}).get("denyRead", [])
+        except (OSError, ValueError, AttributeError):
+            raise Denied(f"cannot read the sandbox settings in {path}")
+        if not isinstance(entries, list):
+            raise Denied(f"sandbox.filesystem.denyRead in {path} must be a list")
+        missing = [e for e in entries if e not in COVERED_DENY_READ | OWN_DENY_READ]
+        if missing:
+            raise Denied(f"cc-crit.sb does not cover these denyRead entries in {path}: {missing}")
+
+
+def pid_alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
+def crit_health(port: int) -> dict[str, Any] | None:
+    """127.0.0.1:port の crit の /api/health を返す。crit でなければ None。"""
+    conn = http.client.HTTPConnection("127.0.0.1", port, timeout=2)
+    try:
+        conn.request("GET", "/api/health")
+        resp = conn.getresponse()
+        if resp.status != 200:
+            return None
+        data = json.loads(resp.read(65536))
+    except (OSError, ValueError, http.client.HTTPException):
+        return None
+    finally:
+        conn.close()
+    return data if isinstance(data, dict) and data.get("status") == "ok" else None
+
+
+def session_entries(registry: Path) -> dict[int, set[int]]:
+    """専用 HOME の session ファイルから、範囲内のポートごとに daemon の PID の集合を返す。
+
+    異常終了した daemon の古い session が、同じポートについて残っていることがある。
+    """
+    result: dict[int, set[int]] = {}
+    for path in sorted(registry.glob("*.json")):
+        try:
+            entry = json.loads(path.read_text(encoding="utf-8"))
+            port, pid, host = entry["port"], entry["pid"], entry.get("host", "")
+        except (OSError, ValueError, KeyError, TypeError, AttributeError):
+            continue
+        if type(port) is int and type(pid) is int and port in PORTS and host in ("", "127.0.0.1"):
+            result.setdefault(port, set()).add(pid)
+    return result
+
+
+def port_listening(port: int) -> bool:
+    try:
+        socket.create_connection(("127.0.0.1", port), timeout=0.5).close()
+    except OSError:
+        return False
+    return True
+
+
+def check_ports(registry: Path) -> int:
+    """範囲内の待ち受けがすべて cc-crit の crit であることを確かめ、空いているポートを 1 つ返す。"""
+    known = {port for port, pids in session_entries(registry).items()
+             if any(pid_alive(pid) for pid in pids) and crit_health(port) is not None}
+    free = None
+    for port in PORTS:
+        if port_listening(port):
+            if port not in known:
+                raise Denied(f"port {port} is in use by something other than cc-crit's crit; stop it and retry")
+        elif free is None:
+            free = port
+    if free is None:
+        raise Failed("no free port is left for cc-crit; stop old reviews with crit stop")
+    return free
+
+
+def verify_endpoint(registry: Path, port: int, pid: int) -> bool:
+    return (port in PORTS and pid in session_entries(registry).get(port, set())
+            and pid_alive(pid) and crit_health(port) is not None)
+
+
+def open_browser(port: int) -> None:
+    # URL はここで組み立てる。crit の出力の文字列は渡さない。
+    subprocess.run([OPEN, f"http://localhost:{port}/"], stdin=subprocess.DEVNULL,
+                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=10, check=False)
+
+
+def maybe_open(line: str, registry: Path) -> bool:
+    """crit の出力の 1 行を見て、必要ならブラウザを開く。開いたら True。"""
+    m = STARTED.search(line)
+    if m:
+        port, pid = int(m.group(1)), int(m.group(2))
+        if verify_endpoint(registry, port, pid):
+            open_browser(port)
+            return True
+        return False
+    m = CONNECTED.search(line)
+    if m:
+        port = int(m.group(1))
+        pid = next((p for p in sorted(session_entries(registry).get(port, set())) if pid_alive(p)), None)
+        health = crit_health(port)
+        # 既存の daemon に、まだブラウザがつながっていないときだけ開く。
+        if pid is not None and health is not None and health.get("browser_clients") is False \
+                and verify_endpoint(registry, port, pid):
+            open_browser(port)
+            return True
+    return False
+
+
+def sandbox_argv(home_real: Path, crit_home: Path, argv: list[str]) -> list[str]:
+    return [SANDBOX_EXEC, "-f", str(PROFILE),
+            "-D", f"HOME_REAL={home_real}",
+            "-D", f"CRIT_HOME={crit_home}",
+            "-D", f"PRIVATE_TMP={private_tmp(crit_home)}",
+            *argv]
+
+
+def run_review(files: list[str], top: Path, home_real: Path, crit_home: Path) -> int:
+    registry = crit_home / ".crit" / "sessions"
+    port = check_ports(registry)
+    argv = sandbox_argv(home_real, crit_home,
+                        [CRIT, "--no-open", "-p", str(port), "-o", str(crit_home / ".crit"), *files])
+    child = subprocess.Popen(argv, cwd=top, env=crit_env(crit_home), stdin=subprocess.DEVNULL,
+                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    opened = False
+    try:
+        for line in child.stdout:
+            sys.stdout.write(line)
+            sys.stdout.flush()
+            if not opened:
+                opened = maybe_open(line, registry)
+        return child.wait()
+    finally:
+        # SIGTERM などで抜けたときは、crit の client を止める。daemon は次のラウンドのために残る。
+        if child.poll() is None:
+            child.terminate()
+            with contextlib.suppress(subprocess.TimeoutExpired):
+                child.wait(timeout=5)
+        child.stdout.close()
+
+
+def run_reply(request: dict[str, Any], top: Path, home_real: Path, crit_home: Path) -> int:
+    # 標準入力には reply_to と body だけを渡す。author はここで固定する。
+    payload = json.dumps(request["replies"], ensure_ascii=False)
+    argv = sandbox_argv(home_real, crit_home,
+                        [CRIT, "comment", "--session", request["session"], "--json", "--author", AUTHOR])
+    cp = subprocess.run(argv, cwd=top, env=crit_env(crit_home), input=payload, text=True,
+                        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=60)
+    sys.stdout.write(cp.stdout)
+    return cp.returncode
+
+
+def execute(op: str) -> int:
+    request = parse_request(claim_request(), op)
+    cwd = Path(os.getcwd())
+    top = find_toplevel(cwd)
+    home_real = real_home()
+    check_deny_read(home_real, top)
+    crit_home = prepare_home(home_real)
+    # crit は toplevel で動かす。どのサブディレクトリから呼んでも、同じレビューと信頼の判定になる。
+    write_config(crit_home, top, pwd.getpwuid(os.getuid()).pw_name)
+    if op == "review":
+        return run_review(resolve_files(request["files"], cwd, top), top, home_real, crit_home)
+    return run_reply(request, top, home_real, crit_home)
+
+
+def on_sigterm(signum: int, frame: Any) -> None:
+    raise SystemExit(EXIT_FAILED)
+
+
+def main() -> int:
+    signal.signal(signal.SIGTERM, on_sigterm)
+    if len(sys.argv) != 2 or sys.argv[1] not in FIELDS:
+        print("DENIED: exactly one argument is allowed: review or reply", file=sys.stderr)
+        return EXIT_DENIED
+    # 起動に要るものが欠けていたら、crit を sandbox の外で動かさないように止める。
+    for path in (SANDBOX_EXEC, CRIT, str(PROFILE)):
+        if not os.path.isfile(path):
+            print(f"DENIED: {path} is missing; reinstall cc-crit", file=sys.stderr)
+            return EXIT_DENIED
+    try:
+        return execute(sys.argv[1])
+    except Stop as stop:
+        print(f"{stop.label}: {stop.reason}", file=sys.stderr)
+        return stop.code
+
+
+if __name__ == "__main__":
+    sys.exit(main())
