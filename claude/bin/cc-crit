@@ -564,7 +564,9 @@ def run_review(files: list[str], top: Path, home_real: Path, crit_home: Path, lo
         return code
     finally:
         lock.release()
-        # SIGTERM などで抜けたときは、crit の client を止める。daemon は次のラウンドのために残る。
+        # SIGTERM などで抜けたときは、crit の client を止める。client が daemon を起動したラウンドでは、
+        # client が daemon も止める（crit の installDaemonSignalHandler）。つなぎ直したラウンドでは daemon は残る。
+        # どちらでも、付いたコメントはレビューのファイルに残る。
         if child.poll() is None:
             child.terminate()
             with contextlib.suppress(subprocess.TimeoutExpired):
