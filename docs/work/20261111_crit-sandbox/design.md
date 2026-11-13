@@ -156,7 +156,7 @@ Claude（Bash ツール）
 | 種類 | 許可する範囲 |
 | --- | --- |
 | 書き込み | 専用 HOME の `.crit` 配下と、ラッパーが作る専用の一時ディレクトリだけ。`~/.crit` は書けない |
-| 読み取り | 全体。ただし、Claude の `sandbox.filesystem.denyRead` に相当するパスと `~/Library/Keychains`、`~/.crit` は拒否する |
+| 読み取り | 全体。ただし、Claude の `sandbox.filesystem.denyRead` に相当するパスと `~/Library/Keychains`、`~/.crit`、`~/.claude`、Claude の編集の差分（`/private/tmp/claude-<uid>/bash-edit-diff`）は拒否する |
 | ネットワーク | 専用ポート範囲（47800〜47819）での bind・inbound・outbound だけ。外部への通信はすべて拒否。**待ち受けのアドレスは制限できない**（下記） |
 | プロセス | `crit` と `git`（とその内部ツール）の実行 |
 | mach-lookup | 動作に必要な最小限。LaunchServices と Apple Events は拒否 |
@@ -184,7 +184,7 @@ sandbox の外への書き込みとコード実行、機密ファイル（`denyR
 | # | 脅威 | 対策 | 残るリスク |
 | --- | --- | --- | --- |
 | T1 | ラッパー経由で任意のコマンドを実行する | 引数なしの完全一致。依頼ファイルは厳格な形式で検証する。crit の引数と環境変数を固定する | なし【推測】 |
-| T2 | crit や git に機密ファイルを読ませる | profile で `denyRead` 相当を拒否する。ファイルは git toplevel の配下に限る。`denyRead` を覆えない設定なら実行を拒否する | 検証後の差し替え。読めるのは profile が許す範囲まで |
+| T2 | crit や git に機密ファイルを読ませ、Claude に渡す | crit はレビュー中のファイルの全文を専用 HOME の `snapshots.json` に書き出すので、**Claude の sandbox から `~/.cc-crit` を読ませない**（`denyRead` と `Read(~/.cc-crit/**)`。check-repo で確かめる）。profile で `denyRead` 相当と `~/.claude` を拒否する。ファイルは git toplevel の配下に限る。`denyRead` を覆えない設定なら実行を拒否する | 検証後の差し替えで、Claude が読めないファイルを crit の画面に出せる。Claude に届くのは、人間がコメントした行（Finish の結果の `anchor`）だけ |
 | T3 | リポジトリの設定で git にコードを実行させる | `.git/config` と `.git/hooks` は sandbox から書けない【実測】。グローバル設定とシステム設定を読ませないので、`.gitattributes` から使えるドライバーがない | 実行されても profile の中に閉じ、専用 HOME の外に書けない |
 | T4 | 外部へ持ち出す | profile で外部への通信をすべて拒否する。更新確認は止める | ブラウザ経由（[5.3](#residual)） |
 | T5 | LAN に露出する | profile で待ち受けをポート範囲に限る。アドレスは、crit の設定（`127.0.0.1` に固定。`--host` と `CRIT_HOST` は渡さない）、profile の中の実行の制限、ファイアウォールで守る（4.4） | profile の中で任意のコードを実行され、かつファイアウォールの確認を許可した場合は、範囲内のポートで LAN から届く |
@@ -212,7 +212,7 @@ sandbox の外への書き込みとコード実行、機密ファイル（`denyR
 | --- | --- |
 | `claude/bin/cc-crit` | ラッパー本体（Python、`cc-safe-pr` に合わせる） |
 | `claude/bin/cc-crit.sb` | Crit 専用 profile |
-| `claude/settings.json` | `permissions.allow` と `sandbox.excludedCommands` に `/usr/local/libexec/claude-crit/cc-crit review` と `… reply` を追加。依頼ファイルを書けるように `Edit(**/.cc-crit-request.json)` も追加 |
+| `claude/settings.json` | `permissions.allow` と `sandbox.excludedCommands` に `/usr/local/libexec/claude-crit/cc-crit review` と `… reply` を追加。依頼ファイルを書けるように `Edit(**/.cc-crit-request.json)` も追加。`~/.cc-crit` を読ませないように、`sandbox.filesystem.denyRead` と `permissions.deny`（`Read(~/.cc-crit/**)`）にも追加 |
 | `claude/hooks/validate-command.sh` | `cc-safe-*` と同じく、`cc-crit` も単独の完全一致以外をブロックする |
 | `.github/scripts/check-repo.py` | `WRAPPER_COMMANDS` に追加する。今は実際の値を `"cc-safe" in rule` で抜き出しているので、抜き出し方も変え、未知のラッパーを拒否する |
 | `.github/scripts/test-check-repo.py` | 上の検査の回帰テスト |
@@ -269,3 +269,18 @@ sandbox の外への書き込みとコード実行、機密ファイル（`denyR
 | 11 | P2: deny-default の profile が成り立つ条件と、アドレスごとの保証 | 採用 | 検証項目と版の記録（8 章） |
 | 12 | P2: check-repo.py の抜き出しが `cc-safe` 前提 | 採用 | `check-repo.py:151` で確認。6 章に反映 |
 | 13 | P3: 3.2 と 5.3 の記述の一般化 | 採用 | `open_cmd` などはプロジェクトから読まない、信頼の `always`、`cleanup_on_approve` を書き分けた（3.2、5.3） |
+
+<a name="implementation-review"></a>
+
+## 10. 実装レビューの反映
+
+ブランチ全体（`a5a002a..1d44c6f`）を新しいレビュアーが確認した（2026-11-12）。判断は、利用者が受ける影響で付け直した。
+
+| # | 指摘 | 判断 | 反映 |
+| --- | --- | --- | --- |
+| C1 | crit はレビュー中のファイルの全文を `~/.cc-crit` の `snapshots.json` に書き出し、Claude の sandbox はそれを読める。profile は Claude より広く読めるので、`denyRead` を回り込める | 直した | Claude の sandbox から `~/.cc-crit` を読ませない（`denyRead` と `Read(~/.cc-crit/**)`、check-repo で確かめる）。profile で `~/.claude` と編集の差分を拒否する（T2、4.4） |
+| I2 | crit の設定の信頼の項目を毎回すべて上書きし、その場で書き換える | 直した | ほかのリポジトリの `defaults` を残し、一時ファイルを rename で置き換える |
+| I3 | レビュー全体へのコメント（`r_`）に返信できない | 直した | `reply_to` に `r_` も受け付ける |
+| M6 | 同じポートの古い session ファイルが、生きている daemon の記録を上書きし、誤って拒否する | Important に上げて直した | 異常終了や再起動の後に普通に起こりうる。ポートごとに PID の集合を見る |
+| I1 | 実行時の `denyRead` の確認が、`Read(...)` の規則・managed の設定・組み込みの拒否を見ていない。入れ子の `.git` で toplevel を選べる | Minor に下げた | C1 の対策で、crit が読んだ内容は Claude に届かなくなった（人間がコメントした行の `anchor` を除く）。確認は、補助の防御として今の範囲のまま残す |
+| M1〜M5、M7〜M10 | SIGTERM で 1 ラウンド目の daemon も止まる、ブラウザの URL が `localhost`、T3 の根拠（入れ子のリポジトリや gitfile でリポジトリの設定を用意できる）、設定ファイルの読み方、profile の中の `.crit/hooks` などへの書き込み、必要なものが欠けたときに依頼ファイルが残る、ポートが尽きると再接続もできない、profile のテストの不足、`plan.md` の status | 後回し | 一覧はタスク 6 の後にまとめて報告する |

@@ -249,9 +249,11 @@ Claude は個人スキル `/crit-review`（`claude/skills/crit-review/SKILL.md`�
 | コマンド | 依頼ファイル | 動作 |
 | --- | --- | --- |
 | `/usr/local/libexec/claude-crit/cc-crit review` | `{"files": ["path"]}`、ブランチの差分なら `{}` | crit をポート 47800〜47819 で起動してブラウザを開き、Finish Review まで待つ |
-| `/usr/local/libexec/claude-crit/cc-crit reply` | `{"session": "<id>", "replies": [{"reply_to": "c_…", "body": "…"}]}` | 既存のコメントに返信する。author は `Claude Code` に固定 |
+| `/usr/local/libexec/claude-crit/cc-crit reply` | `{"session": "<id>", "replies": [{"reply_to": "c_…", "body": "…"}]}` | 既存のコメント（行・ファイルは `c_`、レビュー全体は `r_`）に返信する。author は `Claude Code` に固定 |
 
 終了コードは、0 が成功、1 が失敗、2 が拒否。依頼ファイルは実行のたびに消える。
+
+crit はレビュー中のファイルの全文を `~/.cc-crit` に書き出すので、`settings.json` で Claude の sandbox から `~/.cc-crit` を読ませない（`sandbox.filesystem.denyRead` と `permissions.deny` の `Read(~/.cc-crit/**)`）。結果は `cc-crit` の出力で Claude に届く。
 
 <a name="cc-crit-install"></a>
 
