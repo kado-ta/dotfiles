@@ -1,4 +1,5 @@
-#!/usr/bin/python3 -I
+#!/usr/bin/env -i /Library/Developer/CommandLineTools/usr/bin/python3 -I
+# 呼び出し元の環境変数を引き継がず、xcrun の shim（/usr/bin/python3）を通さずに起動する。
 """Claude Code から git push するための、固定形式の判定と実行。
 
 /usr/local/libexec/claude-push/cc-safe-push に root 所有でインストールする。
@@ -23,7 +24,8 @@ from pathlib import Path
 from typing import Literal
 
 CONFIG = Path("/usr/local/etc/claude-push/allowlist.jsonc")
-GIT = "/usr/bin/git"
+# /usr/bin/git は xcrun の shim で、キャッシュや DEVELOPER_DIR で起動するプログラムが変わる。
+GIT = "/Library/Developer/CommandLineTools/usr/bin/git"
 SSH = "/usr/bin/ssh"
 PROTECTED = frozenset(("main", "master", "staging"))
 HEADS = "refs/heads/"

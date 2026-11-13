@@ -767,5 +767,33 @@ class SigtermTests(RunBase):
         self.assertEqual(self.recorded("open"), [])
 
 
+CLT = "/Library/Developer/CommandLineTools/usr/bin"
+
+
+class InterpreterTests(unittest.TestCase):
+    """xcrun の shim と呼び出し元の環境変数に、実行されるプログラムを左右させない。"""
+
+    def test_shebang_clears_env_and_skips_xcrun(self):
+        first = (BIN / "cc-crit").read_text(encoding="utf-8").splitlines()[0]
+        self.assertEqual(first, f"#!/usr/bin/env -i {CLT}/python3 -I")
+
+    def test_ignores_caller_developer_dir(self):
+        with tempfile.TemporaryDirectory(prefix="claude-crit-") as tmp:
+            copy = Path(tmp) / "cc-crit"
+            copy.write_bytes((BIN / "cc-crit").read_bytes())
+            copy.chmod(0o755)
+            cp = subprocess.run([str(copy), "bogus"], capture_output=True, text=True, cwd=tmp,
+                                env={"DEVELOPER_DIR": "/nonexistent", "PATH": "/usr/bin:/bin"})
+        self.assertNotIn("xcrun", cp.stderr)
+        self.assertEqual(cp.returncode, wrapper.EXIT_DENIED)
+        self.assertIn("DENIED: exactly one argument is allowed: review or reply", cp.stderr)
+
+    def test_empty_environment_prints_utf8(self):
+        # env -i で起動するとロケールの環境変数がない。crit の出力（日本語のコメント）をそのまま中継できること。
+        cp = subprocess.run(["/usr/bin/env", "-i", f"{CLT}/python3", "-I", "-c", "print('日本語')"],
+                            capture_output=True)
+        self.assertEqual(cp.stdout, "日本語\n".encode("utf-8"))
+
+
 if __name__ == "__main__":
     unittest.main()
