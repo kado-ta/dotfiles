@@ -40,7 +40,10 @@ CRIT_DENY = (
     "Edit(~/.cc-crit/**)",
 )
 CRIT_DENY_READ = ("~/.cc-crit",)
-DENY_PUSH = ("Bash(git push)", "Bash(git push *)", "Bash(git -C * push *)", "Bash(git -c * push *)")
+# Colima（Lima）の VM に SSH で入る鍵。Colima は $HOME を書き込み可能でマウントするので、VM に入れると sandbox を抜けられる。
+LIMA_DENY = ("Read(~/.colima/_lima/_config/**)", "Read(~/.lima/_config/**)")
+LIMA_DENY_READ = ("~/.colima/_lima/_config", "~/.lima/_config")
+DENY_PUSH =("Bash(git push)", "Bash(git push *)", "Bash(git -C * push *)", "Bash(git -c * push *)")
 JSONC_FILES = {"vscode/settings.json", "vscode/keybindings.json"}
 SETTINGS = "claude/settings.json"
 PROJECT_SETTINGS = ".claude/settings.json"
@@ -182,9 +185,10 @@ def check_push_permissions(root):
     if excluded != sorted(WRAPPER_COMMANDS):
         errors.append(f"{SETTINGS}: sandbox.excludedCommands is {excluded}, expected {sorted(WRAPPER_COMMANDS)}")
     deny = set(permissions.get("deny", []))
-    errors += [f"{SETTINGS}: permissions.deny lacks {rule}" for rule in DENY_PUSH + CRIT_DENY if rule not in deny]
+    errors += [f"{SETTINGS}: permissions.deny lacks {rule}" for rule in DENY_PUSH + CRIT_DENY + LIMA_DENY
+               if rule not in deny]
     deny_read = settings.get("sandbox", {}).get("filesystem", {}).get("denyRead", [])
-    errors += [f"{SETTINGS}: sandbox.filesystem.denyRead lacks {path}" for path in CRIT_DENY_READ
+    errors += [f"{SETTINGS}: sandbox.filesystem.denyRead lacks {path}" for path in CRIT_DENY_READ + LIMA_DENY_READ
                if path not in deny_read]
     return errors
 

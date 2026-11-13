@@ -44,6 +44,8 @@ COVERED_DENY_READ = frozenset({
     "~/.aws/credentials",
     "~/dotfiles/aws/credentials",
     "~/Library/Keychains",
+    "~/.colima/_lima/_config",
+    "~/.lima/_config",
 })
 # Claude Code の sandbox から専用 HOME を読ませないための項目。crit 自身は読むので、profile では覆わない。
 OWN_DENY_READ = frozenset({"~/.cc-crit"})

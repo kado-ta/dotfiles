@@ -261,7 +261,8 @@ class ResolveFilesTests(Base):
         self.assertDenied(self.resolve, ["pipe"])
 
 
-COVERED = ["~/.ssh/id_*", "~/.ssh/config", "~/.aws/credentials", "~/dotfiles/aws/credentials", "~/Library/Keychains"]
+COVERED = ["~/.ssh/id_*", "~/.ssh/config", "~/.aws/credentials", "~/dotfiles/aws/credentials", "~/Library/Keychains",
+           "~/.colima/_lima/_config", "~/.lima/_config"]
 
 # 偽物は python の実体で動かす。/usr/bin/python3 は xcrun の中継役で、SDKROOT などを環境変数に足すため。
 PYTHON = os.path.realpath(sys.executable)
@@ -704,6 +705,13 @@ class DenyReadTests(RunBase):
                   for line in profile.splitlines() if line.startswith("; denyRead: ")}
         self.assertEqual(marked, set(wrapper.COVERED_DENY_READ))
         self.assertEqual(marked, set(COVERED))
+
+    def test_repository_settings_are_covered(self):
+        # claude/settings.json の denyRead を足したら、cc-crit.sb と COVERED_DENY_READ も一緒に変える。
+        # 変えないと、インストール済みの cc-crit が拒否する。
+        settings = json.loads((BIN.parent / "settings.json").read_text(encoding="utf-8"))
+        deny_read = set(settings["sandbox"]["filesystem"]["denyRead"])
+        self.assertEqual(deny_read - wrapper.COVERED_DENY_READ - wrapper.OWN_DENY_READ, set())
 
 
 class MainTests(RunBase):

@@ -88,6 +88,10 @@
 (deny file-read* (regex #"/credentials(/|$)"))
 ; denyRead: ~/Library/Keychains
 (deny file-read* (subpath (home-path "/Library/Keychains")))
+; denyRead: ~/.colima/_lima/_config
+(deny file-read* (subpath (home-path "/.colima/_lima/_config")))
+; denyRead: ~/.lima/_config
+(deny file-read* (subpath (home-path "/.lima/_config")))
 ; 以下は permissions.deny の Read(...) に相当する。
 (deny file-read*
   (regex #"/\.env[^/]*$")
