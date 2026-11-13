@@ -1,4 +1,5 @@
 import contextlib
+import fcntl
 import hashlib
 import importlib.machinery
 import importlib.util
@@ -11,6 +12,7 @@ import subprocess
 import sys
 import tempfile
 import textwrap
+import threading
 import time
 import unittest
 from pathlib import Path
@@ -283,7 +285,7 @@ os.execv(args[i], args[i:])
 # crit の偽物。mode ファイルの内容で振る舞いを変える。
 FAKE_CRIT = """\
 #!{python} -I
-import json, os, signal, sys, time
+import fcntl, json, os, signal, sys, time
 from pathlib import Path
 root = Path({root!r})
 args = sys.argv[1:]
@@ -292,10 +294,31 @@ if args[:1] == ["comment"]:
     record["stdin"] = sys.stdin.read()
 with open(root / "calls.jsonl", "a") as f:
     f.write(json.dumps(record) + "\\n")
+
+def lockcheck(name):
+    # cc-crit の起動のロック（専用 HOME の 1 つ上の lock）を、3 秒まで取れるか試す。
+    fd = os.open(str(Path(os.environ["HOME"]).parent / "lock"), os.O_RDWR | os.O_CREAT, 0o600)
+    result = "held"
+    deadline = time.time() + 3
+    while time.time() < deadline:
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            fcntl.flock(fd, fcntl.LOCK_UN)
+            result = "acquired"
+            break
+        except BlockingIOError:
+            time.sleep(0.05)
+    os.close(fd)
+    (root / name).write_text(result)
+
 if args[:1] == ["comment"]:
+    lockcheck("lockcheck-comment")
     print("Replied to the comments", flush=True)
     sys.exit(0)
 mode = (root / "mode").read_text().strip()
+if mode == "fail":
+    print("Error: listen tcp 127.0.0.1: bind: address already in use", flush=True)
+    sys.exit(1)
 if mode == "hang":
     def on_term(signum, frame):
         (root / "terminated").write_text("1")
@@ -308,8 +331,10 @@ port = int(args[args.index("-p") + 1])
 sessions = Path(os.environ["HOME"]) / ".crit" / "sessions"
 sessions.mkdir(parents=True, exist_ok=True)
 (sessions / "abcdefabcdef.json").write_text(json.dumps({{"pid": os.getpid(), "port": port, "host": "127.0.0.1"}}))
-if mode == "started":
+if mode in ("started", "lockcheck"):
     print(f"Started crit daemon at http://localhost:{{port}} (session abcdefabcdef, PID {{os.getpid()}})", flush=True)
+    if mode == "lockcheck":
+        lockcheck("lockcheck")
 else:
     print(f"Connected to crit daemon at http://localhost:{{port}} (session abcdefabcdef)", flush=True)
 print("approved: true", flush=True)
@@ -477,6 +502,17 @@ class ReviewTests(RunBase):
         self.assertTrue(config["no_integration_check"])
         self.assertEqual(config["trusted_project_prompts"], {key: {"mode": "defaults"}})
 
+    def test_config_replaces_the_finish_prompt(self):
+        # crit の既定の案内（crit comment で返信し、crit --session で次のラウンド）は、この環境では実行できない。
+        self.assertEqual(self.review(), 0, self.stderr)
+        prompt = self.config()["prompts"]["on_finish_unresolved"]
+        self.assertTrue(prompt.startswith("inline:"))
+        self.assertIn("{{.session_key}}", prompt)
+        self.assertIn("/usr/local/libexec/claude-crit/cc-crit reply", prompt)
+        self.assertIn("/usr/local/libexec/claude-crit/cc-crit review", prompt)
+        self.assertNotIn("crit comment", prompt)
+        self.assertNotIn("crit --session", prompt)
+
     def config(self):
         return json.loads((self.crit_home / ".crit.config.json").read_text(encoding="utf-8"))
 
@@ -570,7 +606,7 @@ class BrowserTests(RunBase):
 
     def test_opens_the_browser_after_a_new_daemon_starts(self):
         self.assertEqual(self.review(), 0, self.stderr)
-        self.assertEqual(self.opened(), [[f"http://localhost:{self.ports[0]}/"]])
+        self.assertEqual(self.opened(), [[f"http://127.0.0.1:{self.ports[0]}/"]])
 
     def test_does_not_open_when_the_endpoint_does_not_answer(self):
         self.healthy = False
@@ -592,7 +628,7 @@ class BrowserTests(RunBase):
         self.set_mode("connected")
         self.browser_clients = False
         self.assertEqual(self.review(), 0, self.stderr)
-        self.assertEqual(self.opened(), [[f"http://localhost:{self.ports[0]}/"]])
+        self.assertEqual(self.opened(), [[f"http://127.0.0.1:{self.ports[0]}/"]])
 
 
 class PortTests(RunBase):
@@ -643,12 +679,71 @@ class PortTests(RunBase):
         self.assertEqual(self.review(), 2)
         self.assertEqual(self.recorded("crit"), [])
 
-    def test_no_free_port_fails(self):
+    def take_every_port(self):
         for port in self.ports:
             self.listen(port)
             self.register(port, os.getpid())
+
+    def test_no_free_port_still_reconnects(self):
+        # 同じ session の daemon が生きていれば、crit は -p を使わずにつなぐ。
+        self.take_every_port()
+        self.set_mode("connected")
+        self.assertEqual(self.review(), 0, self.stderr)
+        [call] = self.recorded("crit")
+        self.assertEqual(call["argv"][call["argv"].index("-p") + 1], str(self.ports[0]))
+
+    def test_no_free_port_without_a_session_explains(self):
+        self.take_every_port()
+        self.set_mode("fail")
         self.assertEqual(self.review(), 1)
+        self.assertIn("no free port is left", self.stderr)
+        # 利用者の HOME の crit stop は、専用 HOME の daemon に届かない。
+        self.assertNotIn("crit stop", self.stderr)
+
+
+class LockTests(RunBase):
+    """同時に動く cc-crit が、信頼の設定とポートを取り合わないこと（PR #15 の Codex の指摘 1・2）。"""
+
+    def lock_path(self):
+        base = self.home / ".cc-crit"
+        base.mkdir(parents=True, exist_ok=True)
+        return base / "lock"
+
+    def hold_lock(self):
+        fd = os.open(self.lock_path(), os.O_RDWR | os.O_CREAT, 0o600)
+        self.addCleanup(os.close, fd)
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+    def assert_lock_free(self):
+        fd = os.open(self.lock_path(), os.O_RDWR | os.O_CREAT, 0o600)
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        finally:
+            os.close(fd)
+
+    def test_config_write_waits_for_the_lock(self):
+        self.hold_lock()
+        with mock.patch.object(wrapper, "LOCK_TIMEOUT", 0.3, create=True):
+            self.assertEqual(self.review(), 1)
+        self.assertIn("another cc-crit is starting", self.stderr)
         self.assertEqual(self.recorded("crit"), [])
+        self.assertFalse((self.crit_home / ".crit.config.json").exists())
+
+    def test_lock_is_released_after_the_daemon_starts(self):
+        # daemon が動いている間は持ち続けない。crit にロックの fd を引き継がないことも、これで確かめる。
+        self.set_mode("lockcheck")
+        self.assertEqual(self.review(), 0, self.stderr)
+        self.assertEqual((self.root / "lockcheck").read_text(), "acquired")
+
+    def test_lock_is_released_when_crit_exits_without_starting(self):
+        self.set_mode("fail")
+        self.assertEqual(self.review(), 1)
+        self.assert_lock_free()
+
+    def test_reply_releases_the_lock_before_running_crit(self):
+        self.write_request(reply_request())
+        self.assertEqual(self.main("reply"), 0, self.stderr)
+        self.assertEqual((self.root / "lockcheck-comment").read_text(), "acquired")
 
 
 class ReplyTests(RunBase):
@@ -691,6 +786,29 @@ class DenyReadTests(RunBase):
     def test_uncovered_local_entry_is_denied(self):
         self.settings(self.repo / ".claude" / "settings.local.json", ["~/.config/gh"])
         self.assertEqual(self.review(), 2)
+
+    def test_fifo_settings_are_denied(self):
+        # 入れ子のリポジトリなどに FIFO を置かれても、読み込みで止まらないこと。
+        path = self.repo / ".claude" / "settings.local.json"
+        path.parent.mkdir()
+        os.mkfifo(path)
+        result = {}
+
+        def check():
+            try:
+                wrapper.check_deny_read(self.home, self.repo)
+            except wrapper.Denied as e:
+                result["reason"] = e.reason
+
+        thread = threading.Thread(target=check, daemon=True)
+        thread.start()
+        thread.join(5)
+        if thread.is_alive():
+            # 止まっているスレッドを、書き込み側を開いて解放する。
+            os.close(os.open(path, os.O_WRONLY | os.O_NONBLOCK))
+            thread.join(5)
+            self.fail("check_deny_read blocked on a FIFO")
+        self.assertIn("cannot read the sandbox settings", result.get("reason", ""))
 
     def test_broken_settings_are_denied(self):
         path = self.repo / ".claude" / "settings.local.json"

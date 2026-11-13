@@ -16,6 +16,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 mise run brew:deps:show   # Homebrew の依存関係ツリーを表示
 mise run brew:dump        # インストール済みパッケージから Brewfile を再生成
 mise run vscode:ext:list  # vscode/extensions リストを再生成
+mise run crit:profile-test  # cc-crit の profile のテスト（sandbox の外で。crit・git・macOS の更新後に実行）
 mise run sf:plugins       # sf のプラグインを config/sf/plugins.txt に同期（グローバルタスク）
 ```
 

@@ -13,3 +13,9 @@ run = ["rm -rf Brewfile", "brew bundle dump"]
 [tasks."vscode:ext:list"]
 description = "VSCode 拡張のリストを vscode/extensions に書き出す"
 run = "code --list-extensions > vscode/extensions"
+
+# profile は crit と git の実行ファイルの場所と、動作に要る権限に依存する。
+# Claude Code の sandbox の中では sandbox-exec を入れ子にできず、スキップされる。
+[tasks."crit:profile-test"]
+description = "cc-crit の profile のテストを実行する（sandbox の外で。crit・git・macOS を更新したら実行する）"
+run = "/usr/bin/python3 -B claude/hooks/tests/test-cc-crit-profile.py"

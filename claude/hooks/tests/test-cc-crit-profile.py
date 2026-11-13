@@ -264,6 +264,25 @@ class ProfileTests(unittest.TestCase):
             self.skipTest("~/.lima/_config does not exist")
         self.assertDenied(f"attempt(lambda: os.listdir({str(p)!r}))")
 
+    def test_read_real_crit_denied(self):
+        # sandbox の外の crit（plan-hook）の状態。crit は使わない。
+        p = self.home_real / ".crit"
+        if not p.is_dir():
+            self.skipTest("~/.crit does not exist")
+        self.assertDenied(f"attempt(lambda: os.listdir({str(p)!r}))")
+
+    def test_read_aws_credentials_denied(self):
+        p = self.home_real / ".aws" / "credentials"
+        if not p.exists():
+            self.skipTest("~/.aws/credentials does not exist")
+        self.assertDenied(f"attempt(lambda: open({str(p)!r}).read())")
+
+    def test_read_dotfiles_aws_credentials_denied(self):
+        p = self.home_real / "dotfiles" / "aws" / "credentials"
+        if not p.exists():
+            self.skipTest("~/dotfiles/aws/credentials does not exist")
+        self.assertDenied(f"attempt(lambda: open({str(p)!r}).read())")
+
     # --- 拒否すべきもの: ネットワーク ---
 
     def test_external_connect_denied(self):
