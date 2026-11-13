@@ -45,7 +45,7 @@ cask "atok"
 cask "bruno"              # Open source API Client
 cask "chatgpt"
 cask "claude"
-cask "claude-code"
+cask "claude-code@latest"
 cask "codex"              # OpenAI Codex CLI (Claude Code との協調動作用)
 cask "coteditor"
 cask "dbgate"             # Database manager for MySQL, PostgreSQL, SQL Server, MongoDB, SQLite and others
