@@ -502,6 +502,17 @@ class ReviewTests(RunBase):
         self.assertTrue(config["no_integration_check"])
         self.assertEqual(config["trusted_project_prompts"], {key: {"mode": "defaults"}})
 
+    def test_config_replaces_the_finish_prompt(self):
+        # crit の既定の案内（crit comment で返信し、crit --session で次のラウンド）は、この環境では実行できない。
+        self.assertEqual(self.review(), 0, self.stderr)
+        prompt = self.config()["prompts"]["on_finish_unresolved"]
+        self.assertTrue(prompt.startswith("inline:"))
+        self.assertIn("{{.session_key}}", prompt)
+        self.assertIn("/usr/local/libexec/claude-crit/cc-crit reply", prompt)
+        self.assertIn("/usr/local/libexec/claude-crit/cc-crit review", prompt)
+        self.assertNotIn("crit comment", prompt)
+        self.assertNotIn("crit --session", prompt)
+
     def config(self):
         return json.loads((self.crit_home / ".crit.config.json").read_text(encoding="utf-8"))
 

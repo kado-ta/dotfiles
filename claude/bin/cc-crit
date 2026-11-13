@@ -71,6 +71,26 @@ CONTROL = re.compile(r"[\x00-\x08\x0b-\x1f\x7f]")
 CONTROL_ANY = re.compile(r"[\x00-\x1f\x7f]")
 FIELDS = {"review": {"files"}, "reply": {"session", "replies"}}
 REPLY_FIELDS = {"reply_to", "body"}
+# Finish の後に crit が出す案内文（crit の Go のテンプレート）。既定の案内は crit comment で返信し、
+# crit --session で次のラウンドへ進むよう書くが、Claude Code からは crit を直接実行できない。
+# 1〜3 行目は、crit の既定のテンプレート（integrations/prompts/on_finish_unresolved.md）と同じ。
+FINISH_PROMPT = (
+    "inline:"
+    "{{if eq .unresolved_count 1}}The review finished with 1 unresolved comment."
+    "{{else}}The review finished with {{.unresolved_count}} unresolved comments.{{end}}\n"
+    "\n"
+    "{{if .comments_unresolved_json}}{{.comments_unresolved_json}}\n"
+    "\n"
+    "{{end}}"
+    "Address each comment. Do not run crit directly; use cc-crit as the crit-review skill describes. "
+    "To reply, write {\"session\": \"{{.session_key}}\", \"replies\": [{\"reply_to\": \"<comment-id>\", "
+    "\"body\": \"<what you did>\"}]} to .cc-crit-request.json and run "
+    "/usr/local/libexec/claude-crit/cc-crit reply alone. "
+    "Put your explanations in these replies, not in chat. The reviewer reads them in Crit.\n"
+    "\n"
+    "When you're done, write the same review request to .cc-crit-request.json again and run "
+    "/usr/local/libexec/claude-crit/cc-crit review alone. That starts the next review round."
+)
 
 
 class Stop(Exception):
@@ -327,6 +347,8 @@ def write_config(crit_home: Path, project_dir: Path, author: str) -> None:
         "no_integration_check": True,
         "author": author,
         "trusted_project_prompts": trusted,
+        # プロジェクトは信頼しない（defaults）ので、プロジェクトの prompts は使われず、この案内文が使われる。
+        "prompts": {"on_finish_unresolved": FINISH_PROMPT},
     }
     # crit は Finish のたびにこのファイルを読み直すので、途中まで書いた状態を見せない。
     # rename は置き換え先のリンクをたどらない。
