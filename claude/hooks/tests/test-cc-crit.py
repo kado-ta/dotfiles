@@ -594,7 +594,7 @@ class BrowserTests(RunBase):
 
     def test_opens_the_browser_after_a_new_daemon_starts(self):
         self.assertEqual(self.review(), 0, self.stderr)
-        self.assertEqual(self.opened(), [[f"http://localhost:{self.ports[0]}/"]])
+        self.assertEqual(self.opened(), [[f"http://127.0.0.1:{self.ports[0]}/"]])
 
     def test_does_not_open_when_the_endpoint_does_not_answer(self):
         self.healthy = False
@@ -616,7 +616,7 @@ class BrowserTests(RunBase):
         self.set_mode("connected")
         self.browser_clients = False
         self.assertEqual(self.review(), 0, self.stderr)
-        self.assertEqual(self.opened(), [[f"http://localhost:{self.ports[0]}/"]])
+        self.assertEqual(self.opened(), [[f"http://127.0.0.1:{self.ports[0]}/"]])
 
 
 class PortTests(RunBase):

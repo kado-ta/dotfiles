@@ -457,7 +457,8 @@ def verify_endpoint(registry: Path, port: int, pid: int) -> bool:
 
 def open_browser(port: int) -> None:
     # URL はここで組み立てる。crit の出力の文字列は渡さない。
-    subprocess.run([OPEN, f"http://localhost:{port}/"], stdin=subprocess.DEVNULL,
+    # localhost は ::1 にも解決される。crit が待ち受ける 127.0.0.1 を直接開き、::1 の同じポートの別のものにつながせない。
+    subprocess.run([OPEN, f"http://127.0.0.1:{port}/"], stdin=subprocess.DEVNULL,
                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=10, check=False)
 
 
