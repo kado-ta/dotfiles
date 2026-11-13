@@ -5,7 +5,7 @@ description: Use when the user asks to commit only the currently staged git chan
 
 # Commit Staged Changes and Open a PR
 
-ステージ済みの変更だけをコミットし、`cc-safe-push` で push して PR を作る。`cc-safe-push` が拒否したり失敗したりしたときと、ユーザーが自分で push すると言っているときは、ユーザーの push を待つ。PR はリモートにブランチがないと作れないため、作業は push を挟んだ 2 フェーズになる。
+ステージ済みの変更だけをコミットし、`cc-safe-push` で push して PR を作る。push の前に、確認スキルの提案と、Crit での人間のレビューを行う。`cc-safe-push` が拒否したり失敗したりしたときと、ユーザーが自分で push すると言っているときは、ユーザーの push を待つ。PR はリモートにブランチがないと作れないため、作業は push を挟んだ 2 フェーズになる。
 
 起動時にステージ済みの変更がなく、現在のブランチが push 済みで open な PR がない場合は、[フェーズ 2](#phase-2) から始める。どちらにも当てはまらない場合は、状況を伝えて止まる。
 
@@ -45,7 +45,34 @@ description: Use when the user asks to commit only the currently staged git chan
    - フックで失敗したら、`--no-verify` で回避せず、内容を報告して止める。
    - `git log -1 --stat` と `git status --short` で、コミット内容と、ステージ外の変更が残っていることを確認する。
 
-5. push する。ユーザーが自分で push すると言っているときは、実行せずに下の依頼に進む。対象リポジトリに移動してから、次のコマンドを引数なし・単独で実行する（ほかのコマンドと連結すると sandbox の中で失敗する）。
+5. push の前に確認する。ユーザーが自分で push すると言っているときも、push を依頼する前に行う。
+   - **確認スキル**: 手順 4 でコミットした差分が下の表に当てはまるときは、当てはまるスキルから下の条件で使えないものを除き、表の上から順に最大 2 つ、理由を 1 行ずつ添えて提案し、実行するかをユーザーに選んでもらう。当てはまらないときと、不要と言われたときは、何も実行せずに Crit に進む。提案と実行は 1 回の作業で 1 回だけにする。
+
+     | 差分の内容 | 提案するスキル |
+     |---|---|
+     | 認証・権限・シークレットの扱い・インフラ・依存の追加 | `/cso --diff` |
+     | 画面（コンポーネント・CSS・テンプレート） | `/qa`、`/design-review` |
+     | 性能に効く変更（クエリ・バンドル・画像） | `/benchmark --diff` |
+
+     <!--
+       TODO: 下記は、別タスクとして対応し、解決する必要がある。
+       Sandbox の中で確認スキルが動かない:
+       - /qa・/design-review・/benchmark のブラウザ（gstack の browse）は localhost で待ち受けますが、
+         sandbox では許可されておらず、除外コマンドにも入っていません。Aside も入っていません。
+       - /cso の保存先 ~/.gstack/security/cso は、書き込みの許可（~/.gstack/projects だけ）の外にあります。
+       - グローバル CLAUDE.md で使うと決めている /qa と /browse にも同じ影響があります。
+     -->
+
+     - `/qa`・`/design-review`・`/benchmark` は動いているアプリを使う。sandbox の中ではサーバーを起動できないので、ユーザーに起動してもらう必要があると添えて提案する。`/benchmark --diff` は、変更前の baseline がないと絶対値しか出せず、回帰を検出できないことも添える。
+     - `/qa` と `/design-review` は、作業ツリーがクリーンでないと止まり、全部コミットするか stash するかを聞いてくる。提案の前と実行の直前に `git status --porcelain` を確かめ、空でなければ提案も実行もせず、未コミットの変更が残っているので使えないと伝える。
+     - スキルが修正をコミットしたら、そのコミットも今回のコミットとして扱う。
+     - スキルがコミットせずに作業ツリーに残した変更があれば、内容を伝え、コミットするかを確認する。コミットするときは、ステージはユーザーに任せ、ステージし直したと連絡を受けてから手順 4 でコミットする。
+     - スキルが最後まで動かなかったとき（blocked・not assessed など）と、直さずに残した指摘があるときは、Crit に進まずに伝え、どうするかを確認する。`/cso --diff` は未ステージ・未追跡のファイルも検査するので、そのファイルへの指摘は PR に含まれないことも添える。進めると言われたら Crit に進む。直すときは、直した後のステージはユーザーに任せ、ステージし直したと連絡を受けてから手順 4 でコミットし、Crit に進む。
+   - **Crit**: `/crit-review` の手順で、ブランチの差分（依頼ファイル `{}`）を開く。`approved: true` が返るまで手順 6 に進まない。承認されたら `git rev-parse HEAD` を控える。
+     - Crit の差分は default branch との merge-base から作業ツリーまでなので、PR に含めない変更も入る。未ステージ・未追跡のファイルがあるときと、PR の base が default branch でないときは、開く前にそのことを伝える。
+     - コメントに沿って修正したら、ステージはユーザーに任せ、ステージし直したと連絡を受けてから手順 4 でコミットし、Crit を開き直す。
+
+6. push する。ユーザーが自分で push すると言っているときは、実行せずに下の依頼に進む。対象リポジトリに移動してから、次のコマンドを引数なし・単独で実行する（ほかのコマンドと連結すると sandbox の中で失敗する）。
 
    ```sh
    /usr/local/libexec/claude-push/cc-safe-push
@@ -68,7 +95,7 @@ description: Use when the user asks to commit only the currently staged git chan
    - `cc-safe-push` で push した場合は、`PUSHED:` の行の SHA が `git rev-parse --short=12 HEAD` と一致すること
    - ユーザーが push した場合は、`gh api 'repos/{owner}/{repo}/git/ref/heads/<branch>' --jq .object.sha` が `git rev-parse HEAD` と一致すること（`git ls-remote` は sandbox の中で SSH が失敗する）
 2. 同じ head の open な PR があれば、その URL を伝えて終了する。`gh` が失敗して確認できなければ、作成に進まずに確認する。
-3. PR を作る。ユーザーが push した場合は、フェーズ 1 で示した案を使う。`cc-safe-push` で push した場合は、ここで案を作る（`.github/pull_request_template.md` などのテンプレートがあれば従う）。フェーズ 2 から始めた場合は、案を示して確認してから作る。カレントディレクトリに `.cc-pr-request.json` を書き、そのディレクトリで次のコマンドを単独で実行する（ほかのコマンドと連結すると sandbox の中で失敗する）。
+3. PR を作る。Crit で承認したときに控えた HEAD が `git rev-parse HEAD` と一致しないとき（フェーズ 2 から始めた場合を含む）は、先にフェーズ 1 の手順 5 の Crit を開き、`approved: true` を得る（確認スキルは提案しない）。Crit のコメントで修正したら、ステージはユーザーに任せ、ステージし直したと連絡を受けてから[フェーズ 1](#phase-1) の手順 4 でコミットし、Crit を開き直してから手順 6 に進む。ユーザーが push した場合は、フェーズ 1 で示した案を使う。`cc-safe-push` で push した場合は、ここで案を作る（`.github/pull_request_template.md` などのテンプレートがあれば従う）。フェーズ 2 から始めた場合は、案を示して確認してから作る。カレントディレクトリに `.cc-pr-request.json` を書き、そのディレクトリで次のコマンドを単独で実行する（ほかのコマンドと連結すると sandbox の中で失敗する）。
 
    ```json
    { "version": 1, "op": "create", "head": "<branch>", "title": "<title>", "body": "<body>", "base": "<base>" }
@@ -93,5 +120,6 @@ description: Use when the user asks to commit only the currently staged git chan
 | 操作 | 理由 |
 |---|---|
 | `git push`、`--head` なしの `gh pr create`、`gh pr create --dry-run` | gh は未 push のブランチを push しようとする（`--dry-run` でも push しうる） |
-| `git add`、`git commit -a`、了承なしのステージ組み替え | ステージの内容がユーザーの意図 |
+| `git add`、`git commit -a`、了承なしのステージ組み替え（手順 5 で承認したスキルが、自分の修正をコミットするのは除く） | ステージの内容がユーザーの意図 |
 | `git stash`、`--no-verify`、フックの回避 | 未コミット変更の消失や安全装置の無効化につながる |
+| `/document-release` など、自前で `git push` や `gh pr edit` を実行するスキル | `cc-safe-push`・`cc-safe-pr` を通らない push と PR 編集になる（deny ルールや 403 で失敗する） |
