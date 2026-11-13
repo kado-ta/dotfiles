@@ -24,6 +24,21 @@ CRIT_DENY = ["Read(~/.cc-crit/**)", "Edit(~/.crit/**)", "Edit(~/.crit.config.jso
 CRIT_DENY_READ = ["~/.cc-crit"]
 LIMA_DENY = ["Read(~/.colima/_lima/_config/**)", "Read(~/.lima/_config/**)"]
 LIMA_DENY_READ = ["~/.colima/_lima/_config", "~/.lima/_config"]
+EDIT_DENY = ["Edit(**/.git/**/hooks/**)"]
+MISE_CONFIG = [
+    "**/mise.toml",
+    "**/.mise.toml",
+    "**/mise.*.toml",
+    "**/.mise.*.toml",
+    "**/mise/config.toml",
+    "**/mise/config.*.toml",
+    "**/mise/conf.d/**",
+    "**/.mise/**",
+    "**/.config/mise/**",
+    "**/.tool-versions",
+]
+MISE_ASK = [f"Edit({p})" for p in MISE_CONFIG]
+MISE_DENY_WRITE = [p.removesuffix("/**") for p in MISE_CONFIG]
 PROJECT_ASK = [
     "Edit(/claude/**)",
     "Edit(/zsh/**)",
@@ -65,12 +80,13 @@ def settings():
     return {
         "permissions": {
             "allow": [f"Bash({c})" for c in WRAPPER_COMMANDS],
-            "deny": list(DENY_PUSH) + CRIT_DENY + LIMA_DENY,
+            "deny": list(DENY_PUSH) + CRIT_DENY + LIMA_DENY + EDIT_DENY,
+            "ask": list(MISE_ASK),
             "blockWritesOutsideWorkingDirectories": True,
         },
         "sandbox": {
             "excludedCommands": list(WRAPPER_COMMANDS),
-            "filesystem": {"denyRead": CRIT_DENY_READ + LIMA_DENY_READ},
+            "filesystem": {"denyRead": CRIT_DENY_READ + LIMA_DENY_READ, "denyWrite": list(MISE_DENY_WRITE)},
         },
         "hooks": {
             "PreToolUse": [
@@ -282,6 +298,26 @@ class CheckRepoTests(unittest.TestCase):
                 data["permissions"]["blockWritesOutsideWorkingDirectories"] = value
                 self.write_settings(data)
                 self.assert_fails("FAIL edit-permissions", "blockWritesOutsideWorkingDirectories")
+
+    def test_missing_git_hooks_deny_fails(self):
+        # hooks は、人間が git を使ったときに sandbox の外で動く。
+        data = settings()
+        data["permissions"]["deny"].remove("Edit(**/.git/**/hooks/**)")
+        self.write_settings(data)
+        self.assert_fails("FAIL edit-permissions", "Edit(**/.git/**/hooks/**)")
+
+    def test_missing_mise_ask_fails(self):
+        # 信頼済みのパスの mise の設定は、人間が cd したときに sandbox の外で動く。
+        data = settings()
+        data["permissions"]["ask"].remove("Edit(**/mise.toml)")
+        self.write_settings(data)
+        self.assert_fails("FAIL edit-permissions", "Edit(**/mise.toml)")
+
+    def test_missing_mise_deny_write_fails(self):
+        data = settings()
+        data["sandbox"]["filesystem"]["denyWrite"].remove("**/mise.toml")
+        self.write_settings(data)
+        self.assert_fails("FAIL edit-permissions", "**/mise.toml")
 
     def test_missing_push_deny_fails(self):
         data = settings()

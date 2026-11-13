@@ -49,6 +49,25 @@ DENY_PUSH = ("Bash(git push)", "Bash(git push *)", "Bash(git -C * push *)", "Bas
 # Edit・Write ツールは sandbox の外で動く。消すと、作業ディレクトリの外（ほかのリポジトリの .git/hooks、
 # ~/Library/LaunchAgents など）にも、auto mode の判定だけで書ける。
 WRITE_BLOCK = "blockWritesOutsideWorkingDirectories"
+# 作業ディレクトリの中で、人間が操作しなくても sandbox の外で動くもの。外は WRITE_BLOCK が止める。
+# hooks は、人間が git を使ったときに動く。
+EDIT_DENY = ("Edit(**/.git/**/hooks/**)",)
+# mise が読む設定。信頼済みのパスの hooks・_.source・exec() は、人間が cd したときに動く。
+MISE_CONFIG = (
+    "**/mise.toml",
+    "**/.mise.toml",
+    "**/mise.*.toml",
+    "**/.mise.*.toml",
+    "**/mise/config.toml",
+    "**/mise/config.*.toml",
+    "**/mise/conf.d/**",
+    "**/.mise/**",
+    "**/.config/mise/**",
+    "**/.tool-versions",
+)
+MISE_ASK = tuple(f"Edit({p})" for p in MISE_CONFIG)
+# Bash（sandbox の中）からも書かせない。denyWrite はディレクトリの中も止めるので、末尾の /** は付けない。
+MISE_DENY_WRITE = tuple(p.removesuffix("/**") for p in MISE_CONFIG)
 JSONC_FILES = {"vscode/settings.json", "vscode/keybindings.json"}
 SETTINGS = "claude/settings.json"
 PROJECT_SETTINGS = ".claude/settings.json"
@@ -202,10 +221,17 @@ def check_push_permissions(root):
 
 
 def check_edit_permissions(root):
-    permissions = load_settings(root).get("permissions", {})
+    settings = load_settings(root)
+    permissions = settings.get("permissions", {})
     errors = []
     if permissions.get(WRITE_BLOCK) is not True:
         errors.append(f"{SETTINGS}: permissions.{WRITE_BLOCK} must be true")
+    deny, ask = set(permissions.get("deny", [])), set(permissions.get("ask", []))
+    errors += [f"{SETTINGS}: permissions.deny lacks {rule}" for rule in EDIT_DENY if rule not in deny]
+    errors += [f"{SETTINGS}: permissions.ask lacks {rule}" for rule in MISE_ASK if rule not in ask]
+    deny_write = settings.get("sandbox", {}).get("filesystem", {}).get("denyWrite", [])
+    errors += [f"{SETTINGS}: sandbox.filesystem.denyWrite lacks {path}" for path in MISE_DENY_WRITE
+               if path not in deny_write]
     return errors
 
 

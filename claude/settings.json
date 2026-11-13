@@ -156,6 +156,7 @@
       "Edit(/etc/**)",
       "Edit(**/.env*)",
       "Edit(**/.git/config)",
+      "Edit(**/.git/**/hooks/**)",
       "Edit(**/package-lock.json)",
       "Edit(**/pnpm-lock.yaml)",
       "Edit(**/yarn.lock)",
@@ -188,7 +189,17 @@
       "Bash(gh release delete*)",
       "Bash(gh repo sync*)",
       "Bash(gh api *)",
-      "Edit(~/dotfiles/claude/**)"
+      "Edit(~/dotfiles/claude/**)",
+      "Edit(**/mise.toml)",
+      "Edit(**/.mise.toml)",
+      "Edit(**/mise.*.toml)",
+      "Edit(**/.mise.*.toml)",
+      "Edit(**/mise/config.toml)",
+      "Edit(**/mise/config.*.toml)",
+      "Edit(**/mise/conf.d/**)",
+      "Edit(**/.mise/**)",
+      "Edit(**/.config/mise/**)",
+      "Edit(**/.tool-versions)"
     ],
     "disableBypassPermissionsMode": "disable",
     "blockWritesOutsideWorkingDirectories": true
@@ -355,6 +366,18 @@
         "~/.cc-crit",
         "~/.colima/_lima/_config",
         "~/.lima/_config"
+      ],
+      "denyWrite": [
+        "**/mise.toml",
+        "**/.mise.toml",
+        "**/mise.*.toml",
+        "**/.mise.*.toml",
+        "**/mise/config.toml",
+        "**/mise/config.*.toml",
+        "**/mise/conf.d",
+        "**/.mise",
+        "**/.config/mise",
+        "**/.tool-versions"
       ]
     },
     "credentials": {
