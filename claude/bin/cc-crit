@@ -12,6 +12,7 @@ crit は同じディレクトリの cc-crit.sb（Crit 専用の Seatbelt profile
 from __future__ import annotations
 
 import contextlib
+import fcntl
 import hashlib
 import http.client
 import json
@@ -23,6 +24,7 @@ import socket
 import stat
 import subprocess
 import sys
+import time
 import uuid
 from pathlib import Path
 from typing import Any
@@ -58,7 +60,9 @@ MAX_REPLIES = 50
 MAX_BODY = 65536
 EXIT_FAILED = 1
 EXIT_DENIED = 2
-SESSION = re.compile(r"[0-9a-f]{12}\Z")
+# 起動のロックを待つ秒数。crit の起動は 1〜2 秒で終わる。
+LOCK_TIMEOUT = 30
+SESSION =re.compile(r"[0-9a-f]{12}\Z")
 # c_ は行・ファイルへのコメント、r_ はレビュー全体へのコメント（crit の session.go）。
 COMMENT_ID = re.compile(r"[cr]_[0-9a-f]{6,16}\Z")
 # 返信の本文では、改行とタブ以外の制御文字を拒否する。端末の制御シーケンスなどを入れさせない。
@@ -235,6 +239,47 @@ def prepare_home(home_real: Path) -> Path:
         # sandbox.excludedCommands と完全一致せず、sandbox 内で動いたときにここで失敗する。
         raise Failed("cannot create ~/.cc-crit; run cc-crit alone so that it runs outside the sandbox")
     return crit_home
+
+
+class StartLock:
+    """起動が終わるまで持つ排他ロック。
+
+    同時に動く cc-crit が、信頼の設定の書き直しと、空きポートの選択を取り合わないようにする。
+    fd を閉じるとロックも外れる。crit には引き継がない（O_CLOEXEC）。
+    """
+
+    def __init__(self, fd: int):
+        self.fd: int | None = fd
+
+    def release(self) -> None:
+        if self.fd is not None:
+            os.close(self.fd)
+            self.fd = None
+
+
+def acquire_lock(base: Path) -> StartLock:
+    path = base / "lock"
+    try:
+        fd = os.open(path, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC, 0o600)
+    except OSError:
+        raise Denied(f"cannot open {path}; it must be a regular file you own")
+    lock = StartLock(fd)
+    try:
+        st = os.fstat(fd)
+        if not stat.S_ISREG(st.st_mode) or st.st_uid != os.getuid() or st.st_nlink != 1:
+            raise Denied(f"{path} must be a regular file you own, with one link")
+        deadline = time.monotonic() + LOCK_TIMEOUT
+        while True:
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                return lock
+            except BlockingIOError:
+                if time.monotonic() >= deadline:
+                    raise Failed("another cc-crit is starting; retry")
+                time.sleep(0.2)
+    except BaseException:
+        lock.release()
+        raise
 
 
 def repo_root_hash(project_dir: Path) -> str:
@@ -448,7 +493,7 @@ def sandbox_argv(home_real: Path, crit_home: Path, argv: list[str]) -> list[str]
             *argv]
 
 
-def run_review(files: list[str], top: Path, home_real: Path, crit_home: Path) -> int:
+def run_review(files: list[str], top: Path, home_real: Path, crit_home: Path, lock: StartLock) -> int:
     registry = crit_home / ".crit" / "sessions"
     port = check_ports(registry)
     argv = sandbox_argv(home_real, crit_home,
@@ -460,10 +505,14 @@ def run_review(files: list[str], top: Path, home_real: Path, crit_home: Path) ->
         for line in child.stdout:
             sys.stdout.write(line)
             sys.stdout.flush()
+            if STARTED.search(line) or CONNECTED.search(line):
+                # daemon がポートで待ち受けたか、既存の daemon につないだ。ほかの cc-crit を通す。
+                lock.release()
             if not opened:
                 opened = maybe_open(line, registry)
         return child.wait()
     finally:
+        lock.release()
         # SIGTERM などで抜けたときは、crit の client を止める。daemon は次のラウンドのために残る。
         if child.poll() is None:
             child.terminate()
@@ -490,11 +539,17 @@ def execute(op: str) -> int:
     home_real = real_home()
     check_deny_read(home_real, top)
     crit_home = prepare_home(home_real)
-    # crit は toplevel で動かす。どのサブディレクトリから呼んでも、同じレビューと信頼の判定になる。
-    write_config(crit_home, top, pwd.getpwuid(os.getuid()).pw_name)
-    if op == "review":
-        return run_review(resolve_files(request["files"], cwd, top), top, home_real, crit_home)
-    return run_reply(request, top, home_real, crit_home)
+    # 信頼の設定の書き直しから、crit が待ち受けるまでを、同時に動くほかの cc-crit と分ける。
+    lock = acquire_lock(crit_home.parent)
+    try:
+        # crit は toplevel で動かす。どのサブディレクトリから呼んでも、同じレビューと信頼の判定になる。
+        write_config(crit_home, top, pwd.getpwuid(os.getuid()).pw_name)
+        if op == "review":
+            return run_review(resolve_files(request["files"], cwd, top), top, home_real, crit_home, lock)
+        lock.release()
+        return run_reply(request, top, home_real, crit_home)
+    finally:
+        lock.release()
 
 
 def on_sigterm(signum: int, frame: Any) -> None:
