@@ -69,8 +69,6 @@ jobs:
         run: |
           /bin/bash --version | head -n 1
           /usr/bin/python3 --version
-          # ラッパーは xcrun の shim を通さず、CLT の実体を直接使う。
-          ls -l /Library/Developer/CommandLineTools/usr/bin/python3 /Library/Developer/CommandLineTools/usr/bin/git
           # 1 行にまとめると、どちらかがなくても成功する。
           command -v jq
           command -v git
