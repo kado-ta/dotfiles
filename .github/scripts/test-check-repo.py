@@ -66,6 +66,7 @@ def settings():
         "permissions": {
             "allow": [f"Bash({c})" for c in WRAPPER_COMMANDS],
             "deny": list(DENY_PUSH) + CRIT_DENY + LIMA_DENY,
+            "blockWritesOutsideWorkingDirectories": True,
         },
         "sandbox": {
             "excludedCommands": list(WRAPPER_COMMANDS),
@@ -266,6 +267,21 @@ class CheckRepoTests(unittest.TestCase):
         data["sandbox"]["network"] = {"allowLocalBinding": False, "allowUnixSockets": []}
         self.write_settings(data)
         self.assert_passes()
+
+    def test_missing_write_block_fails(self):
+        # 作業ディレクトリの外への Edit・Write を、ほかに止める規則はない。
+        data = settings()
+        del data["permissions"]["blockWritesOutsideWorkingDirectories"]
+        self.write_settings(data)
+        self.assert_fails("FAIL edit-permissions", "blockWritesOutsideWorkingDirectories")
+
+    def test_write_block_not_true_fails(self):
+        for value in (False, "true"):
+            with self.subTest(value=value):
+                data = settings()
+                data["permissions"]["blockWritesOutsideWorkingDirectories"] = value
+                self.write_settings(data)
+                self.assert_fails("FAIL edit-permissions", "blockWritesOutsideWorkingDirectories")
 
     def test_missing_push_deny_fails(self):
         data = settings()

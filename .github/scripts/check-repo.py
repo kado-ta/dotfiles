@@ -46,6 +46,9 @@ LIMA_DENY_READ = ("~/.colima/_lima/_config", "~/.lima/_config")
 # Docker（Colima）のソケットや localhost の全ポートに、sandbox の中のすべてのコマンドから届くようにする設定。
 FORBIDDEN_NETWORK = ("allowUnixSockets", "allowAllUnixSockets", "allowLocalBinding")
 DENY_PUSH = ("Bash(git push)", "Bash(git push *)", "Bash(git -C * push *)", "Bash(git -c * push *)")
+# Edit・Write ツールは sandbox の外で動く。消すと、作業ディレクトリの外（ほかのリポジトリの .git/hooks、
+# ~/Library/LaunchAgents など）にも、auto mode の判定だけで書ける。
+WRITE_BLOCK = "blockWritesOutsideWorkingDirectories"
 JSONC_FILES = {"vscode/settings.json", "vscode/keybindings.json"}
 SETTINGS = "claude/settings.json"
 PROJECT_SETTINGS = ".claude/settings.json"
@@ -198,6 +201,14 @@ def check_push_permissions(root):
     return errors
 
 
+def check_edit_permissions(root):
+    permissions = load_settings(root).get("permissions", {})
+    errors = []
+    if permissions.get(WRITE_BLOCK) is not True:
+        errors.append(f"{SETTINGS}: permissions.{WRITE_BLOCK} must be true")
+    return errors
+
+
 def key_paths(value, prefix=""):
     """dict を末端のキーのパス（a.b.c）に展開する。空の dict も末端として返す。"""
     if isinstance(value, dict) and value:
@@ -331,6 +342,7 @@ CHECKS = (
     ("secret-files", check_secret_files),
     ("hook-scripts", check_hook_scripts),
     ("push-permissions", check_push_permissions),
+    ("edit-permissions", check_edit_permissions),
     ("project-permissions", check_project_permissions),
     ("syntax", check_syntax),
     ("markdown-names", check_markdown_names),

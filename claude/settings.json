@@ -190,7 +190,8 @@
       "Bash(gh api *)",
       "Edit(~/dotfiles/claude/**)"
     ],
-    "disableBypassPermissionsMode": "disable"
+    "disableBypassPermissionsMode": "disable",
+    "blockWritesOutsideWorkingDirectories": true
   },
   "model": "opus[1m]",
   "hooks": {
