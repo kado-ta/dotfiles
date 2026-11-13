@@ -148,7 +148,7 @@
       "Read(./secrets/**)",
       "Read(**/credentials/**)",
       "Read(**/*.key)",
-      "Read(~/Dev/**/*.key)",
+      "Read(~/**/*.key)",
       "Read(**/*.pem)",
       "Read(~/Dev/**/*.pem)",
       "Read(**/.pgpass)",
