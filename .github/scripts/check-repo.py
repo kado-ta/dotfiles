@@ -32,7 +32,13 @@ WRAPPER_COMMANDS = (
 # ラッパーを置くディレクトリ。permissions.allow のうち、ここを指す規則はすべて WRAPPER_COMMANDS と一致させる。
 WRAPPER_RULE_PREFIX = "Bash(/usr/local/libexec/claude-"
 # cc-crit の crit は、レビュー中のファイルの全文を ~/.cc-crit に書き出す。Claude の sandbox から読ませない。
-CRIT_DENY = ("Read(~/.cc-crit/**)",)
+# sandbox の外で動く crit は ~/.crit の hooks・prompts・レビューを信頼する。sandbox を通らない Edit・Write ツールでも書かせない。
+CRIT_DENY = (
+    "Read(~/.cc-crit/**)",
+    "Edit(~/.crit/**)",
+    "Edit(~/.crit.config.json)",
+    "Edit(~/.cc-crit/**)",
+)
 CRIT_DENY_READ = ("~/.cc-crit",)
 DENY_PUSH = ("Bash(git push)", "Bash(git push *)", "Bash(git -C * push *)", "Bash(git -c * push *)")
 JSONC_FILES = {"vscode/settings.json", "vscode/keybindings.json"}

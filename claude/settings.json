@@ -166,7 +166,10 @@
       "Edit(~/Library/Logs/cc-safe-pr/**)",
       "Read(~/Library/Keychains/**)",
       "Read(~/.cc-crit/**)",
-      "Edit(~/.config/cc-gh-read/**)"
+      "Edit(~/.config/cc-gh-read/**)",
+      "Edit(~/.crit/**)",
+      "Edit(~/.crit.config.json)",
+      "Edit(~/.cc-crit/**)"
     ],
     "ask": [
       "Bash(gh pr create*)",

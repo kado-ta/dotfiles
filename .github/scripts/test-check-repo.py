@@ -20,7 +20,7 @@ WRAPPER_COMMANDS = [
     "/usr/local/libexec/claude-crit/cc-crit reply",
 ]
 DENY_PUSH = ["Bash(git push)", "Bash(git push *)", "Bash(git -C * push *)", "Bash(git -c * push *)"]
-CRIT_DENY = ["Read(~/.cc-crit/**)"]
+CRIT_DENY = ["Read(~/.cc-crit/**)", "Edit(~/.crit/**)", "Edit(~/.crit.config.json)", "Edit(~/.cc-crit/**)"]
 CRIT_DENY_READ = ["~/.cc-crit"]
 PROJECT_ASK = [
     "Edit(/zsh/**)",
