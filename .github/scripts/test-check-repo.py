@@ -25,6 +25,7 @@ CRIT_DENY_READ = ["~/.cc-crit"]
 LIMA_DENY = ["Read(~/.colima/_lima/_config/**)", "Read(~/.lima/_config/**)"]
 LIMA_DENY_READ = ["~/.colima/_lima/_config", "~/.lima/_config"]
 PROJECT_ASK = [
+    "Edit(/claude/**)",
     "Edit(/zsh/**)",
     "Edit(/config/**)",
     "Edit(/mise/**)",
@@ -302,6 +303,13 @@ class CheckRepoTests(unittest.TestCase):
         data["permissions"]["ask"].remove("Edit(/mise.toml)")
         self.write_project_settings(data)
         self.assert_fails("FAIL project-permissions", "Edit(/mise.toml)")
+
+    def test_project_removed_claude_ask_fails(self):
+        # worktree では、ユーザー設定の Edit(~/dotfiles/claude/**) が当たらない。
+        data = project_settings()
+        data["permissions"]["ask"].remove("Edit(/claude/**)")
+        self.write_project_settings(data)
+        self.assert_fails("FAIL project-permissions", "Edit(/claude/**)")
 
     def test_project_added_restrictions_pass(self):
         # 制限を強める方向の追加は通す。

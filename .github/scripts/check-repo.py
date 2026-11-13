@@ -59,6 +59,7 @@ PROJECT_ALLOWED_KEYS = {
 }
 # 消すと dotfiles で起動したときの権限が広がる。外すときはここも一緒に変える。
 PROJECT_ASK = (
+    "Edit(/claude/**)",
     "Edit(/zsh/**)",
     "Edit(/config/**)",
     "Edit(/mise/**)",

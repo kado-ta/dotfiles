@@ -4,6 +4,7 @@
   ],
   "permissions": {
     "ask": [
+      "Edit(/claude/**)",
       "Edit(/zsh/**)",
       "Edit(/config/**)",
       "Edit(/mise/**)",
