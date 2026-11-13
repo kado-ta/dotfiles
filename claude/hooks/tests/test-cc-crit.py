@@ -12,6 +12,7 @@ import subprocess
 import sys
 import tempfile
 import textwrap
+import threading
 import time
 import unittest
 from pathlib import Path
@@ -774,6 +775,29 @@ class DenyReadTests(RunBase):
     def test_uncovered_local_entry_is_denied(self):
         self.settings(self.repo / ".claude" / "settings.local.json", ["~/.config/gh"])
         self.assertEqual(self.review(), 2)
+
+    def test_fifo_settings_are_denied(self):
+        # 入れ子のリポジトリなどに FIFO を置かれても、読み込みで止まらないこと。
+        path = self.repo / ".claude" / "settings.local.json"
+        path.parent.mkdir()
+        os.mkfifo(path)
+        result = {}
+
+        def check():
+            try:
+                wrapper.check_deny_read(self.home, self.repo)
+            except wrapper.Denied as e:
+                result["reason"] = e.reason
+
+        thread = threading.Thread(target=check, daemon=True)
+        thread.start()
+        thread.join(5)
+        if thread.is_alive():
+            # 止まっているスレッドを、書き込み側を開いて解放する。
+            os.close(os.open(path, os.O_WRONLY | os.O_NONBLOCK))
+            thread.join(5)
+            self.fail("check_deny_read blocked on a FIFO")
+        self.assertIn("cannot read the sandbox settings", result.get("reason", ""))
 
     def test_broken_settings_are_denied(self):
         path = self.repo / ".claude" / "settings.local.json"

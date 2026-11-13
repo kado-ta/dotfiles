@@ -366,17 +366,38 @@ def crit_env(crit_home: Path) -> dict[str, str]:
     }
 
 
+def read_settings(path: Path) -> bytes | None:
+    """設定ファイルを読む。なければ None。
+
+    リンクはたどる（~/.claude/settings.json は dotfiles へのリンク）。
+    FIFO などを読むと止まるので、通常のファイルだけを読む。
+    """
+    try:
+        fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK | os.O_CLOEXEC)
+    except FileNotFoundError:
+        return None
+    except OSError:
+        raise Denied(f"cannot read the sandbox settings in {path}")
+    try:
+        if not stat.S_ISREG(os.fstat(fd).st_mode):
+            raise Denied(f"cannot read the sandbox settings in {path}")
+        return os.read(fd, MAX_REQUEST + 1)
+    finally:
+        os.close(fd)
+
+
 def check_deny_read(home_real: Path, top: Path) -> None:
     """Claude Code の denyRead の項目を、cc-crit.sb がすべて覆っていることを確かめる。"""
     for path in (home_real / ".claude" / "settings.json",
                  top / ".claude" / "settings.json",
                  top / ".claude" / "settings.local.json"):
-        if not path.exists():
+        raw = read_settings(path)
+        if raw is None:
             continue
         try:
-            data = json.loads(path.read_text(encoding="utf-8"))
+            data = json.loads(raw.decode("utf-8"))
             entries = data.get("sandbox", {}).get("filesystem", {}).get("denyRead", [])
-        except (OSError, ValueError, AttributeError):
+        except (ValueError, AttributeError):
             raise Denied(f"cannot read the sandbox settings in {path}")
         if not isinstance(entries, list):
             raise Denied(f"sandbox.filesystem.denyRead in {path} must be a list")
