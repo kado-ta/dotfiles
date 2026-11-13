@@ -98,11 +98,13 @@
   (regex #"/\.pgpass$")
   (regex #"/secrets(/|$)")
   (literal (home-path "/dotfiles/aws/config")))
-; 本物の crit の状態（plan-hook が使う）と、Claude Code の IDE 連携の情報。
+; 本物の crit の状態（plan-hook が使う）と、Claude Code の状態（会話の記録、IDE 連携の情報、編集の差分など）。
+; crit はどれも使わない。crit が読めるものは、レビューの画面や Finish の結果を通じて Claude に届きうる。
 (deny file-read*
   (subpath (home-path "/.crit"))
   (literal (home-path "/.crit.config.json"))
-  (subpath (home-path "/.claude/ide")))
+  (subpath (home-path "/.claude"))
+  (regex #"^/private/tmp/claude-[0-9]+/bash-edit-diff(/|$)"))
 
 ; --- 書き込み ---
 ; 専用 HOME の .crit 配下と、専用の一時ディレクトリだけ。専用 HOME の .crit.config.json には書けない。

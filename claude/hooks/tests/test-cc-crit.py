@@ -154,6 +154,10 @@ class ParseReplyTests(Base):
         replies = [{"reply_to": "c_73f150", "body": "ok"}] * (wrapper.MAX_REPLIES + 1)
         self.assertDenied(self.parse, reply_request(replies=replies))
 
+    def test_reply_to_a_review_level_comment_is_accepted(self):
+        data = reply_request(replies=[{"reply_to": "r_b4c9e1", "body": "全体のコメントへの返信"}])
+        self.assertEqual(self.parse(data), data)
+
     def test_malformed_reply_to_is_denied(self):
         for reply_to in ("rp_bc1969", "c_XYZXYZ", "c_123", "c_73f150 --resolve", 7):
             with self.subTest(reply_to=reply_to):
@@ -472,6 +476,67 @@ class ReviewTests(RunBase):
         self.assertTrue(config["no_integration_check"])
         self.assertEqual(config["trusted_project_prompts"], {key: {"mode": "defaults"}})
 
+    def config(self):
+        return json.loads((self.crit_home / ".crit.config.json").read_text(encoding="utf-8"))
+
+    def make_home(self):
+        (self.crit_home / ".crit").mkdir(parents=True)
+        (self.home / ".cc-crit" / "tmp").mkdir()
+
+    def test_trust_of_other_repositories_is_kept(self):
+        other = self.root / "other"
+        (other / ".git").mkdir(parents=True)
+        (other / "notes.md").write_text("notes\n", encoding="utf-8")
+        self.assertEqual(self.review(), 0, self.stderr)
+        os.chdir(other)
+        self.assertEqual(self.review(["notes.md"]), 0, self.stderr)
+        self.assertEqual(self.config()["trusted_project_prompts"], {
+            wrapper.repo_root_hash(self.repo): {"mode": "defaults"},
+            wrapper.repo_root_hash(other): {"mode": "defaults"},
+        })
+
+    def test_only_fixed_keys_and_defaults_trust_survive(self):
+        self.make_home()
+        (self.crit_home / ".crit.config.json").write_text(json.dumps({
+            "agent_cmd": "touch /tmp/pwned",
+            "open_cmd": "/tmp/evil",
+            "trusted_project_prompts": {"sha256:always": {"mode": "always"},
+                                        "sha256:kept": {"mode": "defaults"}},
+        }), encoding="utf-8")
+        self.assertEqual(self.review(), 0, self.stderr)
+        config = self.config()
+        self.assertNotIn("agent_cmd", config)
+        self.assertNotIn("open_cmd", config)
+        self.assertEqual(config["trusted_project_prompts"], {
+            "sha256:kept": {"mode": "defaults"},
+            wrapper.repo_root_hash(self.repo): {"mode": "defaults"},
+        })
+
+    def test_hard_linked_config_is_denied(self):
+        self.make_home()
+        victim = self.root / "victim"
+        victim.write_text("keep", encoding="utf-8")
+        os.link(victim, self.crit_home / ".crit.config.json")
+        self.assertEqual(self.review(), 2)
+        self.assertEqual(victim.read_text(encoding="utf-8"), "keep")
+        self.assertEqual(self.recorded("crit"), [])
+
+    def test_config_is_replaced_not_rewritten_in_place(self):
+        # 書き換えの途中を crit に読ませないように、一時ファイルを rename で置き換える。
+        self.make_home()
+        path = self.crit_home / ".crit.config.json"
+        path.write_text("{}", encoding="utf-8")
+        before = os.stat(path).st_ino
+        self.assertEqual(self.review(), 0, self.stderr)
+        self.assertNotEqual(os.stat(path).st_ino, before)
+        self.assertEqual([p.name for p in self.crit_home.iterdir() if p.name.startswith(".crit.config.json.")], [])
+
+    def test_broken_config_is_rewritten(self):
+        self.make_home()
+        (self.crit_home / ".crit.config.json").write_text("{", encoding="utf-8")
+        self.assertEqual(self.review(), 0, self.stderr)
+        self.assertEqual(self.config()["host"], "127.0.0.1")
+
     def test_config_symlink_is_denied(self):
         victim = self.root / "victim"
         victim.write_text("keep", encoding="utf-8")
@@ -541,10 +606,21 @@ class PortTests(RunBase):
     def listen(self, port):
         self.listening.add(port)
 
-    def register(self, port, pid):
+    def register(self, port, pid, name=None):
         sessions = self.crit_home / ".crit" / "sessions"
         sessions.mkdir(parents=True, exist_ok=True)
-        (sessions / f"k{port}.json").write_text(json.dumps({"pid": pid, "port": port, "host": "127.0.0.1"}))
+        (sessions / f"{name or f'k{port}'}.json").write_text(json.dumps({"pid": pid, "port": port, "host": "127.0.0.1"}))
+
+    def test_stale_entry_for_the_same_port_does_not_hide_the_live_daemon(self):
+        # 異常終了した daemon の session が残り、同じポートを新しい daemon が使っている。
+        # 古い方のファイル名が後に並んでも、生きている daemon を crit とみなす。
+        self.listen(self.ports[0])
+        self.register(self.ports[0], os.getpid(), name="aa-live")
+        self.register(self.ports[0], 999999, name="zz-stale")
+        self.alive = {os.getpid()}
+        self.assertEqual(self.review(), 0, self.stderr)
+        [call] = self.recorded("crit")
+        self.assertEqual(call["argv"][call["argv"].index("-p") + 1], str(self.ports[1]))
 
     def test_foreign_listener_in_the_range_is_denied(self):
         self.listen(self.ports[0])
@@ -598,6 +674,11 @@ class DenyReadTests(RunBase):
 
     def test_covered_entries_pass(self):
         self.settings(self.home / ".claude" / "settings.json", COVERED)
+        self.assertEqual(self.review(), 0, self.stderr)
+
+    def test_own_private_home_entry_passes(self):
+        # ~/.cc-crit は Claude の sandbox から読ませないための項目で、crit 自身は読む。
+        self.settings(self.home / ".claude" / "settings.json", COVERED + ["~/.cc-crit"])
         self.assertEqual(self.review(), 0, self.stderr)
 
     def test_uncovered_project_entry_is_denied(self):

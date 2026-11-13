@@ -20,7 +20,8 @@ import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
-PROFILE = ROOT / "claude" / "bin" / "cc-crit.sb"
+# 変更前の profile と比べるときだけ、CC_CRIT_PROFILE で差し替える（テストのための指定で、ラッパーは読まない）。
+PROFILE = Path(os.environ.get("CC_CRIT_PROFILE", ROOT / "claude" / "bin" / "cc-crit.sb"))
 SANDBOX_EXEC = "/usr/bin/sandbox-exec"
 CRIT = "/opt/homebrew/bin/crit"
 GIT = "/opt/homebrew/bin/git"
@@ -232,6 +233,19 @@ class ProfileTests(unittest.TestCase):
         if not p.exists():
             self.skipTest("~/.ssh/config does not exist")
         self.assertDenied(f"attempt(lambda: open({str(p)!r}).read())")
+
+    def test_read_claude_home_denied(self):
+        # crit は使わない。会話の記録や IDE 連携の情報など、Claude の sandbox が読ませないものがある。
+        p = self.home_real / ".claude"
+        if not p.is_dir():
+            self.skipTest("~/.claude does not exist")
+        self.assertDenied(f"attempt(lambda: os.listdir({str(p)!r}))")
+
+    def test_read_claude_edit_diff_cache_denied(self):
+        p = Path(f"/private/tmp/claude-{os.getuid()}/bash-edit-diff")
+        if not p.is_dir():
+            self.skipTest(f"{p} does not exist")
+        self.assertDenied(f"attempt(lambda: os.listdir({str(p)!r}))")
 
     def test_read_keychains_denied(self):
         p = self.home_real / "Library" / "Keychains"

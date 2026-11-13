@@ -31,6 +31,9 @@ WRAPPER_COMMANDS = (
 )
 # ラッパーを置くディレクトリ。permissions.allow のうち、ここを指す規則はすべて WRAPPER_COMMANDS と一致させる。
 WRAPPER_RULE_PREFIX = "Bash(/usr/local/libexec/claude-"
+# cc-crit の crit は、レビュー中のファイルの全文を ~/.cc-crit に書き出す。Claude の sandbox から読ませない。
+CRIT_DENY = ("Read(~/.cc-crit/**)",)
+CRIT_DENY_READ = ("~/.cc-crit",)
 DENY_PUSH = ("Bash(git push)", "Bash(git push *)", "Bash(git -C * push *)", "Bash(git -c * push *)")
 JSONC_FILES = {"vscode/settings.json", "vscode/keybindings.json"}
 SETTINGS = "claude/settings.json"
@@ -159,7 +162,10 @@ def check_push_permissions(root):
     if excluded != sorted(WRAPPER_COMMANDS):
         errors.append(f"{SETTINGS}: sandbox.excludedCommands is {excluded}, expected {sorted(WRAPPER_COMMANDS)}")
     deny = set(permissions.get("deny", []))
-    errors += [f"{SETTINGS}: permissions.deny lacks {rule}" for rule in DENY_PUSH if rule not in deny]
+    errors += [f"{SETTINGS}: permissions.deny lacks {rule}" for rule in DENY_PUSH + CRIT_DENY if rule not in deny]
+    deny_read = settings.get("sandbox", {}).get("filesystem", {}).get("denyRead", [])
+    errors += [f"{SETTINGS}: sandbox.filesystem.denyRead lacks {path}" for path in CRIT_DENY_READ
+               if path not in deny_read]
     return errors
 
 

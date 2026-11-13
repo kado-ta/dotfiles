@@ -165,6 +165,7 @@
       "Edit(**/.tflint.hcl)",
       "Edit(~/Library/Logs/cc-safe-pr/**)",
       "Read(~/Library/Keychains/**)",
+      "Read(~/.cc-crit/**)",
       "Edit(~/.config/cc-gh-read/**)"
     ],
     "ask": [
@@ -344,7 +345,8 @@
         "~/dotfiles/aws/credentials",
         "~/.ssh/id_*",
         "~/.ssh/config",
-        "~/Library/Keychains"
+        "~/Library/Keychains",
+        "~/.cc-crit"
       ]
     },
     "credentials": {

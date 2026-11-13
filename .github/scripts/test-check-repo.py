@@ -19,7 +19,9 @@ WRAPPER_COMMANDS = [
     "/usr/local/libexec/claude-crit/cc-crit review",
     "/usr/local/libexec/claude-crit/cc-crit reply",
 ]
-DENY_PUSH =["Bash(git push)", "Bash(git push *)", "Bash(git -C * push *)", "Bash(git -c * push *)"]
+DENY_PUSH = ["Bash(git push)", "Bash(git push *)", "Bash(git -C * push *)", "Bash(git -c * push *)"]
+CRIT_DENY = ["Read(~/.cc-crit/**)"]
+CRIT_DENY_READ = ["~/.cc-crit"]
 PROJECT_ASK = [
     "Edit(/zsh/**)",
     "Edit(/config/sheldon/**)",
@@ -46,9 +48,12 @@ def settings():
     return {
         "permissions": {
             "allow": [f"Bash({c})" for c in WRAPPER_COMMANDS],
-            "deny": list(DENY_PUSH),
+            "deny": list(DENY_PUSH) + CRIT_DENY,
         },
-        "sandbox": {"excludedCommands": list(WRAPPER_COMMANDS)},
+        "sandbox": {
+            "excludedCommands": list(WRAPPER_COMMANDS),
+            "filesystem": {"denyRead": list(CRIT_DENY_READ)},
+        },
         "hooks": {
             "PreToolUse": [
                 {
@@ -201,6 +206,19 @@ class CheckRepoTests(unittest.TestCase):
         data["sandbox"]["excludedCommands"].remove("/usr/local/libexec/claude-crit/cc-crit reply")
         self.write_settings(data)
         self.assert_fails("FAIL push-permissions")
+
+    def test_missing_cc_crit_deny_read_fails(self):
+        # crit がレビュー中のファイルを書き出す ~/.cc-crit を、Claude の sandbox から読ませない。
+        data = settings()
+        data["sandbox"]["filesystem"]["denyRead"].remove("~/.cc-crit")
+        self.write_settings(data)
+        self.assert_fails("FAIL push-permissions", "~/.cc-crit")
+
+    def test_missing_cc_crit_read_deny_fails(self):
+        data = settings()
+        data["permissions"]["deny"].remove("Read(~/.cc-crit/**)")
+        self.write_settings(data)
+        self.assert_fails("FAIL push-permissions", "Read(~/.cc-crit/**)")
 
     def test_missing_push_deny_fails(self):
         data = settings()
