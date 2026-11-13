@@ -29,7 +29,9 @@ brew "telnet"            # RTX ルーターへの接続に使用する。
 brew "tree"              # ディレクトリ構造をツリー表示する。
 brew "trivy"             # コンテナイメージの脆弱性スキャンツール
 # brew "zsh"               # Zsh は Mac デフォルトを使用せず、 Homebrew でインストールする。
-brew "yukiarrr/tap/ecsk" # AWS ECS への SSH を簡単にするコマンド。
+
+# AWS ECS への SSH を簡単にするコマンド。
+brew "yukiarrr/tap/ecsk", trusted: true
 
 # Colima + Docker CLI で Docker Desktop を代替する。
 brew "colima"         # Container runtimes on MacOS (and Linux) with minimal setup
