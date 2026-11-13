@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: done
 created: 2026-11-13
 ---
 
@@ -30,7 +30,7 @@ created: 2026-11-13
 | --- | --- | --- | --- | --- |
 | D1 | ラッパーを起動するインタプリタ | **CLT の実体を、`env -i` を付けて直接起動する**（`#!/usr/bin/env -i /Library/Developer/CommandLineTools/usr/bin/python3 -I`）。`cc-safe-push` の git も CLT の実体にする | xcrun を通らなくなるので、`DEVELOPER_DIR`・`TOOLCHAINS`・xcrun のキャッシュのどれでも、実行されるプログラムを変えられない（[research 5.4](research-sandbox-escape.md#risk-xcrun-cache)）。代わりに、CLT を消すとラッパーが動かなくなる（拒否側に倒れる）。CI の runner にそのパスがないと、CI のテストが失敗する（[特に確かめること](#review-focus)の 5）。もう 1 つの案は shim のまま `env -i` を付け、キャッシュへの Edit を `permissions.deny` で拒否するもの。ただし、キャッシュの場所の推測と、Edit の規則の両方に頼ることになる | 推奨案で進める |
 | D2 | dotfiles の `CLAUDE.md` を Task 1 に含めるか | **含める**（`./CLAUDE.md` と `Edit(/CLAUDE.md)`） | sandbox から書けることを実測した。書いた内容は、次のセッションでは指示として読まれる。Edit ツールで変えるときは、承認の画面で差分を見られる。代わりに、CLAUDE.md を変える PR のたびに承認が要る | 含める |
-| D3 | Docker のソケットに接続できないことを確かめる方法 | **auto mode を一時的に外して（Shift+Tab）、確認の画面で 1 回だけ承認する** | 許可をもらった後も、auto mode の自動判定で拒否された。`!` で実行すると sandbox の中で動くかどうかを私は確かめていないので、測定にならないおそれがある。確かめない場合は、コード（sandbox-runtime）を根拠にして、Task 5 の検査だけを入れる | 推奨のとおり。Task 5 の手順 7 で、auto mode を外してもらってから実行する |
+| D3 | Docker のソケットに接続できないことを確かめる方法 | **auto mode を一時的に外して（Shift+Tab）、確認の画面で 1 回だけ承認する** | 許可をもらった後も拒否された（後に、原因は auto mode ではなく、`permissions.deny` の `Bash(curl *)` だと分かった）。`!` で実行すると sandbox の中で動くかどうかを私は確かめていないので、測定にならないおそれがある。確かめない場合は、コード（sandbox-runtime）を根拠にして、Task 5 の検査だけを入れる | 推奨のとおり。Task 5 の手順 7 で、auto mode を外してもらってから実行する |
 | D4 | 実装を worktree で行うか | **worktree で行う** | `claude/settings.json` は、`~/.claude/settings.json` の実体。main checkout で編集すると、作業途中の状態が、動いているすべてのセッションにすぐ効く。たとえば Task 4 の途中では、インストール済みの cc-crit が拒否側に倒れる。worktree を使うには、明示の指示が要る | worktree で行う（[Task 0](#task-0)） |
 | D5 | GitHub Actions（[research 5.2](research-sandbox-escape.md#risk-actions)） | **この PR には入れず、別の作業にする** | 対策は 2 つある。1 つは GitHub 側の設定（main の ruleset、workflow の既定の権限、secrets を environment に置く）の確認で、これは人間が行う。もう 1 つは、`.github/workflows/` を変えるコミットの push を `cc-safe-push` で拒否することで、これはラッパーの変更になる | 別の作業にする |
 

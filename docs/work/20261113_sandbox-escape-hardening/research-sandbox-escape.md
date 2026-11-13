@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: done
 created: 2026-11-13
 ---
 
@@ -93,7 +93,10 @@ sandbox-runtime は、作業ディレクトリの下のどの深さにあって�
 - **Lima の鍵:** `~/.colima/_lima/_config/user` はある。`test -r` では読めた。実際に開く確認は、自動判定で拒否された。`~/.lima/_config` はない。
 - **Docker のソケット:** `~/.colima/default/docker.sock` と `containerd.sock` がある（所有者のみ読み書きできる）。`/var/run/docker.sock` はない。
   - sandbox-runtime は、`allowUnixSockets` か `allowAllUnixSockets` がなければ unix ソケットへの接続を止める（`macos-sandbox-utils.ts:1292-1315`）。
-  - 接続の実験（`curl --unix-socket … /_ping`）は、2026-11-13 に利用者が許可した後も、auto mode の自動判定で拒否された。未確認。
+  - curl での接続の実験（`curl --unix-socket … /_ping`）は、3 回とも実行前に拒否された。原因は、ユーザー設定の `permissions.deny` にある `Bash(curl *)` だった。auto mode を外しても同じだった。最初の 2 回は、auto mode の自動判定による拒否だと誤って判断していた。
+  - 代わりに、利用者の承認を得て、Python で接続だけを試した（要求は送らない。2026-11-13）。結果は `PermissionError: [Errno 1] Operation not permitted` で、sandbox の中からは接続できない（実測）。
+    - ソケットの所有者は利用者なので、ファイルの権限で拒否されたのなら `EACCES`（13）になる。`EPERM`（1）が返ったので、sandbox による拒否と判断した。
+    - sandbox の外から接続できるかの確認（対照）は行っていない。
 - **影響:** `colima.yaml` の `mounts: []` には「既定で `$HOME` を書き込み可能でマウントする」とある。VM か Docker に入れると、`$HOME` のどこにでも書けるので、sandbox を抜けられる。
 
 <a name="risk-actions"></a>
@@ -145,7 +148,6 @@ sandbox-runtime は、作業ディレクトリの下のどの深さにあって�
 
 | 項目 | 理由 | 扱い |
 | --- | --- | --- |
-| Docker のソケットに sandbox から接続できないこと | 自動判定で拒否（2 回） | [plan.md の D3](plan.md#decisions) |
 | Lima の鍵を実際に開けること | 自動判定で拒否 | denyRead を足すので、結果によらず塞がる |
 | macOS が shebang の引数を分けるか（`env -i` が使えるか） | 自動判定で拒否 | plan.md の Task 3 のテストで確かめる |
 | ラッパーが mise の `[env]` を引き継ぐこと | 未実施 | `env -i` で結果によらず塞がる |
