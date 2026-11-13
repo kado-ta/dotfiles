@@ -273,14 +273,14 @@ grep -qxF '.cc-crit-request.json' ~/.config/git/ignore || echo '.cc-crit-request
 インストールしたら、sandbox の外で profile のテストを実行する。Claude Code の sandbox の中では `sandbox-exec` を入れ子にできないので、スキップされる。
 
 ```sh
-/usr/bin/python3 -B claude/hooks/tests/test-cc-crit-profile.py
+mise run crit:profile-test
 ```
 
 <a name="cc-crit-update"></a>
 
 ### 更新するとき
 
-`cc-crit` か `cc-crit.sb` を変更したら、再度インストールする。crit、git、macOS を更新したら、profile のテストをやり直す。profile は crit と git の実行ファイルの場所と、動作に要る権限に依存する。
+`cc-crit` か `cc-crit.sb` を変更したら、再度インストールする。crit、git、macOS を更新したら、profile のテストをやり直す（`mise run crit:profile-test`）。profile は crit と git の実行ファイルの場所と、動作に要る権限に依存する。
 
 アンインストールは、`settings.json` の `cc-crit` の行を消して `sudo rm -r /usr/local/libexec/claude-crit` を実行する。専用 HOME の `~/.cc-crit` は残るので、要らなければ消す。
 
