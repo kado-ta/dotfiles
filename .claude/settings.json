@@ -17,7 +17,8 @@
       "Edit(/aws/**)",
       "Edit(/init.command)",
       "Edit(/setup.command)",
-      "Edit(/CLAUDE.md)"
+      "Edit(/CLAUDE.md)",
+      "Edit(/.claude/rules/**)"
     ]
   },
   "sandbox": {
@@ -37,7 +38,8 @@
         "./aws",
         "./init.command",
         "./setup.command",
-        "./CLAUDE.md"
+        "./CLAUDE.md",
+        "./.claude/rules"
       ]
     }
   }
