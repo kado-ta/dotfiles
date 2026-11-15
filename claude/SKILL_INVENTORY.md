@@ -325,7 +325,7 @@ sandbox の外で `/cso` を実行すると、保存先に秘密ファイルの�
 
 | 提供元 | 見ること |
 | --- | --- |
-| gstack（例: 1.99.4.0） | `/gstack-upgrade` は `~/.claude/skills` に書くので、sandbox の外で実行する。CHANGELOG で、廃止・追加されたスキルを見る。増えたスキルは `skillOverrides` が `on` のまま入るので、要るかを決める。`skillOverrides` は gstack が管理していない（dotfiles のコミット 02d0add で手で足した）。`/cso` が、読めない秘密ファイルで止まらなくなったかを確かめる（[`/cso` を sandbox で使う](#cso-sandbox)）。直っていれば、一時的に消す手順をやめ、規則で `/cso` を使う場面を決め直す |
+| gstack（例: 1.99.4.0） | `/gstack-upgrade` は `~/.claude/skills` に書くので、sandbox の外で実行する。CHANGELOG で、廃止・追加されたスキルを見る。増えたスキルは `skillOverrides` が `on` のまま入るので、要るかを決める。`skillOverrides` は gstack が管理していない（dotfiles のコミット 02d0add で手で足した）。`/cso` が、読めない秘密ファイルで止まらなくなったかを確かめる（[`/cso` を sandbox で使う](#cso-sandbox)）。直っていれば、一時的に消す手順をやめ、規則で `/cso` を使う場面を決め直す。setup は、`~/.gstack/config.yaml` で on のフックを `claude/settings.json` に絶対パスで登録する（`_gstack_source` の項目）。timeline-stop-hook と ceo-review-gate は、`claude/setup.sh` のフラグで off にしている。項目が増えていたら、`gstack-config set <キー> off` を実行してから項目を消す（項目だけ消すと、次の setup で戻る） |
 | understand-anything（例: 2.9.8） | 自動更新が on なので、気づかないうちに変わる。hooks は sandbox の外で動く（2026-11-14 に承知のうえで自動更新を選んだ）。hooks が変わったら判断し直す |
 | crit（例: 1.8.15） | プラグインと CLI の版の組み合わせと、`plan-hook` の変化を見る。更新したら、sandbox の外で `mise run crit:profile-test` を実行する |
 | pstack | [README](README.md) の手順で、hooks・スキルの一覧・依存を見直す。新しいスキルが増えても deny は広がらない |
