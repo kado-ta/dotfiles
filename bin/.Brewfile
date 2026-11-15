@@ -1,6 +1,4 @@
 # Usage: Mac 移行直後は、ホームディレクトリへこのファイルをコピーして、 `brew bundle` コマンドを実行する。
-tap "1password/tap"      # 1Password CLI
-tap "oven-sh/bun"        # bun コマンド
 tap "yukiarrr/tap"       # ecsk コマンド
 
 brew "actionlint"        # Static checker for GitHub Actions workflow files
