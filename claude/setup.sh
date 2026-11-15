@@ -102,6 +102,19 @@ if [ -d "${GSTACK_DIR}" ]; then
 else
   git clone --single-branch --depth 1 https://github.com/garrytan/gstack.git "${GSTACK_DIR}"
 fi
+# ~/.gstack/config.yaml は dotfiles にリンクせず、新しいマシンでも残したいキーだけをここで設定する。
+# gstack-config は一時ファイルを mv して書き換えるので、リンクは実ファイルに置き換わる。
+# リンク先を dotfiles に置くと、dotfiles で起動したセッションの sandbox からも書けるようになる。
+# setup が redact_prepush_hook の確認で止まらないように、setup の前に設定する。
+# - telemetry: 既定も off だが、外部への送信に関わるので明示する。
+# - update_channel: 既定の auto は team_mode でなければ main を追い、main へのマージごとに更新される。
+# - routing_declined: CLAUDE.md にスキルのルーティングを書き足すかの確認を出さない。
+# - redact_prepush_hook: /ship が各リポジトリに認証情報の pre-push フックを入れることへの同意。/ship は無効にしている。
+GSTACK_CONFIG="${GSTACK_DIR}/bin/gstack-config"
+"${GSTACK_CONFIG}" set telemetry off
+"${GSTACK_CONFIG}" set update_channel stable
+"${GSTACK_CONFIG}" set routing_declined true
+"${GSTACK_CONFIG}" set redact_prepush_hook true
 # clone 後の setup が途中で失敗しても、再実行で回復できるように毎回実行する。
 # "${GSTACK_DIR}/setup" は GSTACK_DIR 内で実行しないと正常終了しない。
 # サブシェル (...) 内での cd はスクリプト本体のカレントディレクトリに影響しない。
