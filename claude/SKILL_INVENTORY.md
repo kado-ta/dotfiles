@@ -39,7 +39,7 @@
 | 組み込み・claude.ai | — | Claude Code に同梱、または claude.ai のアカウントから提供 | 下の表 | 7 | — | Claude Code の更新 |
 | salesforce-development | 2.5.0 | プラグイン、別リポジトリの local スコープ。このリポジトリでは無効 | — | — | — | — |
 
-- superpowers・claude-code-setup・ruby-lsp・understand-anything は、dotfiles を projectPath とする project スコープにも登録がある（`installed_plugins.json`）。原因と影響は未確認。
+- superpowers・claude-code-setup・ruby-lsp・understand-anything には、dotfiles を projectPath とする project スコープの重複登録があった（`installed_plugins.json`）。2026-11-16 に `claude plugin uninstall <名前> --scope project --keep-data` で消した。登録日の 2026-10-05 は `claude/` が `.claude/` という名前で、ユーザー設定がプロジェクト設定としても読み込まれていたためと推測する。`claude plugin list` に `Scope: project` が再び出たら、同じ手順で消す。
 - `~/.claude/commands/` と `~/.claude/agents/` はない。有効なプラグインにコマンドはない（`commands/` を持つのは salesforce-development だけ）。
 
 <a name="superpowers"></a>
