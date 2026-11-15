@@ -33,3 +33,9 @@ run = "/usr/bin/python3 -B claude/scripts/skills-check.py snapshot"
 [tasks."claude:skill-usage"]
 description = "期間内のスキルの使われ方を集計する（例: mise run claude:skill-usage 2026-11-16 2026-12-07）"
 run = "/usr/bin/python3 -B claude/scripts/skill-usage.py"
+
+# スキル・プラグインをまとめて更新する。sandbox の中からは ~/.claude と Homebrew に書けないので、端末か Claude Code の ! で実行する。
+# 終わったら /sync-skill-docs で文書を直す。
+[tasks."claude:update"]
+description = "gstack・プラグイン・crit の CLI を更新し、gstack が settings.json に書いた絶対パスを ~/ に戻す（端末か Claude Code の ! で実行する）"
+run = "/bin/bash claude/scripts/update-skills.sh"

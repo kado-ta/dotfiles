@@ -29,7 +29,7 @@
 | 提供元 | 版 | 入れ方・スコープ | スキル | エージェント | hooks | 更新 |
 | --- | --- | --- | --- | --- | --- | --- |
 | superpowers | 7.0.2 | プラグイン（claude-plugins-official）、user | 15 | 0 | SessionStart | `/plugin` |
-| gstack | 1.99.4.0 | `git clone` で `~/.claude/skills/gstack`。プラグインではないので、名前に接頭辞が付かない | 63（有効 25、明示 7、無効 31） | 0 | スキルの frontmatter だけ | `/gstack-upgrade`（sandbox の外） |
+| gstack | 1.99.4.0 | `git clone` で `~/.claude/skills/gstack`。プラグインではないので、名前に接頭辞が付かない | 63（有効 25、明示 7、無効 31） | 0 | スキルの frontmatter だけ | `mise run claude:update`（sandbox の外） |
 | pstack | 0.15.42 | プラグイン（cursor-plugins）、user | 58 | 2（deny） | なし | `/plugin`（自動更新 off） |
 | understand-anything | 2.9.8 | プラグイン、user | 9 | 11 | SessionStart、PostToolUse | `/plugin`（自動更新 on） |
 | crit | 1.8.15 | プラグイン、user。CLI は 0.23.3 | 3 | 0 | PermissionRequest | `/plugin` と Homebrew |
@@ -40,6 +40,7 @@
 | 組み込み・claude.ai | — | Claude Code に同梱、または claude.ai のアカウントから提供 | 下の表 | 7 | — | Claude Code の更新 |
 | salesforce-development | 2.5.0 | プラグイン、別リポジトリの local スコープ。このリポジトリでは無効 | — | — | — | — |
 
+- プラグインも `mise run claude:update` でまとめて更新できる（user スコープのものすべて。crit は CLI も）。手順は[更新したときの見直し](#upgrade)にある。
 - superpowers・claude-code-setup・ruby-lsp・understand-anything には、dotfiles を projectPath とする project スコープの重複登録があった（`installed_plugins.json`）。2026-11-16 に `claude plugin uninstall <名前> --scope project --keep-data` で消した。登録日の 2026-10-05 は `claude/` が `.claude/` という名前で、ユーザー設定がプロジェクト設定としても読み込まれていたためと推測する。`claude plugin list` に `Scope: project` が再び出たら、同じ手順で消す。
 - `~/.claude/commands/` と `~/.claude/agents/` はない。有効なプラグインにコマンドはない（`commands/` を持つのは salesforce-development だけ）。
 
@@ -305,6 +306,8 @@ sandbox の外で `/cso` を実行すると、保存先に秘密ファイルの�
 
 ### 共通の手順
 
+更新は、sandbox の外で `mise run claude:update` を実行してまとめて行う（Claude Code からは `! mise run claude:update`）。gstack・user スコープのプラグイン・crit の CLI を更新し、gstack が `claude/settings.json` に書いた絶対パスを `~/` に戻し、`crit:profile-test` まで実行する。その後、次の手順で見直す。
+
 1. `mise run claude:skills-check` を実行する（スクリプトは `claude/scripts/skills-check.py`）。次の 2 つを照合する。
    - **入っている状態と、前回文書を合わせたときのスナップショット**（`claude/skills-snapshot.json`）:
      - プラグイン・gstack の増減と版
@@ -325,9 +328,9 @@ sandbox の外で `/cso` を実行すると、保存先に秘密ファイルの�
 
 | 提供元 | 見ること |
 | --- | --- |
-| gstack（例: 1.99.4.0） | `/gstack-upgrade` は `~/.claude/skills` に書くので、sandbox の外で実行する。CHANGELOG で、廃止・追加されたスキルを見る。増えたスキルは `skillOverrides` が `on` のまま入るので、要るかを決める。`skillOverrides` は gstack が管理していない（dotfiles のコミット 02d0add で手で足した）。`/cso` が、読めない秘密ファイルで止まらなくなったかを確かめる（[`/cso` を sandbox で使う](#cso-sandbox)）。直っていれば、一時的に消す手順をやめ、規則で `/cso` を使う場面を決め直す。setup は、`~/.gstack/config.yaml` で on のフックを `claude/settings.json` に絶対パスで登録する（`_gstack_source` の項目）。timeline-stop-hook と ceo-review-gate は、`claude/setup.sh` のフラグで off にしている。項目が増えていたら、`gstack-config set <キー> off` を実行してから項目を消す（項目だけ消すと、次の setup で戻る） |
+| gstack（例: 1.99.4.0） | `mise run claude:update` で更新する（`~/.claude/skills` に書くので sandbox の外で）。CHANGELOG で、廃止・追加されたスキルを見る。増えたスキルは `skillOverrides` が `on` のまま入るので、要るかを決める。`skillOverrides` は gstack が管理していない（dotfiles のコミット 02d0add で手で足した）。`/cso` が、読めない秘密ファイルで止まらなくなったかを確かめる（[`/cso` を sandbox で使う](#cso-sandbox)）。直っていれば、一時的に消す手順をやめ、規則で `/cso` を使う場面を決め直す。setup は、`~/.gstack/config.yaml` で on のフックを `claude/settings.json` に絶対パスで登録する（`_gstack_source` の項目）。タスクはこれを `~/` に戻す（setup は `~/` の項目も絶対パスに書き戻すので、更新のたびに要る）。`/gstack-upgrade` で更新したときは、後で `! /usr/bin/python3 -B claude/scripts/settings-home-paths.py` を実行する。timeline-stop-hook と ceo-review-gate は、`claude/setup.sh` のフラグで off にしている。項目が増えていたら、`gstack-config set <キー> off` を実行してから項目を消す（項目だけ消すと、次の setup で戻る） |
 | understand-anything（例: 2.9.8） | 自動更新が on なので、気づかないうちに変わる。hooks は sandbox の外で動く（2026-11-14 に承知のうえで自動更新を選んだ）。hooks が変わったら判断し直す |
-| crit（例: 1.8.15） | プラグインと CLI の版の組み合わせと、`plan-hook` の変化を見る。更新したら、sandbox の外で `mise run crit:profile-test` を実行する |
+| crit（例: 1.8.15） | プラグインと CLI の版の組み合わせと、`plan-hook` の変化を見る。`mise run claude:update` は CLI の更新と `mise run crit:profile-test` まで実行する。個別に更新したときは、sandbox の外で `mise run crit:profile-test` を実行する |
 | pstack | [README](README.md) の手順で、hooks・スキルの一覧・依存を見直す。新しいスキルが増えても deny は広がらない |
 | superpowers | SessionStart で注入する `using-superpowers` の変化を見る。とくに、ユーザーの指示を優先するという一文が残っているか |
 

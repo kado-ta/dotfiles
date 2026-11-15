@@ -54,6 +54,7 @@ jobs:
           python3 -B claude/scripts/test-skills-check.py
           python3 -B claude/scripts/test-skill-usage.py
           python3 -B claude/scripts/test-settings-home-paths.py
+          python3 -B claude/scripts/test-update-skills.py
 
       # herdr-agent-state.sh は herdr が生成・上書きするので対象外。
       - name: shellcheck

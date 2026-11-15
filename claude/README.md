@@ -14,7 +14,7 @@ Claude Code の設定を管理するディレクトリ。`setup.sh` で `~/.clau
 
 `settings.json` のセキュリティ設定は、[【2026年最新版】Claude Codeで行うべきセキュリティ設定 10選 - Qiita](https://qiita.com/miruky/items/51db293a7a7d0d277a5d) を参考にしている。
 
-gstack は `gstack-upgrade` で更新する（`--check` で確認のみ）。
+gstack・プラグイン・crit の CLI は、sandbox の外で `mise run claude:update` を実行してまとめて更新する（gstack の確認だけなら `gstack-upgrade --check`）。手順は [SKILL_INVENTORY.md の「更新したときの見直し」](SKILL_INVENTORY.md#upgrade) にある。
 
 pstack はサードパーティのマーケットプレイスなので自動更新されない。`claude plugin update pstack@cursor-plugins` で更新し、hooks が増えていないか、スキルの一覧と依存が変わっていないかを確かめる。`settings.json` の `permissions.deny` は、モデルから起動できる `setup-pstack` と、使わないエージェント 2 つを止めている。ほかの使わないスキルはモデルから起動できず、deny ではユーザーのスラッシュコマンドを止められないので、方針として使わない。スキルの分類は [pstack の導入の plan](../docs/work/20261114_pstack-skill-routing/plan.md#decisions) にある。
 

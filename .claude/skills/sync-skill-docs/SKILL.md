@@ -7,7 +7,7 @@ description: Use after adding, removing or updating a Claude Code plugin or skil
 
 プラグインやスキルを足した・外した・更新した後に、棚卸し（`claude/SKILL_INVENTORY.md`）・チートシート（`claude/SKILL_CHEATSHEET.md`）・規則（`claude/rules/SKILL_ROUTING.md`）を直す。照合は `mise run claude:skills-check` が機械的に行い、このスキルは違いがあるときの判断と文書の修正だけを行う。
 
-更新そのもの（`/gstack-upgrade`、`claude plugin update`）は行わない。
+更新そのもの（`mise run claude:update`、`/gstack-upgrade`、`claude plugin update`）は行わない。
 
 <a name="steps"></a>
 
