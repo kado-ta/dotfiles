@@ -85,6 +85,15 @@ else
   claude plugins install understand-anything@understand-anything
 fi
 
+# Install pstack
+# crit と同じく、マーケットプレイスを先に追加しないと install が失敗する。
+if claude plugins list 2>/dev/null | grep -q " pstack@cursor-plugins$"; then
+  echo "pstack plugin already installed, skipping"
+else
+  claude plugins marketplace list 2>/dev/null | grep -q " cursor-plugins$" || claude plugins marketplace add cursor/plugins
+  claude plugins install pstack@cursor-plugins
+fi
+
 # Install gstack
 GSTACK_DIR="${CLAUDE_DIR}/skills/gstack"
 [ -d "${CLAUDE_DIR}/skills" ] || mkdir -p "${CLAUDE_DIR}/skills"
