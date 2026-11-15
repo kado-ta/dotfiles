@@ -1,6 +1,7 @@
 {
   "claudeMdExcludes": [
-    "**/dotfiles/claude/CLAUDE.md"
+    "**/dotfiles/claude/CLAUDE.md",
+    "**/dotfiles/.claude/worktrees/*/claude/CLAUDE.md"
   ],
   "permissions": {
     "ask": [
