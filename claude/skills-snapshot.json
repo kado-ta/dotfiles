@@ -5,6 +5,7 @@
     "understand-anything:architecture-analyzer",
     "understand-anything:article-analyzer",
     "understand-anything:assemble-reviewer",
+    "understand-anything:code-lesson-writer",
     "understand-anything:design-analyzer",
     "understand-anything:domain-analyzer",
     "understand-anything:file-analyzer",
@@ -14,7 +15,7 @@
     "understand-anything:tour-builder"
   ],
   "gstack": {
-    "version": "1.99.3.0"
+    "version": "1.99.4.0"
   },
   "plugin_hooks": {
     "crit@crit": [
@@ -24,8 +25,8 @@
       "SessionStart startup|clear|compact sha256:12d079e1117bd6db"
     ],
     "understand-anything@understand-anything": [
-      "PostToolUse Bash sha256:fa5811de64b72997",
-      "SessionStart  sha256:be0b775fea741ca4"
+      "PostToolUse ^(Bash|exec)$ sha256:fa5811de64b72997",
+      "SessionStart  sha256:428d24d7ffe34749"
     ]
   },
   "plugins": {
@@ -41,7 +42,7 @@
       "scopes": [
         "user"
       ],
-      "version": "1.8.14"
+      "version": "1.8.15"
     },
     "pstack@cursor-plugins": {
       "enabled": true,
@@ -76,7 +77,7 @@
       "scopes": [
         "user"
       ],
-      "version": "2.9.7"
+      "version": "2.9.8"
     }
   },
   "skills": {

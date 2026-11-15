@@ -29,10 +29,10 @@
 | 提供元 | 版 | 入れ方・スコープ | スキル | エージェント | hooks | 更新 |
 | --- | --- | --- | --- | --- | --- | --- |
 | superpowers | 7.0.2 | プラグイン（claude-plugins-official）、user | 15 | 0 | SessionStart | `/plugin` |
-| gstack | 1.99.3.0 | `git clone` で `~/.claude/skills/gstack`。プラグインではないので、名前に接頭辞が付かない | 63（有効 25、明示 7、無効 31） | 0 | スキルの frontmatter だけ | `/gstack-upgrade`（sandbox の外） |
+| gstack | 1.99.4.0 | `git clone` で `~/.claude/skills/gstack`。プラグインではないので、名前に接頭辞が付かない | 63（有効 25、明示 7、無効 31） | 0 | スキルの frontmatter だけ | `/gstack-upgrade`（sandbox の外） |
 | pstack | 0.15.42 | プラグイン（cursor-plugins）、user | 58 | 2（deny） | なし | `/plugin`（自動更新 off） |
-| understand-anything | 2.9.7 | プラグイン、user | 9 | 10 | SessionStart、PostToolUse | `/plugin`（自動更新 on） |
-| crit | 1.8.14 | プラグイン、user。CLI は 0.23.3 | 3 | 0 | PermissionRequest | `/plugin` と Homebrew |
+| understand-anything | 2.9.8 | プラグイン、user | 9 | 11 | SessionStart、PostToolUse | `/plugin`（自動更新 on） |
+| crit | 1.8.15 | プラグイン、user。CLI は 0.23.3 | 3 | 0 | PermissionRequest | `/plugin` と Homebrew |
 | claude-code-setup | 1.0.0 | プラグイン、user | 1 | 0 | なし | `/plugin` |
 | ruby-lsp | 1.0.0 | プラグイン、user | 0（LSP だけ） | 0 | なし | `/plugin` |
 | 個人スキル | — | dotfiles の `claude/skills/` を `~/.claude/skills/` にリンク | 4 | 0 | なし | dotfiles |
@@ -246,7 +246,7 @@ sandbox の外で `/cso` を実行すると、保存先に秘密ファイルの�
 | 提供元 | エージェント | 状態 |
 | --- | --- | --- |
 | 組み込み | `general-purpose`、`Explore`、`Plan`、`claude-code-guide`、`statusline-setup`、`web-fetch`、`claude` | 有効 |
-| understand-anything | `project-scanner`、`file-analyzer`、`architecture-analyzer`、`tour-builder`、`graph-reviewer`、`assemble-reviewer`、`domain-analyzer`、`article-analyzer`、`design-analyzer`、`knowledge-graph-guide` | 有効。主に `/understand-anything:understand` が使う |
+| understand-anything | `project-scanner`、`file-analyzer`、`architecture-analyzer`、`tour-builder`、`graph-reviewer`、`assemble-reviewer`、`domain-analyzer`、`article-analyzer`、`design-analyzer`、`knowledge-graph-guide`、`code-lesson-writer` | 有効。主に `/understand-anything:understand` が使う。`code-lesson-writer`（2.9.8 で追加）は、`autoUpdate` が true のリポジトリでは commit の後の自動更新でも確認なしで起動する |
 | pstack | `poteto-agent`、`comment-sicko` | 制限（`Agent(...)` を deny）。Agent の一覧に出ないことを 2026-11-16 に確認 |
 
 <a name="hooks"></a>
@@ -325,7 +325,7 @@ sandbox の外で `/cso` を実行すると、保存先に秘密ファイルの�
 
 | 提供元 | 見ること |
 | --- | --- |
-| gstack（例: 1.99.4.0） | `/gstack-upgrade` は `~/.claude/skills` に書くので、sandbox の外で実行する。CHANGELOG で、廃止・追加されたスキルを見る。増えたスキルは `skillOverrides` が `on` のまま入るので、要るかを決める。`skillOverrides` は gstack が管理していない（dotfiles のコミット 02d0add で手で足した）。`/cso` が、読めない秘密ファイルで止まらなくなったかを確かめる（[`/cso` を sandbox で使う](#cso-sandbox)）。直っていれば、一時的に消す手順をやめ、規則で `/cso` を使う場面を決め直す |
+| gstack（例: 1.99.4.0） | `/gstack-upgrade` は `~/.claude/skills` に書くので、sandbox の外で実行する。CHANGELOG で、廃止・追加されたスキルを見る。増えたスキルは `skillOverrides` が `on` のまま入るので、要るかを決める。`skillOverrides` は gstack が管理していない（dotfiles のコミット 02d0add で手で足した）。`/cso` が、読めない秘密ファイルで止まらなくなったかを確かめる（[`/cso` を sandbox で使う](#cso-sandbox)）。直っていれば、一時的に消す手順をやめ、規則で `/cso` を使う場面を決め直す。setup は、`~/.gstack/config.yaml` で on のフックを `claude/settings.json` に絶対パスで登録する（`_gstack_source` の項目）。timeline-stop-hook と ceo-review-gate は、`claude/setup.sh` のフラグで off にしている。項目が増えていたら、`gstack-config set <キー> off` を実行してから項目を消す（項目だけ消すと、次の setup で戻る） |
 | understand-anything（例: 2.9.8） | 自動更新が on なので、気づかないうちに変わる。hooks は sandbox の外で動く（2026-11-14 に承知のうえで自動更新を選んだ）。hooks が変わったら判断し直す |
 | crit（例: 1.8.15） | プラグインと CLI の版の組み合わせと、`plan-hook` の変化を見る。更新したら、sandbox の外で `mise run crit:profile-test` を実行する |
 | pstack | [README](README.md) の手順で、hooks・スキルの一覧・依存を見直す。新しいスキルが増えても deny は広がらない |

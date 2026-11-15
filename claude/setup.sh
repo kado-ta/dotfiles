@@ -107,8 +107,9 @@ fi
 # サブシェル (...) 内での cd はスクリプト本体のカレントディレクトリに影響しない。
 # plan-tune のフックは導入しない。確認で止まらず、claude/settings.json も書き換えないようにする。
 # timeline の Stop フックも導入しない。Stop はターンごとに発火するので、実行中の skill を完了扱いにしてしまう。
-# このフラグは ~/.gstack/config.yaml に保存されるので、/gstack-upgrade が実行する setup でも登録しない。
-(cd "${GSTACK_DIR}" && ./setup --no-plan-tune-hooks --no-timeline-stop-hook)
+# /plan-ceo-review のゲート（Stop・SubagentStop）も導入しない。使わないスキルのために、終了のたびに sandbox の外で bun が動く。
+# timeline とゲートのフラグは ~/.gstack/config.yaml に保存されるので、/gstack-upgrade が実行する setup でも登録しない。
+(cd "${GSTACK_DIR}" && ./setup --no-plan-tune-hooks --no-timeline-stop-hook --no-ceo-review-gate)
 
 # Link personal skills (global, available in all projects)
 for skill_dir in "${SCRIPT_DIR}/skills"/*/; do
