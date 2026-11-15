@@ -171,7 +171,10 @@
       "Edit(~/.crit.config.json)",
       "Edit(~/.cc-crit/**)",
       "Read(~/.colima/_lima/_config/**)",
-      "Read(~/.lima/_config/**)"
+      "Read(~/.lima/_config/**)",
+      "Skill(pstack:setup-pstack)",
+      "Agent(pstack:poteto-agent)",
+      "Agent(pstack:comment-sicko)"
     ],
     "ask": [
       "Bash(gh pr create*)",
@@ -193,6 +196,43 @@
     "disableBypassPermissionsMode": "disable"
   },
   "model": "opus[1m]",
+  "skillOverrides": {
+    "ios-qa": "off",
+    "ios-fix": "off",
+    "ios-design-review": "off",
+    "ios-sync": "off",
+    "ios-clean": "off",
+    "ship": "off",
+    "land-and-deploy": "off",
+    "setup-deploy": "off",
+    "landing-report": "off",
+    "modernize": "off",
+    "connect-chrome": "off",
+    "open-gstack-browser": "off",
+    "setup-browser-cookies": "off",
+    "pair-agent": "off",
+    "scrape": "off",
+    "skillify": "off",
+    "careful": "user-invocable-only",
+    "guard": "user-invocable-only",
+    "freeze": "user-invocable-only",
+    "unfreeze": "user-invocable-only",
+    "autoplan": "off",
+    "plan-devex-review": "off",
+    "devex-review": "off",
+    "setup-gbrain": "off",
+    "sync-gbrain": "off",
+    "ubicloud": "off",
+    "benchmark-models": "off",
+    "eval-plan": "off",
+    "gstack": "off",
+    "_gstack-command": "off",
+    "plan-tune": "off",
+    "learn": "off",
+    "runaway-stopper": "off",
+    "write-skill": "off",
+    "design-motion": "off"
+  },
   "hooks": {
     "PreToolUse": [
       {
@@ -300,44 +340,8 @@
     "claude-code-setup@claude-plugins-official": true,
     "ruby-lsp@claude-plugins-official": true,
     "understand-anything@understand-anything": true,
-    "crit@crit": true
-  },
-  "skillOverrides": {
-    "ios-qa": "off",
-    "ios-fix": "off",
-    "ios-design-review": "off",
-    "ios-sync": "off",
-    "ios-clean": "off",
-    "ship": "off",
-    "land-and-deploy": "off",
-    "setup-deploy": "off",
-    "landing-report": "off",
-    "modernize": "off",
-    "connect-chrome": "off",
-    "open-gstack-browser": "off",
-    "setup-browser-cookies": "off",
-    "pair-agent": "off",
-    "scrape": "off",
-    "skillify": "off",
-    "careful": "user-invocable-only",
-    "guard": "user-invocable-only",
-    "freeze": "user-invocable-only",
-    "unfreeze": "user-invocable-only",
-    "autoplan": "off",
-    "plan-devex-review": "off",
-    "devex-review": "off",
-    "setup-gbrain": "off",
-    "sync-gbrain": "off",
-    "ubicloud": "off",
-    "benchmark-models": "off",
-    "eval-plan": "off",
-    "gstack": "off",
-    "_gstack-command": "off",
-    "plan-tune": "off",
-    "learn": "off",
-    "runaway-stopper": "off",
-    "write-skill": "off",
-    "design-motion": "off"
+    "crit@crit": true,
+    "pstack@cursor-plugins": true
   },
   "extraKnownMarketplaces": {
     "understand-anything": {
@@ -350,6 +354,12 @@
       "source": {
         "source": "github",
         "repo": "tomasz-tomczyk/crit"
+      }
+    },
+    "cursor-plugins": {
+      "source": {
+        "source": "github",
+        "repo": "cursor/plugins"
       }
     }
   },

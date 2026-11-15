@@ -10,11 +10,13 @@ Claude Code の設定を管理するディレクトリ。`setup.sh` で `~/.clau
 
 - `settings.json`・`CLAUDE.md`・`rules/`・`mcp.json`・`hooks/`・`scripts/statusline.sh` を `~/.claude/` にリンクする。`~/.claude/hooks/` が実ディレクトリの場合は、削除してからリンクに置き換える。
 - `skills/*/` の個人スキルを `~/.claude/skills/` にリンクする（全プロジェクトで使える）。
-- プラグイン `superpowers`・`claude-code-setup`・`ruby-lsp`・`crit`・`understand-anything` と、スキル集 [gstack](https://github.com/garrytan/gstack) をインストールする（インストール済みならスキップする）。`ruby-lsp` プラグインは LSP サーバーを含まないので、`ruby-lsp` gem を別途入れて PATH に通す。
+- プラグイン `superpowers`・`claude-code-setup`・`ruby-lsp`・`crit`・`understand-anything`・`pstack` と、スキル集 [gstack](https://github.com/garrytan/gstack) をインストールする（インストール済みならスキップする）。`ruby-lsp` プラグインは LSP サーバーを含まないので、`ruby-lsp` gem を別途入れて PATH に通す。
 
 `settings.json` のセキュリティ設定は、[【2026年最新版】Claude Codeで行うべきセキュリティ設定 10選 - Qiita](https://qiita.com/miruky/items/51db293a7a7d0d277a5d) を参考にしている。
 
 gstack は `gstack-upgrade` で更新する（`--check` で確認のみ）。
+
+pstack はサードパーティのマーケットプレイスなので自動更新されない。`claude plugin update pstack@cursor-plugins` で更新し、hooks が増えていないか、スキルの一覧と依存が変わっていないかを確かめる。`settings.json` の `permissions.deny` は、モデルから起動できる `setup-pstack` と、使わないエージェント 2 つを止めている。ほかの使わないスキルはモデルから起動できず、deny ではユーザーのスラッシュコマンドを止められないので、方針として使わない。スキルの分類は [pstack の導入の plan](../docs/work/20261114_pstack-skill-routing/plan.md#decisions) にある。
 
 <a name="hooks"></a>
 
