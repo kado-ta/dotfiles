@@ -29,10 +29,10 @@
 | 提供元 | 版 | 入れ方・スコープ | スキル | エージェント | hooks | 更新 |
 | --- | --- | --- | --- | --- | --- | --- |
 | superpowers | 7.0.2 | プラグイン（claude-plugins-official）、user | 15 | 0 | SessionStart | `/plugin` |
-| gstack | 1.99.3.0 | `git clone` で `~/.claude/skills/gstack`。プラグインではないので、名前に接頭辞が付かない | 63（有効 25、明示 7、無効 31） | 0 | スキルの frontmatter だけ | `/gstack-upgrade`（sandbox の外） |
+| gstack | 1.99.4.0 | `git clone` で `~/.claude/skills/gstack`。プラグインではないので、名前に接頭辞が付かない | 63（有効 25、明示 7、無効 31） | 0 | スキルの frontmatter だけ | `/gstack-upgrade`（sandbox の外） |
 | pstack | 0.15.42 | プラグイン（cursor-plugins）、user | 58 | 2（deny） | なし | `/plugin`（自動更新 off） |
-| understand-anything | 2.9.7 | プラグイン、user | 9 | 10 | SessionStart、PostToolUse | `/plugin`（自動更新 on） |
-| crit | 1.8.14 | プラグイン、user。CLI は 0.23.3 | 3 | 0 | PermissionRequest | `/plugin` と Homebrew |
+| understand-anything | 2.9.8 | プラグイン、user | 9 | 11 | SessionStart、PostToolUse | `/plugin`（自動更新 on） |
+| crit | 1.8.15 | プラグイン、user。CLI は 0.23.3 | 3 | 0 | PermissionRequest | `/plugin` と Homebrew |
 | claude-code-setup | 1.0.0 | プラグイン、user | 1 | 0 | なし | `/plugin` |
 | ruby-lsp | 1.0.0 | プラグイン、user | 0（LSP だけ） | 0 | なし | `/plugin` |
 | 個人スキル | — | dotfiles の `claude/skills/` を `~/.claude/skills/` にリンク | 4 | 0 | なし | dotfiles |
@@ -246,7 +246,7 @@ sandbox の外で `/cso` を実行すると、保存先に秘密ファイルの�
 | 提供元 | エージェント | 状態 |
 | --- | --- | --- |
 | 組み込み | `general-purpose`、`Explore`、`Plan`、`claude-code-guide`、`statusline-setup`、`web-fetch`、`claude` | 有効 |
-| understand-anything | `project-scanner`、`file-analyzer`、`architecture-analyzer`、`tour-builder`、`graph-reviewer`、`assemble-reviewer`、`domain-analyzer`、`article-analyzer`、`design-analyzer`、`knowledge-graph-guide` | 有効。主に `/understand-anything:understand` が使う |
+| understand-anything | `project-scanner`、`file-analyzer`、`architecture-analyzer`、`tour-builder`、`graph-reviewer`、`assemble-reviewer`、`domain-analyzer`、`article-analyzer`、`design-analyzer`、`knowledge-graph-guide`、`code-lesson-writer` | 有効。主に `/understand-anything:understand` が使う。`code-lesson-writer`（2.9.8 で追加）は、`autoUpdate` が true のリポジトリでは commit の後の自動更新でも確認なしで起動する |
 | pstack | `poteto-agent`、`comment-sicko` | 制限（`Agent(...)` を deny）。Agent の一覧に出ないことを 2026-11-16 に確認 |
 
 <a name="hooks"></a>
