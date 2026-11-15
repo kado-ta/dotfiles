@@ -231,7 +231,10 @@
     "learn": "off",
     "runaway-stopper": "off",
     "write-skill": "off",
-    "design-motion": "off"
+    "design-motion": "off",
+    "document-release": "user-invocable-only",
+    "document-generate": "user-invocable-only",
+    "spec": "user-invocable-only"
   },
   "hooks": {
     "PreToolUse": [

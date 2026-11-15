@@ -18,6 +18,12 @@ gstack は `gstack-upgrade` で更新する（`--check` で確認のみ）。
 
 pstack はサードパーティのマーケットプレイスなので自動更新されない。`claude plugin update pstack@cursor-plugins` で更新し、hooks が増えていないか、スキルの一覧と依存が変わっていないかを確かめる。`settings.json` の `permissions.deny` は、モデルから起動できる `setup-pstack` と、使わないエージェント 2 つを止めている。ほかの使わないスキルはモデルから起動できず、deny ではユーザーのスラッシュコマンドを止められないので、方針として使わない。スキルの分類は [pstack の導入の plan](../docs/work/20261114_pstack-skill-routing/plan.md#decisions) にある。
 
+スキルの役割分担は、次の 3 つに分けて書いている。プラグインやスキルを更新したら、棚卸しの「更新したときの見直し」に従って 3 つを直す。
+
+- [rules/SKILL_ROUTING.md](rules/SKILL_ROUTING.md): Claude がスキルを選ぶときの規則。全プロジェクトの全セッションで読み込まれる。
+- [SKILL_INVENTORY.md](SKILL_INVENTORY.md): 全スキルの棚卸し（状態・制約・重複の裁定・更新したときの見直し・規則の効果の確認）。
+- [SKILL_CHEATSHEET.md](SKILL_CHEATSHEET.md): タスク別の早見表（人間向け）。
+
 <a name="hooks"></a>
 
 ## フック

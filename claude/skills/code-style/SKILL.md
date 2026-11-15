@@ -1,6 +1,6 @@
 ---
 name: code-style
-description: Use when writing or reviewing code - applies naming conventions, code quality rules, and style guidelines for this project
+description: Use when writing or reviewing code in any repository - applies personal default naming conventions and code quality rules; the repository's own conventions, formatter and linter take precedence
 ---
 
 # Code Style
