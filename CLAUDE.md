@@ -106,6 +106,23 @@ Claude から Crit の対話レビューを開くときは、`claude/bin/cc-crit
 
 `sandbox.network` の `allowUnixSockets`・`allowAllUnixSockets`・`allowLocalBinding` は設定しない（`check-repo.py` の `push-permissions` が失敗する）。Colima は既定で `$HOME` を書き込み可能でマウントするので、Docker のソケットや VM の SSH に届くと、`$HOME` のどこにでも書けて sandbox を抜けられる。同じ理由で、Colima（Lima）の VM に入る鍵（`~/.colima/_lima/_config`）を `denyRead` で読ませない。経緯は [docs/work/20261113_sandbox-escape-hardening/research-sandbox-escape.md](docs/work/20261113_sandbox-escape-hardening/research-sandbox-escape.md#risk-colima) を参照する。
 
+<a name="edit-write-rules"></a>
+
+### Edit・Write ツールの書き込み
+
+Edit・Write ツールは sandbox の外で動くので、`permissions` の規則で守る。
+
+- `settings.json` で `permissions.blockWritesOutsideWorkingDirectories` をオンにしている。Edit・Write ツールは、作業ディレクトリの外（ほかのリポジトリの `.git/hooks`、`~/Library/LaunchAgents` など）に書けない。外に書く必要があるときは、人間が `/add-dir` でディレクトリを足す。
+- この設定では、Claude Code の設定ファイルは、作業ディレクトリの中でも Claude から編集できない。設定ファイルは人間が編集する。
+- 作業ディレクトリの中でも、人間が操作しなくても sandbox の外で動くファイルは守る。`.git` の hooks は Edit を deny にしている。mise の設定（`mise.toml`、`.tool-versions` など）は、Edit を ask にし、`sandbox.filesystem.denyWrite` にも入れている。mise は、信頼済みのパスに cd したときに、設定の hooks・`_.source`・`exec()` を動かすため。
+- これらの設定を外すと、`check-repo.py` の `edit-permissions` が失敗する。
+- `.claude/settings.json` の ask に `Edit(/claude/**)` があるのは、worktree ではユーザー設定の `Edit(~/dotfiles/claude/**)` が当たらないため。
+- Read の deny の `*.pem` を `~/**` に広げない。mise で入れた pip・Ruby・aws-cli の CA 証明書の束が `~/.local/share/mise` の下にあり、sandbox の中でそれらの HTTPS が失敗する見込みのため。
+
+worktree は `claude -w <name>` で始める。この設定では EnterWorktree・ExitWorktree を使えない。ブランチ名は `worktree-<name>` になるので、規約の名前（`fix/…` など）には `git branch -m <新しい名前>` で変える。sandbox が `.git/config` を守っているので、`could not lock config file` と出て終了コード 128 で終わるが、名前は変わる。元のブランチに `branch.<name>.*` の設定がなければ、影響はない。終了コードが 0 でないので、`&&` で後ろにコマンドをつながない。
+
+経緯は [docs/work/20261114_edit-write-rules/research-edit-write.md](docs/work/20261114_edit-write-rules/research-edit-write.md) を参照する。
+
 ### 個人スキル
 
 `skills/*/` 配下の個人スキルは `~/.claude/skills/` にグローバルシンボリックリンクされ、全プロジェクトで使える。各スキルの用途は `SKILL.md` の `description` を参照する。
