@@ -1,0 +1,1317 @@
+{
+  "agents": [
+    "pstack:comment-sicko",
+    "pstack:poteto-agent",
+    "understand-anything:architecture-analyzer",
+    "understand-anything:article-analyzer",
+    "understand-anything:assemble-reviewer",
+    "understand-anything:design-analyzer",
+    "understand-anything:domain-analyzer",
+    "understand-anything:file-analyzer",
+    "understand-anything:graph-reviewer",
+    "understand-anything:knowledge-graph-guide",
+    "understand-anything:project-scanner",
+    "understand-anything:tour-builder"
+  ],
+  "gstack": {
+    "version": "1.99.3.0"
+  },
+  "plugin_hooks": {
+    "crit@crit": [
+      "PermissionRequest ExitPlanMode sha256:93f34ecba3243f82"
+    ],
+    "superpowers@claude-plugins-official": [
+      "SessionStart startup|clear|compact sha256:12d079e1117bd6db"
+    ],
+    "understand-anything@understand-anything": [
+      "PostToolUse Bash sha256:fa5811de64b72997",
+      "SessionStart  sha256:be0b775fea741ca4"
+    ]
+  },
+  "plugins": {
+    "claude-code-setup@claude-plugins-official": {
+      "enabled": true,
+      "scopes": [
+        "user"
+      ],
+      "version": "1.0.0"
+    },
+    "crit@crit": {
+      "enabled": true,
+      "scopes": [
+        "user"
+      ],
+      "version": "1.8.14"
+    },
+    "pstack@cursor-plugins": {
+      "enabled": true,
+      "scopes": [
+        "user"
+      ],
+      "version": "0.15.42"
+    },
+    "ruby-lsp@claude-plugins-official": {
+      "enabled": true,
+      "scopes": [
+        "user"
+      ],
+      "version": "1.0.0"
+    },
+    "salesforce-development@claude-plugins-official": {
+      "enabled": false,
+      "scopes": [
+        "local"
+      ],
+      "version": "2.5.0"
+    },
+    "superpowers@claude-plugins-official": {
+      "enabled": true,
+      "scopes": [
+        "user"
+      ],
+      "version": "7.0.2"
+    },
+    "understand-anything@understand-anything": {
+      "enabled": true,
+      "scopes": [
+        "user"
+      ],
+      "version": "2.9.7"
+    }
+  },
+  "skills": {
+    "_gstack-command": {
+      "description": "sha256:aba61a00d517aae9",
+      "dmi": false,
+      "hooks": null,
+      "override": "off",
+      "provider": "gstack",
+      "user_invocable": true
+    },
+    "autoplan": {
+      "description": "sha256:370cdae91bbf5635",
+      "dmi": false,
+      "hooks": "sha256:100661e8a4deef7c",
+      "override": "off",
+      "provider": "gstack",
+      "user_invocable": true
+    },
+    "benchmark": {
+      "description": "sha256:610a8b126d3a0593",
+      "dmi": false,
+      "hooks": null,
+      "override": "on",
+      "provider": "gstack",
+      "user_invocable": true
+    },
+    "benchmark-models": {
+      "description": "sha256:9b5191459085e9c2",
+      "dmi": false,
+      "hooks": null,
+      "override": "off",
+      "provider": "gstack",
+      "user_invocable": true
+    },
+    "browse": {
+      "description": "sha256:babc369ef353983c",
+      "dmi": false,
+      "hooks": null,
+      "override": "on",
+      "provider": "gstack",
+      "user_invocable": true
+    },
+    "canary": {
+      "description": "sha256:6d5612547ffcc772",
+      "dmi": false,
+      "hooks": null,
+      "override": "on",
+      "provider": "gstack",
+      "user_invocable": true
+    },
+    "careful": {
+      "description": "sha256:116fb49d74fce1d2",
+      "dmi": false,
+      "hooks": "sha256:69f1bd0c590d030f",
+      "override": "user-invocable-only",
+      "provider": "gstack",
+      "user_invocable": true
+    },
+    "claude-code-setup:claude-automation-recommender": {
+      "description": "sha256:db90afcde3c999d6",
+      "dmi": false,
+      "hooks": null,
+      "override": null,
+      "provider": "claude-code-setup",
+      "user_invocable": true
+    },
+    "code-style": {
+      "description": "sha256:04ed2cc51f33aa05",
+      "dmi": false,
+      "hooks": null,
+      "override": "on",
+      "provider": "personal",
+      "user_invocable": true
+    },
+    "codex": {
+      "description": "sha256:29b9d8eb251ac762",
+      "dmi": false,
+      "hooks": null,
+      "override": "on",
+      "provider": "gstack",
+      "user_invocable": true
+    },
+    "commit-staged-pr": {
+      "description": "sha256:bacd1e1abafb8a7b",
+      "dmi": false,
+      "hooks": null,
+      "override": "on",
+      "provider": "personal",
+      "user_invocable": true
+    },
+    "connect-chrome": {
+      "description": "sha256:00a8fcada5a3693e",
+      "dmi": false,
+      "hooks": null,
+      "override": "off",
+      "provider": "gstack",
+      "user_invocable": true
+    },
+    "context-restore": {
+      "description": "sha256:d1fd051fc09b9197",
+      "dmi": false,
+      "hooks": null,
+      "override": "on",
+      "provider": "gstack",
+      "user_invocable": true
+    },
+    "context-save": {
+      "description": "sha256:0c60bb556d02f249",
+      "dmi": false,
+      "hooks": null,
+      "override": "on",
+      "provider": "gstack",
+      "user_invocable": true
+    },
+    "crit-review": {
+      "description": "sha256:5e98c102a1ae0136",
+      "dmi": false,
+      "hooks": null,
+      "override": "on",
+      "provider": "personal",
+      "user_invocable": true
+    },
+    "crit:crit": {
+      "description": "sha256:f2dd182d8dca5bb3",
+      "dmi": false,
+      "hooks": null,
+      "override": null,
+      "provider": "crit",
+      "user_invocable": true
+    },
+    "crit:crit-cli": {
+      "description": "sha256:383bf6eb648c3ac3",
+      "dmi": false,
+      "hooks": null,
+      "override": null,
+      "provider": "crit",
+      "user_invocable": false
+    },
+    "crit:crit-story": {
+      "description": "sha256:f7719edb6887bc8a",
+      "dmi": false,
+      "hooks": null,
+      "override": null,
+      "provider": "crit",
+      "user_invocable": true
+    },
+    "cso": {
+      "description": "sha256:644a35e9e6bc95f6",
+      "dmi": false,
+      "hooks": null,
+      "override": "on",
+      "provider": "gstack",
+      "user_invocable": true
+    },
+    "design-consultation": {
+      "description": "sha256:992f651462b3ff37",
+      "dmi": false,
+      "hooks": null,
+      "override": "on",
+      "provider": "gstack",
+      "user_invocable": true
+    },
+    "design-html": {
+      "description": "sha256:33466af2bb48422a",
+      "dmi": false,
+      "hooks": null,
+      "override": "on",
+      "provider": "gstack",
+      "user_invocable": true
+    },
+    "design-motion": {
+      "description": "sha256:4b3153b72acb77e8",
+      "dmi": false,
+      "hooks": null,
+      "override": "off",
+      "provider": "gstack",
+      "user_invocable": true
+    },
+    "design-review": {
+      "description": "sha256:1f49c4734daac75e",
+      "dmi": false,
+      "hooks": null,
+      "override": "on",
+      "provider": "gstack",
+      "user_invocable": true
+    },
+    "design-shotgun": {
+      "description": "sha256:09d6eccbf731bb1a",
+      "dmi": false,
+      "hooks": null,
+      "override": "on",
+      "provider": "gstack",
+      "user_invocable": true
+    },
+    "deslop-shared-libs": {
+      "description": "sha256:631a75240986090a",
+      "dmi": false,
+      "hooks": null,
+      "override": "on",
+      "provider": "gstack",
+      "user_invocable": true
+    },
+    "devex-review": {
+      "description": "sha256:366a127b59e3e96c",
+      "dmi": false,
+      "hooks": null,
+      "override": "off",
+      "provider": "gstack",
+      "user_invocable": true
+    },
+    "diagram": {
+      "description": "sha256:7be1d10455037936",
+      "dmi": false,
+      "hooks": null,
+      "override": "on",
+      "provider": "gstack",
+      "user_invocable": true
+    },
+    "document-generate": {
+      "description": "sha256:c1e4f5e00b77a1af",
+      "dmi": false,
+      "hooks": null,
+      "override": "user-invocable-only",
+      "provider": "gstack",
+      "user_invocable": true
+    },
+    "document-release": {
+      "description": "sha256:7a08bc5340527e60",
+      "dmi": false,
+      "hooks": null,
+      "override": "user-invocable-only",
+      "provider": "gstack",
+      "user_invocable": true
+    },
+    "eval-plan": {
+      "description": "sha256:a362b90f137484c2",
+      "dmi": false,
+      "hooks": null,
+      "override": "off",
+      "provider": "gstack",
+      "user_invocable": true
+    },
+    "freeze": {
+      "description": "sha256:5bf34292a87d8af6",
+      "dmi": false,
+      "hooks": "sha256:baabde3dbce15610",
+      "override": "user-invocable-only",
+      "provider": "gstack",
+      "user_invocable": true
+    },
+    "gstack": {
+      "description": "sha256:aba61a00d517aae9",
+      "dmi": false,
+      "hooks": null,
+      "override": "off",
+      "provider": "gstack",
+      "user_invocable": true
+    },
+    "gstack-upgrade": {
+      "description": "sha256:1c184b00b20cd0f4",
+      "dmi": false,
+      "hooks": null,
+      "override": "on",
+      "provider": "gstack",
+      "user_invocable": true
+    },
+    "guard": {
+      "description": "sha256:e26d69a9d3627d45",
+      "dmi": false,
+      "hooks": "sha256:3cea7982471bd8d1",
+      "override": "user-invocable-only",
+      "provider": "gstack",
+      "user_invocable": true
+    },
+    "health": {
+      "description": "sha256:7260f9d9c097a909",
+      "dmi": false,
+      "hooks": null,
+      "override": "on",
+      "provider": "gstack",
+      "user_invocable": true
+    },
+    "ios-clean": {
+      "description": "sha256:1a4ddcdf8c47b573",
+      "dmi": false,
+      "hooks": null,
+      "override": "off",
+      "provider": "gstack",
+      "user_invocable": true
+    },
+    "ios-design-review": {
+      "description": "sha256:5543e014b4afb24c",
+      "dmi": false,
+      "hooks": null,
+      "override": "off",
+      "provider": "gstack",
+      "user_invocable": true
+    },
+    "ios-fix": {
+      "description": "sha256:4d503ac9efea177c",
+      "dmi": false,
+      "hooks": null,
+      "override": "off",
+      "provider": "gstack",
+      "user_invocable": true
+    },
+    "ios-qa": {
+      "description": "sha256:a9e2a18b50827e1a",
+      "dmi": false,
+      "hooks": null,
+      "override": "off",
+      "provider": "gstack",
+      "user_invocable": true
+    },
+    "ios-sync": {
+      "description": "sha256:2d78486469f68c2a",
+      "dmi": false,
+      "hooks": null,
+      "override": "off",
+      "provider": "gstack",
+      "user_invocable": true
+    },
+    "land-and-deploy": {
+      "description": "sha256:def22022ed06b6bd",
+      "dmi": true,
+      "hooks": null,
+      "override": "off",
+      "provider": "gstack",
+      "user_invocable": true
+    },
+    "landing-report": {
+      "description": "sha256:fd4d197405b9141d",
+      "dmi": false,
+      "hooks": null,
+      "override": "off",
+      "provider": "gstack",
+      "user_invocable": true
+    },
+    "learn": {
+      "description": "sha256:ea69aeaba1341e76",
+      "dmi": false,
+      "hooks": null,
+      "override": "off",
+      "provider": "gstack",
+      "user_invocable": true
+    },
+    "make-pdf": {
+      "description": "sha256:17d7cbe13f70bf36",
+      "dmi": false,
+      "hooks": null,
+      "override": "on",
+      "provider": "gstack",
+      "user_invocable": true
+    },
+    "modernize": {
+      "description": "sha256:b3a7d685801a090f",
+      "dmi": true,
+      "hooks": null,
+      "override": "off",
+      "provider": "gstack",
+      "user_invocable": true
+    },
+    "office-hours": {
+      "description": "sha256:0aec7e20d10e6b5a",
+      "dmi": false,
+      "hooks": null,
+      "override": "on",
+      "provider": "gstack",
+      "user_invocable": true
+    },
+    "open-gstack-browser": {
+      "description": "sha256:00a8fcada5a3693e",
+      "dmi": false,
+      "hooks": null,
+      "override": "off",
+      "provider": "gstack",
+      "user_invocable": true
+    },
+    "pair-agent": {
+      "description": "sha256:c62815e591cc5717",
+      "dmi": false,
+      "hooks": null,
+      "override": "off",
+      "provider": "gstack",
+      "user_invocable": true
+    },
+    "plan-ceo-review": {
+      "description": "sha256:80597ff24a8a47c1",
+      "dmi": false,
+      "hooks": "sha256:ba37f92750a3cd2c",
+      "override": "on",
+      "provider": "gstack",
+      "user_invocable": true
+    },
+    "plan-design-review": {
+      "description": "sha256:b682b9d4871e22de",
+      "dmi": false,
+      "hooks": null,
+      "override": "on",
+      "provider": "gstack",
+      "user_invocable": true
+    },
+    "plan-devex-review": {
+      "description": "sha256:c3a22ad033299c5f",
+      "dmi": false,
+      "hooks": null,
+      "override": "off",
+      "provider": "gstack",
+      "user_invocable": true
+    },
+    "plan-tune": {
+      "description": "sha256:e8c65c3f661cafa6",
+      "dmi": false,
+      "hooks": null,
+      "override": "off",
+      "provider": "gstack",
+      "user_invocable": true
+    },
+    "pstack:architect": {
+      "description": "sha256:0099a63aeda44737",
+      "dmi": true,
+      "hooks": null,
+      "override": null,
+      "provider": "pstack",
+      "user_invocable": true
+    },
+    "pstack:arena": {
+      "description": "sha256:cc99cf15f7b08916",
+      "dmi": true,
+      "hooks": null,
+      "override": null,
+      "provider": "pstack",
+      "user_invocable": true
+    },
+    "pstack:automate-me": {
+      "description": "sha256:e869d3573c455b35",
+      "dmi": true,
+      "hooks": null,
+      "override": null,
+      "provider": "pstack",
+      "user_invocable": true
+    },
+    "pstack:benchmark-checklist": {
+      "description": "sha256:e73e996724f9bf1c",
+      "dmi": true,
+      "hooks": null,
+      "override": null,
+      "provider": "pstack",
+      "user_invocable": true
+    },
+    "pstack:blast-radius": {
+      "description": "sha256:1ea5d70e949eedaa",
+      "dmi": true,
+      "hooks": null,
+      "override": null,
+      "provider": "pstack",
+      "user_invocable": true
+    },
+    "pstack:bro": {
+      "description": "sha256:ee9fcc0440aa7706",
+      "dmi": true,
+      "hooks": null,
+      "override": null,
+      "provider": "pstack",
+      "user_invocable": true
+    },
+    "pstack:correct": {
+      "description": "sha256:1cd54fca295e7228",
+      "dmi": true,
+      "hooks": null,
+      "override": null,
+      "provider": "pstack",
+      "user_invocable": true
+    },
+    "pstack:create-formal-verification-skill": {
+      "description": "sha256:57678443bccc4f02",
+      "dmi": true,
+      "hooks": null,
+      "override": null,
+      "provider": "pstack",
+      "user_invocable": true
+    },
+    "pstack:create-verification-skill": {
+      "description": "sha256:f190a24993bb1eec",
+      "dmi": true,
+      "hooks": null,
+      "override": null,
+      "provider": "pstack",
+      "user_invocable": true
+    },
+    "pstack:figure-it-out": {
+      "description": "sha256:9eed81e1781d10c9",
+      "dmi": true,
+      "hooks": null,
+      "override": null,
+      "provider": "pstack",
+      "user_invocable": true
+    },
+    "pstack:how": {
+      "description": "sha256:cc5583d6f08d8a64",
+      "dmi": true,
+      "hooks": null,
+      "override": null,
+      "provider": "pstack",
+      "user_invocable": true
+    },
+    "pstack:in-your-own-words": {
+      "description": "sha256:90d14851864443c7",
+      "dmi": true,
+      "hooks": null,
+      "override": null,
+      "provider": "pstack",
+      "user_invocable": true
+    },
+    "pstack:interrogate": {
+      "description": "sha256:14b844d7dd583665",
+      "dmi": true,
+      "hooks": null,
+      "override": null,
+      "provider": "pstack",
+      "user_invocable": true
+    },
+    "pstack:ketchup": {
+      "description": "sha256:32ff448e266fffe6",
+      "dmi": true,
+      "hooks": null,
+      "override": null,
+      "provider": "pstack",
+      "user_invocable": true
+    },
+    "pstack:ketchup-video": {
+      "description": "sha256:a8ae2ec6181d74b9",
+      "dmi": true,
+      "hooks": null,
+      "override": null,
+      "provider": "pstack",
+      "user_invocable": true
+    },
+    "pstack:maintain-formal-verification-skill": {
+      "description": "sha256:6e78daa14e982165",
+      "dmi": true,
+      "hooks": null,
+      "override": null,
+      "provider": "pstack",
+      "user_invocable": true
+    },
+    "pstack:maintain-verification-skill": {
+      "description": "sha256:f45526e16ad4630b",
+      "dmi": true,
+      "hooks": null,
+      "override": null,
+      "provider": "pstack",
+      "user_invocable": true
+    },
+    "pstack:make-bot-ui": {
+      "description": "sha256:40dfb1718c097092",
+      "dmi": true,
+      "hooks": null,
+      "override": null,
+      "provider": "pstack",
+      "user_invocable": true
+    },
+    "pstack:no-comments": {
+      "description": "sha256:9efba35040913bc3",
+      "dmi": true,
+      "hooks": null,
+      "override": null,
+      "provider": "pstack",
+      "user_invocable": true
+    },
+    "pstack:poteto-help": {
+      "description": "sha256:2b99db2458378576",
+      "dmi": true,
+      "hooks": null,
+      "override": null,
+      "provider": "pstack",
+      "user_invocable": true
+    },
+    "pstack:poteto-mode": {
+      "description": "sha256:3083df2532d54b06",
+      "dmi": true,
+      "hooks": null,
+      "override": null,
+      "provider": "pstack",
+      "user_invocable": true
+    },
+    "pstack:principle-attack-the-premise": {
+      "description": "sha256:409bff04155cf1a5",
+      "dmi": true,
+      "hooks": null,
+      "override": null,
+      "provider": "pstack",
+      "user_invocable": true
+    },
+    "pstack:principle-boundary-discipline": {
+      "description": "sha256:d8cd1ddfdecea6f2",
+      "dmi": true,
+      "hooks": null,
+      "override": null,
+      "provider": "pstack",
+      "user_invocable": true
+    },
+    "pstack:principle-build-the-lever": {
+      "description": "sha256:64b883b29d994e28",
+      "dmi": true,
+      "hooks": null,
+      "override": null,
+      "provider": "pstack",
+      "user_invocable": true
+    },
+    "pstack:principle-encode-lessons-in-structure": {
+      "description": "sha256:0903e88fac77027b",
+      "dmi": true,
+      "hooks": null,
+      "override": null,
+      "provider": "pstack",
+      "user_invocable": true
+    },
+    "pstack:principle-exhaust-the-design-space": {
+      "description": "sha256:bb7b5d5c1d3d3364",
+      "dmi": true,
+      "hooks": null,
+      "override": null,
+      "provider": "pstack",
+      "user_invocable": true
+    },
+    "pstack:principle-experience-first": {
+      "description": "sha256:8ac7758c4a94d42e",
+      "dmi": true,
+      "hooks": null,
+      "override": null,
+      "provider": "pstack",
+      "user_invocable": true
+    },
+    "pstack:principle-explain-the-number": {
+      "description": "sha256:246e62a3c7990328",
+      "dmi": true,
+      "hooks": null,
+      "override": null,
+      "provider": "pstack",
+      "user_invocable": true
+    },
+    "pstack:principle-fix-root-causes": {
+      "description": "sha256:1bed9bf9a66f3bec",
+      "dmi": true,
+      "hooks": null,
+      "override": null,
+      "provider": "pstack",
+      "user_invocable": true
+    },
+    "pstack:principle-foundational-thinking": {
+      "description": "sha256:0ab62e059c5cae1c",
+      "dmi": true,
+      "hooks": null,
+      "override": null,
+      "provider": "pstack",
+      "user_invocable": true
+    },
+    "pstack:principle-guard-the-context-window": {
+      "description": "sha256:efcd9ae4cde688ff",
+      "dmi": true,
+      "hooks": null,
+      "override": null,
+      "provider": "pstack",
+      "user_invocable": true
+    },
+    "pstack:principle-laziness-protocol": {
+      "description": "sha256:5a67babe4dd8e699",
+      "dmi": true,
+      "hooks": null,
+      "override": null,
+      "provider": "pstack",
+      "user_invocable": true
+    },
+    "pstack:principle-make-operations-idempotent": {
+      "description": "sha256:4bb9a96d2c1fe354",
+      "dmi": true,
+      "hooks": null,
+      "override": null,
+      "provider": "pstack",
+      "user_invocable": true
+    },
+    "pstack:principle-migrate-callers-then-delete-legacy-apis": {
+      "description": "sha256:729e129c75b6b9d0",
+      "dmi": true,
+      "hooks": null,
+      "override": null,
+      "provider": "pstack",
+      "user_invocable": true
+    },
+    "pstack:principle-minimize-reader-load": {
+      "description": "sha256:2e56c73c78440a9b",
+      "dmi": true,
+      "hooks": null,
+      "override": null,
+      "provider": "pstack",
+      "user_invocable": true
+    },
+    "pstack:principle-model-the-domain": {
+      "description": "sha256:ec9a90af6dca8234",
+      "dmi": true,
+      "hooks": null,
+      "override": null,
+      "provider": "pstack",
+      "user_invocable": true
+    },
+    "pstack:principle-never-block-on-the-human": {
+      "description": "sha256:450e2773ac954bb0",
+      "dmi": true,
+      "hooks": null,
+      "override": null,
+      "provider": "pstack",
+      "user_invocable": true
+    },
+    "pstack:principle-outcome-oriented-execution": {
+      "description": "sha256:a315bf51a5471504",
+      "dmi": true,
+      "hooks": null,
+      "override": null,
+      "provider": "pstack",
+      "user_invocable": true
+    },
+    "pstack:principle-prove-it-works": {
+      "description": "sha256:aaddd68753a84844",
+      "dmi": true,
+      "hooks": null,
+      "override": null,
+      "provider": "pstack",
+      "user_invocable": true
+    },
+    "pstack:principle-redesign-from-first-principles": {
+      "description": "sha256:2ee0d35302fd8b1c",
+      "dmi": true,
+      "hooks": null,
+      "override": null,
+      "provider": "pstack",
+      "user_invocable": true
+    },
+    "pstack:principle-separate-before-serializing-shared-state": {
+      "description": "sha256:4f7db82b7cc3d85b",
+      "dmi": true,
+      "hooks": null,
+      "override": null,
+      "provider": "pstack",
+      "user_invocable": true
+    },
+    "pstack:principle-sequence-verifiable-units": {
+      "description": "sha256:52ef2e8b21041ff8",
+      "dmi": true,
+      "hooks": null,
+      "override": null,
+      "provider": "pstack",
+      "user_invocable": true
+    },
+    "pstack:principle-subtract-before-you-add": {
+      "description": "sha256:753756ce113d0ffd",
+      "dmi": true,
+      "hooks": null,
+      "override": null,
+      "provider": "pstack",
+      "user_invocable": true
+    },
+    "pstack:principle-test-behavior-not-implementation": {
+      "description": "sha256:0c1eab0c502755e4",
+      "dmi": true,
+      "hooks": null,
+      "override": null,
+      "provider": "pstack",
+      "user_invocable": true
+    },
+    "pstack:principle-type-system-discipline": {
+      "description": "sha256:e3168831dedf90c7",
+      "dmi": true,
+      "hooks": null,
+      "override": null,
+      "provider": "pstack",
+      "user_invocable": true
+    },
+    "pstack:recall": {
+      "description": "sha256:ee2ce4a1289359cb",
+      "dmi": true,
+      "hooks": null,
+      "override": null,
+      "provider": "pstack",
+      "user_invocable": true
+    },
+    "pstack:reflect": {
+      "description": "sha256:3a49c77517034bb5",
+      "dmi": true,
+      "hooks": null,
+      "override": null,
+      "provider": "pstack",
+      "user_invocable": true
+    },
+    "pstack:setup-pstack": {
+      "description": "sha256:c580c60c8616a520",
+      "dmi": false,
+      "hooks": null,
+      "override": null,
+      "provider": "pstack",
+      "user_invocable": true
+    },
+    "pstack:sharpen": {
+      "description": "sha256:f807ca9e924b204e",
+      "dmi": true,
+      "hooks": null,
+      "override": null,
+      "provider": "pstack",
+      "user_invocable": true
+    },
+    "pstack:show-me-your-work": {
+      "description": "sha256:d353bbd66eb0127e",
+      "dmi": true,
+      "hooks": null,
+      "override": null,
+      "provider": "pstack",
+      "user_invocable": true
+    },
+    "pstack:statechart": {
+      "description": "sha256:0e27192a6370d29f",
+      "dmi": true,
+      "hooks": null,
+      "override": null,
+      "provider": "pstack",
+      "user_invocable": true
+    },
+    "pstack:swarm": {
+      "description": "sha256:6c6e0406ed880bc8",
+      "dmi": true,
+      "hooks": null,
+      "override": null,
+      "provider": "pstack",
+      "user_invocable": true
+    },
+    "pstack:tdd": {
+      "description": "sha256:64b0c222a5bda981",
+      "dmi": true,
+      "hooks": null,
+      "override": null,
+      "provider": "pstack",
+      "user_invocable": true
+    },
+    "pstack:teach": {
+      "description": "sha256:8be0f75107b48a49",
+      "dmi": true,
+      "hooks": null,
+      "override": null,
+      "provider": "pstack",
+      "user_invocable": true
+    },
+    "pstack:technical-writing": {
+      "description": "sha256:45bec9c8b3cd37bc",
+      "dmi": true,
+      "hooks": null,
+      "override": null,
+      "provider": "pstack",
+      "user_invocable": true
+    },
+    "pstack:typescript-best-practices": {
+      "description": "sha256:9d42a17f466003f7",
+      "dmi": true,
+      "hooks": null,
+      "override": null,
+      "provider": "pstack",
+      "user_invocable": true
+    },
+    "pstack:unslop": {
+      "description": "sha256:32a8cbdc8b7aafd9",
+      "dmi": true,
+      "hooks": null,
+      "override": null,
+      "provider": "pstack",
+      "user_invocable": true
+    },
+    "pstack:why": {
+      "description": "sha256:b24c238d219ece7c",
+      "dmi": true,
+      "hooks": null,
+      "override": null,
+      "provider": "pstack",
+      "user_invocable": true
+    },
+    "qa": {
+      "description": "sha256:2d1a7f49357bda60",
+      "dmi": false,
+      "hooks": null,
+      "override": "on",
+      "provider": "gstack",
+      "user_invocable": true
+    },
+    "qa-only": {
+      "description": "sha256:4ba0055a3325eb80",
+      "dmi": false,
+      "hooks": null,
+      "override": "on",
+      "provider": "gstack",
+      "user_invocable": true
+    },
+    "retro": {
+      "description": "sha256:6e7c63da18a996ea",
+      "dmi": false,
+      "hooks": null,
+      "override": "on",
+      "provider": "gstack",
+      "user_invocable": true
+    },
+    "review": {
+      "description": "sha256:6b24c922897b3de5",
+      "dmi": false,
+      "hooks": null,
+      "override": "on",
+      "provider": "gstack",
+      "user_invocable": true
+    },
+    "runaway-stopper": {
+      "description": "sha256:53993931d939b8a8",
+      "dmi": false,
+      "hooks": null,
+      "override": "off",
+      "provider": "gstack",
+      "user_invocable": true
+    },
+    "salesforce-help": {
+      "description": "sha256:ceeb55e5c061f510",
+      "dmi": false,
+      "hooks": null,
+      "override": "on",
+      "provider": "personal",
+      "user_invocable": true
+    },
+    "scrape": {
+      "description": "sha256:45b85f0831943f77",
+      "dmi": false,
+      "hooks": null,
+      "override": "off",
+      "provider": "gstack",
+      "user_invocable": true
+    },
+    "setup-browser-cookies": {
+      "description": "sha256:9ce52c73ab546439",
+      "dmi": false,
+      "hooks": null,
+      "override": "off",
+      "provider": "gstack",
+      "user_invocable": true
+    },
+    "setup-deploy": {
+      "description": "sha256:de4128325e41fce6",
+      "dmi": false,
+      "hooks": null,
+      "override": "off",
+      "provider": "gstack",
+      "user_invocable": true
+    },
+    "setup-gbrain": {
+      "description": "sha256:1b2692837b523665",
+      "dmi": false,
+      "hooks": null,
+      "override": "off",
+      "provider": "gstack",
+      "user_invocable": true
+    },
+    "ship": {
+      "description": "sha256:56a4b49e9bdc59c6",
+      "dmi": false,
+      "hooks": null,
+      "override": "off",
+      "provider": "gstack",
+      "user_invocable": true
+    },
+    "skillify": {
+      "description": "sha256:caf39fdd3f44c634",
+      "dmi": false,
+      "hooks": null,
+      "override": "off",
+      "provider": "gstack",
+      "user_invocable": true
+    },
+    "spec": {
+      "description": "sha256:7f48124193b5a616",
+      "dmi": false,
+      "hooks": null,
+      "override": "user-invocable-only",
+      "provider": "gstack",
+      "user_invocable": true
+    },
+    "superpowers:brainstorming": {
+      "description": "sha256:031ec08d5214fa0a",
+      "dmi": false,
+      "hooks": null,
+      "override": null,
+      "provider": "superpowers",
+      "user_invocable": true
+    },
+    "superpowers:diagnosing-superpowers": {
+      "description": "sha256:4c2a5d6d79554401",
+      "dmi": false,
+      "hooks": null,
+      "override": null,
+      "provider": "superpowers",
+      "user_invocable": true
+    },
+    "superpowers:dispatching-parallel-agents": {
+      "description": "sha256:5649c0d308ec206f",
+      "dmi": false,
+      "hooks": null,
+      "override": null,
+      "provider": "superpowers",
+      "user_invocable": true
+    },
+    "superpowers:executing-plans": {
+      "description": "sha256:fbf78c622d7e89fc",
+      "dmi": false,
+      "hooks": null,
+      "override": null,
+      "provider": "superpowers",
+      "user_invocable": true
+    },
+    "superpowers:finishing-a-development-branch": {
+      "description": "sha256:abec2b086d3c16ee",
+      "dmi": false,
+      "hooks": null,
+      "override": null,
+      "provider": "superpowers",
+      "user_invocable": true
+    },
+    "superpowers:receiving-code-review": {
+      "description": "sha256:aaf1de41eab32e80",
+      "dmi": false,
+      "hooks": null,
+      "override": null,
+      "provider": "superpowers",
+      "user_invocable": true
+    },
+    "superpowers:requesting-code-review": {
+      "description": "sha256:739cdd1b776658eb",
+      "dmi": false,
+      "hooks": null,
+      "override": null,
+      "provider": "superpowers",
+      "user_invocable": true
+    },
+    "superpowers:subagent-driven-development": {
+      "description": "sha256:4a3ca86a4a7b7f1a",
+      "dmi": false,
+      "hooks": null,
+      "override": null,
+      "provider": "superpowers",
+      "user_invocable": true
+    },
+    "superpowers:systematic-debugging": {
+      "description": "sha256:45abe257b772fb52",
+      "dmi": false,
+      "hooks": null,
+      "override": null,
+      "provider": "superpowers",
+      "user_invocable": true
+    },
+    "superpowers:test-driven-development": {
+      "description": "sha256:23b7e98c1a3494e1",
+      "dmi": false,
+      "hooks": null,
+      "override": null,
+      "provider": "superpowers",
+      "user_invocable": true
+    },
+    "superpowers:using-git-worktrees": {
+      "description": "sha256:f112aa0c9e54d2f6",
+      "dmi": false,
+      "hooks": null,
+      "override": null,
+      "provider": "superpowers",
+      "user_invocable": true
+    },
+    "superpowers:using-superpowers": {
+      "description": "sha256:574152d6113b5dfa",
+      "dmi": false,
+      "hooks": null,
+      "override": null,
+      "provider": "superpowers",
+      "user_invocable": true
+    },
+    "superpowers:verification-before-completion": {
+      "description": "sha256:fc4ba75fba42be6b",
+      "dmi": false,
+      "hooks": null,
+      "override": null,
+      "provider": "superpowers",
+      "user_invocable": true
+    },
+    "superpowers:writing-plans": {
+      "description": "sha256:90ae238dbfd4ac84",
+      "dmi": false,
+      "hooks": null,
+      "override": null,
+      "provider": "superpowers",
+      "user_invocable": true
+    },
+    "superpowers:writing-skills": {
+      "description": "sha256:5699be5f365acafa",
+      "dmi": false,
+      "hooks": null,
+      "override": null,
+      "provider": "superpowers",
+      "user_invocable": true
+    },
+    "sync-gbrain": {
+      "description": "sha256:07cc4bd040d5f9e8",
+      "dmi": false,
+      "hooks": null,
+      "override": "off",
+      "provider": "gstack",
+      "user_invocable": true
+    },
+    "sync-skill-docs": {
+      "description": "sha256:dce40737b1a63f0f",
+      "dmi": false,
+      "hooks": null,
+      "override": "on",
+      "provider": "project",
+      "user_invocable": true
+    },
+    "test-audit": {
+      "description": "sha256:84c44092dbbbeb22",
+      "dmi": false,
+      "hooks": null,
+      "override": "on",
+      "provider": "gstack",
+      "user_invocable": true
+    },
+    "ubicloud": {
+      "description": "sha256:e8d3c7573bebad34",
+      "dmi": false,
+      "hooks": null,
+      "override": "off",
+      "provider": "gstack",
+      "user_invocable": true
+    },
+    "understand-anything:understand": {
+      "description": "sha256:d0be9f869d9e424e",
+      "dmi": false,
+      "hooks": null,
+      "override": null,
+      "provider": "understand-anything",
+      "user_invocable": true
+    },
+    "understand-anything:understand-chat": {
+      "description": "sha256:64ffed579e8e6baf",
+      "dmi": false,
+      "hooks": null,
+      "override": null,
+      "provider": "understand-anything",
+      "user_invocable": true
+    },
+    "understand-anything:understand-dashboard": {
+      "description": "sha256:2756860b7b10079e",
+      "dmi": false,
+      "hooks": null,
+      "override": null,
+      "provider": "understand-anything",
+      "user_invocable": true
+    },
+    "understand-anything:understand-diff": {
+      "description": "sha256:d1ed2c00cde3cd2e",
+      "dmi": false,
+      "hooks": null,
+      "override": null,
+      "provider": "understand-anything",
+      "user_invocable": true
+    },
+    "understand-anything:understand-domain": {
+      "description": "sha256:da7b271f28cac8de",
+      "dmi": false,
+      "hooks": null,
+      "override": null,
+      "provider": "understand-anything",
+      "user_invocable": true
+    },
+    "understand-anything:understand-explain": {
+      "description": "sha256:232406d001c22813",
+      "dmi": false,
+      "hooks": null,
+      "override": null,
+      "provider": "understand-anything",
+      "user_invocable": true
+    },
+    "understand-anything:understand-figma": {
+      "description": "sha256:3bda40e73ecbc21b",
+      "dmi": false,
+      "hooks": null,
+      "override": null,
+      "provider": "understand-anything",
+      "user_invocable": true
+    },
+    "understand-anything:understand-knowledge": {
+      "description": "sha256:93ab656f340b64cb",
+      "dmi": false,
+      "hooks": null,
+      "override": null,
+      "provider": "understand-anything",
+      "user_invocable": true
+    },
+    "understand-anything:understand-onboard": {
+      "description": "sha256:e0d60bf23b749db1",
+      "dmi": false,
+      "hooks": null,
+      "override": null,
+      "provider": "understand-anything",
+      "user_invocable": true
+    },
+    "unfreeze": {
+      "description": "sha256:b3d89d6c4f18932c",
+      "dmi": false,
+      "hooks": null,
+      "override": "user-invocable-only",
+      "provider": "gstack",
+      "user_invocable": true
+    },
+    "verify": {
+      "description": "sha256:5f2f0ad62f7af374",
+      "dmi": false,
+      "hooks": null,
+      "override": "on",
+      "provider": "gstack",
+      "user_invocable": true
+    },
+    "write-skill": {
+      "description": "sha256:9285cbe1d41bdc70",
+      "dmi": false,
+      "hooks": null,
+      "override": "off",
+      "provider": "gstack",
+      "user_invocable": true
+    }
+  },
+  "version": 1
+}
