@@ -59,6 +59,14 @@ else
   claude plugins install claude-code-setup@claude-plugins-official
 fi
 
+# Install ruby-lsp
+# LSP サーバーの ruby-lsp コマンドは含まれないので、別途 gem で入れて PATH に通す。
+if claude plugins list 2>/dev/null | grep -q " ruby-lsp@claude-plugins-official$"; then
+  echo "ruby-lsp plugin already installed, skipping"
+else
+  claude plugins install ruby-lsp@claude-plugins-official
+fi
+
 # Install crit
 # settings.json の extraKnownMarketplaces だけではマーケットプレイスが取得されず、install が失敗する。
 if claude plugins list 2>/dev/null | grep -q " crit@crit$"; then
@@ -66,6 +74,24 @@ if claude plugins list 2>/dev/null | grep -q " crit@crit$"; then
 else
   claude plugins marketplace list 2>/dev/null | grep -q " crit$" || claude plugins marketplace add tomasz-tomczyk/crit
   claude plugins install crit@crit
+fi
+
+# Install understand-anything
+# crit と同じく、マーケットプレイスを先に追加しないと install が失敗する。
+if claude plugins list 2>/dev/null | grep -q " understand-anything@understand-anything$"; then
+  echo "understand-anything plugin already installed, skipping"
+else
+  claude plugins marketplace list 2>/dev/null | grep -q " understand-anything$" || claude plugins marketplace add Egonex-AI/Understand-Anything
+  claude plugins install understand-anything@understand-anything
+fi
+
+# Install pstack
+# crit と同じく、マーケットプレイスを先に追加しないと install が失敗する。
+if claude plugins list 2>/dev/null | grep -q " pstack@cursor-plugins$"; then
+  echo "pstack plugin already installed, skipping"
+else
+  claude plugins marketplace list 2>/dev/null | grep -q " cursor-plugins$" || claude plugins marketplace add cursor/plugins
+  claude plugins install pstack@cursor-plugins
 fi
 
 # Install gstack
@@ -80,7 +106,10 @@ fi
 # "${GSTACK_DIR}/setup" は GSTACK_DIR 内で実行しないと正常終了しない。
 # サブシェル (...) 内での cd はスクリプト本体のカレントディレクトリに影響しない。
 # plan-tune のフックは導入しない。確認で止まらず、claude/settings.json も書き換えないようにする。
-(cd "${GSTACK_DIR}" && ./setup --no-plan-tune-hooks)
+# timeline の Stop フックも導入しない。Stop はターンごとに発火するので、実行中の skill を完了扱いにしてしまう。
+# /plan-ceo-review のゲート（Stop・SubagentStop）も導入しない。使わないスキルのために、終了のたびに sandbox の外で bun が動く。
+# timeline とゲートのフラグは ~/.gstack/config.yaml に保存されるので、/gstack-upgrade が実行する setup でも登録しない。
+(cd "${GSTACK_DIR}" && ./setup --no-plan-tune-hooks --no-timeline-stop-hook --no-ceo-review-gate)
 
 # Link personal skills (global, available in all projects)
 for skill_dir in "${SCRIPT_DIR}/skills"/*/; do

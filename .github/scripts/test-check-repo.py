@@ -55,6 +55,7 @@ PROJECT_ASK = [
     "Edit(/init.command)",
     "Edit(/setup.command)",
     "Edit(/CLAUDE.md)",
+    "Edit(/.claude/rules/**)",
 ]
 PROJECT_DENY_WRITE = [
     "./claude",
@@ -72,6 +73,7 @@ PROJECT_DENY_WRITE = [
     "./init.command",
     "./setup.command",
     "./CLAUDE.md",
+    "./.claude/rules",
 ]
 README = "## Foo Bar\n\n[x](#foo-bar)\n\n"
 

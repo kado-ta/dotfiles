@@ -19,3 +19,17 @@ run = "code --list-extensions > vscode/extensions"
 [tasks."crit:profile-test"]
 description = "cc-crit の profile のテストを実行する（sandbox の外で。crit・git・macOS を更新したら実行する）"
 run = "/usr/bin/python3 -B claude/hooks/tests/test-cc-crit-profile.py"
+
+# スキル・プラグインを足した・外した・更新したら check を実行し、違いがあれば /sync-skill-docs で文書を直す。
+# 手順は claude/SKILL_INVENTORY.md の「更新したときの見直し」にある。
+[tasks."claude:skills-check"]
+description = "入っているスキルを、スナップショットとスキルの文書に照合する（終了コード 0: 違いなし、1: 違いあり、2: 照合できない）"
+run = "/usr/bin/python3 -B claude/scripts/skills-check.py check"
+
+[tasks."claude:skills-snapshot"]
+description = "今のスキルの状態を claude/skills-snapshot.json に書く（文書を合わせた後に、端末か Claude Code の ! で実行する。sandbox の中からは claude/ に書けない）"
+run = "/usr/bin/python3 -B claude/scripts/skills-check.py snapshot"
+
+[tasks."claude:skill-usage"]
+description = "期間内のスキルの使われ方を集計する（例: mise run claude:skill-usage 2026-11-16 2026-12-07）"
+run = "/usr/bin/python3 -B claude/scripts/skill-usage.py"

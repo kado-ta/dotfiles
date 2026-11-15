@@ -11,11 +11,13 @@
     "command": "workbench.action.nextEditor"
   },
   // .md ファイルを開いた状態から Cmd+Opt+T キーで、そのファイルを Typora で開く。
+  // 言語 ID（instructions, chatagent, skill など）によらず拡張子で判定する。
+  // エクスプローラーの選択項目とタスクの ${file} がずれないよう、エディタにフォーカスがあるときに限る。
   {
     "key": "cmd+alt+t",
     "command": "workbench.action.tasks.runTask",
     "args": "Open current Markdown in Typora",
-    "when": "editorLangId == markdown"
+    "when": "editorFocus && resourceExtname == .md"
   },
   {
     "key": "cmd+alt+t",

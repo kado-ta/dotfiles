@@ -9,7 +9,7 @@
 - 特定ファイル種別だけのルール → ~/.claude/rules/（paths でスコープ）
 - 必ず守らせたいこと → ~/.claude/settings.json の permissions / hooks
 - 追記基準: 同じ指摘を 2 回したら追記。月1で /doctor prompt-audit と棚卸し。
-- Herdr / Crit 連携ルールは運用が固まってから追記する。
+- Herdr 連携ルールは運用が固まってから追記する。
 -->
 
 ## About me
@@ -100,6 +100,9 @@ https://x.com/ai_database/status/2114184481951330365?s=12
 - `mcp__claude-in-chrome__*` ツールは使わない。
 - サイト・API・CLI の動作を通しで検証し、見つけたバグまで直す依頼には gstack の `/qa` を使う。個別のブラウザ操作は上記の `/browse` を使う。
 - PR やブランチの差分のレビュー依頼には gstack の `/review` を使う。Codex レビューの方針は「Cross-model review (Codex)」のとおりで、これを置き換えない。
+- Crit での人間のレビューは `/crit-review` で開く。
+  - 作業文書の design / plan を書き終えて承認を求めるときは、チャットで頼む代わりに `/crit-review <file>` で開く。`approved: true` が返ったら承認とみなす。
+  - PR を作るときは毎回、push と PR 作成の前に `/crit-review` でブランチの差分を開き、`approved: true` が返るまでどちらもしない。AI のレビュー（`/review` など）をするときは、その指摘を直した後に開く。
 
 <!--
 gstack の CLAUDE.md へのルーティング規則の追記案内は routing_declined で止めている。
