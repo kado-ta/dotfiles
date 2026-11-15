@@ -59,7 +59,8 @@ description: Use when the user asks to commit only the currently staged git chan
        Sandbox の中で確認スキルが動かない:
        - /qa・/design-review・/benchmark のブラウザ（gstack の browse）は localhost で待ち受けますが、
          sandbox では許可されておらず、除外コマンドにも入っていません。Aside も入っていません。
-       - /cso の保存先 ~/.gstack/security/cso は、書き込みの許可（~/.gstack/projects だけ）の外にあります。
+       - /cso は保存先に書けるようになりましたが、.env.example など sandbox が読めないファイルを追跡している
+         リポジトリでは start が失敗します（回避の手順は claude/SKILL_INVENTORY.md の cso-sandbox の節）。
        - グローバル CLAUDE.md で使うと決めている /qa と /browse にも同じ影響があります。
      -->
 

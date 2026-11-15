@@ -38,7 +38,7 @@
 | OpenAPI の設計・変更 | spec を先に更新 → `writing-plans` | `/review`、Codex | 公開 API は高リスク | 内部だけの型の変更 |
 | 認証・認可の変更 | `brainstorming` → `writing-plans` → `/crit-review` | `/pstack:blast-radius`、`/security-review`、`/pstack:interrogate`、Codex | 常に高リスク | — |
 | インフラ・Terraform の変更 | `writing-plans` と `terraform plan` | `/security-review`（IAM・公開範囲）、Codex | 常に高リスク | apply・destroy は Claude が実行しない |
-| セキュリティレビュー | `/security-review` | `/cso`（使えるようになったら） | セキュリティの境界に触れる | データの整合性だけの変更 |
+| セキュリティレビュー | `/security-review` | `/cso`（ユーザーが指定したとき。`.env.example` などを追跡しているリポジトリでは[一時的に消す](SKILL_INVENTORY.md#cso-sandbox)） | セキュリティの境界に触れる | データの整合性だけの変更 |
 | パフォーマンス改善 | `systematic-debugging`（計測から） | `/benchmark`（ブラウザが使えれば） | 遅い原因が分からない | 計測せずに直すこと |
 | テストの設計・実装 | `test-driven-development` | `/test-audit` | 振る舞いの変更、テストの整理 | — |
 | コードレビュー | `/review` | `/pstack:interrogate`（明示）、Codex | PR の前 | 軽微な変更（`/crit-review` だけ） |
