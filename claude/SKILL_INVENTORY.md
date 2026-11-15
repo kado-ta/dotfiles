@@ -36,6 +36,7 @@
 | claude-code-setup | 1.0.0 | プラグイン、user | 1 | 0 | なし | `/plugin` |
 | ruby-lsp | 1.0.0 | プラグイン、user | 0（LSP だけ） | 0 | なし | `/plugin` |
 | 個人スキル | — | dotfiles の `claude/skills/` を `~/.claude/skills/` にリンク | 4 | 0 | なし | dotfiles |
+| dotfiles の project スキル | — | dotfiles の `.claude/skills/`。dotfiles で起動したセッションだけで使える | 1 | 0 | なし | dotfiles |
 | 組み込み・claude.ai | — | Claude Code に同梱、または claude.ai のアカウントから提供 | 下の表 | 7 | — | Claude Code の更新 |
 | salesforce-development | 2.5.0 | プラグイン、別リポジトリの local スコープ。このリポジトリでは無効 | — | — | — | — |
 
@@ -199,7 +200,7 @@ sandbox の外で `/cso` を実行すると、保存先に秘密ファイルの�
 
 <a name="crit"></a>
 
-## crit（3）と個人スキル（4）
+## crit（3）・個人スキル（4）・project スキル（1）
 
 | スキル | 機能 | 起動 | 状態 | 依存・制約 |
 | --- | --- | --- | --- | --- |
@@ -210,6 +211,7 @@ sandbox の外で `/cso` を実行すると、保存先に秘密ファイルの�
 | `/commit-staged-pr`（個人） | ステージ済みの変更だけを commit し、push と PR まで進める | 自動 | 有効 | cc-safe-push・cc-safe-pr を使う |
 | `code-style`（個人） | 命名・品質・スタイルの規則 | 自動 | 有効 | 全リポジトリに当たる個人の既定。リポジトリの規約・formatter・linter を優先する |
 | `salesforce-help`（個人） | help.salesforce.com の記事を読む | 自動 | 有効 | — |
+| `/sync-skill-docs`（dotfiles の project） | スキル・プラグインの更新の後、この文書・チートシート・規則を入っている状態に合わせる | 自動 | 有効 | 照合は `mise run claude:skills-check`。スナップショットの作り直しはユーザーが `!` で行う |
 | `/claude-code-setup:claude-automation-recommender` | Claude Code の自動化（hooks・スキル・MCP など）を勧める | 自動 | 有効 | 読み取りだけ |
 
 - crit の plan-hook（PermissionRequest の ExitPlanMode）は、Plan Mode の plan を Crit で開く。そのときは `/crit-review` を使わない。
@@ -303,15 +305,19 @@ sandbox の外で `/cso` を実行すると、保存先に秘密ファイルの�
 
 ### 共通の手順
 
-1. 更新の前後で、次の差分を見る。
-   - hooks（プラグインの `hooks/hooks.json`、SKILL.md の frontmatter の `hooks`）
-   - スキルの増減
-   - `disable-model-invocation`・`user-invocable` の変化
-   - 説明文の変化（自動起動に効く）
-   - 新しく増えた外部への書き込み（`git push`、`gh` の書き込み、`~/` の外への出力）
-2. `claude/settings.json` が書き換わっていないかを見る。CLI はキーの並びを変えることがあるので、`jq -S` で比べる。
-3. 規則・チートシート・この文書に出てくる名前が、まだ存在するかを確かめる。照合のスクリプトは [test-report.md](../docs/work/20261116_skill-role-division/test-report.md#name-check) にある。
-4. 変わった点を、この文書の「状態」と「制約」に反映する。規則とチートシートも必要なら直す。
+1. `mise run claude:skills-check` を実行する（スクリプトは `claude/scripts/skills-check.py`）。次の 2 つを照合する。
+   - **入っている状態と、前回文書を合わせたときのスナップショット**（`claude/skills-snapshot.json`）:
+     - プラグイン・gstack の増減と版
+     - スキルの増減
+     - `disable-model-invocation`・`user-invocable`・`skillOverrides` の変化
+     - 説明文と hooks の変化（ハッシュで比べる）
+   - **文書と入っている状態**:
+     - 規則・チートシート・この文書のスキル名が実在するか
+     - 入っているスキルとエージェントが、すべてこの文書に載っているか
+     - 「提供元」の表の版
+     - gstack の状態ごとの節
+2. 終了コードが 0 なら終わり。1 なら、Claude に `/sync-skill-docs` を頼む（「gstack を更新した」と伝えるだけでもよい）。スキルが元のファイルを読んで文書を直し、差分を `/crit-review` で開く。スナップショットの作り直し（`! /usr/bin/python3 -B claude/scripts/skills-check.py snapshot`、または端末で `mise run claude:skills-snapshot`）は、ユーザーが行う。sandbox の中の Bash は `claude/` に書けないため。2 は照合できない状態（ファイルが読めない、この文書のアンカーがない）。
+3. `claude/settings.json` が書き換わっていないかを見る。CLI はキーの並びを変えることがあるので、`jq -S` で比べる。
 
 <a name="upgrade-source"></a>
 
@@ -331,8 +337,8 @@ sandbox の外で `/cso` を実行すると、保存先に秘密ファイルの�
 
 規則（[SKILL_ROUTING.md](rules/SKILL_ROUTING.md)）を置く前と後で、スキルの使われ方を比べる。予定と結果は GitHub Issue で管理する。基準値（2026-10-27〜11-16）は [test-report.md](../docs/work/20261116_skill-role-division/test-report.md#baseline) にある。
 
-- 期間: 後の期間は PR のマージから 21 日間。測定は遅くともマージの 30 日後まで（トランスクリプトは既定で 30 日で消える）。
-- 実行: 新しいセッションで Claude に頼むか、自分で次のスクリプトを実行する。件数とセッション ID だけを出し、会話の中身は出さない。
+- 期間: 後の期間は PR #29 のマージ（2026-11-16）から 21 日間。測定日は 2026-12-07、期限は 2026-12-16（トランスクリプトは既定で 30 日で消える）。
+- 実行: 新しいセッションで Claude に頼むか、自分で `mise run claude:skill-usage 2026-11-16 2026-12-07` を実行する（スクリプトは `claude/scripts/skill-usage.py`。終わりの日は含まない）。件数とセッション ID だけを出し、会話の中身は出さない。
 
 判定の基準:
 
@@ -341,81 +347,3 @@ sandbox の外で `/cso` を実行すると、保存先に秘密ファイルの�
 - **削除:** 前後で差がなく、提案も使われていない。規則を消し、チートシートとこの文書だけを残す。
 
 `/pstack:` の提案の回数には、スキルの設定を扱うセッション（この文書を作ったセッションなど）で Claude がコマンド名を書いた分も入る。増減は、セッションの一覧と合わせて見る。
-
-```python
-"""Count skill usage in Claude Code transcripts between two dates (UTC, YYYY-MM-DD).
-
-Prints counts and session IDs only, never message content.
-Usage: python3 -I skill_usage.py <since> <until>
-"""
-import collections
-import glob
-import json
-import os
-import re
-import sys
-
-since, until = sys.argv[1], sys.argv[2]
-REVIEW = {"review", "code-review", "superpowers:requesting-code-review"}
-PLANNING = {"superpowers:brainstorming", "superpowers:writing-plans"}
-
-skill_calls = collections.Counter()
-skill_sessions = collections.defaultdict(set)
-slash = collections.Counter()
-pstack_suggestions = 0
-sessions = set()
-reviews_by_session = collections.defaultdict(set)
-planning_sessions = set()
-
-for path in glob.glob(os.path.expanduser("~/.claude/projects/*/*.jsonl")):
-    try:
-        lines = open(path, encoding="utf-8")
-    except OSError:
-        continue
-    for line in lines:
-        try:
-            d = json.loads(line)
-        except ValueError:
-            continue
-        ts = (d.get("timestamp") or "")[:10]
-        if not (since <= ts < until):
-            continue
-        sid = d.get("sessionId")
-        sessions.add(sid)
-        content = (d.get("message") or {}).get("content")
-        if d.get("type") == "assistant" and isinstance(content, list):
-            for c in content:
-                if c.get("type") == "tool_use" and c.get("name") == "Skill":
-                    name = str((c.get("input") or {}).get("skill"))
-                    skill_calls[name] += 1
-                    skill_sessions[name].add(sid)
-                    if name in REVIEW:
-                        reviews_by_session[sid].add(name)
-                    if name in PLANNING:
-                        planning_sessions.add(sid)
-                elif c.get("type") == "text" and "/pstack:" in c.get("text", ""):
-                    pstack_suggestions += 1
-        elif d.get("type") == "user":
-            if isinstance(content, list):
-                text = " ".join(c.get("text", "") for c in content if isinstance(c, dict))
-            else:
-                text = content or ""
-            for name in re.findall(r"<command-name>/?([^<]+)</command-name>", text):
-                slash[name] += 1
-                if name in REVIEW:
-                    reviews_by_session[sid].add(name)
-
-print(f"period: {since} .. {until} (until is exclusive)")
-print(f"sessions: {len(sessions)}")
-print("skill tool calls (calls / sessions):")
-for name, n in skill_calls.most_common():
-    print(f"  {name}: {n} / {len(skill_sessions[name])}")
-print("slash commands typed by the user:")
-for name, n in slash.most_common():
-    print(f"  {name}: {n}")
-print(f"sessions with 2+ review skills: {sum(1 for s in reviews_by_session.values() if len(s) >= 2)}")
-print(f"assistant messages suggesting /pstack: {pstack_suggestions}")
-print("sessions that started brainstorming or writing-plans (check these by hand):")
-for sid in sorted(planning_sessions):
-    print(f"  {sid}")
-```
