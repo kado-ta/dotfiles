@@ -70,7 +70,7 @@
 
 ## gstack（63）
 
-呼び出しは `/<名前>`（接頭辞なし）。`proactive=core` なので、頼まれずに提案するのは `/office-hours`・`/review`・`/qa`（と無効の `/ship`）だけ。`codex_reviews=enabled`。多くのスキルが共通の前処理で `~/.gstack/` に記録を書くが、`~/.gstack/projects` 以外は sandbox で書けず、失敗は無視される。
+呼び出しは `/<名前>`（接頭辞なし）。`proactive=core` なので、頼まれずに提案するのは `/office-hours`・`/review`・`/qa`（と無効の `/ship`）だけ。`codex_reviews=enabled`。多くのスキルが共通の前処理で `~/.gstack/` に記録を書くが、`~/.gstack/projects` と `~/.gstack/security/cso` 以外は sandbox で書けず、失敗は無視される。
 
 <a name="gstack-enabled"></a>
 
@@ -80,7 +80,7 @@
 | --- | --- | --- | --- | --- |
 | `review` | ベースブランチとの差分（未 commit・未追跡も含む）をレビューし、直す | 自動 | 有効 | 専門のサブエージェント（テスト、保守性、セキュリティ、API の契約、マイグレーションなど）を並列に起動し、自動で直せるものは直す。commit・push はしない。レビュー bot のコメントがあると PR に返信を投稿する（sandbox では 403）。Codex の段は Bash から `codex exec` を呼ぶ（拒否される見込み） |
 | `codex` | Codex CLI による別モデルの意見（review・challenge・consult） | 自動 | 制限 | ファイルは変えない。Bash から `codex exec` を呼ぶので、auto モードの判定で拒否された記録がある（2026-11-11）。独立レビューは、ユーザーが `!` で `codex review` を実行する |
-| `cso` | セキュリティ監査。範囲（`--infra`・`--code`・`--supply-chain`・`--owasp` など）と `--diff` を選べる | 自動 | 制限 | 保存先 `~/.gstack/security/cso/` は sandbox で書けない。ソースはすべてランチャー経由で読む。使えるようにする変更は別のタスク |
+| `cso` | セキュリティ監査。範囲（`--infra`・`--code`・`--supply-chain`・`--owasp` など）と `--diff` を選べる | 自動 | 制限 | 規則でユーザーが指定したときだけにしている。sandbox では静的な監査だけで、`.env.example` などを追跡しているリポジトリでは失敗する（[`/cso` を sandbox で使う](#cso-sandbox)）。ソースはすべてランチャー経由で読む |
 | `qa` | サイト・API・CLI を試し、見つけたバグを直して確かめる | 自動 | 有効 | 修正ごとに commit する（作業ツリーが汚れていれば commit か stash を尋ねる）。ブラウザは Aside か gstack のヘッドレスブラウザ。後者は localhost で待ち受けるので sandbox では動かない |
 | `qa-only` | `qa` の報告だけ | 自動 | 有効 | 直さない、commit しない。ブラウザの制約は `qa` と同じ |
 | `browse` | 1 回だけのブラウザ作業（開く、操作、スクリーンショット、console） | 自動 | 有効 | ブラウザの制約は `qa` と同じ。Aside が sandbox で動くかは未確認 |
@@ -125,6 +125,39 @@
 `ios-qa`、`ios-fix`、`ios-design-review`、`ios-sync`、`ios-clean`、`ship`（commit・`git push`・PR 作成）、`land-and-deploy`（PR のマージとデプロイの見守り）、`setup-deploy`、`landing-report`、`modernize`（rebase と `git push --force-with-lease`）、`connect-chrome`、`open-gstack-browser`、`setup-browser-cookies`、`pair-agent`、`scrape`、`skillify`、`autoplan`（CEO・デザイン・DX・エンジニアリングのレビューを続けて流す）、`plan-devex-review`、`devex-review`、`setup-gbrain`、`sync-gbrain`、`ubicloud`、`benchmark-models`、`eval-plan`、`gstack`（ルート）、`_gstack-command`、`plan-tune`、`learn`、`runaway-stopper`、`write-skill`、`design-motion`。
 
 - `/plan-eng-review` と `/investigate` は gstack で廃止された（CHANGELOG）。技術設計のレビューは `/autoplan` に移ったが、`/autoplan` は無効。
+
+<a name="cso-sandbox"></a>
+
+### `/cso` を sandbox で使う
+
+保存先 `~/.gstack/security/cso/` だけを sandbox の書き込み許可に入れている。理由は [CLAUDE_CONFIG.md](../.claude/rules/CLAUDE_CONFIG.md#cso-state) にある。
+
+- 動くのは静的な監査だけ。スキャナ 6 種と `--comprehensive` は Docker が要るので、前提条件の不足として記録される。
+- `--doctor` の static-snapshot は missing と出るが、監査（`start`）は動く。ランチャーが `TMPDIR` を渡さず、`/tmp` に書こうとするため。
+- sandbox が読めないファイルを、追跡しているか、無視されていない未追跡として持つリポジトリでは、`start` が `INVALID_SCHEMA` で失敗する。読めないファイルは `permissions.deny` の `Read(...)` で決まる（`.env*`・`*.pem`・`*.key`・`credentials`・`id_rsa*`・`id_ed25519*`・`.ssh/`・`.aws/`・`.pgpass`）。helper は秘密ファイルも一度読んでマスキングし、写しを保存するため。`.gitignore` で無視したファイルは問題ない。
+
+失敗するリポジトリでは、追跡中で変更のないファイルを一時的に消してから監査する。消したファイルは「履歴だけで評価」と記録され、結果は `partial` になる。`--diff` では、この削除も差分に入る。2026-11-16 に、`.env.example` を 1 つ追跡する検証用のリポジトリで確かめた。
+
+1. Claude が、対象のファイルの名前だけを調べる（中身は読まない）。
+
+   ```sh
+   git ls-files -co --exclude-standard -- ':(glob)**/.env*' ':(glob)**/id_rsa*' ':(glob)**/id_ed25519*' ':(glob)**/.ssh/**' ':(glob)**/.aws/**' ':(glob)**/credentials' ':(glob)**/credentials/**' ':(glob)**/*.key' ':(glob)**/*.pem' ':(glob)**/.pgpass'
+   ```
+
+2. ユーザーが `!` で消す。Claude からは書き込み拒否で消せない。次のコマンドは、未追跡のファイルか変更のあるファイルが 1 つでも混じると、何も消さない。未追跡か変更があるファイルは、ユーザーがリポジトリの外へ移して、後で戻す。
+
+   ```sh
+   ! cd <repo> && git ls-files --error-unmatch -- <files> >/dev/null && git diff --quiet HEAD -- <files> && rm -- <files>
+   ```
+
+3. `/cso` を実行する。
+4. ユーザーが `!` で戻し、`git status` で消えたままのファイルがないことを確かめる。
+
+   ```sh
+   ! cd <repo> && git restore -- <files> && git status --short
+   ```
+
+sandbox の外で `/cso` を実行すると、保存先に秘密ファイルの写しが残り、7 日後に sandbox の中で動く掃除が止まる。そのときは、sandbox の外で古い実行（`~/.gstack/security/cso/<repo>/<run>`）を消す。
 
 <a name="pstack"></a>
 
@@ -255,7 +288,7 @@
 | 差分のレビュー | `/review` | `/pstack:interrogate`（高リスクで実行による証明が要るとき） | `/code-review`、`requesting-code-review` |
 | 独立したモデルのレビュー | ユーザーが `!` で実行する `codex review` | — | `/codex`（Bash から拒否される）、`interrogate`・`arena`（Claude 同士） |
 | 計画の人間レビュー | `/crit-review` | — | `/crit:crit`（sandbox で動かない） |
-| セキュリティ | `/security-review` | — | `/cso`（今は保存先に書けない） |
+| セキュリティ | `/security-review` | `/cso`（ユーザーが指定したとき） | 同じ差分に `/security-review` と `/cso` を重ねない |
 | コードの理解 | 通常の読解・Explore | `understand-chat`（グラフがあるとき）、`/pstack:how` | `/understand-anything:understand` を自分で起動しない |
 | E2E・ブラウザ | `/qa`（直す）、`/qa-only`（報告だけ） | `/browse` | `claude-in-chrome` |
 | PR・リリース | CLAUDE.md の Git 節、`/commit-staged-pr` | — | `/ship`（無効）、`/document-release`（明示だけ）、finishing の push |
@@ -286,7 +319,7 @@
 
 | 提供元 | 見ること |
 | --- | --- |
-| gstack（例: 1.99.4.0） | `/gstack-upgrade` は `~/.claude/skills` に書くので、sandbox の外で実行する。CHANGELOG で、廃止・追加されたスキルを見る。増えたスキルは `skillOverrides` が `on` のまま入るので、要るかを決める。`skillOverrides` は gstack が管理していない（dotfiles のコミット 02d0add で手で足した） |
+| gstack（例: 1.99.4.0） | `/gstack-upgrade` は `~/.claude/skills` に書くので、sandbox の外で実行する。CHANGELOG で、廃止・追加されたスキルを見る。増えたスキルは `skillOverrides` が `on` のまま入るので、要るかを決める。`skillOverrides` は gstack が管理していない（dotfiles のコミット 02d0add で手で足した）。`/cso` が、読めない秘密ファイルで止まらなくなったかを確かめる（[`/cso` を sandbox で使う](#cso-sandbox)）。直っていれば、一時的に消す手順をやめ、規則で `/cso` を使う場面を決め直す |
 | understand-anything（例: 2.9.8） | 自動更新が on なので、気づかないうちに変わる。hooks は sandbox の外で動く（2026-11-14 に承知のうえで自動更新を選んだ）。hooks が変わったら判断し直す |
 | crit（例: 1.8.15） | プラグインと CLI の版の組み合わせと、`plan-hook` の変化を見る。更新したら、sandbox の外で `mise run crit:profile-test` を実行する |
 | pstack | [README](README.md) の手順で、hooks・スキルの一覧・依存を見直す。新しいスキルが増えても deny は広がらない |

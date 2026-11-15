@@ -383,7 +383,8 @@
     },
     "filesystem": {
       "allowWrite": [
-        "~/.gstack/projects"
+        "~/.gstack/projects",
+        "~/.gstack/security/cso"
       ],
       "denyRead": [
         "~/.aws/credentials",

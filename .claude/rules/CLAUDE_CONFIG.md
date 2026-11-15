@@ -30,3 +30,15 @@ Claude から Crit の対話レビューを開くときは、`claude/bin/cc-crit
 `sandbox.filesystem.allowWrite` に `~/.crit` 配下を入れない。sandbox の外で動く crit（Crit プラグインの plan-hook と、人間が端末で実行する crit）は `~/.crit` の hooks・prompts・session・レビューを信頼するので、sandbox から書けると sandbox を抜ける経路になり、承認も偽造できる。`allowLocalBinding` も使わない（全インターフェースでの待ち受けと、localhost の全ポートへの接続を、sandbox 内のすべてのコマンドに許すことになる）。経緯は [docs/work/20261111_crit-sandbox/design.md](../../docs/work/20261111_crit-sandbox/design.md) を参照する。インストール手順は [claude/README.md](../../claude/README.md#cc-crit-install) を参照する。
 
 `sandbox.network` の `allowUnixSockets`・`allowAllUnixSockets`・`allowLocalBinding` は設定しない（`check-repo.py` の `push-permissions` が失敗する）。Colima は既定で `$HOME` を書き込み可能でマウントするので、Docker のソケットや VM の SSH に届くと、`$HOME` のどこにでも書けて sandbox を抜けられる。同じ理由で、Colima（Lima）の VM に入る鍵（`~/.colima/_lima/_config`）を `denyRead` で読ませない。経緯は [docs/work/20261113_sandbox-escape-hardening/research-sandbox-escape.md](../../docs/work/20261113_sandbox-escape-hardening/research-sandbox-escape.md#risk-colima) を参照する。
+
+<a name="cso-state"></a>
+
+## gstack の `/cso`
+
+`sandbox.filesystem.allowWrite` に `~/.gstack/security/cso` を入れている。`/cso` は、ソースの読み取りも含めてすべての操作を `gstack-cso-launcher` で行い、そのたびにこの下に書く。ここに書けないと監査を始められない。
+
+- `~/.gstack/security` ごとは許さない。隣の `egress.jsonl` は gstack が外部に送信した記録で、sandbox の中から改ざんできるようになるため。
+- ランチャーを `excludedCommands` に入れない。引数はモデルが決め、モデルは監査対象（信頼しない入力）の影響を受ける。sandbox の外で任意の Git リポジトリを読めて `denyRead` を迂回でき、`--comprehensive` では Docker にも届く。
+- 書き込みを許したので、sandbox の中のどのコマンドも cso の保存物（スナップショット・報告・修正案）を書き換えられる。sandbox の中から見た報告の完全性は保証しない。読み取りは前からできる。
+- sandbox の中で動くのは静的な監査だけ。スキャナと `--comprehensive` は Docker が要り、Docker のソケットには上の理由で届かない。
+- helper は、`.env*`・`*.pem`・`*.key` などの秘密ファイルも一度読んでマスキングし、写しを保存する。`permissions.deny` の `Read(...)` は sandbox の `denyRead` になり、`sandbox.filesystem.allowRead` でも外せない（2026-11-16 に実測）。そのため、これらを追跡しているリポジトリでは `start` が失敗する。回避の手順は [SKILL_INVENTORY.md](../../claude/SKILL_INVENTORY.md#cso-sandbox) にある。
