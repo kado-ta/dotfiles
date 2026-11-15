@@ -28,7 +28,7 @@ created: 2026-11-14
 | D1 | 2 の方式 | `blockWritesOutsideWorkingDirectories` をオンにする。作業ディレクトリの中向けの規則と、プロジェクト設定の `Edit(/claude/**)` を足す | 外への書き込みを、場所を並べずにまとめて止められる。代わりに、外に書くには `/add-dir` が要り、Claude は設定ファイルを編集できなくなり、EnterWorktree・ExitWorktree がなくなる（[research 2.5](research-edit-write.md#docs-write-block)） | 推奨のとおり（2026-11-14） |
 | D2 | 3 の扱い | `CLAUDE.md`・`AGENTS.md` のための規則は足さずに閉じる | [research 7 章](research-edit-write.md#decisions) | 推奨のとおり（2026-11-14） |
 | D3 | 作業の場所 | この会話のまま EnterWorktree で worktree に入り、出ずに最後まで進める | 会話の文脈を保てる。作業中の変更が、使っている設定に効かない。ExitWorktree の後に設定が古く残る件は、出なければ起きない | 推奨のとおり（2026-11-14） |
-| D4 | mise の設定ファイルを、Bash からも守るか | **守る。** ユーザー設定の `sandbox.filesystem.denyWrite` に足す | Bash は作業ディレクトリの中の `mise.toml` に書ける。sf_hpf_metadata にも `mise.toml` があり、信頼はパスで決まる（[research 5 章](research-edit-write.md#mise)）。代わりに、Claude が `mise use` などで mise の設定を書き換える作業は、Edit ツール（確認あり）か人間が行う。`**/` の形が sandbox で効くかは未確認なので、Task 7 で確かめ、効かなければこの部分を戻す | 推奨のとおり（2026-11-14） |
+| D4 | mise の設定ファイルを、Bash からも守るか | **守る。** ユーザー設定の `sandbox.filesystem.denyWrite` に足す | Bash は作業ディレクトリの中の `mise.toml` に書ける。sf_hpf_metadata にも `mise.toml` があり、信頼はパスで決まる（[research 5 章](research-edit-write.md#mise)）。代わりに、Claude が `mise use` などで mise の設定を書き換える作業は、Edit ツール（確認あり）か人間が行う。`**/` の形が sandbox で効くかは未確認なので、Task 7 で確かめ、効かなければこの部分を戻す | 推奨のとおり（2026-11-14）。T6 で `**/` が効かなかったので、戻さずに `~/**/` の形に変えた（2026-11-16、[research 3.5](research-edit-write.md#probe-sandbox-anchor)） |
 | D5 | Read の規則の整理 | **`*.key` は `~/**` に広げる。`*.pem` は広げない。`credentials` は Task 5 で測ってから決める** | `*.pem` を広げると、mise で入れた pip・Ruby・aws-cli の CA 証明書の束を sandbox から読めなくなる（[research 6 章](research-edit-write.md#read-rules)）。`*.key` で巻き込むのは、主に `~/.claude/sessions/*.key` と Keynote の書類 | 推奨のとおり（2026-11-14） |
 
 <a name="constraints"></a>

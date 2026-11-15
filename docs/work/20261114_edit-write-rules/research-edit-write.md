@@ -147,6 +147,24 @@ EnterWorktree で作った worktree の中で、`git branch -m fix/edit-write-ru
 - `error: could not lock config file .git/config` が出た。sandbox が `.git/config` を守っているため。
 - 元のブランチ名の設定（`branch.<name>.*`）がなかったので、影響はない。`claude -w` で作った worktree でも、同じ方法で規約の名前（`fix/…` など）に変えられると考える（推測）。
 
+<a name="probe-sandbox-anchor"></a>
+
+### 3.5 sandbox の `denyWrite` の `**/` の形（plan の Task 7 の T6）
+
+2026-11-16 に 2.1.325 で試した。変更後の規則を `--settings` で読ませた worktree のセッションで、sandbox の中の Bash から書き込んだ。
+
+- `denyWrite` に `**/mise.toml`・`**/.tool-versions`・`**/.config/mise` があっても、`touch tmp-probe/mise.toml`、`touch tmp-probe/.tool-versions`、`mkdir tmp-probe/.config/mise` はどれも成功した。sandbox の拒否も出なかった。
+- 同じセッションで、`denyRead` の `~/**/*.key` は `~/cc-probe/b.key` の読み取りを止めた（T8）。
+- settings-reference の「Sandbox path prefixes」には、`./` と接頭辞なしは「Relative to the project root for project settings, or to `~/.claude` for user settings」とある。権限の規則（[2.2](#docs-pattern-anchor)）では接頭辞なしの起点はカレントディレクトリなので、同じ `**/mise.toml` でも、権限の規則と sandbox とで当たる場所が違う。
+- `--settings` で渡したファイルでの起点は、文書に書かれていない。
+- 同じ文書には、macOS では `*`・`?`・`**` が sandbox の 4 つのリストすべてで使えるとある。
+- 文書は WebFetch で取得した本文で読んだ。逐語かどうかは原文で確かめていない。
+- ユーザー設定の `**/mise.toml` は `~/.claude/**/mise.toml` として扱われ、作業ディレクトリに当たらなかったと考える（推測）。起点を確かめる試験は、作業ディレクトリの外に書く操作が自動判定で拒否されたので、していない。
+- dotfiles の設定で、接頭辞のない sandbox のパスは、この mise の 10 項目だけだった。`denyRead` などは、すべて `~/` か `/` で始まる。
+- **対応（2026-11-16、人間の判断）:** D4 は戻さずに、`~/**/mise.toml` の形に変えた。
+  - ホームの下の全プロジェクトに当たる見込み。ホームの外（`/tmp` に clone したものなど）は守れない。
+  - `~/Dev`、bun のキャッシュ、mise の installs、`~/.cache` の依存パッケージの中に、同じ名前のファイルはなかった。巻き込みで `npm install` などが失敗するおそれは小さい。
+
 <a name="write-targets"></a>
 
 ## 4. 過去 90 日の書き込み先
@@ -238,6 +256,6 @@ Read の deny の規則は、sandbox の `denyRead` にもなる（このセッ�
 | --- | --- | --- |
 | 元のチェックアウトの `claude/settings.json` を、`blockWritesOutsideWorkingDirectories` が止めるか | 試験は worktree で行った | plan の Task 7 で確かめる |
 | `Read(~/**/credentials)` がディレクトリの中身まで止めるか | 試験用のファイルの作成が拒否された | plan の Task 5 で、人間がファイルを作って確かめる |
-| sandbox の `denyWrite` の `**/` の形が、作業ディレクトリの中に効くか | 未実施 | plan の Task 7 で確かめる（D4） |
+| sandbox の `denyWrite` の `~/**/` の形が、作業ディレクトリの中に効くか | 未実施。`**/` の形は効かなかった（[3.5](#probe-sandbox-anchor)） | plan の Task 7 の T6 をやり直す（D4） |
 | `Edit(**/.git/**/hooks/**)` のように、途中に `**` を置いた規則が、`.git/hooks` に当たるか | 未実施 | plan の Task 7 |
 | `claude -w` の worktree で `git branch -m` が使えるか | EnterWorktree の worktree でだけ試した | plan の Task 6 で、文書に書く前に人間が確かめる |

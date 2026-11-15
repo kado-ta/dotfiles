@@ -67,7 +67,8 @@ MISE_CONFIG = (
 )
 MISE_ASK = tuple(f"Edit({p})" for p in MISE_CONFIG)
 # Bash（sandbox の中）からも書かせない。denyWrite はディレクトリの中も止めるので、末尾の /** は付けない。
-MISE_DENY_WRITE = tuple(p.removesuffix("/**") for p in MISE_CONFIG)
+# sandbox のパスは、接頭辞がないとユーザー設定では ~/.claude が基準になり、作業ディレクトリに当たらないので、~/ を付ける。
+MISE_DENY_WRITE = tuple("~/" + p.removesuffix("/**") for p in MISE_CONFIG)
 JSONC_FILES = {"vscode/settings.json", "vscode/keybindings.json"}
 SETTINGS = "claude/settings.json"
 PROJECT_SETTINGS = ".claude/settings.json"

@@ -38,7 +38,7 @@ MISE_CONFIG = [
     "**/.tool-versions",
 ]
 MISE_ASK = [f"Edit({p})" for p in MISE_CONFIG]
-MISE_DENY_WRITE = [p.removesuffix("/**") for p in MISE_CONFIG]
+MISE_DENY_WRITE = ["~/" + p.removesuffix("/**") for p in MISE_CONFIG]
 PROJECT_ASK = [
     "Edit(/claude/**)",
     "Edit(/zsh/**)",
@@ -315,9 +315,16 @@ class CheckRepoTests(unittest.TestCase):
 
     def test_missing_mise_deny_write_fails(self):
         data = settings()
-        data["sandbox"]["filesystem"]["denyWrite"].remove("**/mise.toml")
+        data["sandbox"]["filesystem"]["denyWrite"].remove("~/**/mise.toml")
         self.write_settings(data)
-        self.assert_fails("FAIL edit-permissions", "**/mise.toml")
+        self.assert_fails("FAIL edit-permissions", "~/**/mise.toml")
+
+    def test_unprefixed_mise_deny_write_fails(self):
+        # sandbox のパスは、接頭辞がないとユーザー設定では ~/.claude が基準になり、作業ディレクトリに当たらない。
+        data = settings()
+        data["sandbox"]["filesystem"]["denyWrite"] = [p.removeprefix("~/") for p in MISE_DENY_WRITE]
+        self.write_settings(data)
+        self.assert_fails("FAIL edit-permissions", "~/**/mise.toml")
 
     def test_missing_push_deny_fails(self):
         data = settings()

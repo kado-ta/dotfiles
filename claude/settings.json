@@ -368,16 +368,16 @@
         "~/.lima/_config"
       ],
       "denyWrite": [
-        "**/mise.toml",
-        "**/.mise.toml",
-        "**/mise.*.toml",
-        "**/.mise.*.toml",
-        "**/mise/config.toml",
-        "**/mise/config.*.toml",
-        "**/mise/conf.d",
-        "**/.mise",
-        "**/.config/mise",
-        "**/.tool-versions"
+        "~/**/mise.toml",
+        "~/**/.mise.toml",
+        "~/**/mise.*.toml",
+        "~/**/.mise.*.toml",
+        "~/**/mise/config.toml",
+        "~/**/mise/config.*.toml",
+        "~/**/mise/conf.d",
+        "~/**/.mise",
+        "~/**/.config/mise",
+        "~/**/.tool-versions"
       ]
     },
     "credentials": {
