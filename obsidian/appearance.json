@@ -2,5 +2,6 @@
   "enabledCssSnippets": [
     "typora-like",
     "typora-mermaid"
-  ]
+  ],
+  "showRibbon": true
 }
