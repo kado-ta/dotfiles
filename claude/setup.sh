@@ -56,6 +56,17 @@ sys.exit(not any(p.get("id") == sys.argv[1] and p.get("scope") == "user" for p i
 ' "$1"
 }
 
+# マーケットプレイスが追加済みかを返す。
+# grep -q は一致した時点で読むのをやめるので、pipefail の下では claude が SIGPIPE で失敗し、
+# 追加済みでも未追加と判定して marketplace add を実行しうる。JSON を最後まで読んで判定する。
+marketplace_added() {
+  claude plugins marketplace list --json 2>/dev/null | /usr/bin/python3 -c '
+import json, sys
+marketplaces = json.load(sys.stdin)
+sys.exit(not any(m.get("name") == sys.argv[1] for m in marketplaces))
+' "$1"
+}
+
 # Install Superpowers
 if plugin_installed_for_user superpowers@claude-plugins-official; then
   echo "superpowers plugin already installed, skipping"
@@ -83,7 +94,7 @@ fi
 if plugin_installed_for_user crit@crit; then
   echo "crit plugin already installed, skipping"
 else
-  claude plugins marketplace list 2>/dev/null | grep -q " crit$" || claude plugins marketplace add tomasz-tomczyk/crit
+  marketplace_added crit || claude plugins marketplace add tomasz-tomczyk/crit
   claude plugins install crit@crit
 fi
 
@@ -92,7 +103,7 @@ fi
 if plugin_installed_for_user understand-anything@understand-anything; then
   echo "understand-anything plugin already installed, skipping"
 else
-  claude plugins marketplace list 2>/dev/null | grep -q " understand-anything$" || claude plugins marketplace add Egonex-AI/Understand-Anything
+  marketplace_added understand-anything || claude plugins marketplace add Egonex-AI/Understand-Anything
   claude plugins install understand-anything@understand-anything
 fi
 
@@ -101,7 +112,7 @@ fi
 if plugin_installed_for_user pstack@cursor-plugins; then
   echo "pstack plugin already installed, skipping"
 else
-  claude plugins marketplace list 2>/dev/null | grep -q " cursor-plugins$" || claude plugins marketplace add cursor/plugins
+  marketplace_added cursor-plugins || claude plugins marketplace add cursor/plugins
   claude plugins install pstack@cursor-plugins
 fi
 
