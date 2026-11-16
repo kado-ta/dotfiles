@@ -217,7 +217,10 @@
       "Edit(//**/.tool-versions)"
     ],
     "disableBypassPermissionsMode": "disable",
-    "blockWritesOutsideWorkingDirectories": true
+    "blockWritesOutsideWorkingDirectories": true,
+    "additionalDirectories": [
+      "~/.gstack/projects"
+    ]
   },
   "model": "opus[1m]",
   "skillOverrides": {

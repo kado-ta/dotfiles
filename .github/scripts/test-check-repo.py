@@ -85,6 +85,7 @@ def settings():
             "deny": list(DENY_PUSH) + CRIT_DENY + LIMA_DENY + EDIT_DENY,
             "ask": list(MISE_ASK),
             "blockWritesOutsideWorkingDirectories": True,
+            "additionalDirectories": ["~/.gstack/projects"],
         },
         "sandbox": {
             "excludedCommands": list(WRAPPER_COMMANDS),
@@ -340,6 +341,13 @@ class CheckRepoTests(unittest.TestCase):
         data["sandbox"]["filesystem"]["denyWrite"] = [p.removeprefix("~/") for p in MISE_DENY_WRITE]
         self.write_settings(data)
         self.assert_fails("FAIL edit-permissions", "~/**/mise.toml")
+
+    def test_unexpected_additional_directory_fails(self):
+        # 作業ディレクトリとして数えられ、blockWritesOutsideWorkingDirectories がそこでは効かなくなる。
+        data = settings()
+        data["permissions"]["additionalDirectories"].append("~/Dev")
+        self.write_settings(data)
+        self.assert_fails("FAIL edit-permissions", "permissions.additionalDirectories must not list ~/Dev")
 
     def test_unprefixed_sandbox_path_fails(self):
         # ユーザー設定では、~/ でも / でも始まらない sandbox のパスは ~/.claude が起点になり、黙って効かない。

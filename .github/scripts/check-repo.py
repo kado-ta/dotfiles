@@ -72,6 +72,9 @@ MISE_ASK = tuple(f"Edit({p})" for p in MISE_CONFIG) + tuple(f"Edit(//{p})" for p
 MISE_DENY_WRITE = tuple("~/" + p.removesuffix("/**") for p in MISE_CONFIG)
 # ユーザー設定のこれらのリストは、~/ でも / でも始まらないパスが ~/.claude を起点にし、黙って効かない。
 SANDBOX_PATH_LISTS = ("denyRead", "denyWrite", "allowWrite", "allowRead")
+# additionalDirectories は作業ディレクトリとして数えられ、そこでは WRITE_BLOCK が効かない。
+# gstack の置き場所は sandbox の allowWrite にも入っていて、Bash はもともと書けるので、これだけを許す。
+ADDITIONAL_DIRECTORIES = ("~/.gstack/projects",)
 JSONC_FILES = {"vscode/settings.json", "vscode/keybindings.json"}
 SETTINGS = "claude/settings.json"
 PROJECT_SETTINGS = ".claude/settings.json"
@@ -232,6 +235,8 @@ def check_edit_permissions(root):
     errors = []
     if permissions.get(WRITE_BLOCK) is not True:
         errors.append(f"{SETTINGS}: permissions.{WRITE_BLOCK} must be true")
+    errors += [f"{SETTINGS}: permissions.additionalDirectories must not list {path}"
+               for path in permissions.get("additionalDirectories", []) if path not in ADDITIONAL_DIRECTORIES]
     deny, ask = set(permissions.get("deny", [])), set(permissions.get("ask", []))
     errors += [f"{SETTINGS}: permissions.deny lacks {rule}" for rule in EDIT_DENY if rule not in deny]
     errors += [f"{SETTINGS}: permissions.ask lacks {rule}" for rule in MISE_ASK if rule not in ask]
