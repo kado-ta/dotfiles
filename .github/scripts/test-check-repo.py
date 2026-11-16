@@ -24,7 +24,24 @@ CRIT_DENY = ["Read(~/.cc-crit/**)", "Edit(~/.crit/**)", "Edit(~/.crit.config.jso
 CRIT_DENY_READ = ["~/.cc-crit"]
 LIMA_DENY = ["Read(~/.colima/_lima/_config/**)", "Read(~/.lima/_config/**)"]
 LIMA_DENY_READ = ["~/.colima/_lima/_config", "~/.lima/_config"]
+EDIT_DENY = ["Edit(**/.git/**/hooks/**)"]
+EDIT_ASK = ["Edit(//**/.git/**/hooks/**)", "Edit(//**/.git/config)"]
+MISE_CONFIG = [
+    "**/mise.toml",
+    "**/.mise.toml",
+    "**/mise.*.toml",
+    "**/.mise.*.toml",
+    "**/mise/config.toml",
+    "**/mise/config.*.toml",
+    "**/mise/conf.d/**",
+    "**/.mise/**",
+    "**/.config/mise/**",
+    "**/.tool-versions",
+]
+MISE_ASK = [f"Edit({p})" for p in MISE_CONFIG] + [f"Edit(//{p})" for p in MISE_CONFIG]
+MISE_DENY_WRITE = ["~/" + p.removesuffix("/**") for p in MISE_CONFIG]
 PROJECT_ASK = [
+    "Edit(/claude/**)",
     "Edit(/zsh/**)",
     "Edit(/config/**)",
     "Edit(/mise/**)",
@@ -66,11 +83,18 @@ def settings():
     return {
         "permissions": {
             "allow": [f"Bash({c})" for c in WRAPPER_COMMANDS],
-            "deny": list(DENY_PUSH) + CRIT_DENY + LIMA_DENY,
+            "deny": list(DENY_PUSH) + CRIT_DENY + LIMA_DENY + EDIT_DENY,
+            "ask": list(MISE_ASK) + EDIT_ASK,
+            "blockWritesOutsideWorkingDirectories": True,
+            "additionalDirectories": ["~/.gstack/projects"],
         },
         "sandbox": {
             "excludedCommands": list(WRAPPER_COMMANDS),
-            "filesystem": {"denyRead": CRIT_DENY_READ + LIMA_DENY_READ},
+            "filesystem": {
+                "allowWrite": ["~/.gstack/projects"],
+                "denyRead": CRIT_DENY_READ + LIMA_DENY_READ,
+                "denyWrite": list(MISE_DENY_WRITE),
+            },
         },
         "hooks": {
             "PreToolUse": [
@@ -268,6 +292,115 @@ class CheckRepoTests(unittest.TestCase):
         self.write_settings(data)
         self.assert_passes()
 
+    def test_missing_write_block_fails(self):
+        # 作業ディレクトリの外への Edit・Write を、ほかに止める規則はない。
+        data = settings()
+        del data["permissions"]["blockWritesOutsideWorkingDirectories"]
+        self.write_settings(data)
+        self.assert_fails("FAIL edit-permissions", "blockWritesOutsideWorkingDirectories")
+
+    def test_write_block_not_true_fails(self):
+        for value in (False, "true"):
+            with self.subTest(value=value):
+                data = settings()
+                data["permissions"]["blockWritesOutsideWorkingDirectories"] = value
+                self.write_settings(data)
+                self.assert_fails("FAIL edit-permissions", "blockWritesOutsideWorkingDirectories")
+
+    def test_missing_git_hooks_deny_fails(self):
+        # hooks は、人間が git を使ったときに sandbox の外で動く。
+        data = settings()
+        data["permissions"]["deny"].remove("Edit(**/.git/**/hooks/**)")
+        self.write_settings(data)
+        self.assert_fails("FAIL edit-permissions", "Edit(**/.git/**/hooks/**)")
+
+    def test_missing_mise_ask_fails(self):
+        # 信頼済みのパスの mise の設定は、人間が cd したときに sandbox の外で動く。
+        data = settings()
+        data["permissions"]["ask"].remove("Edit(**/mise.toml)")
+        self.write_settings(data)
+        self.assert_fails("FAIL edit-permissions", "Edit(**/mise.toml)")
+
+    def test_missing_root_anchored_git_ask_fails(self):
+        # 接頭辞のない形の起点は、文書ではカレントディレクトリ。/cd などで起点が変わったときの備え。
+        for rule in EDIT_ASK:
+            with self.subTest(rule=rule):
+                data = settings()
+                data["permissions"]["ask"].remove(rule)
+                self.write_settings(data)
+                self.assert_fails("FAIL edit-permissions", f"permissions.ask lacks {rule}")
+
+    def test_root_anchored_git_deny_fails(self):
+        # deny は sandbox の denyWrite にもなり、// の形ではどこでも git init・git clone が hooks を写せなくなる。
+        for rule in EDIT_ASK:
+            with self.subTest(rule=rule):
+                data = settings()
+                data["permissions"]["deny"].append(rule)
+                self.write_settings(data)
+                self.assert_fails("FAIL edit-permissions", f"{rule} must not be a deny rule")
+
+    def test_missing_root_anchored_mise_ask_fails(self):
+        data = settings()
+        data["permissions"]["ask"].remove("Edit(//**/mise.toml)")
+        self.write_settings(data)
+        self.assert_fails("FAIL edit-permissions", "Edit(//**/mise.toml)")
+
+    def test_missing_mise_deny_write_fails(self):
+        data = settings()
+        data["sandbox"]["filesystem"]["denyWrite"].remove("~/**/mise.toml")
+        self.write_settings(data)
+        self.assert_fails("FAIL edit-permissions", "~/**/mise.toml")
+
+    def test_unprefixed_mise_deny_write_fails(self):
+        # sandbox のパスは、接頭辞がないとユーザー設定では ~/.claude が基準になり、作業ディレクトリに当たらない。
+        data = settings()
+        data["sandbox"]["filesystem"]["denyWrite"] = [p.removeprefix("~/") for p in MISE_DENY_WRITE]
+        self.write_settings(data)
+        self.assert_fails("FAIL edit-permissions", "~/**/mise.toml")
+
+    def test_unexpected_additional_directory_fails(self):
+        # 作業ディレクトリとして数えられ、blockWritesOutsideWorkingDirectories がそこでは効かなくなる。
+        data = settings()
+        data["permissions"]["additionalDirectories"].append("~/Dev")
+        self.write_settings(data)
+        self.assert_fails("FAIL edit-permissions", "permissions.additionalDirectories must not list ~/Dev")
+
+    def test_additional_directory_without_allow_write_fails(self):
+        # additionalDirectories は、Bash がもともと書ける（sandbox の allowWrite にある）場所だけを許す。
+        data = settings()
+        data["sandbox"]["filesystem"]["allowWrite"] = []
+        self.write_settings(data)
+        self.assert_fails("FAIL edit-permissions", "sandbox.filesystem.allowWrite lacks ~/.gstack/projects")
+
+    def test_additional_directory_variants_fail(self):
+        # 前方一致にすると、隣の ~/.gstack/security（gstack の送信の記録）まで書けるようになる。
+        for path in ("~/.gstack/projects/../security", "~/.gstack", "~/.gstack/projects/"):
+            with self.subTest(path=path):
+                data = settings()
+                data["permissions"]["additionalDirectories"] = [path]
+                self.write_settings(data)
+                self.assert_fails("FAIL edit-permissions", f"must not list {path}")
+
+    def test_sandbox_path_prefix_boundaries(self):
+        data = settings()
+        data["sandbox"]["filesystem"]["denyRead"].append("/Library/Keychains")
+        self.write_settings(data)
+        self.assert_passes()
+        data = settings()
+        data["sandbox"]["filesystem"]["denyRead"].append("~.ssh")
+        self.write_settings(data)
+        self.assert_fails("FAIL edit-permissions", "unprefixed path ~.ssh")
+
+    def test_unprefixed_sandbox_path_fails(self):
+        # ユーザー設定では、~/ でも / でも始まらない sandbox のパスは ~/.claude が起点になり、黙って効かない。
+        for key in ("denyRead", "denyWrite", "allowWrite", "allowRead"):
+            for path in ("**/.ssh", "./secrets"):
+                with self.subTest(key=key, path=path):
+                    data = settings()
+                    data["sandbox"]["filesystem"].setdefault(key, []).append(path)
+                    self.write_settings(data)
+                    self.assert_fails("FAIL edit-permissions", f"sandbox.filesystem.{key} has an unprefixed path {path}")
+
     def test_missing_push_deny_fails(self):
         data = settings()
         data["permissions"]["deny"].remove("Bash(git -C * push *)")
@@ -304,6 +437,13 @@ class CheckRepoTests(unittest.TestCase):
         data["permissions"]["ask"].remove("Edit(/mise.toml)")
         self.write_project_settings(data)
         self.assert_fails("FAIL project-permissions", "Edit(/mise.toml)")
+
+    def test_project_removed_claude_ask_fails(self):
+        # worktree では、ユーザー設定の Edit(~/dotfiles/claude/**) が当たらない。
+        data = project_settings()
+        data["permissions"]["ask"].remove("Edit(/claude/**)")
+        self.write_project_settings(data)
+        self.assert_fails("FAIL project-permissions", "Edit(/claude/**)")
 
     def test_project_added_restrictions_pass(self):
         # 制限を強める方向の追加は通す。

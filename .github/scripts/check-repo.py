@@ -46,6 +46,38 @@ LIMA_DENY_READ = ("~/.colima/_lima/_config", "~/.lima/_config")
 # Docker（Colima）のソケットや localhost の全ポートに、sandbox の中のすべてのコマンドから届くようにする設定。
 FORBIDDEN_NETWORK = ("allowUnixSockets", "allowAllUnixSockets", "allowLocalBinding")
 DENY_PUSH = ("Bash(git push)", "Bash(git push *)", "Bash(git -C * push *)", "Bash(git -c * push *)")
+# Edit・Write ツールは sandbox の外で動く。消すと、作業ディレクトリの外（ほかのリポジトリの .git/hooks、
+# ~/Library/LaunchAgents など）にも、auto mode の判定だけで書ける。
+WRITE_BLOCK = "blockWritesOutsideWorkingDirectories"
+# 作業ディレクトリの中で、人間が操作しなくても sandbox の外で動くもの。外は WRITE_BLOCK が止める。
+# hooks は、人間が git を使ったときに動く。
+EDIT_DENY = ("Edit(**/.git/**/hooks/**)",)
+# 接頭辞のない形は /add-dir で足したディレクトリにも当たる（2026-11-16 に実測）。文書は起点をカレントディレクトリと
+# しているので、/cd などで起点が変わったときの備えに // の形も置く。deny にしない。Edit の deny は sandbox の denyWrite にもなり、// の形ではどこでも git init・git clone が
+# hooks のサンプルを写せなくなる。ask は sandbox に変換されない。
+EDIT_ASK = ("Edit(//**/.git/**/hooks/**)", "Edit(//**/.git/config)")
+# mise が読む設定。信頼済みのパスの hooks・_.source・exec() は、人間が cd したときに動く。
+MISE_CONFIG = (
+    "**/mise.toml",
+    "**/.mise.toml",
+    "**/mise.*.toml",
+    "**/.mise.*.toml",
+    "**/mise/config.toml",
+    "**/mise/config.*.toml",
+    "**/mise/conf.d/**",
+    "**/.mise/**",
+    "**/.config/mise/**",
+    "**/.tool-versions",
+)
+MISE_ASK = tuple(f"Edit({p})" for p in MISE_CONFIG) + tuple(f"Edit(//{p})" for p in MISE_CONFIG)
+# Bash（sandbox の中）からも書かせない。denyWrite はディレクトリの中も止めるので、末尾の /** は付けない。
+# sandbox のパスは、接頭辞がないとユーザー設定では ~/.claude が基準になり、作業ディレクトリに当たらないので、~/ を付ける。
+MISE_DENY_WRITE = tuple("~/" + p.removesuffix("/**") for p in MISE_CONFIG)
+# ユーザー設定のこれらのリストは、~/ でも / でも始まらないパスが ~/.claude を起点にし、黙って効かない。
+SANDBOX_PATH_LISTS = ("denyRead", "denyWrite", "allowWrite", "allowRead")
+# additionalDirectories は作業ディレクトリとして数えられ、そこでは WRITE_BLOCK が効かない。
+# gstack の置き場所は sandbox の allowWrite にも入っていて、Bash はもともと書けるので、これだけを許す。
+ADDITIONAL_DIRECTORIES = ("~/.gstack/projects",)
 JSONC_FILES = {"vscode/settings.json", "vscode/keybindings.json"}
 SETTINGS = "claude/settings.json"
 PROJECT_SETTINGS = ".claude/settings.json"
@@ -59,6 +91,7 @@ PROJECT_ALLOWED_KEYS = {
 }
 # 消すと dotfiles で起動したときの権限が広がる。外すときはここも一緒に変える。
 PROJECT_ASK = (
+    "Edit(/claude/**)",
     "Edit(/zsh/**)",
     "Edit(/config/**)",
     "Edit(/mise/**)",
@@ -199,6 +232,31 @@ def check_push_permissions(root):
     return errors
 
 
+def check_edit_permissions(root):
+    settings = load_settings(root)
+    permissions = settings.get("permissions", {})
+    errors = []
+    if permissions.get(WRITE_BLOCK) is not True:
+        errors.append(f"{SETTINGS}: permissions.{WRITE_BLOCK} must be true")
+    errors += [f"{SETTINGS}: permissions.additionalDirectories must not list {path}"
+               for path in permissions.get("additionalDirectories", []) if path not in ADDITIONAL_DIRECTORIES]
+    deny, ask = set(permissions.get("deny", [])), set(permissions.get("ask", []))
+    errors += [f"{SETTINGS}: permissions.deny lacks {rule}" for rule in EDIT_DENY if rule not in deny]
+    errors += [f"{SETTINGS}: permissions.ask lacks {rule}" for rule in MISE_ASK + EDIT_ASK if rule not in ask]
+    errors += [f"{SETTINGS}: permissions.deny: {rule} must not be a deny rule" for rule in EDIT_ASK if rule in deny]
+    filesystem = settings.get("sandbox", {}).get("filesystem", {})
+    errors += [f"{SETTINGS}: sandbox.filesystem.allowWrite lacks {path} (listed in permissions.additionalDirectories)"
+               for path in permissions.get("additionalDirectories", [])
+               if path in ADDITIONAL_DIRECTORIES and path not in filesystem.get("allowWrite", [])]
+    deny_write = filesystem.get("denyWrite", [])
+    errors += [f"{SETTINGS}: sandbox.filesystem.denyWrite lacks {path}" for path in MISE_DENY_WRITE
+               if path not in deny_write]
+    errors += [f"{SETTINGS}: sandbox.filesystem.{key} has an unprefixed path {path}"
+               for key in SANDBOX_PATH_LISTS for path in filesystem.get(key, [])
+               if not path.startswith(("~/", "/"))]
+    return errors
+
+
 def key_paths(value, prefix=""):
     """dict を末端のキーのパス（a.b.c）に展開する。空の dict も末端として返す。"""
     if isinstance(value, dict) and value:
@@ -332,6 +390,7 @@ CHECKS = (
     ("secret-files", check_secret_files),
     ("hook-scripts", check_hook_scripts),
     ("push-permissions", check_push_permissions),
+    ("edit-permissions", check_edit_permissions),
     ("project-permissions", check_project_permissions),
     ("syntax", check_syntax),
     ("markdown-names", check_markdown_names),

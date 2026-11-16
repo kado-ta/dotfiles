@@ -149,7 +149,7 @@
       "Read(./secrets/**)",
       "Read(**/credentials/**)",
       "Read(**/*.key)",
-      "Read(~/Dev/**/*.key)",
+      "Read(~/**/*.key)",
       "Read(**/*.pem)",
       "Read(~/Dev/**/*.pem)",
       "Read(**/.pgpass)",
@@ -157,6 +157,7 @@
       "Edit(/etc/**)",
       "Edit(**/.env*)",
       "Edit(**/.git/config)",
+      "Edit(**/.git/**/hooks/**)",
       "Edit(**/package-lock.json)",
       "Edit(**/pnpm-lock.yaml)",
       "Edit(**/yarn.lock)",
@@ -192,9 +193,35 @@
       "Bash(gh release delete*)",
       "Bash(gh repo sync*)",
       "Bash(gh api *)",
-      "Edit(~/dotfiles/claude/**)"
+      "Edit(~/dotfiles/claude/**)",
+      "Edit(//**/.git/**/hooks/**)",
+      "Edit(//**/.git/config)",
+      "Edit(**/mise.toml)",
+      "Edit(**/.mise.toml)",
+      "Edit(**/mise.*.toml)",
+      "Edit(**/.mise.*.toml)",
+      "Edit(**/mise/config.toml)",
+      "Edit(**/mise/config.*.toml)",
+      "Edit(**/mise/conf.d/**)",
+      "Edit(**/.mise/**)",
+      "Edit(**/.config/mise/**)",
+      "Edit(**/.tool-versions)",
+      "Edit(//**/mise.toml)",
+      "Edit(//**/.mise.toml)",
+      "Edit(//**/mise.*.toml)",
+      "Edit(//**/.mise.*.toml)",
+      "Edit(//**/mise/config.toml)",
+      "Edit(//**/mise/config.*.toml)",
+      "Edit(//**/mise/conf.d/**)",
+      "Edit(//**/.mise/**)",
+      "Edit(//**/.config/mise/**)",
+      "Edit(//**/.tool-versions)"
     ],
-    "disableBypassPermissionsMode": "disable"
+    "disableBypassPermissionsMode": "disable",
+    "blockWritesOutsideWorkingDirectories": true,
+    "additionalDirectories": [
+      "~/.gstack/projects"
+    ]
   },
   "model": "opus[1m]",
   "skillOverrides": {
@@ -396,6 +423,18 @@
         "~/.cc-crit",
         "~/.colima/_lima/_config",
         "~/.lima/_config"
+      ],
+      "denyWrite": [
+        "~/**/mise.toml",
+        "~/**/.mise.toml",
+        "~/**/mise.*.toml",
+        "~/**/.mise.*.toml",
+        "~/**/mise/config.toml",
+        "~/**/mise/config.*.toml",
+        "~/**/mise/conf.d",
+        "~/**/.mise",
+        "~/**/.config/mise",
+        "~/**/.tool-versions"
       ]
     },
     "credentials": {
