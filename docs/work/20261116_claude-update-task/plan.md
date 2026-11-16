@@ -301,6 +301,15 @@ Claude は sandbox の外でコマンドを実行できないので、次の 1 �
 3. 案内に従って `/sync-skill-docs` を実行する（文書の修正はそのスキルの範囲）。
 4. PR の前に `/review` を実行し、指摘を直した後にブランチの差分を `/crit-review` で開く。`approved: true` が返ってから push と PR の作成を行う。
 
+<a name="acceptance-results"></a>
+
+### 実機での確認の結果（2026-11-16）
+
+- 1: `! /bin/bash ~/dotfiles/claude/scripts/update-skills.sh` は、すべての手順が成功した。gstack 1.99.4.0・プラグイン 6 つ・crit 0.23.3 は、どれもすでに最新だった。cc-crit の profile テストは 27 件のうち 26 件が OK で、1 件は `~/.lima/_config` がないためのスキップ。
+- 2: `claude/settings.json` に差分はなく、`/Users/` は 0 件。`~/.claude/settings.json` のリンクも残っていた。gstack のフックがないので、書き換えたコマンドは 0 件だった。書き換えが起きるときにリンクが残るかは、まだ実機で確かめていない。
+- 3: `/sync-skill-docs` は変化なし（`RESULT: no differences`）。
+- Codex レビュー（1 回目）: 指摘なし。
+
 <a name="rollback"></a>
 
 ## ロールバック
