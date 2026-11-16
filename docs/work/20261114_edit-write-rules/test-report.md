@@ -22,12 +22,12 @@ created: 2026-11-16
 
 ## 2. 自動テスト
 
-Claude Code の Bash ツール（sandbox の中）で、worktree の `07e8bf8` で実行した。Task 9〜12 の後（`7bc82dc`）にも実行し、数字はその時点のもの。
+Claude Code の Bash ツール（sandbox の中）で、worktree の `07e8bf8` で実行した。最後に `16b8677` で実行し、数字はその時点のもの。
 
 | コマンド | 結果 |
 | --- | --- |
 | `python3 -B .github/scripts/check-repo.py` | 9 項目 PASS（変更前は 8 項目。`edit-permissions` を足した） |
-| `python3 -B .github/scripts/test-check-repo.py` | 54 件 OK（変更前は 43 件） |
+| `python3 -B .github/scripts/test-check-repo.py` | 58 件 OK（変更前は 43 件） |
 | shellcheck / actionlint | 指摘なし |
 
 <a name="red-green"></a>
@@ -43,6 +43,8 @@ Claude Code の Bash ツール（sandbox の中）で、worktree の `07e8bf8` �
 | 9 | `test_missing_root_anchored_hooks_deny_fails`、`test_missing_root_anchored_mise_ask_fails` | `//**/` の形を検査していなかった |
 | 10 | `test_unprefixed_sandbox_path_fails`（4 つのリスト × 2 つのパスの 8 件） | mise の 10 項目のほかは、接頭辞を検査していなかった |
 | 11 | `test_unexpected_additional_directory_fails` | `additionalDirectories` を検査していなかった |
+| 14 | `test_missing_root_anchored_git_ask_fails`、`test_root_anchored_git_deny_fails`（各 2 件） | `.git` の `//**/` の規則が ask にあることと、deny にないことを検査していなかった。フィクスチャの deny から `//**/` の hooks を外したので、成功を期待するテストも失敗した |
+| 15 | `test_additional_directory_without_allow_write_fails` | allowWrite を検査していなかった。同じ Task の `test_additional_directory_variants_fail` と `test_sandbox_path_prefix_boundaries` は、今の実装でも通った（境界を固定するテストとして残した） |
 
 <a name="measurements"></a>
 
@@ -163,3 +165,12 @@ Claude Code の Bash ツール（sandbox の中）で、worktree の `07e8bf8` �
 - **plan のファイルへの書き込み:** [特に確かめること](plan.md#review-focus)の 2 のうち、scratchpad だけを試した（T2）。plan のファイルは、ドキュメントでは止めない場所に入っている。
 - **マージの後:** 元のチェックアウトで `git pull` してセッションを起動し直した後、Write ツールで `~/block-test.txt` を作らせて拒否されることを、人間が確かめる（PR の本文に書く）。
 - **/review で見つかった、規則の外の経路:** git の index 経由の mise の設定、ハードリンク・大文字小文字、submodule の config と hooks など。[research 8.1](research-edit-write.md#review-gaps) にまとめ、次の作業にする（D9）。
+
+<a name="codex"></a>
+
+## 8. レビュー
+
+- **/review（2 回）:** 指摘への対応は、[plan](plan.md#decisions) の D6〜D13 に書いた。
+- **Codex（1 回目、2026-11-16）:** `codex review --base origin/main`（読み取り専用）で、`16b8677` を受けた。
+  - **結果:** 指摘なし。意図した制限の強化と、文書に書いた運用上の制約のほかに、直す必要のある新しい不具合はなかった。`check-repo.py` の 9 項目、shellcheck、actionlint は成功した。
+  - **Codex が確かめていないこと:** 一時ファイルを作るテストと、Claude Code の上での権限の実際の動き。読み取り専用の環境のため。どちらも、2 章と 5 章で確かめた。
