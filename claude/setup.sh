@@ -145,6 +145,8 @@ GSTACK_CONFIG="${GSTACK_DIR}/bin/gstack-config"
 # /plan-ceo-review のゲート（Stop・SubagentStop）も導入しない。使わないスキルのために、終了のたびに sandbox の外で bun が動く。
 # timeline とゲートのフラグは ~/.gstack/config.yaml に保存されるので、/gstack-upgrade が実行する setup でも登録しない。
 (cd "${GSTACK_DIR}" && ./setup --no-plan-tune-hooks --no-timeline-stop-hook --no-ceo-review-gate)
+# setup はフックを $HOME の絶対パスで settings.json に登録する。公開リポジトリにユーザー名を入れないよう ~/ に戻す。
+/usr/bin/python3 -B "${SCRIPT_DIR}/scripts/settings-home-paths.py"
 
 # Link personal skills (global, available in all projects)
 for skill_dir in "${SCRIPT_DIR}/skills"/*/; do

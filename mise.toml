@@ -33,3 +33,11 @@ run = "/usr/bin/python3 -B claude/scripts/skills-check.py snapshot"
 [tasks."claude:skill-usage"]
 description = "期間内のスキルの使われ方を集計する（例: mise run claude:skill-usage 2026-11-16 2026-12-07）"
 run = "/usr/bin/python3 -B claude/scripts/skill-usage.py"
+
+# スキル・プラグインをまとめて更新する。sandbox の中からは ~/.claude と Homebrew に書けないので、端末で実行する。
+# Claude Code からは mise を通さず ! /bin/bash ~/dotfiles/claude/scripts/update-skills.sh で実行する。
+# mise は dotfiles のルートの設定ファイル（mise.local.toml など）を自動で信頼して読み込み、ルートには sandbox から書けるため。
+# 終わったら、Claude Code を再起動する前に /sync-skill-docs で文書と hooks を見直す。
+[tasks."claude:update"]
+description = "gstack・プラグイン・crit の CLI を更新し、gstack が settings.json に書いた絶対パスを ~/ に戻す（端末で実行する）"
+run = "/bin/bash claude/scripts/update-skills.sh"
