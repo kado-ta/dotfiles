@@ -263,17 +263,20 @@ Read の deny の規則は、sandbox の `denyRead` にもなる（このセッ�
 - **元のチェックアウトから worktree の `claude/`:** 元のチェックアウトのセッションでは、プロジェクト設定の `Edit(/claude/**)` と denyWrite の `./claude` が、`.claude/worktrees/<name>/claude/` に当たらない。
 - **起動したディレクトリ:** `~` や `~/Dev` で起動すると、すべてのリポジトリが作業ディレクトリに入り、`blockWritesOutsideWorkingDirectories` が効かない。Ghostty の新しいウィンドウは `~/Dev` で開く（`ghostty/config` の `working-directory`）。グローバルの CLAUDE.md に、最初に人間に伝えるよう書いた。
 - **`*.pem` の範囲:** `~/Dev` と作業ディレクトリの外の `.pem`（`~/Downloads` の EC2 のキーペアなど）は読める。CA 証明書の束を巻き込まない範囲（`~/Downloads/**` など）に絞って足す案がある。
+- **`~/.gstack/projects` の symlink（未確認）:** sandbox の allowWrite に入っているので、Bash で中身を消し、`~/Library/LaunchAgents` などへの symlink に差し替えられる見込み。次のセッションがそのパスを実体に解決すると、sandbox（allowWrite）と Edit・Write ツール（`additionalDirectories`、D7）のどちらからも、ログイン時に動く場所に書けるおそれがある。allowWrite はこの作業の前からある（2 回目の /review の adversarial が指摘、D11）。
+- **接頭辞のない hooks の deny の副作用:** Edit の deny は sandbox の denyWrite にもなるので、起動したディレクトリの中では、入れ子のリポジトリの `git init`・`git clone` と、`hooks` という名前の階層を含む refs（`fix/hooks/x` のようなブランチ）への書き込みが、sandbox の中で失敗しうる。2026-11-16 の時点で、dotfiles の refs にも `~/Dev` の submodule にも該当はない。
 
 <a name="next-candidates"></a>
 
 ### 8.2 次の作業の候補
 
 1. **mise の paranoid:** 信頼を、設定ファイルの中身のハッシュに結び付ける。Edit・Bash・git の index・ホームの外・`/add-dir` の経路を、まとめて塞げる見込み。代わりに、mise の設定を変えるたびに人間の `mise trust` が要る。採るなら、denyWrite を外して git の巻き込みをなくす案もある。
-2. **ハードリンクと大文字・小文字のダミーでの確認。**
-3. **権限の規則から変換された `**/` の確認**（env-zsh の `.env` を含む）。
-4. **git の設定と hooks のほかの置き場所**（submodule、`.git` ファイル、`core.hooksPath`、`safe.bareRepository`）。
-5. **元のチェックアウトから worktree の `claude/`。**
-6. **`*.pem` の範囲。**
+2. **`~/.gstack/projects` の symlink:** ダミーで確かめる。成り立つなら、SessionStart のフックで実体のディレクトリかを確かめる案か、allowWrite と `additionalDirectories` から外す案。
+3. **ハードリンクと大文字・小文字のダミーでの確認。**
+4. **権限の規則から変換された `**/` の確認**（env-zsh の `.env` を含む）。
+5. **git の設定と hooks のほかの置き場所**（submodule、`.git` ファイル、`core.hooksPath`、`safe.bareRepository`）。Edit の deny は sandbox の denyWrite にもなるので、PreToolUse のフックで拒否する案も比べる。
+6. **元のチェックアウトから worktree の `claude/`。**
+7. **`*.pem` の範囲。**
 
 <a name="not-verified"></a>
 

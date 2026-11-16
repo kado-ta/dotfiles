@@ -123,7 +123,8 @@ Claude Code の Bash ツール（sandbox の中）で、worktree の `07e8bf8` �
 | T14 | Write ツールで `~/block-test.txt` を作る | 拒否された。文面の作業ディレクトリの一覧に `~/.gstack/projects` と `~/cc-probe2` が入っていた | 期待どおり |
 | T15 | Write ツールで `tmp-probe/.tool-versions` を作る | 確認の画面が出て、No で止まった | 期待どおり |
 
-- `~/cc-probe2` は作業ディレクトリの外なので、接頭辞のない形の規則は当たらない。T11 と T12 は、`//**/` の形の規則によるものと判断した。
+- `~/cc-probe2` は作業ディレクトリの外なので、接頭辞のない形の規則は当たらない見込み。T11 と T12 は、`//**/` の形の規則によるものと考える（推測。接頭辞のない形だけの対照は試していない）。
+- T12 の `Edit(//**/.git/**/hooks/**)` は、この後の Task 14 で deny から ask に移した（sandbox の中の `git init`・`git clone` を壊す見込みのため）。今の設定での振る舞いは Task 17 の T19 で確かめる。
 - T13 と T14 の文面から、`additionalDirectories` の `~/` の形は、ホームのディレクトリとして解決されている。
 - 書き込みの後、ファイルは T13 の `cc-probe.txt` だけだった（確かめのセッションが `ls` で確認）。
 

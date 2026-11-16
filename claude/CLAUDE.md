@@ -55,10 +55,10 @@ https://x.com/ai_database/status/2114184481951330365?s=12
 - 明示的な指示なしに実行しない: `git push --force`、main / master / staging への直接 push、`terraform apply` / `destroy`、本番環境（DB・AWS）への書き込み、DB の drop/reset、広範囲の `rm -rf`。
 - 未コミットの変更を `git checkout` / `reset --hard` / `stash` 等で破棄しない。
 - シークレット（`.env`、認証情報、`*.tfstate`）の内容を出力・ハードコード・コミットしない。
-- Edit・Write ツールは、作業ディレクトリの外と Claude Code の設定ファイルに書けない（`blockWritesOutsideWorkingDirectories`）。外に書く必要があるときは人間に `/add-dir` を頼み、この設定を外すことは提案しない。
-- worktree は人間に `claude -w <name>` で作ってもらう。EnterWorktree は使えず、sandbox の中の `git worktree add` は途中で失敗する。
+- Edit・Write ツールは、作業ディレクトリの外と Claude Code の設定ファイルに書けない（`blockWritesOutsideWorkingDirectories`）。外に書く必要があるときは、書き込み先の最小のディレクトリを人間に `/add-dir` で足してもらい、この設定を外すことは提案しない。`/add-dir` はそのディレクトリの `.claude/skills`・`commands`・`agents` も読み込むので、信頼していないリポジトリと、sandbox から書ける場所（`$TMPDIR` など）は頼まない。
+- worktree は人間に `claude -w <name>` で作ってもらう。EnterWorktree は使えず、sandbox の中の `git worktree add` は途中で失敗する。サブエージェントに `isolation: "worktree"` を使わない（作業ディレクトリの外になり、編集が拒否される）。バックグラウンドのセッションが要るときは、人間に `claude --bg -w <name>` で始めてもらう。
 - sandbox の中の git が、mise の設定（`mise.toml`・`.tool-versions` など）で `unable to unlink` や `Operation not permitted` を出したら、続けずに `git status` を確かめて報告する。その状態の作業ツリーをコミットしない。
-- 起動したディレクトリが `~` や `~/Dev` のように複数のリポジトリを含むときは、作業ディレクトリの外を止める設定が効かないので、最初に人間に伝える。
+- 起動したディレクトリが `~` や `~/Dev` のように複数のリポジトリを含むときは、作業ディレクトリの外を止める設定が効かず、sandbox の書き込み範囲も広がる。作業の前に、リポジトリのルートで起動し直すよう人間に頼む。
 
 ## Verification
 
