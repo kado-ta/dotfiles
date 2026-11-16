@@ -143,8 +143,9 @@ GSTACK_CONFIG="${GSTACK_DIR}/bin/gstack-config"
 # plan-tune のフックは導入しない。確認で止まらず、claude/settings.json も書き換えないようにする。
 # timeline の Stop フックも導入しない。Stop はターンごとに発火するので、実行中の skill を完了扱いにしてしまう。
 # /plan-ceo-review のゲート（Stop・SubagentStop）も導入しない。使わないスキルのために、終了のたびに sandbox の外で bun が動く。
-# timeline とゲートのフラグは ~/.gstack/config.yaml に保存されるので、/gstack-upgrade が実行する setup でも登録しない。
-(cd "${GSTACK_DIR}" && ./setup --no-plan-tune-hooks --no-timeline-stop-hook --no-ceo-review-gate)
+# スキルのルーティング（UserPromptSubmit）と出力の契約のゲート（Stop）も導入しない。今の既定は off だが、既定は gstack のコードで決まるので、更新で on に変わると settings.json にフックが足される。
+# timeline・ゲート・ルーティングのフラグは ~/.gstack/config.yaml に保存されるので、/gstack-upgrade が実行する setup でも登録しない。
+(cd "${GSTACK_DIR}" && ./setup --no-plan-tune-hooks --no-timeline-stop-hook --no-ceo-review-gate --no-skill-routing --no-skill-contracts)
 # setup はフックを $HOME の絶対パスで settings.json に登録する。公開リポジトリにユーザー名を入れないよう ~/ に戻す。
 /usr/bin/python3 -B "${SCRIPT_DIR}/scripts/settings-home-paths.py"
 
