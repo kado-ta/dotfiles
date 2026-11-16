@@ -45,15 +45,37 @@ link "${SCRIPT_DIR}/hooks" "${CLAUDE_DIR}/hooks"
 [ -d "${CLAUDE_DIR}/scripts" ] || mkdir -p "${CLAUDE_DIR}/scripts"
 link "${SCRIPT_DIR}/scripts/statusline.sh" "${CLAUDE_DIR}/scripts/statusline.sh"
 
+# プラグインが user スコープに入っているかを返す。
+# claude plugins list は、全プロジェクトの project・local スコープのものも、無効なものも返す。
+# ID だけで判定すると、別のプロジェクトにだけ入っているときに user スコープへのインストールを飛ばしてしまう。
+plugin_installed_for_user() {
+  claude plugins list --json 2>/dev/null | /usr/bin/python3 -c '
+import json, sys
+plugins = json.load(sys.stdin)
+sys.exit(not any(p.get("id") == sys.argv[1] and p.get("scope") == "user" for p in plugins))
+' "$1"
+}
+
+# マーケットプレイスが追加済みかを返す。
+# grep -q は一致した時点で読むのをやめるので、pipefail の下では claude が SIGPIPE で失敗し、
+# 追加済みでも未追加と判定して marketplace add を実行しうる。JSON を最後まで読んで判定する。
+marketplace_added() {
+  claude plugins marketplace list --json 2>/dev/null | /usr/bin/python3 -c '
+import json, sys
+marketplaces = json.load(sys.stdin)
+sys.exit(not any(m.get("name") == sys.argv[1] for m in marketplaces))
+' "$1"
+}
+
 # Install Superpowers
-if claude plugins list 2>/dev/null | grep -q " superpowers@claude-plugins-official$"; then
+if plugin_installed_for_user superpowers@claude-plugins-official; then
   echo "superpowers plugin already installed, skipping"
 else
   claude plugins install superpowers@claude-plugins-official
 fi
 
 # Install claude-code-setup
-if claude plugins list 2>/dev/null | grep -q " claude-code-setup@claude-plugins-official$"; then
+if plugin_installed_for_user claude-code-setup@claude-plugins-official; then
   echo "claude-code-setup plugin already installed, skipping"
 else
   claude plugins install claude-code-setup@claude-plugins-official
@@ -61,7 +83,7 @@ fi
 
 # Install ruby-lsp
 # LSP サーバーの ruby-lsp コマンドは含まれないので、別途 gem で入れて PATH に通す。
-if claude plugins list 2>/dev/null | grep -q " ruby-lsp@claude-plugins-official$"; then
+if plugin_installed_for_user ruby-lsp@claude-plugins-official; then
   echo "ruby-lsp plugin already installed, skipping"
 else
   claude plugins install ruby-lsp@claude-plugins-official
@@ -69,28 +91,28 @@ fi
 
 # Install crit
 # settings.json の extraKnownMarketplaces だけではマーケットプレイスが取得されず、install が失敗する。
-if claude plugins list 2>/dev/null | grep -q " crit@crit$"; then
+if plugin_installed_for_user crit@crit; then
   echo "crit plugin already installed, skipping"
 else
-  claude plugins marketplace list 2>/dev/null | grep -q " crit$" || claude plugins marketplace add tomasz-tomczyk/crit
+  marketplace_added crit || claude plugins marketplace add tomasz-tomczyk/crit
   claude plugins install crit@crit
 fi
 
 # Install understand-anything
 # crit と同じく、マーケットプレイスを先に追加しないと install が失敗する。
-if claude plugins list 2>/dev/null | grep -q " understand-anything@understand-anything$"; then
+if plugin_installed_for_user understand-anything@understand-anything; then
   echo "understand-anything plugin already installed, skipping"
 else
-  claude plugins marketplace list 2>/dev/null | grep -q " understand-anything$" || claude plugins marketplace add Egonex-AI/Understand-Anything
+  marketplace_added understand-anything || claude plugins marketplace add Egonex-AI/Understand-Anything
   claude plugins install understand-anything@understand-anything
 fi
 
 # Install pstack
 # crit と同じく、マーケットプレイスを先に追加しないと install が失敗する。
-if claude plugins list 2>/dev/null | grep -q " pstack@cursor-plugins$"; then
+if plugin_installed_for_user pstack@cursor-plugins; then
   echo "pstack plugin already installed, skipping"
 else
-  claude plugins marketplace list 2>/dev/null | grep -q " cursor-plugins$" || claude plugins marketplace add cursor/plugins
+  marketplace_added cursor-plugins || claude plugins marketplace add cursor/plugins
   claude plugins install pstack@cursor-plugins
 fi
 
