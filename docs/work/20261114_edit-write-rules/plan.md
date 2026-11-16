@@ -30,6 +30,10 @@ created: 2026-11-14
 | D3 | 作業の場所 | この会話のまま EnterWorktree で worktree に入り、出ずに最後まで進める | 会話の文脈を保てる。作業中の変更が、使っている設定に効かない。ExitWorktree の後に設定が古く残る件は、出なければ起きない | 推奨のとおり（2026-11-14） |
 | D4 | mise の設定ファイルを、Bash からも守るか | **守る。** ユーザー設定の `sandbox.filesystem.denyWrite` に足す | Bash は作業ディレクトリの中の `mise.toml` に書ける。sf_hpf_metadata にも `mise.toml` があり、信頼はパスで決まる（[research 5 章](research-edit-write.md#mise)）。代わりに、Claude が `mise use` などで mise の設定を書き換える作業は、Edit ツール（確認あり）か人間が行う。`**/` の形が sandbox で効くかは未確認なので、Task 7 で確かめ、効かなければこの部分を戻す | 推奨のとおり（2026-11-14）。T6 で `**/` が効かなかったので、戻さずに `~/**/` の形に変えた（2026-11-16、[research 3.5](research-edit-write.md#probe-sandbox-anchor)） |
 | D5 | Read の規則の整理 | **`*.key` は `~/**` に広げる。`*.pem` は広げない。`credentials` は Task 5 で測ってから決める** | `*.pem` を広げると、mise で入れた pip・Ruby・aws-cli の CA 証明書の束を sandbox から読めなくなる（[research 6 章](research-edit-write.md#read-rules)）。`*.key` で巻き込むのは、主に `~/.claude/sessions/*.key` と Keynote の書類 | 推奨のとおり（2026-11-14） |
+| D6 | 新しい Edit の規則の起点 | **接頭辞のない形を残したまま、`//**/` の形を併記する**（`.git` の hooks の deny と、mise の ask） | 接頭辞のない形は、起動したディレクトリが起点になる。CLAUDE.md が勧める `/add-dir` のディレクトリには当たらない（/review の security と adversarial が指摘）。今の形を残すので、新しい形が効かなくても後退しない | 推奨のとおり（2026-11-16、/review の D1） |
+| D7 | 全リポジトリ向けの運用 | **グローバルの `claude/CLAUDE.md` に運用の説明を足し、`permissions.additionalDirectories` に `~/.gstack/projects` を入れる** | 設定は全リポジトリに効くのに、説明は dotfiles の CLAUDE.md にしかない。gstack の `/office-hours`・`/context-save` などは、Write ツールで `~/.gstack/projects` に書く。そこは sandbox の allowWrite に入っていて、Bash はもともと書けるので、書ける範囲は広がらない。`~/` の形が使えるかは文書にないので、Task 13 で確かめる | 推奨のとおり（2026-11-16、/review の D2） |
+| D8 | sandbox のパスの接頭辞の検査 | **ユーザー設定の `sandbox.filesystem` の 4 つのリストの全項目が、`~/` か `/` で始まることを検査する** | 接頭辞のないパスは `~/.claude` が起点になり、黙って効かない（T6）。今は mise の 10 項目しか検査していない（/review の testing が指摘） | 推奨のとおり（2026-11-16、/review の D3） |
+| D9 | この PR の規則の外にある経路 | **直さずに、research の残るリスクと test-report に記録し、次の作業にする** | git の index 経由の mise の設定、ハードリンク・大文字小文字、submodule の config と hooks など（/review の adversarial と red team が指摘）。どれもこの PR が持ち込んだものではない。次の作業の第一候補は、mise の paranoid と、ハードリンク・大文字小文字のダミーでの確認 | 推奨のとおり（2026-11-16、/review の D4） |
 
 <a name="constraints"></a>
 
@@ -55,6 +59,8 @@ created: 2026-11-14
 4. **sandbox の `**/` の形（D4）:** 作業ディレクトリの中の `mise.toml` などへの Bash の書き込みを止めるか（T6）。
 5. **`~/**/*.key`（D5）:** sandbox の中の `claude plugins list` が動くか（T7）。
 6. **マージの後:** すべてのセッションから EnterWorktree・ExitWorktree がなくなる。マージの時点で EnterWorktree の worktree にいるセッション（このセッションを含む）は、終わるまで worktree から出られない。
+7. **`//**/` の形（D6）:** `/add-dir` で足したディレクトリの `mise.toml` で確認の画面が出るか、`.git/hooks` が拒否されるか（Task 13 の T11・T12）。出なければ、接頭辞のない形は残っているので後退はしない。原因を調べて research に書く。
+8. **`additionalDirectories` の `~/`（D7）:** `~/.gstack/projects` に Write ツールで書けるか（T13）。書けなければ、`additionalDirectories` と検査の定数を戻し、グローバルの CLAUDE.md に「gstack の置き場所には Bash で書く」と書く。
 
 <a name="task-0"></a>
 
@@ -83,13 +89,13 @@ created: 2026-11-14
 - Modify: `.github/scripts/test-check-repo.py`（`PROJECT_ASK` とテスト）
 - Modify: `.claude/settings.json`（`permissions.ask`）
 
-- [ ] 1. `check-repo.py` の `PROJECT_ASK` の先頭に `"Edit(/claude/**)"` を足す。`PROJECT_DENY_WRITE` の `./claude` と同じ位置。
-- [ ] 2. `test-check-repo.py` の `PROJECT_ASK` に同じものを足し、次のテストを足す。
+- [x] 1. `check-repo.py` の `PROJECT_ASK` の先頭に `"Edit(/claude/**)"` を足す。`PROJECT_DENY_WRITE` の `./claude` と同じ位置。
+- [x] 2. `test-check-repo.py` の `PROJECT_ASK` に同じものを足し、次のテストを足す。
   - `test_project_removed_claude_ask_fails`: `Edit(/claude/**)` を消すと、`FAIL project-permissions` と `Edit(/claude/**)` が出る。コメントに、worktree ではユーザー設定の `Edit(~/dotfiles/claude/**)` が当たらないことを書く。
-- [ ] 3. `test-check-repo.py` が OK、`check-repo.py` が `FAIL project-permissions`（`.claude/settings.json: permissions.ask lacks Edit(/claude/**)`）になることを確かめる。
-- [ ] 4. `.claude/settings.json` の `permissions.ask` の先頭に `"Edit(/claude/**)"` を足す。
-- [ ] 5. `check-repo.py` が PASS になることを確かめる。
-- [ ] 6. コミットする: `fix(claude): ask before Edit writes to claude/ in worktrees`
+- [x] 3. `test-check-repo.py` が OK、`check-repo.py` が `FAIL project-permissions`（`.claude/settings.json: permissions.ask lacks Edit(/claude/**)`）になることを確かめる。
+- [x] 4. `.claude/settings.json` の `permissions.ask` の先頭に `"Edit(/claude/**)"` を足す。
+- [x] 5. `check-repo.py` が PASS になることを確かめる。
+- [x] 6. コミットする: `fix(claude): ask before Edit writes to claude/ in worktrees`
 
 <a name="task-3"></a>
 
@@ -105,15 +111,15 @@ created: 2026-11-14
 
 - Produces: `check_edit_permissions(root) -> list[str]`。`CHECKS` の `("push-permissions", …)` の次に `("edit-permissions", check_edit_permissions)` として登録する。Task 4 はこの関数に検査を足す。
 
-- [ ] 1. `check-repo.py` に定数 `WRITE_BLOCK = "blockWritesOutsideWorkingDirectories"` を足す。コメントに、消すと作業ディレクトリの外（ほかのリポジトリの `.git/hooks`、`~/Library/LaunchAgents` など）に確認なしで書ける場合があることを書く。
-- [ ] 2. `check_edit_permissions(root)` を足す。`permissions[WRITE_BLOCK]` が `True`（真偽値）でなければ、`{SETTINGS}: permissions.{WRITE_BLOCK} must be true` を返す。
-- [ ] 3. `test-check-repo.py` の `settings()` の `permissions` に `"blockWritesOutsideWorkingDirectories": True` を足し、次のテストを足す。
+- [x] 1. `check-repo.py` に定数 `WRITE_BLOCK = "blockWritesOutsideWorkingDirectories"` を足す。コメントに、消すと作業ディレクトリの外（ほかのリポジトリの `.git/hooks`、`~/Library/LaunchAgents` など）に確認なしで書ける場合があることを書く。
+- [x] 2. `check_edit_permissions(root)` を足す。`permissions[WRITE_BLOCK]` が `True`（真偽値）でなければ、`{SETTINGS}: permissions.{WRITE_BLOCK} must be true` を返す。
+- [x] 3. `test-check-repo.py` の `settings()` の `permissions` に `"blockWritesOutsideWorkingDirectories": True` を足し、次のテストを足す。
   - `test_missing_write_block_fails`: キーを消すと、`FAIL edit-permissions` と `blockWritesOutsideWorkingDirectories` が出る。
   - `test_write_block_not_true_fails`: `False` と文字列の `"true"` のそれぞれで失敗する（`subTest`）。
-- [ ] 4. `test-check-repo.py` が OK、`check-repo.py` が `FAIL edit-permissions` になることを確かめる。
-- [ ] 5. `claude/settings.json` の `permissions` に `"blockWritesOutsideWorkingDirectories": true` を足す。
-- [ ] 6. `check-repo.py` が PASS になることを確かめる。
-- [ ] 7. コミットする: `fix(claude): block Edit and Write outside the working directories`
+- [x] 4. `test-check-repo.py` が OK、`check-repo.py` が `FAIL edit-permissions` になることを確かめる。
+- [x] 5. `claude/settings.json` の `permissions` に `"blockWritesOutsideWorkingDirectories": true` を足す。
+- [x] 6. `check-repo.py` が PASS になることを確かめる。
+- [x] 7. コミットする: `fix(claude): block Edit and Write outside the working directories`
 
 <a name="task-4"></a>
 
@@ -129,7 +135,7 @@ created: 2026-11-14
 
 - Consumes: Task 3 の `check_edit_permissions(root)`
 
-- [ ] 1. `check-repo.py` に定数を足す。
+- [x] 1. `check-repo.py` に定数を足す。
   - `EDIT_DENY = ("Edit(**/.git/**/hooks/**)",)`。コメント: hooks は、人間が git を使ったときに sandbox の外で動く。
   - `MISE_CONFIG`: mise が読む設定ファイルのパターン。次の 10 個。
     - `**/mise.toml`、`**/.mise.toml`、`**/mise.*.toml`、`**/.mise.*.toml`
@@ -137,15 +143,18 @@ created: 2026-11-14
     - `**/.mise/**`、`**/.config/mise/**`、`**/.tool-versions`
   - `MISE_ASK`: `MISE_CONFIG` のそれぞれを `Edit(…)` で包んだもの。コメント: 信頼済みのパスの hooks・`_.source`・`exec()` は、人間が `cd` したときに sandbox の外で動く。
   - `MISE_DENY_WRITE`（D4）: sandbox の `denyWrite` の形。末尾の `/**` を外したもの（`**/mise/conf.d`、`**/.mise`、`**/.config/mise`）と、残りのファイルのパターン。
-- [ ] 2. `check_edit_permissions` に、`permissions.deny` が `EDIT_DENY` を、`permissions.ask` が `MISE_ASK` を、`sandbox.filesystem.denyWrite` が `MISE_DENY_WRITE` を含むかの検査を足す。メッセージは、既存の `lacks` の形に合わせる。
-- [ ] 3. `test-check-repo.py` の `settings()` に、3 つの定数の内容を足し、次のテストを足す。
+- [x] 2. `check_edit_permissions` に、`permissions.deny` が `EDIT_DENY` を、`permissions.ask` が `MISE_ASK` を、`sandbox.filesystem.denyWrite` が `MISE_DENY_WRITE` を含むかの検査を足す。メッセージは、既存の `lacks` の形に合わせる。
+- [x] 3. `test-check-repo.py` の `settings()` に、3 つの定数の内容を足し、次のテストを足す。
   - `test_missing_git_hooks_deny_fails`
   - `test_missing_mise_ask_fails`（`Edit(**/mise.toml)` を消す）
   - `test_missing_mise_deny_write_fails`（`**/mise.toml` を消す）
-- [ ] 4. `test-check-repo.py` が OK、`check-repo.py` が `FAIL edit-permissions` になることを確かめる。
-- [ ] 5. `claude/settings.json` に、`EDIT_DENY` を `permissions.deny` に、`MISE_ASK` を `permissions.ask` に、`MISE_DENY_WRITE` を `sandbox.filesystem.denyWrite`（新しいキー）に足す。
-- [ ] 6. `check-repo.py` が PASS になることを確かめる。
-- [ ] 7. コミットする: `fix(claude): guard git hooks and mise config inside the working directory`
+- [x] 4. `test-check-repo.py` が OK、`check-repo.py` が `FAIL edit-permissions` になることを確かめる。
+- [x] 5. `claude/settings.json` に、`EDIT_DENY` を `permissions.deny` に、`MISE_ASK` を `permissions.ask` に、`MISE_DENY_WRITE` を `sandbox.filesystem.denyWrite`（新しいキー）に足す。
+- [x] 6. `check-repo.py` が PASS になることを確かめる。
+- [x] 7. コミットする: `fix(claude): guard git hooks and mise config inside the working directory`
+
+> [!NOTE]
+> Task 7 の T6 で `**/` の形が効かなかったので、`MISE_DENY_WRITE` と設定は `~/**/` の形に変えた（`07e8bf8`、D4）。テストで消す項目も `~/**/mise.toml` になった。
 
 <a name="task-5"></a>
 
@@ -155,14 +164,14 @@ created: 2026-11-14
 
 - Modify: `claude/settings.json`（`permissions.deny`）
 
-- [ ] 1. `credentials` を測る。
+- [x] 1. `credentials` を測る。
   1. 人間が自分の端末で、ダミーのファイルを作る: `mkdir -p ~/cc-probe/credentials && echo probe > ~/cc-probe/credentials/a.txt && echo probe > ~/cc-probe/b.key`
   2. このセッションで、Read ツールで `~/cc-probe/credentials/a.txt` を読む。拒否されれば、今の `Read(~/**/credentials)` で足りる。
   3. Bash で `head -c1 ~/cc-probe/credentials/a.txt >/dev/null; echo $?` を実行し、sandbox が止めるかを記録する。
-- [ ] 2. 1 で Read ツールが拒否されなかった場合だけ、`Read(~/**/credentials/**)` を足す。sandbox が止めなかった場合は、bun のキャッシュの `@anthropic-ai/sdk` の `credentials` も読めなくなるので、research に書く。
-- [ ] 3. `Read(~/Dev/**/*.key)` を `Read(~/**/*.key)` に置き換える。`Read(~/Dev/**/*.pem)` は変えない。
-- [ ] 4. `check-repo.py` が PASS になることを確かめる。
-- [ ] 5. コミットする: `fix(claude): deny reading key files anywhere under home`。本文に、`*.pem` を広げない理由を書く。
+- [x] 2. 1 で Read ツールが拒否されなかった場合だけ、`Read(~/**/credentials/**)` を足す。sandbox が止めなかった場合は、bun のキャッシュの `@anthropic-ai/sdk` の `credentials` も読めなくなるので、research に書く。
+- [x] 3. `Read(~/Dev/**/*.key)` を `Read(~/**/*.key)` に置き換える。`Read(~/Dev/**/*.pem)` は変えない。
+- [x] 4. `check-repo.py` が PASS になることを確かめる。
+- [x] 5. コミットする: `fix(claude): deny reading key files anywhere under home`。本文に、`*.pem` を広げない理由を書く。
 
 <a name="task-6"></a>
 
@@ -172,14 +181,17 @@ created: 2026-11-14
 
 - Modify: `CLAUDE.md`（「Claude Code 設定（`claude/`）」の節）
 
-- [ ] 1. 人間が、`claude -w` で作った worktree で `git branch -m <新しい名前>` が使えるかを確かめる（[research 3.4](research-edit-write.md#branch-rename) は EnterWorktree の worktree でだけ確かめた）。
-- [ ] 2. `CLAUDE.md` に小節「Edit・Write ツールの書き込み」を足す。アンカーは `edit-write-rules`。書くことは次のとおり。
+- [x] 1. 人間が、`claude -w` で作った worktree で `git branch -m <新しい名前>` が使えるかを確かめる（[research 3.4](research-edit-write.md#branch-rename) は EnterWorktree の worktree でだけ確かめた）。
+- [x] 2. `CLAUDE.md` に小節「Edit・Write ツールの書き込み」を足す。アンカーは `edit-write-rules`。書くことは次のとおり。
   - ユーザー設定で `blockWritesOutsideWorkingDirectories` をオンにしている。作業ディレクトリの外に書くには `/add-dir` を使う。Claude は設定ファイルを編集できないので、人間が編集する。
   - worktree は `claude -w <name>` で始める（EnterWorktree・ExitWorktree は使えない）。ブランチ名は 1 の結果に合わせて書く。
   - `.claude/settings.json` の ask に `Edit(/claude/**)` があるのは、worktree ではユーザー設定の `Edit(~/dotfiles/claude/**)` が当たらないため。
   - Read の `*.pem` を `~/**` に広げない（CA 証明書の束を sandbox から読めなくなる）。
-- [ ] 3. `check-repo.py` が PASS になることを確かめる（アンカーとリンク）。
-- [ ] 4. コミットする: `docs: describe the Edit and Write guards and the worktree workflow`
+- [x] 3. `check-repo.py` が PASS になることを確かめる（アンカーとリンク）。
+- [x] 4. コミットする: `docs: describe the Edit and Write guards and the worktree workflow`
+
+> [!NOTE]
+> main を取り込んだ後（`5edd643`）、main の構成に合わせて、規則の理由は `.claude/rules/CLAUDE_CONFIG.md` に移した。`CLAUDE.md` には使い方と禁止事項を残した（`01b8e2b`）。
 
 <a name="task-7"></a>
 
@@ -187,14 +199,14 @@ created: 2026-11-14
 
 ユーザー設定の変更は、マージするまでこのセッションに効かない。人間が、変更後の規則を `--settings` で読ませたセッションを起動して確かめる。
 
-- [ ] 1. 人間が、変更後の規則だけを取り出したファイルを作る。
+- [x] 1. 人間が、変更後の規則だけを取り出したファイルを作る。
   ```sh
   cd ~/dotfiles/.claude/worktrees/fix+edit-write-rules
   jq '{permissions: (.permissions | {blockWritesOutsideWorkingDirectories, deny, ask}), sandbox: {filesystem: .sandbox.filesystem}}' claude/settings.json > "$TMPDIR/edit-write-rules.json"
   ```
-- [ ] 2. **worktree のセッション:** worktree で `claude --settings "$TMPDIR/edit-write-rules.json"` を起動し、下の表の T1〜T8 を試す。確認の画面には「No」と答える。
-- [ ] 3. **元のチェックアウトのセッション:** `~/dotfiles` で同じ `--settings` を付けて起動し、下の表の T9 を試す。
-- [ ] 4. 人間が `~/cc-probe` と、worktree に残った `tmp-probe` を消す。
+- [x] 2. **worktree のセッション:** worktree で `claude --settings "$TMPDIR/edit-write-rules.json"` を起動し、下の表の T1〜T8 を試す。確認の画面には「No」と答える。
+- [x] 3. **元のチェックアウトのセッション:** `~/dotfiles` で同じ `--settings` を付けて起動し、下の表の T9 を試す。
+- [x] 4. 人間が `~/cc-probe` と、worktree に残った `tmp-probe` を消す。
 
 | # | セッション | 試すこと | 期待する結果 |
 | --- | --- | --- | --- |
@@ -208,13 +220,118 @@ created: 2026-11-14
 | T8 | worktree | Read ツールと Bash（`head -c1 … >/dev/null; echo $?`）で `~/cc-probe/b.key` を読む | どちらも拒否される |
 | T9 | 元のチェックアウト | Edit ツールで `claude/settings.json` に空行を 1 つ足す | 拒否されるか、確認の画面が出る。どちらだったかを記録する |
 
-- [ ] 5. 期待と違った項目は、原因を調べて直す。T4 は[特に確かめること](#review-focus)の 1 の分け方にする。T6 が効かなければ、D4 の部分（`MISE_DENY_WRITE` と設定）を戻し、research に書く。
-- [ ] 6. `test-report.md` を書く。環境（Claude Code の版、コミット）、自動テストの結果、T1〜T9 の結果を書く。
-- [ ] 7. コミットする: `docs: record the Edit and Write guard verification`
+- [x] 5. 期待と違った項目は、原因を調べて直す。T4 は[特に確かめること](#review-focus)の 1 の分け方にする。T6 が効かなければ、D4 の部分（`MISE_DENY_WRITE` と設定）を戻し、research に書く。
+- [x] 6. `test-report.md` を書く。環境（Claude Code の版、コミット）、自動テストの結果、T1〜T9 の結果を書く。
+- [x] 7. コミットする: `docs: record the Edit and Write guard verification`
+
+> [!NOTE]
+> T6 は、人間の判断で D4 を戻さずに `~/**/` の形に直した。T9 の文面を確かめるために T10（設定と関係のない `.json` を作る）を足した。結果は [test-report](test-report.md#human-sessions) にある。
+
+<a name="task-9"></a>
+
+## Task 9: 新しい Edit の規則に、`//**/` の形を併記する（D6）
+
+/review の後に追記した Task（9〜13）。Task 8 の 1 の検査は、/review の中で一度通した。2〜5 は Task 13 の後に行う。
+
+**Files:**
+
+- Modify: `.github/scripts/check-repo.py`（`EDIT_DENY`・`MISE_ASK`）
+- Modify: `.github/scripts/test-check-repo.py`
+- Modify: `claude/settings.json`（`permissions.deny`・`ask`）
+
+- [ ] 1. `test-check-repo.py` の `EDIT_DENY` に `"Edit(//**/.git/**/hooks/**)"` を足し、`MISE_ASK` を、接頭辞のない形と `//` を付けた形の両方にする。次のテストを足す。
+  - `test_missing_root_anchored_hooks_deny_fails`: `Edit(//**/.git/**/hooks/**)` を消すと、`FAIL edit-permissions` とその規則が出る。
+  - `test_missing_root_anchored_mise_ask_fails`: `Edit(//**/mise.toml)` を消すと、`FAIL edit-permissions` とその規則が出る。
+- [ ] 2. 2 件が失敗し、ほかのテストが通ることを確かめる。
+- [ ] 3. `check-repo.py` の `EDIT_DENY` に同じ規則を足し、`MISE_ASK` に `Edit(//{p})` の形を足す。コメントに、接頭辞のない形は起動したディレクトリが起点で、`/add-dir` のディレクトリに当たらないことを書く。
+- [ ] 4. テストが通り、`check-repo.py` が `FAIL edit-permissions` になることを確かめる。
+- [ ] 5. `claude/settings.json` の deny の `Edit(**/.git/**/hooks/**)` の次と、ask の mise の 10 件の次に、`//` の形を足す。
+- [ ] 6. `check-repo.py` が PASS になることを確かめる。`grep -n -E " =[^= ]"` で空白の落ちを確かめる。
+- [ ] 7. コミットする: `fix(claude): anchor the new Edit rules at the filesystem root as well`
+
+<a name="task-10"></a>
+
+## Task 10: sandbox のパスの接頭辞を検査する（D8）
+
+**Files:**
+
+- Modify: `.github/scripts/check-repo.py`（`check_edit_permissions`）
+- Modify: `.github/scripts/test-check-repo.py`
+
+- [ ] 1. テストを足す。`test_unprefixed_sandbox_path_fails`: `denyRead`・`denyWrite`・`allowWrite`・`allowRead` のそれぞれに、`**/.ssh` と `./secrets` を足すと、`FAIL edit-permissions` とそのパスが出る（`subTest`）。
+- [ ] 2. 失敗することを確かめる。
+- [ ] 3. `check-repo.py` に定数 `SANDBOX_PATH_LISTS = ("denyRead", "denyWrite", "allowWrite", "allowRead")` を足す。`check_edit_permissions` で、ユーザー設定の各リストの項目が `~/` でも `/` でも始まらなければ、`{SETTINGS}: sandbox.filesystem.{key} has an unprefixed path {path}` を返す。
+- [ ] 4. テストが通り、`check-repo.py` が PASS になることを確かめる（今の設定は、すべて `~/` で始まる）。
+- [ ] 5. コミットする: `test(claude): reject unprefixed sandbox paths in user settings`
+
+<a name="task-11"></a>
+
+## Task 11: gstack の置き場所を Edit・Write ツールの書ける範囲に入れる（D7 の設定）
+
+**Files:**
+
+- Modify: `.github/scripts/check-repo.py`（定数と `check_edit_permissions`）
+- Modify: `.github/scripts/test-check-repo.py`
+- Modify: `claude/settings.json`（`permissions.additionalDirectories`）
+
+- [ ] 1. `test-check-repo.py` の `settings()` に `"additionalDirectories": ["~/.gstack/projects"]` を足し、次のテストを足す。
+  - `test_unexpected_additional_directory_fails`: `~/Dev` を足すと、`FAIL edit-permissions` と `~/Dev` が出る。作業ディレクトリとして数えられ、`blockWritesOutsideWorkingDirectories` が効かなくなるため。
+- [ ] 2. 失敗することを確かめる。
+- [ ] 3. `check-repo.py` に定数 `ADDITIONAL_DIRECTORIES = ("~/.gstack/projects",)` を足す。`permissions.additionalDirectories` にこれ以外があれば、`{SETTINGS}: permissions.additionalDirectories must not list {path}` を返す。コメントに、sandbox の allowWrite にも入っていて、Bash はもともと書けることを書く。
+- [ ] 4. テストが通ることを確かめる。
+- [ ] 5. `claude/settings.json` の `permissions` に `"additionalDirectories": ["~/.gstack/projects"]` を足す。
+- [ ] 6. `check-repo.py` が PASS になることを確かめる。
+- [ ] 7. コミットする: `fix(claude): let Edit and Write reach the gstack project directory`
+
+<a name="task-12"></a>
+
+## Task 12: 文書を更新する（D7 の説明と D9 の記録）
+
+**Files:**
+
+- Modify: `claude/CLAUDE.md`（グローバルの指示。「Safety」の節）
+- Modify: `CLAUDE.md`、`.claude/rules/CLAUDE_CONFIG.md`
+- Modify: `docs/work/20261114_edit-write-rules/research-edit-write.md`（8 章）、`test-report.md`（7 章）
+
+- [ ] 1. `claude/CLAUDE.md` の「Safety」に、次の 4 つを 1 行ずつ足す。
+  - Edit・Write ツールは、作業ディレクトリの外と Claude Code の設定ファイルに書けない。外に書く必要があるときは人間に `/add-dir` を頼み、この設定を外すことは提案しない。
+  - worktree は人間に `claude -w <name>` で作ってもらう（EnterWorktree は使えず、sandbox の中の `git worktree add` は途中で失敗する）。
+  - sandbox の中の git が、mise の設定（`mise.toml`・`.tool-versions` など）で `unable to unlink` や `Operation not permitted` を出したら、続けずに `git status` を確かめて報告する。その状態の作業ツリーをコミットしない。
+  - 起動したディレクトリが `~` や `~/Dev` のように複数のリポジトリを含むときは、作業ディレクトリの外を止める設定が効かないので、最初に人間に伝える。
+- [ ] 2. `CLAUDE.md` の「Edit・Write ツールの書き込み」に `~/.gstack/projects` を書き、禁止事項に `additionalDirectories` に足さないことを書く。接頭辞の禁止事項に、`edit-permissions` が失敗することを書き足す。
+- [ ] 3. `.claude/rules/CLAUDE_CONFIG.md` に、`//**/` を併記する理由（D6）、`additionalDirectories` の理由（D7）、接頭辞の検査（D8）を書く。
+- [ ] 4. research の 8 章に、D9 の経路を書く。次の作業の候補と順番（1. mise の paranoid、2. ハードリンク・大文字小文字のダミーでの確認、3. 権限の規則から変換された denyRead・denyWrite の `**/` の確認（env-zsh の `.env` を含む）、4. submodule の config と hooks・`.git` ファイル・core.hooksPath、5. 元のチェックアウトから worktree の `claude/`、6. `*.pem` の範囲）も書く。test-report の 7 章からリンクする。
+- [ ] 5. `check-repo.py` が PASS になることを確かめる。
+- [ ] 6. コミットする: `docs: describe the Edit and Write rules for every repository`
+
+<a name="task-13"></a>
+
+## Task 13: 人間のセッションで確かめる（D6・D7）
+
+- [ ] 1. 人間が、規則のファイルを作り直す。`additionalDirectories` も取り出す。
+  ```sh
+  cd ~/dotfiles/.claude/worktrees/fix+edit-write-rules
+  jq '{permissions: (.permissions | {blockWritesOutsideWorkingDirectories, additionalDirectories, deny, ask}), sandbox: {filesystem: .sandbox.filesystem}}' claude/settings.json > "$TMPDIR/edit-write-rules.json"
+  mkdir -p ~/cc-probe2
+  ```
+- [ ] 2. worktree で `claude --settings "$TMPDIR/edit-write-rules.json"` を起動し、`/add-dir ~/cc-probe2` を実行してから、下の表を試す。確認の画面には「No」と答える。
+- [ ] 3. 人間が `~/cc-probe2`、`~/.gstack/projects/cc-probe.txt`、worktree の `tmp-probe` を消す。
+- [ ] 4. 期待と違った項目は、[特に確かめること](#review-focus)の 7・8 のとおりにする。
+- [ ] 5. test-report に T11〜T15 の結果を足し、コミットする: `docs: record the root-anchored rule and gstack directory checks`
+
+| # | 試すこと | 期待する結果 |
+| --- | --- | --- |
+| T11 | Write ツールで `~/cc-probe2/mise.toml` を作る | 確認の画面が出る（D6） |
+| T12 | Write ツールで `~/cc-probe2/.git/hooks/pre-commit` を作る | 規則で拒否される（D6） |
+| T13 | Write ツールで `~/.gstack/projects/cc-probe.txt` を作る | 作れる（D7） |
+| T14 | Write ツールで `~/block-test.txt` を作る | 拒否される（T1 と同じ） |
+| T15 | Write ツールで `tmp-probe/.tool-versions` を作る | 確認の画面が出る（T5 と同じ） |
 
 <a name="task-8"></a>
 
 ## Task 8: レビューと PR
+
+Task 13 の後に行う。1 の検査を実行し直し、/review を差分（Task 9〜13）に対してもう一度行ってから、2 に進む。
 
 - [ ] 1. 次を実行し、すべて通ることを確かめる。
   - `python3 -B .github/scripts/check-repo.py`
@@ -237,4 +354,5 @@ created: 2026-11-14
 - **`blockReadsOutsideWorkingDirectories`:** ほかのリポジトリを読む作業が多いので、採らない。
 - **作業ディレクトリの中の、そのほかの保護パス（`.vscode`・`.mcp.json` など）:** auto mode の判定に任せる（[research 8 章](research-edit-write.md#residual-risks)）。
 - **auto memory の `.md`:** 塞ぐ手段がないので、残るリスクとして research に書いた。
+- **/review で見つかった、この PR の規則の外にある経路（D9）:** git の index 経由の mise の設定、ハードリンク・大文字小文字、submodule の config と hooks、`.git` ファイル、core.hooksPath、`.claude/hooks` や mise の設定から呼ぶスクリプト、元のチェックアウトから worktree の `claude/`、env-zsh の `.env`、`*.pem` の範囲。Task 12 で research の 8 章に書き、次の作業にする。
 - **マージの後のメモリの更新:** 「worktree を出た後に denyWrite が古く残る」のメモリに、EnterWorktree が使えなくなったことを書き足す。
