@@ -24,7 +24,8 @@ CRIT_DENY = ["Read(~/.cc-crit/**)", "Edit(~/.crit/**)", "Edit(~/.crit.config.jso
 CRIT_DENY_READ = ["~/.cc-crit"]
 LIMA_DENY = ["Read(~/.colima/_lima/_config/**)", "Read(~/.lima/_config/**)"]
 LIMA_DENY_READ = ["~/.colima/_lima/_config", "~/.lima/_config"]
-EDIT_DENY = ["Edit(**/.git/**/hooks/**)", "Edit(//**/.git/**/hooks/**)"]
+EDIT_DENY = ["Edit(**/.git/**/hooks/**)"]
+EDIT_ASK = ["Edit(//**/.git/**/hooks/**)", "Edit(//**/.git/config)"]
 MISE_CONFIG = [
     "**/mise.toml",
     "**/.mise.toml",
@@ -83,7 +84,7 @@ def settings():
         "permissions": {
             "allow": [f"Bash({c})" for c in WRAPPER_COMMANDS],
             "deny": list(DENY_PUSH) + CRIT_DENY + LIMA_DENY + EDIT_DENY,
-            "ask": list(MISE_ASK),
+            "ask": list(MISE_ASK) + EDIT_ASK,
             "blockWritesOutsideWorkingDirectories": True,
             "additionalDirectories": ["~/.gstack/projects"],
         },
@@ -316,12 +317,23 @@ class CheckRepoTests(unittest.TestCase):
         self.write_settings(data)
         self.assert_fails("FAIL edit-permissions", "Edit(**/mise.toml)")
 
-    def test_missing_root_anchored_hooks_deny_fails(self):
-        # 接頭辞のない形は起動したディレクトリが起点で、/add-dir で足したディレクトリに当たらない。
-        data = settings()
-        data["permissions"]["deny"].remove("Edit(//**/.git/**/hooks/**)")
-        self.write_settings(data)
-        self.assert_fails("FAIL edit-permissions", "Edit(//**/.git/**/hooks/**)")
+    def test_missing_root_anchored_git_ask_fails(self):
+        # 接頭辞のない形は起動したディレクトリが起点で、/add-dir で足したディレクトリに当たらない見込み。
+        for rule in EDIT_ASK:
+            with self.subTest(rule=rule):
+                data = settings()
+                data["permissions"]["ask"].remove(rule)
+                self.write_settings(data)
+                self.assert_fails("FAIL edit-permissions", f"permissions.ask lacks {rule}")
+
+    def test_root_anchored_git_deny_fails(self):
+        # deny は sandbox の denyWrite にもなり、// の形ではどこでも git init・git clone が hooks を写せなくなる。
+        for rule in EDIT_ASK:
+            with self.subTest(rule=rule):
+                data = settings()
+                data["permissions"]["deny"].append(rule)
+                self.write_settings(data)
+                self.assert_fails("FAIL edit-permissions", f"{rule} must not be a deny rule")
 
     def test_missing_root_anchored_mise_ask_fails(self):
         data = settings()

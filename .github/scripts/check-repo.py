@@ -51,8 +51,11 @@ DENY_PUSH = ("Bash(git push)", "Bash(git push *)", "Bash(git -C * push *)", "Bas
 WRITE_BLOCK = "blockWritesOutsideWorkingDirectories"
 # 作業ディレクトリの中で、人間が操作しなくても sandbox の外で動くもの。外は WRITE_BLOCK が止める。
 # hooks は、人間が git を使ったときに動く。
-# 接頭辞のない形は起動したディレクトリが起点で、/add-dir で足したディレクトリに当たらないので、// の形も置く。
-EDIT_DENY = ("Edit(**/.git/**/hooks/**)", "Edit(//**/.git/**/hooks/**)")
+EDIT_DENY = ("Edit(**/.git/**/hooks/**)",)
+# 接頭辞のない形は起動したディレクトリが起点で、/add-dir で足したディレクトリには当たらない見込みなので、// の形も置く。
+# deny にしない。Edit の deny は sandbox の denyWrite にもなり、// の形ではどこでも git init・git clone が
+# hooks のサンプルを写せなくなる。ask は sandbox に変換されない。
+EDIT_ASK = ("Edit(//**/.git/**/hooks/**)", "Edit(//**/.git/config)")
 # mise が読む設定。信頼済みのパスの hooks・_.source・exec() は、人間が cd したときに動く。
 MISE_CONFIG = (
     "**/mise.toml",
@@ -239,7 +242,8 @@ def check_edit_permissions(root):
                for path in permissions.get("additionalDirectories", []) if path not in ADDITIONAL_DIRECTORIES]
     deny, ask = set(permissions.get("deny", [])), set(permissions.get("ask", []))
     errors += [f"{SETTINGS}: permissions.deny lacks {rule}" for rule in EDIT_DENY if rule not in deny]
-    errors += [f"{SETTINGS}: permissions.ask lacks {rule}" for rule in MISE_ASK if rule not in ask]
+    errors += [f"{SETTINGS}: permissions.ask lacks {rule}" for rule in MISE_ASK + EDIT_ASK if rule not in ask]
+    errors += [f"{SETTINGS}: permissions.deny: {rule} must not be a deny rule" for rule in EDIT_ASK if rule in deny]
     filesystem = settings.get("sandbox", {}).get("filesystem", {})
     deny_write = filesystem.get("denyWrite", [])
     errors += [f"{SETTINGS}: sandbox.filesystem.denyWrite lacks {path}" for path in MISE_DENY_WRITE
