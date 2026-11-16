@@ -121,3 +121,4 @@ Claude Code の Bash ツール（sandbox の中）で、worktree の `07e8bf8` �
 - **ホームの外の mise の設定:** `~/**/` の形なので、`/tmp` に clone したものなどは、sandbox では守れない。Edit ツールの ask（`Edit(**/mise.toml)` など）は、作業ディレクトリの中ならどこでも効く。
 - **plan のファイルへの書き込み:** [特に確かめること](plan.md#review-focus)の 2 のうち、scratchpad だけを試した（T2）。plan のファイルは、ドキュメントでは止めない場所に入っている。
 - **マージの後:** 元のチェックアウトで `git pull` してセッションを起動し直した後、Write ツールで `~/block-test.txt` を作らせて拒否されることを、人間が確かめる（PR の本文に書く）。
+- **/review で見つかった、規則の外の経路:** git の index 経由の mise の設定、ハードリンク・大文字小文字、submodule の config と hooks など。[research 8.1](research-edit-write.md#review-gaps) にまとめ、次の作業にする（D9）。

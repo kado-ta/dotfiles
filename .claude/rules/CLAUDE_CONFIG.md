@@ -51,8 +51,10 @@ Edit・Write ツールは sandbox の外で動くので、`permissions` の規�
 
 - `blockWritesOutsideWorkingDirectories` は、作業ディレクトリの外（ほかのリポジトリの `.git/hooks`、`~/Library/LaunchAgents` など）への書き込みを、場所を並べずにまとめて止める。作業ディレクトリの中の設定ファイルも拒むのは、設定ファイルからこの設定を外せるため。
 - 作業ディレクトリの中でも、人間が操作しなくても sandbox の外で動くファイルは守る。`.git` の hooks は Edit を deny にしている（Bash は、sandbox が既定で `.git/hooks` と `.git/config` を止める。submodule の `.git/modules/*/` の下は、この一覧に入っていない）。mise の設定（`mise.toml`、`.tool-versions` など）は、Edit を ask にし、`sandbox.filesystem.denyWrite` にも入れている。mise は、信頼済みのパスに cd したときに、設定の hooks・`_.source`・`exec()` を動かすため。
-- mise の `denyWrite` は `~/**/` の形にしている。ユーザー設定の `sandbox.filesystem` のパスは、接頭辞がないと `~/.claude` が基準になり、作業ディレクトリに当たらない。権限の規則（`Read(...)`・`Edit(...)`）は、接頭辞がないとカレントディレクトリが基準なので、同じ `**/mise.toml` でも当たる場所が違う。ホームの外（`/tmp` に clone したものなど）は、sandbox では守れない。
+- mise の `denyWrite` は `~/**/` の形にしている。ユーザー設定の `sandbox.filesystem` のパスは、接頭辞がないと `~/.claude` が基準になり、作業ディレクトリに当たらない。権限の規則（`Read(...)`・`Edit(...)`）は、接頭辞がないとカレントディレクトリが基準なので、同じ `**/mise.toml` でも当たる場所が違う。ホームの外（`/tmp` に clone したものなど）は、sandbox では守れない。`check-repo.py` は、ユーザー設定の `denyRead`・`denyWrite`・`allowWrite`・`allowRead` の全項目が `~/` か `/` で始まることを確かめる。
+- `.git` の hooks と mise の Edit の規則は、接頭辞のない形と `//**/` の形を併記している。接頭辞のない形は起動したディレクトリが起点で、`/add-dir` で足したディレクトリに当たらない。`//**/` だけにしないのは、人間のセッションで確かめた形を残すため。
+- `permissions.additionalDirectories` に `~/.gstack/projects` を入れている。gstack のスキル（`/office-hours`・`/context-save` など）は、Write ツールでそこに書く。sandbox の allowWrite にも入っていて、Bash はもともと書けるので、書ける範囲は広がらない。設定ファイルの `additionalDirectories` は、そのディレクトリの `.claude` の設定を読み込まない。ほかのディレクトリを足すと、そこでは `blockWritesOutsideWorkingDirectories` が効かなくなるので、`check-repo.py` が失敗する。
 - `.claude/settings.json` の ask に `Edit(/claude/**)` があるのは、worktree ではユーザー設定の `Edit(~/dotfiles/claude/**)` が当たらないため。
 - Read の deny の `*.pem` を `~/**` に広げないのは、mise で入れた pip・Ruby・aws-cli の CA 証明書の束が `~/.local/share/mise` の下にあり、sandbox の中でそれらの HTTPS が失敗する見込みのため。
 
-経緯は [docs/work/20261114_edit-write-rules/research-edit-write.md](../../docs/work/20261114_edit-write-rules/research-edit-write.md) を参照する。
+経緯は [docs/work/20261114_edit-write-rules/research-edit-write.md](../../docs/work/20261114_edit-write-rules/research-edit-write.md) を参照する。この規則の外に残る経路と、次の作業の候補は、その [8 章](../../docs/work/20261114_edit-write-rules/research-edit-write.md#residual-risks) にある。

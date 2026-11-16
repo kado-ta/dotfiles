@@ -40,7 +40,7 @@ push は、元のリポジトリの設定とフックを読まないように、
 
 ### Edit・Write ツールの書き込み
 
-ユーザー設定で `permissions.blockWritesOutsideWorkingDirectories` をオンにしている。Edit・Write ツールは作業ディレクトリの外に書けず、Claude Code の設定ファイルは作業ディレクトリの中でも編集できない。外に書く必要があるときは、人間が `/add-dir` でディレクトリを足す。設定ファイルは人間が編集する。規則の理由は [.claude/rules/CLAUDE_CONFIG.md](.claude/rules/CLAUDE_CONFIG.md#edit-write-rules) にある。
+ユーザー設定で `permissions.blockWritesOutsideWorkingDirectories` をオンにしている。Edit・Write ツールは作業ディレクトリの外に書けず、Claude Code の設定ファイルは作業ディレクトリの中でも編集できない。外に書く必要があるときは、人間が `/add-dir` でディレクトリを足す。設定ファイルは人間が編集する。gstack の置き場所（`~/.gstack/projects`）は、`permissions.additionalDirectories` に入れているので書ける。規則の理由は [.claude/rules/CLAUDE_CONFIG.md](.claude/rules/CLAUDE_CONFIG.md#edit-write-rules) にある。
 
 worktree は `claude -w <name>` で始める。この設定では EnterWorktree・ExitWorktree を使えない。ブランチ名は `worktree-<name>` になるので、規約の名前（`fix/…` など）には `git branch -m <新しい名前>` で変える。sandbox が `.git/config` を守っているので、`could not lock config file` と出て終了コード 128 で終わるが、名前は変わる。元のブランチに `branch.<name>.*` の設定がなければ、影響はない。終了コードが 0 でないので、`&&` で後ろにコマンドをつながない。
 
@@ -52,7 +52,8 @@ worktree は `claude -w <name>` で始める。この設定では EnterWorktree�
 - `sandbox.network` の `allowUnixSockets`・`allowAllUnixSockets`・`allowLocalBinding` を設定しない（`check-repo.py` の `push-permissions` が失敗する）。
 - Colima（Lima）の VM に入る鍵（`~/.colima/_lima/_config`）を `denyRead` から外さない。
 - `permissions.blockWritesOutsideWorkingDirectories`、`.git` の hooks の Edit の deny、mise の設定の Edit の ask と `sandbox.filesystem.denyWrite` を外さない（`check-repo.py` の `edit-permissions` が失敗する）。
-- ユーザー設定の `sandbox.filesystem` に、接頭辞のないパスを書かない。`~/` か `/` で始める（接頭辞がないと `~/.claude` が基準になる）。
+- `permissions.additionalDirectories` に `~/.gstack/projects` 以外を足さない（`edit-permissions` が失敗する）。
+- ユーザー設定の `sandbox.filesystem` に、接頭辞のないパスを書かない。`~/` か `/` で始める（接頭辞がないと `~/.claude` が基準になる。`edit-permissions` が失敗する）。
 - Read の deny の `*.pem` を `~/**` に広げない。
 
 ## 規約

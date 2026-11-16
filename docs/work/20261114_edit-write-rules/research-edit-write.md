@@ -248,6 +248,33 @@ Read の deny の規則は、sandbox の `denyRead` にもなる（このセッ�
 - **作業ディレクトリの中の、人間が実行するもの:** `package.json` の scripts、Makefile、テストのスクリプトなど。人間が自分で実行を選ぶものなので、この作業の範囲外にする。
 - **作業ディレクトリの中の保護パス:** `.vscode`・`.mcp.json` などは、auto mode では判定に回るだけ。plan では `.git` の hooks だけを deny にする。
 
+<a name="review-gaps"></a>
+
+### 8.1 /review で見つかった、規則の外の経路（D9）
+
+2026-11-16 の /review（adversarial と red team のサブエージェント）で見つかった。どれもこの作業が持ち込んだものではない。実測していないものは「未確認」と書く。
+
+- **git の index 経由の mise の設定（未確認）:** sandbox の中から `git hash-object -w` と `git update-index --cacheinfo`（または `git commit`）で、作業ツリーに触れずに、mise の設定の中身を index やブランチに入れられる見込み。人間が `git restore`・`checkout`・`pull` などを実行したときに、sandbox の外で書かれる。dotfiles の `./mise.toml` にも前からある経路。
+- **mise の設定を追跡しているリポジトリの git 操作（未確認）:** `~/**/mise.toml` などの denyWrite のため、sandbox の中の checkout・switch・merge・rebase・pull は、mise の設定の書き換えで EPERM になり、途中で止まる見込み。git は HEAD と index を進めるので、古いファイルが変更ありに見え、続く `git add -A` で上流の変更を戻すおそれがある。該当するのは、sf_hpf_metadata・land_match_poc・hpf_login_guide・rplus_net の `mise.toml` と、sf_conn_api_spec の `.tool-versions`。グローバルの CLAUDE.md に、止まって報告するよう書いた。
+- **ハードリンクと大文字・小文字（未確認）:** パスで決める規則（sandbox の denyWrite と Edit の規則）を、ハードリンクや `MISE.TOML` のような名前で抜けられるか。
+- **権限の規則から変換された denyRead・denyWrite の `**/`（未確認）:** `Read(**/.ssh)`・`Edit(**/.env*)` などが、sandbox で作業ディレクトリに効くか（[test-report 7 章](test-report.md#not-verified)）。env-zsh（`config/sheldon/plugins.toml`）は、cd のたびに `.env` と `.env.term` を信頼の確認なしで読み込むので、mise と同じく守る対象になる。
+- **git の設定と hooks のほかの置き場所:** submodule の `.git/modules/*/config` と `hooks`、worktree の `config.worktree`、`claude -w` の worktree の `.git` ファイル（gitdir を書き換えられる）、作業ツリーの中の bare リポジトリ、`core.hooksPath` が作業ツリーの中を指すリポジトリ（husky、`.githooks` など。2026-11-16 の時点で、`~/Dev` の深さ 4 までにはない）。
+- **sandbox の外で動くものから呼ばれるファイル:** `.claude/settings.json` の hooks が呼ぶスクリプトと、mise の設定の `_.source`・`[hooks]`・`_.path` が指すファイル。設定ファイル本体だけを守っても、参照先は書ける。
+- **元のチェックアウトから worktree の `claude/`:** 元のチェックアウトのセッションでは、プロジェクト設定の `Edit(/claude/**)` と denyWrite の `./claude` が、`.claude/worktrees/<name>/claude/` に当たらない。
+- **起動したディレクトリ:** `~` や `~/Dev` で起動すると、すべてのリポジトリが作業ディレクトリに入り、`blockWritesOutsideWorkingDirectories` が効かない。Ghostty の新しいウィンドウは `~/Dev` で開く（`ghostty/config` の `working-directory`）。グローバルの CLAUDE.md に、最初に人間に伝えるよう書いた。
+- **`*.pem` の範囲:** `~/Dev` と作業ディレクトリの外の `.pem`（`~/Downloads` の EC2 のキーペアなど）は読める。CA 証明書の束を巻き込まない範囲（`~/Downloads/**` など）に絞って足す案がある。
+
+<a name="next-candidates"></a>
+
+### 8.2 次の作業の候補
+
+1. **mise の paranoid:** 信頼を、設定ファイルの中身のハッシュに結び付ける。Edit・Bash・git の index・ホームの外・`/add-dir` の経路を、まとめて塞げる見込み。代わりに、mise の設定を変えるたびに人間の `mise trust` が要る。採るなら、denyWrite を外して git の巻き込みをなくす案もある。
+2. **ハードリンクと大文字・小文字のダミーでの確認。**
+3. **権限の規則から変換された `**/` の確認**（env-zsh の `.env` を含む）。
+4. **git の設定と hooks のほかの置き場所**（submodule、`.git` ファイル、`core.hooksPath`、`safe.bareRepository`）。
+5. **元のチェックアウトから worktree の `claude/`。**
+6. **`*.pem` の範囲。**
+
 <a name="not-verified"></a>
 
 ## 9. 未確認のこと
