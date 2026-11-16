@@ -296,7 +296,7 @@ created: 2026-11-16
 
 Claude は sandbox の外でコマンドを実行できないので、次の 1 と 2 はユーザーに頼む。
 
-1. dotfiles の Claude Code で `! mise run claude:update` を実行する。各手順の `==>` の後に失敗が出ないこと（出たら、その出力をもとに直す）。
+1. dotfiles の Claude Code で `! /bin/bash ~/dotfiles/claude/scripts/update-skills.sh` を実行する（[レビューで変えたこと](#review-changes)を参照）。各手順の `==>` の後に失敗が出ないこと（出たら、その出力をもとに直す）。
 2. `git diff claude/settings.json` に `/Users/` がないこと。gstack がフックを登録していれば、`~/.claude/skills/gstack/...` になっていること。
 3. 案内に従って `/sync-skill-docs` を実行する（文書の修正はそのスキルの範囲）。
 4. PR の前に `/review` を実行し、指摘を直した後にブランチの差分を `/crit-review` で開く。`approved: true` が返ってから push と PR の作成を行う。
@@ -307,3 +307,20 @@ Claude は sandbox の外でコマンドを実行できないので、次の 1 �
 
 - 変更は追加だけ（新しいスクリプト 2 つ、テスト 2 つ、mise のタスク 1 つ、setup.sh の 1 行、文書）なので、コミットを revert すれば元に戻る。
 - 書き換えたのはコマンドの先頭の `<HOME>/` だけなので、意味は変わらない。settings.json を戻したいときは、gstack が作った `claude/settings.json.bak.*` か、git の履歴から戻す。
+
+<a name="review-changes"></a>
+
+## レビューで変えたこと
+
+`/review`（スペシャリスト 5、adversarial、Red Team）の指摘のうち、ユーザーが選んだものを直した（2026-11-16）。
+
+- **入口:** Claude Code からは `! /bin/bash ~/dotfiles/claude/scripts/update-skills.sh` で実行する。mise は dotfiles のルートの設定ファイル（`mise.local.toml` など）を自動で信頼して読み込み、ルートには sandbox から書けるため。`mise run claude:update` は端末用に残す。mise を通すほかのタスクにも同じ経路があるので、全体の対策は別の作業にする。
+- **update-skills.sh:**
+  - 先頭でホームに移る。gstack-upgrade が呼び出し元のリポジトリ（dotfiles）を検査して、失敗と表示しないようにするため。
+  - Python に `-I` を付ける。カレントディレクトリの `json.py` などを読み込まないようにするため。
+  - crit の profile テストは、mise を通さず絶対パスで実行する。
+  - プラグインの一覧が空のときも、失敗に数える。
+  - 終わりの案内を「再起動する前に `/sync-skill-docs`」の順にする。
+- **zsh の `gstack-upgrade` 関数:** 更新の後にも書き換える（`--check` のときは除く）。
+- **CI:** 新しいテスト 2 つを、macOS のジョブ（本番と同じ `/bin/bash` 3.2）で実行する。
+- **文書:** README と SKILL_INVENTORY の pstack・crit の記述を、まとめて更新する手順に合わせる。
