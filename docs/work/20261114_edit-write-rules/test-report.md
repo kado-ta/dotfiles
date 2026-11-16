@@ -16,7 +16,7 @@ created: 2026-11-16
 | macOS | 26.7.1 |
 | Claude Code | 2.1.325（[research 3.2](research-edit-write.md#trial-session) の試用は 2.1.323） |
 
-人間の確かめ（[5 章](#human-sessions)）は 2 回に分けて行った。1 回目は `7dc56c9`（設定は `c38cee3` と同じ）、2 回目は `07e8bf8` の設定を使った。/review の後の確かめ（[5.1](#human-sessions-review)）は、`7bc82dc` の設定を使った。
+人間の確かめ（[5 章](#human-sessions)）は 2 回に分けて行った。1 回目は `7dc56c9`（設定は `c38cee3` と同じ）、2 回目は `07e8bf8` の設定を使った。/review の後の確かめ（[5.1](#human-sessions-review)）は `7bc82dc`、2 回目の /review の後の確かめ（[5.2](#human-sessions-git)）は `aa618d0` の設定を使った。
 
 <a name="automated"></a>
 
@@ -123,10 +123,29 @@ Claude Code の Bash ツール（sandbox の中）で、worktree の `07e8bf8` �
 | T14 | Write ツールで `~/block-test.txt` を作る | 拒否された。文面の作業ディレクトリの一覧に `~/.gstack/projects` と `~/cc-probe2` が入っていた | 期待どおり |
 | T15 | Write ツールで `tmp-probe/.tool-versions` を作る | 確認の画面が出て、No で止まった | 期待どおり |
 
-- `~/cc-probe2` は作業ディレクトリの外なので、接頭辞のない形の規則は当たらない見込み。T11 と T12 は、`//**/` の形の規則によるものと考える（推測。接頭辞のない形だけの対照は試していない）。
+- T11 と T12 は、接頭辞のない形と `//**/` の形の両方が読み込まれた状態で試したので、どちらの規則に当たったかは区別できていない。後の T19・T20（[5.2](#human-sessions-git)）で、接頭辞のない deny が `~/cc-probe2` にも当たったので、接頭辞のない形も `/add-dir` のディレクトリに効いていたと考える。
 - T12 の `Edit(//**/.git/**/hooks/**)` は、この後の Task 14 で deny から ask に移した（sandbox の中の `git init`・`git clone` を壊す見込みのため）。今の設定での振る舞いは Task 17 の T19 で確かめる。
 - T13 と T14 の文面から、`additionalDirectories` の `~/` の形は、ホームのディレクトリとして解決されている。
 - 書き込みの後、ファイルは T13 の `cc-probe.txt` だけだった（確かめのセッションが `ls` で確認）。
+
+<a name="human-sessions-git"></a>
+
+### 5.2 2 回目の /review の後の確かめ（Task 17）
+
+`aa618d0` の設定を `--settings` で読ませた worktree のセッションで、人間が `/add-dir ~/cc-probe2` を実行してから試した（2026-11-16）。
+
+| # | 試したこと | 結果 | 判定 |
+| --- | --- | --- | --- |
+| T16 | Bash で `git init -q "$TMPDIR/git-probe"` | 成功（終了コード 0） | 期待どおり（D10） |
+| T17 | Bash で `python3 -B .github/scripts/test-check-repo.py` | 58 件 OK（`setUp` で `git init` する） | 期待どおり（D10） |
+| T18 | Bash で、`$TMPDIR` から `test-protect-main-branch.sh` | pass=94、fail=0 | 期待どおり（D10） |
+| T19 | Write ツールで `~/cc-probe2/.git/hooks/pre-commit` を作る | 確認の画面なしで、規則で拒否された（`File is in a directory that is denied by your permission settings.`） | 期待（確認の画面）より強い |
+| T20 | Write ツールで `~/cc-probe2/.git/config` を作る | T19 と同じ | 期待（確認の画面）より強い |
+| T21 | Write ツールで `tmp-probe/.git/hooks/pre-commit` を作る | T19 と同じ | 期待どおり |
+
+- T16〜T18 で、`//**/` の hooks の規則を ask に移した後は、sandbox の中の `git init` とこの repo のテストが通ることを確かめた。移す前の deny の形で失敗するかは、試していない（[research 8.1](research-edit-write.md#review-gaps) の推測のまま）。
+- T19・T20 の文面は deny の規則に当たったときのもので、ask なら確認の画面になり、`blockWritesOutsideWorkingDirectories` なら別の文面になる（T14）。`~/cc-probe2` の `.git/hooks` と `.git/config` に当たる deny は、接頭辞のない `Edit(**/.git/**/hooks/**)` と `Edit(**/.git/config)` だけなので、**接頭辞のない形も `/add-dir` のディレクトリに当たる**と判断した。D6 の前提（当たらない）は外れていた。
+- `//**/` の形は重複になるが、害はないので残した。文書は接頭辞のない形の起点をカレントディレクトリとしているので、`/cd` などで起点が変わったときの備えになる。
 
 <a name="notes"></a>
 

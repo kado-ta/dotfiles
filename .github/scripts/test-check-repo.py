@@ -322,7 +322,7 @@ class CheckRepoTests(unittest.TestCase):
         self.assert_fails("FAIL edit-permissions", "Edit(**/mise.toml)")
 
     def test_missing_root_anchored_git_ask_fails(self):
-        # 接頭辞のない形は起動したディレクトリが起点で、/add-dir で足したディレクトリに当たらない見込み。
+        # 接頭辞のない形の起点は、文書ではカレントディレクトリ。/cd などで起点が変わったときの備え。
         for rule in EDIT_ASK:
             with self.subTest(rule=rule):
                 data = settings()

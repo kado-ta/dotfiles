@@ -52,8 +52,8 @@ WRITE_BLOCK = "blockWritesOutsideWorkingDirectories"
 # 作業ディレクトリの中で、人間が操作しなくても sandbox の外で動くもの。外は WRITE_BLOCK が止める。
 # hooks は、人間が git を使ったときに動く。
 EDIT_DENY = ("Edit(**/.git/**/hooks/**)",)
-# 接頭辞のない形は起動したディレクトリが起点で、/add-dir で足したディレクトリには当たらない見込みなので、// の形も置く。
-# deny にしない。Edit の deny は sandbox の denyWrite にもなり、// の形ではどこでも git init・git clone が
+# 接頭辞のない形は /add-dir で足したディレクトリにも当たる（2026-11-16 に実測）。文書は起点をカレントディレクトリと
+# しているので、/cd などで起点が変わったときの備えに // の形も置く。deny にしない。Edit の deny は sandbox の denyWrite にもなり、// の形ではどこでも git init・git clone が
 # hooks のサンプルを写せなくなる。ask は sandbox に変換されない。
 EDIT_ASK = ("Edit(//**/.git/**/hooks/**)", "Edit(//**/.git/config)")
 # mise が読む設定。信頼済みのパスの hooks・_.source・exec() は、人間が cd したときに動く。
