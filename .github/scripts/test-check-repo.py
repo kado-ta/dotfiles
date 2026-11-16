@@ -24,7 +24,7 @@ CRIT_DENY = ["Read(~/.cc-crit/**)", "Edit(~/.crit/**)", "Edit(~/.crit.config.jso
 CRIT_DENY_READ = ["~/.cc-crit"]
 LIMA_DENY = ["Read(~/.colima/_lima/_config/**)", "Read(~/.lima/_config/**)"]
 LIMA_DENY_READ = ["~/.colima/_lima/_config", "~/.lima/_config"]
-EDIT_DENY = ["Edit(**/.git/**/hooks/**)"]
+EDIT_DENY = ["Edit(**/.git/**/hooks/**)", "Edit(//**/.git/**/hooks/**)"]
 MISE_CONFIG = [
     "**/mise.toml",
     "**/.mise.toml",
@@ -37,7 +37,7 @@ MISE_CONFIG = [
     "**/.config/mise/**",
     "**/.tool-versions",
 ]
-MISE_ASK = [f"Edit({p})" for p in MISE_CONFIG]
+MISE_ASK = [f"Edit({p})" for p in MISE_CONFIG] + [f"Edit(//{p})" for p in MISE_CONFIG]
 MISE_DENY_WRITE = ["~/" + p.removesuffix("/**") for p in MISE_CONFIG]
 PROJECT_ASK = [
     "Edit(/claude/**)",
@@ -314,6 +314,19 @@ class CheckRepoTests(unittest.TestCase):
         data["permissions"]["ask"].remove("Edit(**/mise.toml)")
         self.write_settings(data)
         self.assert_fails("FAIL edit-permissions", "Edit(**/mise.toml)")
+
+    def test_missing_root_anchored_hooks_deny_fails(self):
+        # 接頭辞のない形は起動したディレクトリが起点で、/add-dir で足したディレクトリに当たらない。
+        data = settings()
+        data["permissions"]["deny"].remove("Edit(//**/.git/**/hooks/**)")
+        self.write_settings(data)
+        self.assert_fails("FAIL edit-permissions", "Edit(//**/.git/**/hooks/**)")
+
+    def test_missing_root_anchored_mise_ask_fails(self):
+        data = settings()
+        data["permissions"]["ask"].remove("Edit(//**/mise.toml)")
+        self.write_settings(data)
+        self.assert_fails("FAIL edit-permissions", "Edit(//**/mise.toml)")
 
     def test_missing_mise_deny_write_fails(self):
         data = settings()

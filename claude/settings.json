@@ -158,6 +158,7 @@
       "Edit(**/.env*)",
       "Edit(**/.git/config)",
       "Edit(**/.git/**/hooks/**)",
+      "Edit(//**/.git/**/hooks/**)",
       "Edit(**/package-lock.json)",
       "Edit(**/pnpm-lock.yaml)",
       "Edit(**/yarn.lock)",
@@ -203,7 +204,17 @@
       "Edit(**/mise/conf.d/**)",
       "Edit(**/.mise/**)",
       "Edit(**/.config/mise/**)",
-      "Edit(**/.tool-versions)"
+      "Edit(**/.tool-versions)",
+      "Edit(//**/mise.toml)",
+      "Edit(//**/.mise.toml)",
+      "Edit(//**/mise.*.toml)",
+      "Edit(//**/.mise.*.toml)",
+      "Edit(//**/mise/config.toml)",
+      "Edit(//**/mise/config.*.toml)",
+      "Edit(//**/mise/conf.d/**)",
+      "Edit(//**/.mise/**)",
+      "Edit(//**/.config/mise/**)",
+      "Edit(//**/.tool-versions)"
     ],
     "disableBypassPermissionsMode": "disable",
     "blockWritesOutsideWorkingDirectories": true

@@ -51,7 +51,8 @@ DENY_PUSH = ("Bash(git push)", "Bash(git push *)", "Bash(git -C * push *)", "Bas
 WRITE_BLOCK = "blockWritesOutsideWorkingDirectories"
 # 作業ディレクトリの中で、人間が操作しなくても sandbox の外で動くもの。外は WRITE_BLOCK が止める。
 # hooks は、人間が git を使ったときに動く。
-EDIT_DENY = ("Edit(**/.git/**/hooks/**)",)
+# 接頭辞のない形は起動したディレクトリが起点で、/add-dir で足したディレクトリに当たらないので、// の形も置く。
+EDIT_DENY = ("Edit(**/.git/**/hooks/**)", "Edit(//**/.git/**/hooks/**)")
 # mise が読む設定。信頼済みのパスの hooks・_.source・exec() は、人間が cd したときに動く。
 MISE_CONFIG = (
     "**/mise.toml",
@@ -65,7 +66,7 @@ MISE_CONFIG = (
     "**/.config/mise/**",
     "**/.tool-versions",
 )
-MISE_ASK = tuple(f"Edit({p})" for p in MISE_CONFIG)
+MISE_ASK = tuple(f"Edit({p})" for p in MISE_CONFIG) + tuple(f"Edit(//{p})" for p in MISE_CONFIG)
 # Bash（sandbox の中）からも書かせない。denyWrite はディレクトリの中も止めるので、末尾の /** は付けない。
 # sandbox のパスは、接頭辞がないとユーザー設定では ~/.claude が基準になり、作業ディレクトリに当たらないので、~/ を付ける。
 MISE_DENY_WRITE = tuple("~/" + p.removesuffix("/**") for p in MISE_CONFIG)
