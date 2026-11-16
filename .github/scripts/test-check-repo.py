@@ -90,7 +90,11 @@ def settings():
         },
         "sandbox": {
             "excludedCommands": list(WRAPPER_COMMANDS),
-            "filesystem": {"denyRead": CRIT_DENY_READ + LIMA_DENY_READ, "denyWrite": list(MISE_DENY_WRITE)},
+            "filesystem": {
+                "allowWrite": ["~/.gstack/projects"],
+                "denyRead": CRIT_DENY_READ + LIMA_DENY_READ,
+                "denyWrite": list(MISE_DENY_WRITE),
+            },
         },
         "hooks": {
             "PreToolUse": [
@@ -360,6 +364,32 @@ class CheckRepoTests(unittest.TestCase):
         data["permissions"]["additionalDirectories"].append("~/Dev")
         self.write_settings(data)
         self.assert_fails("FAIL edit-permissions", "permissions.additionalDirectories must not list ~/Dev")
+
+    def test_additional_directory_without_allow_write_fails(self):
+        # additionalDirectories は、Bash がもともと書ける（sandbox の allowWrite にある）場所だけを許す。
+        data = settings()
+        data["sandbox"]["filesystem"]["allowWrite"] = []
+        self.write_settings(data)
+        self.assert_fails("FAIL edit-permissions", "sandbox.filesystem.allowWrite lacks ~/.gstack/projects")
+
+    def test_additional_directory_variants_fail(self):
+        # 前方一致にすると、隣の ~/.gstack/security（gstack の送信の記録）まで書けるようになる。
+        for path in ("~/.gstack/projects/../security", "~/.gstack", "~/.gstack/projects/"):
+            with self.subTest(path=path):
+                data = settings()
+                data["permissions"]["additionalDirectories"] = [path]
+                self.write_settings(data)
+                self.assert_fails("FAIL edit-permissions", f"must not list {path}")
+
+    def test_sandbox_path_prefix_boundaries(self):
+        data = settings()
+        data["sandbox"]["filesystem"]["denyRead"].append("/Library/Keychains")
+        self.write_settings(data)
+        self.assert_passes()
+        data = settings()
+        data["sandbox"]["filesystem"]["denyRead"].append("~.ssh")
+        self.write_settings(data)
+        self.assert_fails("FAIL edit-permissions", "unprefixed path ~.ssh")
 
     def test_unprefixed_sandbox_path_fails(self):
         # ユーザー設定では、~/ でも / でも始まらない sandbox のパスは ~/.claude が起点になり、黙って効かない。

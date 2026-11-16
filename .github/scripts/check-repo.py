@@ -245,6 +245,9 @@ def check_edit_permissions(root):
     errors += [f"{SETTINGS}: permissions.ask lacks {rule}" for rule in MISE_ASK + EDIT_ASK if rule not in ask]
     errors += [f"{SETTINGS}: permissions.deny: {rule} must not be a deny rule" for rule in EDIT_ASK if rule in deny]
     filesystem = settings.get("sandbox", {}).get("filesystem", {})
+    errors += [f"{SETTINGS}: sandbox.filesystem.allowWrite lacks {path} (listed in permissions.additionalDirectories)"
+               for path in permissions.get("additionalDirectories", [])
+               if path in ADDITIONAL_DIRECTORIES and path not in filesystem.get("allowWrite", [])]
     deny_write = filesystem.get("denyWrite", [])
     errors += [f"{SETTINGS}: sandbox.filesystem.denyWrite lacks {path}" for path in MISE_DENY_WRITE
                if path not in deny_write]
