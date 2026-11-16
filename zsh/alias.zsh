@@ -51,8 +51,13 @@ function ua-dashboard() {
 
 # gstack を最新版へ fast-forward し、./setup --refresh-registered を実行する（/gstack-upgrade の CLI 版）。
 # git リポジトリ内で実行するとそのリポジトリの検査も走るため、ホームディレクトリから実行する。
+# setup はフックを $HOME の絶対パスで claude/settings.json に登録するので、確認のみのとき以外は ~/ に戻す。
+# 途中で失敗しても書き込んでいることがあるので、更新の結果によらず実行し、更新の終了コードを返す。
 # - アップグレード: gstack-upgrade
 # - 確認のみ: gstack-upgrade --check
 function gstack-upgrade() {
-  (cd ~ && "$HOME/.claude/skills/gstack/bin/gstack-upgrade" "$@")
+  local rc=0
+  (cd ~ && "$HOME/.claude/skills/gstack/bin/gstack-upgrade" "$@") || rc=$?
+  [[ "${1:-}" == "--check" ]] || /usr/bin/python3 -I -B "$HOME/dotfiles/claude/scripts/settings-home-paths.py"
+  return $rc
 }
