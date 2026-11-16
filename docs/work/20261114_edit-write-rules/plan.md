@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: done
 created: 2026-11-14
 ---
 
@@ -344,15 +344,15 @@ created: 2026-11-14
 - Modify: `.github/scripts/test-check-repo.py`
 - Modify: `claude/settings.json`（`permissions.deny`・`ask`）
 
-- [ ] 1. テストを変える。`EDIT_DENY` を `["Edit(**/.git/**/hooks/**)"]` に戻し、`EDIT_ASK = ["Edit(//**/.git/**/hooks/**)", "Edit(//**/.git/config)"]` を足して `settings()` の ask に入れる。`test_missing_root_anchored_hooks_deny_fails` を、次の 2 つに置き換える。
+- [x] 1. テストを変える。`EDIT_DENY` を `["Edit(**/.git/**/hooks/**)"]` に戻し、`EDIT_ASK = ["Edit(//**/.git/**/hooks/**)", "Edit(//**/.git/config)"]` を足して `settings()` の ask に入れる。`test_missing_root_anchored_hooks_deny_fails` を、次の 2 つに置き換える。
   - `test_missing_root_anchored_git_ask_fails`: `EDIT_ASK` のそれぞれを ask から消すと、`FAIL edit-permissions` とその規則が出る（`subTest`）。
   - `test_root_anchored_git_deny_fails`: `EDIT_ASK` のそれぞれを deny に足すと、`FAIL edit-permissions` と `must not be a deny rule` が出る（`subTest`）。deny は sandbox の denyWrite にもなり、`git init`・`git clone` を壊すため。
-- [ ] 2. 失敗することを確かめる。
-- [ ] 3. `check-repo.py` に `EDIT_ASK` を足し、`EDIT_DENY` を戻す。`check_edit_permissions` で、`EDIT_ASK` が ask にあること、deny にないことを検査する。コメントに理由を書く。
-- [ ] 4. テストが通り、`check-repo.py` が `FAIL edit-permissions` になることを確かめる。
-- [ ] 5. `claude/settings.json` の deny から `Edit(//**/.git/**/hooks/**)` を外し、ask の `Edit(~/dotfiles/claude/**)` の次に `EDIT_ASK` の 2 つを足す。
-- [ ] 6. `check-repo.py` が PASS になることを確かめる。`grep -n -E " =[^= ]"` で空白の落ちを確かめる。
-- [ ] 7. コミットする: `fix(claude): ask instead of deny for root-anchored git rules`
+- [x] 2. 失敗することを確かめる。
+- [x] 3. `check-repo.py` に `EDIT_ASK` を足し、`EDIT_DENY` を戻す。`check_edit_permissions` で、`EDIT_ASK` が ask にあること、deny にないことを検査する。コメントに理由を書く。
+- [x] 4. テストが通り、`check-repo.py` が `FAIL edit-permissions` になることを確かめる。
+- [x] 5. `claude/settings.json` の deny から `Edit(//**/.git/**/hooks/**)` を外し、ask の `Edit(~/dotfiles/claude/**)` の次に `EDIT_ASK` の 2 つを足す。
+- [x] 6. `check-repo.py` が PASS になることを確かめる。`grep -n -E " =[^= ]"` で空白の落ちを確かめる。
+- [x] 7. コミットする: `fix(claude): ask instead of deny for root-anchored git rules`
 
 <a name="task-15"></a>
 
@@ -362,14 +362,14 @@ created: 2026-11-14
 
 - Modify: `.github/scripts/check-repo.py`、`.github/scripts/test-check-repo.py`
 
-- [ ] 1. テストを足す。`settings()` の filesystem に `"allowWrite": ["~/.gstack/projects"]` を足す。
+- [x] 1. テストを足す。`settings()` の filesystem に `"allowWrite": ["~/.gstack/projects"]` を足す。
   - `test_additional_directory_without_allow_write_fails`: allowWrite を空にすると、`FAIL edit-permissions` と `~/.gstack/projects` が出る。
   - `test_additional_directory_variants_fail`: `~/.gstack/projects/../security`・`~/.gstack`・`~/.gstack/projects/` のそれぞれで失敗する（`subTest`）。
   - `test_sandbox_path_prefix_boundaries`: denyRead に `/Library/Keychains` を足すと通り、`~.ssh` を足すと `unprefixed path ~.ssh` で失敗する。
-- [ ] 2. 新しいテストのうち、allowWrite の検査のものが失敗することを確かめる（ほかは今の実装でも通る見込み。通ったものは、境界を固定するテストとして残す）。
-- [ ] 3. `check_edit_permissions` に、`ADDITIONAL_DIRECTORIES` の各項目が `sandbox.filesystem.allowWrite` にあることの検査を足す（メッセージ: `sandbox.filesystem.allowWrite lacks {path} (listed in permissions.additionalDirectories)`）。
-- [ ] 4. テストと `check-repo.py` が通ることを確かめる。
-- [ ] 5. コミットする: `test(claude): pin the additional directory and sandbox path checks`
+- [x] 2. 新しいテストのうち、allowWrite の検査のものが失敗することを確かめる（ほかは今の実装でも通る見込み。通ったものは、境界を固定するテストとして残す）。
+- [x] 3. `check_edit_permissions` に、`ADDITIONAL_DIRECTORIES` の各項目が `sandbox.filesystem.allowWrite` にあることの検査を足す（メッセージ: `sandbox.filesystem.allowWrite lacks {path} (listed in permissions.additionalDirectories)`）。
+- [x] 4. テストと `check-repo.py` が通ることを確かめる。
+- [x] 5. コミットする: `test(claude): pin the additional directory and sandbox path checks`
 
 <a name="task-16"></a>
 
@@ -380,30 +380,30 @@ created: 2026-11-14
 - Modify: `claude/CLAUDE.md`、`CLAUDE.md`、`.claude/rules/CLAUDE_CONFIG.md`
 - Modify: `docs/work/20261114_edit-write-rules/research-edit-write.md`（8.1・8.2）、`test-report.md`
 
-- [ ] 1. `claude/CLAUDE.md` の「Safety」を直す。
+- [x] 1. `claude/CLAUDE.md` の「Safety」を直す。
   - `/add-dir` の行に、そのディレクトリの `.claude/skills`・`commands`・`agents` も読み込まれるので、書き込み先の最小のディレクトリだけを頼み、信頼していないリポジトリと sandbox から書ける場所（`$TMPDIR` など）は頼まないことを足す。
   - サブエージェントに `isolation: "worktree"` を使わない（編集が拒否される）。バックグラウンドのセッションは、人間に `claude --bg --worktree` で始めてもらう。
   - `~` や `~/Dev` で起動した行を、sandbox の書き込み範囲も広がるので、作業の前にリポジトリで起動し直すよう人間に頼む形にする。
-- [ ] 2. `CLAUDE.md`・`CLAUDE_CONFIG.md` を直す。`.git` の `//` の規則は ask で、deny にしない理由（sandbox の denyWrite になる）。接頭辞のない hooks の deny の、起動したディレクトリの中での副作用（入れ子のリポジトリの `git init`・`git clone`、`hooks` という名前の階層を含む refs）。「接頭辞のない形は `/add-dir` のディレクトリに当たらない」は、文書の「起点はカレントディレクトリ」からの推測と書く。`additionalDirectories` は sandbox の書き込み範囲にもなることと、allowWrite にもあることを検査していること。
-- [ ] 3. research の 8.1 に、`~/.gstack/projects` の symlink の経路を足し、8.2 の候補の 1 番目の次に入れる（D11）。
-- [ ] 4. test-report の 5.1 の、T11・T12 を `//**/` の形によるものとした判断を、推測と書き直す（接頭辞のない形だけの対照は試していない）。
-- [ ] 5. `check-repo.py` が PASS になることを確かめる。
-- [ ] 6. コミットする: `docs: correct the Edit and Write guidance after the second review`
+- [x] 2. `CLAUDE.md`・`CLAUDE_CONFIG.md` を直す。`.git` の `//` の規則は ask で、deny にしない理由（sandbox の denyWrite になる）。接頭辞のない hooks の deny の、起動したディレクトリの中での副作用（入れ子のリポジトリの `git init`・`git clone`、`hooks` という名前の階層を含む refs）。「接頭辞のない形は `/add-dir` のディレクトリに当たらない」は、文書の「起点はカレントディレクトリ」からの推測と書く。`additionalDirectories` は sandbox の書き込み範囲にもなることと、allowWrite にもあることを検査していること。
+- [x] 3. research の 8.1 に、`~/.gstack/projects` の symlink の経路を足し、8.2 の候補の 1 番目の次に入れる（D11）。
+- [x] 4. test-report の 5.1 の、T11・T12 を `//**/` の形によるものとした判断を、推測と書き直す（接頭辞のない形だけの対照は試していない）。
+- [x] 5. `check-repo.py` が PASS になることを確かめる。
+- [x] 6. コミットする: `docs: correct the Edit and Write guidance after the second review`
 
 <a name="task-17"></a>
 
 ## Task 17: 人間のセッションで確かめる（D10）
 
-- [ ] 1. 人間が、規則のファイルを作り直し、ダミーのディレクトリを作る。
+- [x] 1. 人間が、規則のファイルを作り直し、ダミーのディレクトリを作る。
   ```sh
   cd ~/dotfiles/.claude/worktrees/fix+edit-write-rules
   jq '{permissions: (.permissions | {blockWritesOutsideWorkingDirectories, additionalDirectories, deny, ask}), sandbox: {filesystem: .sandbox.filesystem}}' claude/settings.json > "$TMPDIR/edit-write-rules.json"
   mkdir -p ~/cc-probe2
   ```
-- [ ] 2. worktree で `claude --settings "$TMPDIR/edit-write-rules.json"` を起動し、`/add-dir ~/cc-probe2` を実行してから、下の表を試す。確認の画面には「No」と答える。
-- [ ] 3. 人間が `~/cc-probe2` と、worktree の `tmp-probe` を消す。
-- [ ] 4. 期待と違った項目は、[特に確かめること](#review-focus)の 9 のとおりにする。
-- [ ] 5. test-report に T16〜T21 の結果を足し、コミットする: `docs: record the sandboxed git checks`
+- [x] 2. worktree で `claude --settings "$TMPDIR/edit-write-rules.json"` を起動し、`/add-dir ~/cc-probe2` を実行してから、下の表を試す。確認の画面には「No」と答える。
+- [x] 3. 人間が `~/cc-probe2` と、worktree の `tmp-probe` を消す。
+- [x] 4. 期待と違った項目は、[特に確かめること](#review-focus)の 9 のとおりにする。
+- [x] 5. test-report に T16〜T21 の結果を足し、コミットする: `docs: record the sandboxed git checks`
 
 | # | 試すこと | 期待する結果 |
 | --- | --- | --- |
@@ -414,18 +414,21 @@ created: 2026-11-14
 | T20 | Write ツールで `~/cc-probe2/.git/config` を作る | 確認の画面が出る（D10） |
 | T21 | Write ツールで `tmp-probe/.git/hooks/pre-commit` を作る | 拒否される（接頭辞のない deny。T4 と同じ） |
 
+> [!NOTE]
+> T16〜T18 と T21 は期待どおりだった。T19・T20 は、確認の画面ではなく、接頭辞のない deny で拒否された。接頭辞のない形も `/add-dir` のディレクトリに当たるので、D6 の前提は外れていた。`//**/` の形は重複になるが、害はないので残した（[test-report 5.2](test-report.md#human-sessions-git)）。
+
 <a name="task-8"></a>
 
 ## Task 8: レビューと PR
 
 Task 17 の後に行う。1 の検査を実行し直してから 2 に進む（D13 により、3 回目の /review はしない）。
 
-- [ ] 1. 次を実行し、すべて通ることを確かめる。
+- [x] 1. 次を実行し、すべて通ることを確かめる。
   - `python3 -B .github/scripts/check-repo.py`
   - `python3 -B .github/scripts/test-check-repo.py`
   - `git ls-files -z '*.sh' '*.command' ':!:claude/hooks/herdr-agent-state.sh' | xargs -0 shellcheck -S warning`
   - `actionlint`
-- [ ] 2. 権限の境界の変更なので、Codex のレビューを提案する。人間が `!` で実行し、指摘の採否と理由を test-report に書く。
+- [x] 2. 権限の境界の変更なので、Codex のレビューを提案する。人間が `!` で実行し、指摘の採否と理由を test-report に書く。
 - [ ] 3. `cc-safe-push` で push し、`cc-safe-pr create` で PR を作る。本文に、マージの後に人間が行うことを書く。
   - 元のチェックアウトで `git pull` し、Claude Code のセッションをすべて起動し直す。
   - 起動したセッションで、Write ツールで `~/block-test.txt` を作らせ、拒否されることを確かめる。
