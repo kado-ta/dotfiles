@@ -53,8 +53,6 @@ jobs:
         run: |
           python3 -B claude/scripts/test-skills-check.py
           python3 -B claude/scripts/test-skill-usage.py
-          python3 -B claude/scripts/test-settings-home-paths.py
-          python3 -B claude/scripts/test-update-skills.py
 
       # herdr-agent-state.sh は herdr が生成・上書きするので対象外。
       - name: shellcheck
@@ -99,3 +97,9 @@ jobs:
             /usr/bin/python3 -B "$t" || rc=1
           done
           exit "$rc"
+
+      # 更新タスクは本番の /bin/bash 3.2 と /usr/bin/python3 で動くので、このジョブで確かめる。
+      - name: Update task tests
+        run: |
+          /usr/bin/python3 -B claude/scripts/test-settings-home-paths.py
+          /usr/bin/python3 -B claude/scripts/test-update-skills.py
