@@ -16,18 +16,18 @@ created: 2026-11-16
 | macOS | 26.7.1 |
 | Claude Code | 2.1.325（[research 3.2](research-edit-write.md#trial-session) の試用は 2.1.323） |
 
-人間の確かめ（[5 章](#human-sessions)）は 2 回に分けて行った。1 回目は `7dc56c9`（設定は `c38cee3` と同じ）、2 回目は `07e8bf8` の設定を使った。
+人間の確かめ（[5 章](#human-sessions)）は 2 回に分けて行った。1 回目は `7dc56c9`（設定は `c38cee3` と同じ）、2 回目は `07e8bf8` の設定を使った。/review の後の確かめ（[5.1](#human-sessions-review)）は、`7bc82dc` の設定を使った。
 
 <a name="automated"></a>
 
 ## 2. 自動テスト
 
-Claude Code の Bash ツール（sandbox の中）で、worktree の `07e8bf8` で実行した。
+Claude Code の Bash ツール（sandbox の中）で、worktree の `07e8bf8` で実行した。Task 9〜12 の後（`7bc82dc`）にも実行し、数字はその時点のもの。
 
 | コマンド | 結果 |
 | --- | --- |
 | `python3 -B .github/scripts/check-repo.py` | 9 項目 PASS（変更前は 8 項目。`edit-permissions` を足した） |
-| `python3 -B .github/scripts/test-check-repo.py` | 50 件 OK（変更前は 43 件） |
+| `python3 -B .github/scripts/test-check-repo.py` | 54 件 OK（変更前は 43 件） |
 | shellcheck / actionlint | 指摘なし |
 
 <a name="red-green"></a>
@@ -40,6 +40,9 @@ Claude Code の Bash ツール（sandbox の中）で、worktree の `07e8bf8` �
 | 3 | `test_missing_write_block_fails`、`test_write_block_not_true_fails` | `edit-permissions` の検査がなかった |
 | 4 | `test_missing_git_hooks_deny_fails`、`test_missing_mise_ask_fails`、`test_missing_mise_deny_write_fails` | `.git` の hooks の deny と、mise の ask・denyWrite を検査していなかった |
 | 7（T6 の修正） | `test_unprefixed_mise_deny_write_fails` と、テストの denyWrite の形 | `7dc56c9` の検査に変更後のテストを当てると、13 件が失敗した。理由はすべて、denyWrite の形が `**/` のままだったこと |
+| 9 | `test_missing_root_anchored_hooks_deny_fails`、`test_missing_root_anchored_mise_ask_fails` | `//**/` の形を検査していなかった |
+| 10 | `test_unprefixed_sandbox_path_fails`（4 つのリスト × 2 つのパスの 8 件） | mise の 10 項目のほかは、接頭辞を検査していなかった |
+| 11 | `test_unexpected_additional_directory_fails` | `additionalDirectories` を検査していなかった |
 
 <a name="measurements"></a>
 
@@ -106,6 +109,24 @@ Claude Code の Bash ツール（sandbox の中）で、worktree の `07e8bf8` �
   ```
 - **T10:** T9 の文面の後半（managed settings のフォルダを解決できない間は、どの `.json` も設定ファイルとして扱う）が気になったので足した。この Mac には `/Library/Application Support/ClaudeCode` がないが、設定と関係のない `.json` は作れた。この文面は、今の環境には当てはまらなかったと考える（推測）。
 
+<a name="human-sessions-review"></a>
+
+### 5.1 /review の後の確かめ（Task 13）
+
+`7bc82dc` の設定（`additionalDirectories` も含む）を `--settings` で読ませた worktree のセッションで、人間が `/add-dir ~/cc-probe2` を実行してから試した（2026-11-16）。
+
+| # | 試したこと | 結果 | 判定 |
+| --- | --- | --- | --- |
+| T11 | Write ツールで `~/cc-probe2/mise.toml` を作る | 確認の画面が出て、No で止まった（`User rejected write`） | 期待どおり（D6） |
+| T12 | Write ツールで `~/cc-probe2/.git/hooks/pre-commit` を作る | 確認の画面なしで、規則で拒否された（`File is in a directory that is denied by your permission settings.`） | 期待どおり（D6） |
+| T13 | Write ツールで `~/.gstack/projects/cc-probe.txt` を作る | 作れた（`Allowed by auto mode`） | 期待どおり（D7） |
+| T14 | Write ツールで `~/block-test.txt` を作る | 拒否された。文面の作業ディレクトリの一覧に `~/.gstack/projects` と `~/cc-probe2` が入っていた | 期待どおり |
+| T15 | Write ツールで `tmp-probe/.tool-versions` を作る | 確認の画面が出て、No で止まった | 期待どおり |
+
+- `~/cc-probe2` は作業ディレクトリの外なので、接頭辞のない形の規則は当たらない。T11 と T12 は、`//**/` の形の規則によるものと判断した。
+- T13 と T14 の文面から、`additionalDirectories` の `~/` の形は、ホームのディレクトリとして解決されている。
+- 書き込みの後、ファイルは T13 の `cc-probe.txt` だけだった（確かめのセッションが `ls` で確認）。
+
 <a name="notes"></a>
 
 ## 6. 気づいたこと
@@ -118,7 +139,7 @@ Claude Code の Bash ツール（sandbox の中）で、worktree の `07e8bf8` �
 ## 7. 確かめていないこと
 
 - **権限の規則から変換された denyRead の `**/` の形:** `Read(**/.ssh)` などが sandbox の `denyRead` になったとき、作業ディレクトリの中に効くか。ダミーの `x.key` を作って sandbox の中から読む測定が、権限の判定で拒否された。`**/.env*`・`**/*.key` などには `~/**` の対があるので、ホームの下は守られている。対がないのは `**/.ssh` など。
-- **ホームの外の mise の設定:** `~/**/` の形なので、`/tmp` に clone したものなどは、sandbox では守れない。Edit ツールの ask（`Edit(**/mise.toml)` など）は、作業ディレクトリの中ならどこでも効く。
+- **ホームの外の mise の設定:** `~/**/` の形なので、`/tmp` に clone したものなどは、sandbox では守れない。Edit ツールの ask は `//**/` の形も置いたので、ホームの外と `/add-dir` のディレクトリにも効く（T11）。
 - **plan のファイルへの書き込み:** [特に確かめること](plan.md#review-focus)の 2 のうち、scratchpad だけを試した（T2）。plan のファイルは、ドキュメントでは止めない場所に入っている。
 - **マージの後:** 元のチェックアウトで `git pull` してセッションを起動し直した後、Write ツールで `~/block-test.txt` を作らせて拒否されることを、人間が確かめる（PR の本文に書く）。
 - **/review で見つかった、規則の外の経路:** git の index 経由の mise の設定、ハードリンク・大文字小文字、submodule の config と hooks など。[research 8.1](research-edit-write.md#review-gaps) にまとめ、次の作業にする（D9）。
