@@ -70,6 +70,8 @@ MISE_ASK = tuple(f"Edit({p})" for p in MISE_CONFIG) + tuple(f"Edit(//{p})" for p
 # Bash（sandbox の中）からも書かせない。denyWrite はディレクトリの中も止めるので、末尾の /** は付けない。
 # sandbox のパスは、接頭辞がないとユーザー設定では ~/.claude が基準になり、作業ディレクトリに当たらないので、~/ を付ける。
 MISE_DENY_WRITE = tuple("~/" + p.removesuffix("/**") for p in MISE_CONFIG)
+# ユーザー設定のこれらのリストは、~/ でも / でも始まらないパスが ~/.claude を起点にし、黙って効かない。
+SANDBOX_PATH_LISTS = ("denyRead", "denyWrite", "allowWrite", "allowRead")
 JSONC_FILES = {"vscode/settings.json", "vscode/keybindings.json"}
 SETTINGS = "claude/settings.json"
 PROJECT_SETTINGS = ".claude/settings.json"
@@ -233,9 +235,13 @@ def check_edit_permissions(root):
     deny, ask = set(permissions.get("deny", [])), set(permissions.get("ask", []))
     errors += [f"{SETTINGS}: permissions.deny lacks {rule}" for rule in EDIT_DENY if rule not in deny]
     errors += [f"{SETTINGS}: permissions.ask lacks {rule}" for rule in MISE_ASK if rule not in ask]
-    deny_write = settings.get("sandbox", {}).get("filesystem", {}).get("denyWrite", [])
+    filesystem = settings.get("sandbox", {}).get("filesystem", {})
+    deny_write = filesystem.get("denyWrite", [])
     errors += [f"{SETTINGS}: sandbox.filesystem.denyWrite lacks {path}" for path in MISE_DENY_WRITE
                if path not in deny_write]
+    errors += [f"{SETTINGS}: sandbox.filesystem.{key} has an unprefixed path {path}"
+               for key in SANDBOX_PATH_LISTS for path in filesystem.get(key, [])
+               if not path.startswith(("~/", "/"))]
     return errors
 
 

@@ -341,6 +341,16 @@ class CheckRepoTests(unittest.TestCase):
         self.write_settings(data)
         self.assert_fails("FAIL edit-permissions", "~/**/mise.toml")
 
+    def test_unprefixed_sandbox_path_fails(self):
+        # ユーザー設定では、~/ でも / でも始まらない sandbox のパスは ~/.claude が起点になり、黙って効かない。
+        for key in ("denyRead", "denyWrite", "allowWrite", "allowRead"):
+            for path in ("**/.ssh", "./secrets"):
+                with self.subTest(key=key, path=path):
+                    data = settings()
+                    data["sandbox"]["filesystem"].setdefault(key, []).append(path)
+                    self.write_settings(data)
+                    self.assert_fails("FAIL edit-permissions", f"sandbox.filesystem.{key} has an unprefixed path {path}")
+
     def test_missing_push_deny_fails(self):
         data = settings()
         data["permissions"]["deny"].remove("Bash(git -C * push *)")
