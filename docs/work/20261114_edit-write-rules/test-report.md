@@ -14,7 +14,7 @@ created: 2026-11-16
 | 項目 | 版 |
 | --- | --- |
 | macOS | 26.7.1 |
-| Claude Code | 2.1.325（[research 3.3](research-edit-write.md) の試用は 2.1.323） |
+| Claude Code | 2.1.325（[research 3.2](research-edit-write.md#trial-session) の試用は 2.1.323） |
 
 人間の確かめ（[5 章](#human-sessions)）は 2 回に分けて行った。1 回目は `7dc56c9`（設定は `c38cee3` と同じ）、2 回目は `07e8bf8` の設定を使った。
 

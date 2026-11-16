@@ -252,10 +252,12 @@ Read の deny の規則は、sandbox の `denyRead` にもなる（このセッ�
 
 ## 9. 未確認のこと
 
-| 項目 | 理由 | 扱い |
+この章を書いた時点で未確認だった項目。どれも、後の Task で確かめた。
+
+| 項目 | 理由 | 結果 |
 | --- | --- | --- |
-| 元のチェックアウトの `claude/settings.json` を、`blockWritesOutsideWorkingDirectories` が止めるか | 試験は worktree で行った | plan の Task 7 で確かめる |
-| `Read(~/**/credentials)` がディレクトリの中身まで止めるか | 試験用のファイルの作成が拒否された | plan の Task 5 で、人間がファイルを作って確かめる |
-| sandbox の `denyWrite` の `~/**/` の形が、作業ディレクトリの中に効くか | 未実施。`**/` の形は効かなかった（[3.5](#probe-sandbox-anchor)） | plan の Task 7 の T6 をやり直す（D4） |
-| `Edit(**/.git/**/hooks/**)` のように、途中に `**` を置いた規則が、`.git/hooks` に当たるか | 未実施 | plan の Task 7 |
-| `claude -w` の worktree で `git branch -m` が使えるか | EnterWorktree の worktree でだけ試した | plan の Task 6 で、文書に書く前に人間が確かめる |
+| 元のチェックアウトの `claude/settings.json` を、`blockWritesOutsideWorkingDirectories` が止めるか | 試験は worktree で行った | 確認の画面なしで拒否された（[test-report の T9](test-report.md#human-sessions)） |
+| `Read(~/**/credentials)` がディレクトリの中身まで止めるか | 試験用のファイルの作成が拒否された | 中身まで止まる（[test-report 4.1](test-report.md#measure-credentials)） |
+| sandbox の `denyWrite` の `~/**/` の形が、作業ディレクトリの中に効くか | `**/` の形は効かなかった（[3.5](#probe-sandbox-anchor)） | 効く（[test-report の T6](test-report.md#human-sessions)） |
+| `Edit(**/.git/**/hooks/**)` のように、途中に `**` を置いた規則が、`.git/hooks` に当たるか | 未実施 | 両方の深さに当たる（[test-report の T4](test-report.md#human-sessions)） |
+| `claude -w` の worktree で `git branch -m` が使えるか | EnterWorktree の worktree でだけ試した | 名前は変わるが、終了コードは 128（[test-report 4.2](test-report.md#measure-branch-rename)） |

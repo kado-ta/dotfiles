@@ -50,7 +50,7 @@ Claude から Crit の対話レビューを開くときは、`claude/bin/cc-crit
 Edit・Write ツールは sandbox の外で動くので、`permissions` の規則で守る。使い方はルートの [CLAUDE.md](../../CLAUDE.md#edit-write-rules) にある。
 
 - `blockWritesOutsideWorkingDirectories` は、作業ディレクトリの外（ほかのリポジトリの `.git/hooks`、`~/Library/LaunchAgents` など）への書き込みを、場所を並べずにまとめて止める。作業ディレクトリの中の設定ファイルも拒むのは、設定ファイルからこの設定を外せるため。
-- 作業ディレクトリの中でも、人間が操作しなくても sandbox の外で動くファイルは守る。`.git` の hooks は Edit を deny にしている（Bash は sandbox が既定で止める）。mise の設定（`mise.toml`、`.tool-versions` など）は、Edit を ask にし、`sandbox.filesystem.denyWrite` にも入れている。mise は、信頼済みのパスに cd したときに、設定の hooks・`_.source`・`exec()` を動かすため。
+- 作業ディレクトリの中でも、人間が操作しなくても sandbox の外で動くファイルは守る。`.git` の hooks は Edit を deny にしている（Bash は、sandbox が既定で `.git/hooks` と `.git/config` を止める。submodule の `.git/modules/*/` の下は、この一覧に入っていない）。mise の設定（`mise.toml`、`.tool-versions` など）は、Edit を ask にし、`sandbox.filesystem.denyWrite` にも入れている。mise は、信頼済みのパスに cd したときに、設定の hooks・`_.source`・`exec()` を動かすため。
 - mise の `denyWrite` は `~/**/` の形にしている。ユーザー設定の `sandbox.filesystem` のパスは、接頭辞がないと `~/.claude` が基準になり、作業ディレクトリに当たらない。権限の規則（`Read(...)`・`Edit(...)`）は、接頭辞がないとカレントディレクトリが基準なので、同じ `**/mise.toml` でも当たる場所が違う。ホームの外（`/tmp` に clone したものなど）は、sandbox では守れない。
 - `.claude/settings.json` の ask に `Edit(/claude/**)` があるのは、worktree ではユーザー設定の `Edit(~/dotfiles/claude/**)` が当たらないため。
 - Read の deny の `*.pem` を `~/**` に広げないのは、mise で入れた pip・Ruby・aws-cli の CA 証明書の束が `~/.local/share/mise` の下にあり、sandbox の中でそれらの HTTPS が失敗する見込みのため。
