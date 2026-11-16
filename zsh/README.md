@@ -146,7 +146,7 @@ exec zsh
 | `L` / `G`（グローバル）                     | `\| less` / `\| grep`                                                    |
 | `codex-config-sync` / `codex-config-import` | Codex 設定の同期・取り込み（[codex/README.md](../codex/README.md) 参照） |
 | `ua-dashboard [dir]`                        | Understand Anything のダッシュボードを起動（関数）                       |
-| `gstack-upgrade [--check]`                  | gstack を最新版へ更新（`--check` は確認のみ）（関数）                    |
+| `gstack-upgrade [--check]`                  | gstack を最新版へ更新し、settings.json の絶対パスを `~/` に戻す（`--check` は確認のみ）（関数） |
 
 ### プラグイン（`config/sheldon/plugins.toml`）
 

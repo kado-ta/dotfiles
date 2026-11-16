@@ -45,15 +45,37 @@ link "${SCRIPT_DIR}/hooks" "${CLAUDE_DIR}/hooks"
 [ -d "${CLAUDE_DIR}/scripts" ] || mkdir -p "${CLAUDE_DIR}/scripts"
 link "${SCRIPT_DIR}/scripts/statusline.sh" "${CLAUDE_DIR}/scripts/statusline.sh"
 
+# プラグインが user スコープに入っているかを返す。
+# claude plugins list は、全プロジェクトの project・local スコープのものも、無効なものも返す。
+# ID だけで判定すると、別のプロジェクトにだけ入っているときに user スコープへのインストールを飛ばしてしまう。
+plugin_installed_for_user() {
+  claude plugins list --json 2>/dev/null | /usr/bin/python3 -c '
+import json, sys
+plugins = json.load(sys.stdin)
+sys.exit(not any(p.get("id") == sys.argv[1] and p.get("scope") == "user" for p in plugins))
+' "$1"
+}
+
+# マーケットプレイスが追加済みかを返す。
+# grep -q は一致した時点で読むのをやめるので、pipefail の下では claude が SIGPIPE で失敗し、
+# 追加済みでも未追加と判定して marketplace add を実行しうる。JSON を最後まで読んで判定する。
+marketplace_added() {
+  claude plugins marketplace list --json 2>/dev/null | /usr/bin/python3 -c '
+import json, sys
+marketplaces = json.load(sys.stdin)
+sys.exit(not any(m.get("name") == sys.argv[1] for m in marketplaces))
+' "$1"
+}
+
 # Install Superpowers
-if claude plugins list 2>/dev/null | grep -q " superpowers@claude-plugins-official$"; then
+if plugin_installed_for_user superpowers@claude-plugins-official; then
   echo "superpowers plugin already installed, skipping"
 else
   claude plugins install superpowers@claude-plugins-official
 fi
 
 # Install claude-code-setup
-if claude plugins list 2>/dev/null | grep -q " claude-code-setup@claude-plugins-official$"; then
+if plugin_installed_for_user claude-code-setup@claude-plugins-official; then
   echo "claude-code-setup plugin already installed, skipping"
 else
   claude plugins install claude-code-setup@claude-plugins-official
@@ -61,7 +83,7 @@ fi
 
 # Install ruby-lsp
 # LSP サーバーの ruby-lsp コマンドは含まれないので、別途 gem で入れて PATH に通す。
-if claude plugins list 2>/dev/null | grep -q " ruby-lsp@claude-plugins-official$"; then
+if plugin_installed_for_user ruby-lsp@claude-plugins-official; then
   echo "ruby-lsp plugin already installed, skipping"
 else
   claude plugins install ruby-lsp@claude-plugins-official
@@ -69,28 +91,28 @@ fi
 
 # Install crit
 # settings.json の extraKnownMarketplaces だけではマーケットプレイスが取得されず、install が失敗する。
-if claude plugins list 2>/dev/null | grep -q " crit@crit$"; then
+if plugin_installed_for_user crit@crit; then
   echo "crit plugin already installed, skipping"
 else
-  claude plugins marketplace list 2>/dev/null | grep -q " crit$" || claude plugins marketplace add tomasz-tomczyk/crit
+  marketplace_added crit || claude plugins marketplace add tomasz-tomczyk/crit
   claude plugins install crit@crit
 fi
 
 # Install understand-anything
 # crit と同じく、マーケットプレイスを先に追加しないと install が失敗する。
-if claude plugins list 2>/dev/null | grep -q " understand-anything@understand-anything$"; then
+if plugin_installed_for_user understand-anything@understand-anything; then
   echo "understand-anything plugin already installed, skipping"
 else
-  claude plugins marketplace list 2>/dev/null | grep -q " understand-anything$" || claude plugins marketplace add Egonex-AI/Understand-Anything
+  marketplace_added understand-anything || claude plugins marketplace add Egonex-AI/Understand-Anything
   claude plugins install understand-anything@understand-anything
 fi
 
 # Install pstack
 # crit と同じく、マーケットプレイスを先に追加しないと install が失敗する。
-if claude plugins list 2>/dev/null | grep -q " pstack@cursor-plugins$"; then
+if plugin_installed_for_user pstack@cursor-plugins; then
   echo "pstack plugin already installed, skipping"
 else
-  claude plugins marketplace list 2>/dev/null | grep -q " cursor-plugins$" || claude plugins marketplace add cursor/plugins
+  marketplace_added cursor-plugins || claude plugins marketplace add cursor/plugins
   claude plugins install pstack@cursor-plugins
 fi
 
@@ -102,14 +124,30 @@ if [ -d "${GSTACK_DIR}" ]; then
 else
   git clone --single-branch --depth 1 https://github.com/garrytan/gstack.git "${GSTACK_DIR}"
 fi
+# ~/.gstack/config.yaml は dotfiles にリンクせず、新しいマシンでも残したいキーだけをここで設定する。
+# gstack-config は一時ファイルを mv して書き換えるので、リンクは実ファイルに置き換わる。
+# リンク先を dotfiles に置くと、dotfiles で起動したセッションの sandbox からも書けるようになる。
+# setup が redact_prepush_hook の確認で止まらないように、setup の前に設定する。
+# - telemetry: 既定も off だが、外部への送信に関わるので明示する。
+# - update_channel: 既定の auto は team_mode でなければ main を追い、main へのマージごとに更新される。
+# - routing_declined: CLAUDE.md にスキルのルーティングを書き足すかの確認を出さない。
+# - redact_prepush_hook: /ship が各リポジトリに認証情報の pre-push フックを入れることへの同意。/ship は無効にしている。
+GSTACK_CONFIG="${GSTACK_DIR}/bin/gstack-config"
+"${GSTACK_CONFIG}" set telemetry off
+"${GSTACK_CONFIG}" set update_channel stable
+"${GSTACK_CONFIG}" set routing_declined true
+"${GSTACK_CONFIG}" set redact_prepush_hook true
 # clone 後の setup が途中で失敗しても、再実行で回復できるように毎回実行する。
 # "${GSTACK_DIR}/setup" は GSTACK_DIR 内で実行しないと正常終了しない。
 # サブシェル (...) 内での cd はスクリプト本体のカレントディレクトリに影響しない。
 # plan-tune のフックは導入しない。確認で止まらず、claude/settings.json も書き換えないようにする。
 # timeline の Stop フックも導入しない。Stop はターンごとに発火するので、実行中の skill を完了扱いにしてしまう。
 # /plan-ceo-review のゲート（Stop・SubagentStop）も導入しない。使わないスキルのために、終了のたびに sandbox の外で bun が動く。
-# timeline とゲートのフラグは ~/.gstack/config.yaml に保存されるので、/gstack-upgrade が実行する setup でも登録しない。
-(cd "${GSTACK_DIR}" && ./setup --no-plan-tune-hooks --no-timeline-stop-hook --no-ceo-review-gate)
+# スキルのルーティング（UserPromptSubmit）と出力の契約のゲート（Stop）も導入しない。今の既定は off だが、既定は gstack のコードで決まるので、更新で on に変わると settings.json にフックが足される。
+# timeline・ゲート・ルーティングのフラグは ~/.gstack/config.yaml に保存されるので、/gstack-upgrade が実行する setup でも登録しない。
+(cd "${GSTACK_DIR}" && ./setup --no-plan-tune-hooks --no-timeline-stop-hook --no-ceo-review-gate --no-skill-routing --no-skill-contracts)
+# setup はフックを $HOME の絶対パスで settings.json に登録する。公開リポジトリにユーザー名を入れないよう ~/ に戻す。
+/usr/bin/python3 -B "${SCRIPT_DIR}/scripts/settings-home-paths.py"
 
 # Link personal skills (global, available in all projects)
 for skill_dir in "${SCRIPT_DIR}/skills"/*/; do
