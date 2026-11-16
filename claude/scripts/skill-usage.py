@@ -10,6 +10,9 @@ import os
 import re
 import sys
 
+# 日付は文字列のまま比べるので、桁数の違う形式は間違った件数になる。ASCII の数字だけを許す。
+if len(sys.argv) != 3 or not all(re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", a) for a in sys.argv[1:]):
+    sys.exit("使い方: skill-usage.py <since> <until>（YYYY-MM-DD、UTC、until は含まない。例: 2026-11-16 2026-12-07）")
 since, until = sys.argv[1], sys.argv[2]
 REVIEW = {"review", "code-review", "superpowers:requesting-code-review"}
 PLANNING = {"superpowers:brainstorming", "superpowers:writing-plans"}

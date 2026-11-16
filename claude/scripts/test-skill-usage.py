@@ -75,6 +75,15 @@ class SkillUsageTest(unittest.TestCase):
     def test_requires_two_dates(self):
         result = self.run_script("2026-11-16")
         self.assertNotEqual(result.returncode, 0)
+        self.assertIn("使い方", result.stderr)
+        self.assertNotIn("Traceback", result.stderr)
+
+    def test_rejects_dates_not_in_yyyy_mm_dd(self):
+        for args in [("2026-11-1", "2026-12-07"), ("2026-11-16", "2026/12/07"), ("２０２６-11-16", "2026-12-07")]:
+            with self.subTest(args=args):
+                result = self.run_script(*args)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("使い方", result.stderr)
 
 
 if __name__ == "__main__":
