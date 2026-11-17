@@ -74,6 +74,11 @@ MISE_ASK = tuple(f"Edit({p})" for p in MISE_CONFIG) + tuple(f"Edit(//{p})" for p
 # パスで信頼される）、その実体、信頼の記録。ほかの mise の設定は paranoid が中身で守るので入れない（入れると、
 # ほかのリポジトリの git の操作が途中で止まる）。sandbox のパスは、接頭辞がないとユーザー設定では ~/.claude が基準になるので、~/ を付ける。
 MISE_DENY_WRITE = ("~/.config/mise", "~/dotfiles/mise", "~/.local/state/mise")
+# 上の denyWrite は Bash しか止めない。Edit・Write ツールは、~ で起動したセッションでは作業ディレクトリの外を止める設定も
+# 効かないので、規則でも止める。信頼の記録は Claude が書く理由がないので deny（sandbox の denyWrite にもなる）、
+# グローバルの設定の実体は ask にする。~/.config/mise は MISE_ASK の **/.config/mise/** が当たる。
+MISE_EDIT_DENY = ("Edit(~/.local/state/mise/**)",)
+MISE_EDIT_ASK = ("Edit(~/dotfiles/mise/**)",)
 # グローバルの mise 設定（~/.config/mise/config.toml の実体）。paranoid は、グローバルの設定でだけ効く。
 MISE_GLOBAL_CONFIG = "mise/mise_config.toml"
 # config は設定を、env_files は _.source などが読むファイルを、パスではなく中身で信頼させる。true（すべて）でもよい。
@@ -261,8 +266,9 @@ def check_edit_permissions(root):
     errors += [f"{SETTINGS}: permissions.additionalDirectories must not list {path}"
                for path in permissions.get("additionalDirectories", []) if path not in ADDITIONAL_DIRECTORIES]
     deny, ask = set(permissions.get("deny", [])), set(permissions.get("ask", []))
-    errors += [f"{SETTINGS}: permissions.deny lacks {rule}" for rule in EDIT_DENY if rule not in deny]
-    errors += [f"{SETTINGS}: permissions.ask lacks {rule}" for rule in MISE_ASK + EDIT_ASK if rule not in ask]
+    errors += [f"{SETTINGS}: permissions.deny lacks {rule}" for rule in EDIT_DENY + MISE_EDIT_DENY if rule not in deny]
+    errors += [f"{SETTINGS}: permissions.ask lacks {rule}" for rule in MISE_ASK + EDIT_ASK + MISE_EDIT_ASK
+               if rule not in ask]
     errors += [f"{SETTINGS}: permissions.deny: {rule} must not be a deny rule" for rule in EDIT_ASK if rule in deny]
     filesystem = settings.get("sandbox", {}).get("filesystem", {})
     errors += [f"{SETTINGS}: sandbox.filesystem.allowWrite lacks {path} (listed in permissions.additionalDirectories)"

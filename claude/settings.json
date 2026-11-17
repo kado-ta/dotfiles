@@ -176,7 +176,8 @@
       "Read(~/.lima/_config/**)",
       "Skill(pstack:setup-pstack)",
       "Agent(pstack:poteto-agent)",
-      "Agent(pstack:comment-sicko)"
+      "Agent(pstack:comment-sicko)",
+      "Edit(~/.local/state/mise/**)"
     ],
     "ask": [
       "Bash(gh pr create*)",
@@ -215,7 +216,8 @@
       "Edit(//**/mise/conf.d/**)",
       "Edit(//**/.mise/**)",
       "Edit(//**/.config/mise/**)",
-      "Edit(//**/.tool-versions)"
+      "Edit(//**/.tool-versions)",
+      "Edit(~/dotfiles/mise/**)"
     ],
     "disableBypassPermissionsMode": "disable",
     "blockWritesOutsideWorkingDirectories": true,

@@ -40,6 +40,8 @@ MISE_CONFIG = [
 ]
 MISE_ASK = [f"Edit({p})" for p in MISE_CONFIG] + [f"Edit(//{p})" for p in MISE_CONFIG]
 MISE_DENY_WRITE = ["~/.config/mise", "~/dotfiles/mise", "~/.local/state/mise"]
+MISE_EDIT_DENY = ["Edit(~/.local/state/mise/**)"]
+MISE_EDIT_ASK = ["Edit(~/dotfiles/mise/**)"]
 GUARD_TOOLS = ["Edit", "Write", "MultiEdit", "NotebookEdit"]
 GUARD_ERROR = "hooks.PreToolUse lacks hooks/guard-additional-dirs.sh"
 PROJECT_ASK = [
@@ -86,8 +88,8 @@ def settings():
     return {
         "permissions": {
             "allow": [f"Bash({c})" for c in WRAPPER_COMMANDS],
-            "deny": list(DENY_PUSH) + CRIT_DENY + LIMA_DENY + EDIT_DENY,
-            "ask": list(MISE_ASK) + EDIT_ASK,
+            "deny": list(DENY_PUSH) + CRIT_DENY + LIMA_DENY + EDIT_DENY + MISE_EDIT_DENY,
+            "ask": list(MISE_ASK) + EDIT_ASK + MISE_EDIT_ASK,
             "blockWritesOutsideWorkingDirectories": True,
             "additionalDirectories": ["~/.gstack/projects"],
         },
@@ -390,6 +392,26 @@ class CheckRepoTests(unittest.TestCase):
                 data["hooks"]["PreToolUse"][-1]["matcher"] = "|".join(t for t in GUARD_TOOLS if t != tool)
                 self.write_settings(data)
                 self.assert_fails("FAIL edit-permissions", GUARD_ERROR)
+
+    def test_guard_hook_other_command_fails(self):
+        # matcher と onFailure を残したまま、コマンドだけをほかのフックに差し替えると、守りが消える。
+        data = settings()
+        data["hooks"]["PreToolUse"][-1]["hooks"][0]["command"] = "/bin/bash ~/.claude/hooks/viabash.sh"
+        self.write_settings(data)
+        self.assert_fails("FAIL edit-permissions", GUARD_ERROR)
+
+    def test_missing_mise_trust_store_deny_fails(self):
+        # ~ で起動したセッションでは、Write ツールで信頼の記録に書ける。sandbox の denyWrite は Bash しか止めない。
+        data = settings()
+        data["permissions"]["deny"].remove("Edit(~/.local/state/mise/**)")
+        self.write_settings(data)
+        self.assert_fails("FAIL edit-permissions", "permissions.deny lacks Edit(~/.local/state/mise/**)")
+
+    def test_missing_global_mise_edit_ask_fails(self):
+        data = settings()
+        data["permissions"]["ask"].remove("Edit(~/dotfiles/mise/**)")
+        self.write_settings(data)
+        self.assert_fails("FAIL edit-permissions", "permissions.ask lacks Edit(~/dotfiles/mise/**)")
 
     def test_guard_hook_without_block_fails(self):
         # 既定ではフックの失敗（タイムアウトなど）でツールが通る。
