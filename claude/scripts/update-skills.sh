@@ -4,7 +4,8 @@
 #   Claude Code から: ! /bin/bash ~/dotfiles/claude/scripts/update-skills.sh
 #   端末から: 上と同じか、dotfiles で mise run claude:update
 # Claude Code から mise run を使わないのは、mise が dotfiles のルートの設定ファイル（mise.local.toml など）を
-# 自動で信頼して読み込み、ルートには sandbox から書けるため。同じ理由で、ホームに移ってから各コマンドを実行し、
+# 読み込み、ルートには sandbox から書けるため（paranoid で、信頼されていない設定は読み込まれないが、念のため通さない）。
+# 同じ理由で、ホームに移ってから各コマンドを実行し、
 # Python には -I を付けて、カレントディレクトリなどからの import を防ぐ。
 # 手順が失敗しても残りを続け、最後に失敗した手順を表示して終了コード 1 で終わる。
 # macOS の /bin/bash 3.2 で動かすので、空の配列と set -u は使わない。

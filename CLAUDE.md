@@ -28,7 +28,7 @@ dotfiles で起動したときだけ必要な設定（`denyWrite`、`claudeMdExc
 
 `hooks/herdr-agent-state.sh` は herdr が生成・上書きするファイルのため編集しない。
 
-`validate-command.sh` と `protect-main-branch.sh` は、jq や git が動かないなどでコマンドを検査できないときもブロックする（fail closed）。この状態では Bash ツールがすべて止まるので、メッセージに従って Claude Code を再起動するか、`mise trust` を実行する。
+`validate-command.sh` と `protect-main-branch.sh` は、jq や git が動かないなどでコマンドを検査できないときもブロックする（fail closed）。この状態では Bash ツールがすべて止まるので、メッセージに従って Claude Code を再起動するか、人間が mise の設定の全体を確かめてから `mise trust <ファイル>` を実行する。
 
 ### git push
 
@@ -53,7 +53,7 @@ worktree は `claude -w <name>` で始める。この設定では EnterWorktree�
 - `sandbox.filesystem.allowWrite` に `~/.crit` 配下を入れない。
 - `sandbox.network` の `allowUnixSockets`・`allowAllUnixSockets`・`allowLocalBinding` を設定しない（`check-repo.py` の `push-permissions` が失敗する）。
 - Colima（Lima）の VM に入る鍵（`~/.colima/_lima/_config`）を `denyRead` から外さない。
-- `permissions.blockWritesOutsideWorkingDirectories`、`.git` の hooks の Edit の deny、mise の設定の Edit の ask、`sandbox.filesystem.denyWrite` の `~/.config/mise`・`~/dotfiles/mise`・`~/.local/state/mise`、PreToolUse の `guard-additional-dirs.sh` の登録を外さない（`check-repo.py` の `edit-permissions` が失敗する）。
+- `permissions.blockWritesOutsideWorkingDirectories`、`.git` の hooks の Edit の deny、mise の設定の Edit の ask、`Edit(~/.local/state/mise/**)` の deny と `Edit(~/dotfiles/mise/**)` の ask、`sandbox.filesystem.denyWrite` の `~/.config/mise`・`~/dotfiles/mise`・`~/.local/state/mise`、PreToolUse の `guard-additional-dirs.sh` の登録を外さない（`check-repo.py` の `edit-permissions` が失敗する）。
 - `mise/mise_config.toml` の `paranoid` から `config`・`env_files` を外さない（`mise-paranoid` が失敗する）。
 - `permissions.additionalDirectories` に `~/.gstack/projects` 以外を足さない（`edit-permissions` が失敗する）。
 - `Edit(//**/.git/**/hooks/**)` と `Edit(//**/.git/config)` を deny にしない。Edit の deny は sandbox の denyWrite にもなり、どこでも `git init`・`git clone` が失敗する見込み（`edit-permissions` が失敗する）。
