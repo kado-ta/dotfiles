@@ -259,5 +259,5 @@ code=$?
 if [ "$code" -eq 0 ] || [ "$code" -eq 2 ]; then
   exit "$code"
 fi
-echo "BLOCKED: This hook failed (exit $code), so the command cannot be checked. If jq is failing, restart Claude Code, or run mise trust if this directory has an untrusted mise.toml." >&2
+echo "BLOCKED: This hook failed (exit $code), so the command cannot be checked. If jq is failing, restart Claude Code. If this directory has an untrusted mise config, do not trust it yourself: ask the human to review the whole file and the env files it reads, then run mise trust <file>." >&2
 exit 2

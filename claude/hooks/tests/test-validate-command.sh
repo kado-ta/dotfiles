@@ -81,9 +81,9 @@ HOOK_PATH="$BROKEN_JQ:$PATH" check 2 'rm -rf /tmp/x' 'broken jq: rm -rf'
 HOOK_PATH="$NO_JQ" check 2 'git status' 'missing jq: ordinary command'
 HOOK_PATH="$NO_JQ" check 2 'rm -rf /tmp/x' 'missing jq: rm -rf'
 
-# The block message tells how to recover
+# The block message tells how to recover; with mise paranoid, trusting is the human's review, not Claude's step
 message=$(PATH="$BROKEN_JQ:$PATH" "$BASH" "$HOOK" <<<'{}' 2>&1 >/dev/null)
-if [[ "$message" == *'mise trust'* ]]; then
+if [[ "$message" == *'ask the human'*'mise trust'* ]]; then
   pass=$((pass + 1))
   echo "PASS block message mentions the recovery"
 else

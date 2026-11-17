@@ -2,7 +2,7 @@
 
 # jq が動かないとコマンドを検査できないので、素通りさせずにブロックする。
 COMMAND=$(jq -r '.tool_input.command' < /dev/stdin) || {
-  echo "Blocked: jq failed, so this command cannot be checked. Restart Claude Code, or run mise trust if this directory has an untrusted mise.toml." >&2
+  echo "Blocked: jq failed, so this command cannot be checked. Restart Claude Code. If this directory has an untrusted mise config, do not trust it yourself: ask the human to review the whole file and the env files it reads, then run mise trust <file>." >&2
   exit 2
 }
 
