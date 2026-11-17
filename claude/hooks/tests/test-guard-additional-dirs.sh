@@ -60,6 +60,16 @@ check 0 'no ~/.gstack/projects' "$H"
 mkdir -p "$T/home-real/.gstack/projects"
 ln -s "$T/home-real" "$T/home-link"
 check 0 'HOME through a symlink' "$T/home-link"
+# Claude Code writes the whole input; a hook that exits without reading it breaks the pipe once the input outgrows the buffer.
+H=$(newhome big-input)
+mkdir -p "$H/.gstack/projects"
+head -c 300000 /dev/zero | HOME="$H" "$BASH" "$HOOK" >/dev/null 2>&1
+codes=("${PIPESTATUS[@]}")
+if [ "${codes[0]}" = 0 ] && [ "${codes[1]}" = 0 ]; then
+  ok '[0] large input is read to the end'
+else
+  ng "[want writer 0 and hook 0, got ${codes[0]} and ${codes[1]}] large input is read to the end"
+fi
 
 # A redirected ~/.gstack/projects is blocked
 mkdir -p "$T/elsewhere"
@@ -80,6 +90,25 @@ mkdir -p "$T/other/projects"
 H=$(newhome parent-symlink)
 ln -s "$T/other" "$H/.gstack"
 check 2 'parent ~/.gstack is a symlink' "$H"
+# Whoever planted the link chooses its target, so the block reason must not repeat it to Claude.
+H=$(newhome planted)
+mkdir -p "$H/.gstack" "$T/PLANTED-TEXT"
+ln -s "$T/PLANTED-TEXT" "$H/.gstack/projects"
+check 2 'symlink with a planted target' "$H"
+err=$(<"$T/err")
+case "$err" in
+  *PLANTED-TEXT*) ng "message repeats the link target (got '$err')" ;;
+  *) ok 'message does not repeat the link target' ;;
+esac
+H=$(newhome planted-parent)
+mkdir -p "$T/PLANTED-PARENT/projects"
+ln -s "$T/PLANTED-PARENT" "$H/.gstack"
+check 2 'parent symlink with a planted target' "$H"
+err=$(<"$T/err")
+case "$err" in
+  *PLANTED-PARENT*) ng "message repeats the resolved path (got '$err')" ;;
+  *) ok 'message does not repeat the resolved path' ;;
+esac
 H=$(newhome file)
 mkdir -p "$H/.gstack"
 : >"$H/.gstack/projects"
