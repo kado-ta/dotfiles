@@ -77,6 +77,7 @@ PROJECT_DENY_WRITE = [
     "./.claude/rules",
 ]
 README = "## Foo Bar\n\n[x](#foo-bar)\n\n"
+PARANOID_CONFIG = '[settings]\nparanoid = ["config", "env_files"]\n'
 
 
 def settings():
@@ -131,6 +132,7 @@ class CheckRepoTests(unittest.TestCase):
         self.write("claude/hooks/viabash.sh", "#!/bin/bash\n")
         self.write("claude/scripts/status.sh", "#!/bin/bash\n", 0o755)
         self.write("README.md", README)
+        self.write("mise/mise_config.toml", PARANOID_CONFIG)
 
     def git(self, *args):
         subprocess.run(["git", "-C", str(self.root), *args], check=True, capture_output=True)
@@ -357,6 +359,30 @@ class CheckRepoTests(unittest.TestCase):
         data["sandbox"]["filesystem"]["denyWrite"] = [p.removeprefix("~/") for p in MISE_DENY_WRITE]
         self.write_settings(data)
         self.assert_fails("FAIL edit-permissions", "~/**/mise.toml")
+
+    def test_missing_mise_global_config_fails(self):
+        self.git("rm", "-q", "--cached", "mise/mise_config.toml")
+        (self.root / "mise/mise_config.toml").unlink()
+        self.assert_fails("FAIL mise-paranoid", "mise/mise_config.toml")
+
+    def test_missing_paranoid_fails(self):
+        self.write("mise/mise_config.toml", '[tools]\njq = "latest"\n')
+        self.assert_fails("FAIL mise-paranoid", "settings.paranoid")
+
+    def test_partial_paranoid_fails(self):
+        # 文字列は部分一致で通さない。config だけでは、_.source などが読むファイルを中身で信頼しない。
+        for value in ('["config"]', '["env_files"]', "false", '"config,env_files"'):
+            with self.subTest(value=value):
+                self.write("mise/mise_config.toml", f"[settings]\nparanoid = {value}\n")
+                self.assert_fails("FAIL mise-paranoid", "settings.paranoid")
+
+    def test_paranoid_true_passes(self):
+        self.write("mise/mise_config.toml", "[settings]\nparanoid = true\n")
+        self.assert_passes()
+
+    def test_paranoid_superset_passes(self):
+        self.write("mise/mise_config.toml", '[settings]\nparanoid = ["config", "env_files", "plugins"]\n')
+        self.assert_passes()
 
     def test_unexpected_additional_directory_fails(self):
         # 作業ディレクトリとして数えられ、blockWritesOutsideWorkingDirectories がそこでは効かなくなる。

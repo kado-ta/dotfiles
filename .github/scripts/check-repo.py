@@ -73,6 +73,10 @@ MISE_ASK = tuple(f"Edit({p})" for p in MISE_CONFIG) + tuple(f"Edit(//{p})" for p
 # Bash（sandbox の中）からも書かせない。denyWrite はディレクトリの中も止めるので、末尾の /** は付けない。
 # sandbox のパスは、接頭辞がないとユーザー設定では ~/.claude が基準になり、作業ディレクトリに当たらないので、~/ を付ける。
 MISE_DENY_WRITE = tuple("~/" + p.removesuffix("/**") for p in MISE_CONFIG)
+# グローバルの mise 設定（~/.config/mise/config.toml の実体）。paranoid は、グローバルの設定でだけ効く。
+MISE_GLOBAL_CONFIG = "mise/mise_config.toml"
+# config は設定を、env_files は _.source などが読むファイルを、パスではなく中身で信頼させる。true（すべて）でもよい。
+PARANOID_REQUIRED = ("config", "env_files")
 # ユーザー設定のこれらのリストは、~/ でも / でも始まらないパスが ~/.claude を起点にし、黙って効かない。
 SANDBOX_PATH_LISTS = ("denyRead", "denyWrite", "allowWrite", "allowRead")
 # additionalDirectories は作業ディレクトリとして数えられ、そこでは WRITE_BLOCK が効かない。
@@ -282,6 +286,17 @@ def check_project_permissions(root):
     return errors
 
 
+def check_mise_paranoid(root):
+    path = root / MISE_GLOBAL_CONFIG
+    if not path.exists():
+        return [f"{MISE_GLOBAL_CONFIG}: missing"]
+    paranoid = tomllib.loads(path.read_text(encoding="utf-8")).get("settings", {}).get("paranoid")
+    # 文字列は部分一致で通ってしまうので、リストのときだけ中身を見る。
+    if paranoid is True or (isinstance(paranoid, list) and all(c in paranoid for c in PARANOID_REQUIRED)):
+        return []
+    return [f"{MISE_GLOBAL_CONFIG}: settings.paranoid must be true or a list with {', '.join(PARANOID_REQUIRED)}"]
+
+
 def check_syntax(root):
     errors = []
     for rel in repo_files(root):
@@ -392,6 +407,7 @@ CHECKS = (
     ("push-permissions", check_push_permissions),
     ("edit-permissions", check_edit_permissions),
     ("project-permissions", check_project_permissions),
+    ("mise-paranoid", check_mise_paranoid),
     ("syntax", check_syntax),
     ("markdown-names", check_markdown_names),
     ("markdown-links", check_markdown_links),

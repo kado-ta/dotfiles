@@ -30,3 +30,9 @@ java = "temurin-21"
 [tasks."sf:plugins"]
 description = "Salesforce CLI のプラグインを ~/.config/sf/plugins.txt に同期する"
 run = '"$HOME/.config/sf/sync-plugins.sh"'
+
+# プロジェクトの設定（config）と、_.source などが読むファイル（env_files）を、パスではなく中身で信頼する。
+# 中身が変わったら、人間が差分を確かめて `mise trust` するまで読み込まない（docs/work/20261116_sandbox-path-gaps）。
+# plugins・provenance は入れない。このリスクと関係がなく、npm:@salesforce/cli のインストールを止める見込みのため。
+[settings]
+paranoid = ["config", "env_files"]
