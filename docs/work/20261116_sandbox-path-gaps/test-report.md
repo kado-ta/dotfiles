@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: done
 created: 2026-11-18
 ---
 
@@ -113,9 +113,19 @@ created: 2026-11-18
 | `test-update-skills.py` | OK |
 | shellcheck・actionlint | 出力なし |
 
+<a name="codex"></a>
+
+## 5. Codex のレビュー
+
+2026-11-18 に、人間が普段の端末で `codex review --base origin/main -c 'sandbox_mode="read-only"' -c skills.include_instructions=false` を実行した。Claude Code の `!` からは、codex の app-server の起動が `Operation not permitted` で失敗した（`!` 自体は sandbox の外で動いていることを、`~/.ssh/config` を開けることで確かめた。原因は調べていない）。
+
+- 結果: 直すべき新しい不具合はない。
+- Codex が実行したもの: `check-repo.py`（10 項目）、shellcheck、actionlint、`git diff --check`、新しいフックが普段の HOME で通し、空の HOME で止めること。
+- Codex が実行しなかったもの: 一時ファイルを作る回帰テストと、実際のセッションでの確認（読み取り専用のため）。どちらも 1・2・4 章で実行した。
+
 <a name="unverified"></a>
 
-## 5. 確かめられなかったこと
+## 6. 確かめられなかったこと
 
 - **フックが実際のセッションで呼ばれていること:** 確かめるセッションの記録には、SessionStart のフックの記録だけがあり、PreToolUse のフックの跡はなかった。出力のないフックは記録されないと考える（推測）。分かっているのは次のこと。
   - 読み込まれている（事実）: 新しいセッションの `/hooks` に、PreToolUse の `[User] /bin/bash ~/.claude/hooks/guard-additional-dirs.sh`（`Edit|Write|MultiEdit|NotebookEdit`）が表示された（2026-11-18）。
