@@ -70,9 +70,10 @@ MISE_CONFIG = (
     "**/.tool-versions",
 )
 MISE_ASK = tuple(f"Edit({p})" for p in MISE_CONFIG) + tuple(f"Edit(//{p})" for p in MISE_CONFIG)
-# Bash（sandbox の中）からも書かせない。denyWrite はディレクトリの中も止めるので、末尾の /** は付けない。
-# sandbox のパスは、接頭辞がないとユーザー設定では ~/.claude が基準になり、作業ディレクトリに当たらないので、~/ を付ける。
-MISE_DENY_WRITE = tuple("~/" + p.removesuffix("/**") for p in MISE_CONFIG)
+# paranoid の土台は、どこで起動したセッションでも Bash（sandbox の中）から書かせない。グローバルの設定（paranoid でも
+# パスで信頼される）、その実体、信頼の記録。ほかの mise の設定は paranoid が中身で守るので入れない（入れると、
+# ほかのリポジトリの git の操作が途中で止まる）。sandbox のパスは、接頭辞がないとユーザー設定では ~/.claude が基準になるので、~/ を付ける。
+MISE_DENY_WRITE = ("~/.config/mise", "~/dotfiles/mise", "~/.local/state/mise")
 # グローバルの mise 設定（~/.config/mise/config.toml の実体）。paranoid は、グローバルの設定でだけ効く。
 MISE_GLOBAL_CONFIG = "mise/mise_config.toml"
 # config は設定を、env_files は _.source などが読むファイルを、パスではなく中身で信頼させる。true（すべて）でもよい。
@@ -82,6 +83,10 @@ SANDBOX_PATH_LISTS = ("denyRead", "denyWrite", "allowWrite", "allowRead")
 # additionalDirectories は作業ディレクトリとして数えられ、そこでは WRITE_BLOCK が効かない。
 # gstack の置き場所は sandbox の allowWrite にも入っていて、Bash はもともと書けるので、これだけを許す。
 ADDITIONAL_DIRECTORIES = ("~/.gstack/projects",)
+# その根が symlink に差し替えられているあいだ、Edit・Write 系のツールをすべて止めるフック。
+# 既定ではフックの失敗（タイムアウトなど）でツールが通るので、onFailure を block にする。
+GUARD_HOOK = "hooks/guard-additional-dirs.sh"
+GUARD_TOOLS = ("Edit", "Write", "MultiEdit", "NotebookEdit")
 JSONC_FILES = {"vscode/settings.json", "vscode/keybindings.json"}
 SETTINGS = "claude/settings.json"
 PROJECT_SETTINGS = ".claude/settings.json"
@@ -236,6 +241,17 @@ def check_push_permissions(root):
     return errors
 
 
+def guard_hook_registered(settings):
+    for group in settings.get("hooks", {}).get("PreToolUse", []):
+        # MultiEdit・NotebookEdit が Edit を含むので、部分一致ではなく | で分けて比べる。
+        if not set(GUARD_TOOLS) <= set(group.get("matcher", "").split("|")):
+            continue
+        if any(hook.get("command", "").endswith(GUARD_HOOK) and hook.get("onFailure") == "block"
+               for hook in group.get("hooks", [])):
+            return True
+    return False
+
+
 def check_edit_permissions(root):
     settings = load_settings(root)
     permissions = settings.get("permissions", {})
@@ -255,6 +271,8 @@ def check_edit_permissions(root):
     deny_write = filesystem.get("denyWrite", [])
     errors += [f"{SETTINGS}: sandbox.filesystem.denyWrite lacks {path}" for path in MISE_DENY_WRITE
                if path not in deny_write]
+    if not guard_hook_registered(settings):
+        errors.append(f"{SETTINGS}: hooks.PreToolUse lacks {GUARD_HOOK} for {'|'.join(GUARD_TOOLS)} with onFailure block")
     errors += [f"{SETTINGS}: sandbox.filesystem.{key} has an unprefixed path {path}"
                for key in SANDBOX_PATH_LISTS for path in filesystem.get(key, [])
                if not path.startswith(("~/", "/"))]

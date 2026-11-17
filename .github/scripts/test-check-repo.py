@@ -39,7 +39,9 @@ MISE_CONFIG = [
     "**/.tool-versions",
 ]
 MISE_ASK = [f"Edit({p})" for p in MISE_CONFIG] + [f"Edit(//{p})" for p in MISE_CONFIG]
-MISE_DENY_WRITE = ["~/" + p.removesuffix("/**") for p in MISE_CONFIG]
+MISE_DENY_WRITE = ["~/.config/mise", "~/dotfiles/mise", "~/.local/state/mise"]
+GUARD_TOOLS = ["Edit", "Write", "MultiEdit", "NotebookEdit"]
+GUARD_ERROR = "hooks.PreToolUse lacks hooks/guard-additional-dirs.sh"
 PROJECT_ASK = [
     "Edit(/claude/**)",
     "Edit(/zsh/**)",
@@ -106,6 +108,17 @@ def settings():
                         {"type": "command", "command": "/bin/bash ~/.claude/hooks/viabash.sh"},
                     ],
                 },
+                {
+                    "matcher": "|".join(GUARD_TOOLS),
+                    "hooks": [
+                        {
+                            "type": "command",
+                            "command": "/bin/bash ~/.claude/hooks/guard-additional-dirs.sh",
+                            "timeout": 10,
+                            "onFailure": "block",
+                        },
+                    ],
+                },
             ],
         },
         "statusLine": {"type": "command", "command": "~/.claude/scripts/status.sh"},
@@ -130,6 +143,7 @@ class CheckRepoTests(unittest.TestCase):
         self.write_project_settings(project_settings())
         self.write("claude/hooks/direct.sh", "#!/bin/bash\n", 0o755)
         self.write("claude/hooks/viabash.sh", "#!/bin/bash\n")
+        self.write("claude/hooks/guard-additional-dirs.sh", "#!/bin/bash\n")
         self.write("claude/scripts/status.sh", "#!/bin/bash\n", 0o755)
         self.write("README.md", README)
         self.write("mise/mise_config.toml", PARANOID_CONFIG)
@@ -348,17 +362,41 @@ class CheckRepoTests(unittest.TestCase):
         self.assert_fails("FAIL edit-permissions", "Edit(//**/mise.toml)")
 
     def test_missing_mise_deny_write_fails(self):
-        data = settings()
-        data["sandbox"]["filesystem"]["denyWrite"].remove("~/**/mise.toml")
-        self.write_settings(data)
-        self.assert_fails("FAIL edit-permissions", "~/**/mise.toml")
+        for path in MISE_DENY_WRITE:
+            with self.subTest(path=path):
+                data = settings()
+                data["sandbox"]["filesystem"]["denyWrite"].remove(path)
+                self.write_settings(data)
+                self.assert_fails("FAIL edit-permissions", f"denyWrite lacks {path}")
 
     def test_unprefixed_mise_deny_write_fails(self):
         # sandbox のパスは、接頭辞がないとユーザー設定では ~/.claude が基準になり、作業ディレクトリに当たらない。
         data = settings()
         data["sandbox"]["filesystem"]["denyWrite"] = [p.removeprefix("~/") for p in MISE_DENY_WRITE]
         self.write_settings(data)
-        self.assert_fails("FAIL edit-permissions", "~/**/mise.toml")
+        self.assert_fails("FAIL edit-permissions", "denyWrite lacks ~/.config/mise")
+
+    def test_missing_guard_hook_fails(self):
+        data = settings()
+        data["hooks"]["PreToolUse"].pop()
+        self.write_settings(data)
+        self.assert_fails("FAIL edit-permissions", GUARD_ERROR)
+
+    def test_guard_hook_matcher_missing_tool_fails(self):
+        # MultiEdit・NotebookEdit が Edit を含むので、部分一致では Edit の抜けを見落とす。
+        for tool in GUARD_TOOLS:
+            with self.subTest(tool=tool):
+                data = settings()
+                data["hooks"]["PreToolUse"][-1]["matcher"] = "|".join(t for t in GUARD_TOOLS if t != tool)
+                self.write_settings(data)
+                self.assert_fails("FAIL edit-permissions", GUARD_ERROR)
+
+    def test_guard_hook_without_block_fails(self):
+        # 既定ではフックの失敗（タイムアウトなど）でツールが通る。
+        data = settings()
+        del data["hooks"]["PreToolUse"][-1]["hooks"][0]["onFailure"]
+        self.write_settings(data)
+        self.assert_fails("FAIL edit-permissions", GUARD_ERROR)
 
     def test_missing_mise_global_config_fails(self):
         self.git("rm", "-q", "--cached", "mise/mise_config.toml")
