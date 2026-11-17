@@ -33,6 +33,7 @@ mise の設定を、パスではなく中身で信頼させる（mise の parano
 **非目標**
 
 - dotfiles のうち、`~` からのリンクでそのまま使われているファイルを、git を経由して書き換える経路。対象は、グローバルの mise 設定（`mise/mise_config.toml`）、`claude/` の `settings.json`・`hooks`・`rules`・`CLAUDE.md`・`mcp.json`、`bin/` の `.zshrc`・`.zprofile`・`.gitconfig` など。sandbox の中で、これらを変えたコミットや index を作れる。人間が `!` で `git switch`・`merge`・`restore` をすると、その中身が sandbox の外で書かれる。リンクで使われているファイル全体の問題で、mise だけを直しても残る。そのため、対策の案（リンクをやめてコピーで置く、切り替えの後に差分を警告する、など）を比べる設計を別に行い、次の作業の先頭にする（2026-11-17、人間の判断）。
+  - /review で、同じ経路がすべてのリポジトリの、sandbox の外で自動で読み込まれたり動いたりするファイル（`.env*`・`.claude/settings.json`・`.claude/hooks`・`.mcp.json` など）にも当てはまると分かった（2026-11-18）。次の作業の範囲はこれらに広げる。当面の手当てとして、グローバルの `claude/CLAUDE.md` に、止まった git の続きを `!` で頼む前に、変わるファイルを確かめて伝える手順を置いた（2026-11-18、人間の判断）。
 - mise の tasks が呼ぶスクリプトの改ざん。`mise run` は人間が選んで実行する。
 - `.env` の残りの経路。受け入れて記録する（[7 章](#accepted-risks)）。
 - 前回の research の 8.2 の 5〜7（git の設定と hooks のほかの置き場所、worktree の `claude/`、`*.pem` の範囲）と、ユーザー設定の `Edit(/etc/**)` の起点。次の作業にする。
@@ -85,7 +86,7 @@ mise の設定を、パスではなく中身で信頼させる（mise の parano
 | --- | --- | --- |
 | A | paranoid（`config`・`env_files`）を入れ、mise の denyWrite を外す。グローバルの設定のディレクトリ `~/.config/mise` だけは denyWrite に残す | **採用**（2026-11-16、人間の判断） |
 | B | paranoid を入れ、denyWrite も残す | 不採用。git の途中停止が残る。最後に人間が信頼を判断する点は A と同じなので、守りはあまり増えない |
-| C | `paranoid = true`（4 つすべて） | 不採用。`plugins`・`provenance` はこのリスクと関係がなく、`npm:@salesforce/cli`（`trust_policy_excludes` で例外を入れている）のインストールを止める見込み（推測） |
+| C | `paranoid = true`（4 つすべて） | 不採用。`npm:@salesforce/cli`（`trust_policy_excludes` で例外を入れている）のインストールを止める見込み（推測）。/review で、`provenance` は lockfile（`mise.lock`）の改ざんへの備えにもなる見込みと分かった（未確認。[7 章](#accepted-risks)） |
 | D | dotfiles を `trusted_config_paths` に入れて、信頼し直しを省く | 不採用。パスでの信頼に戻る |
 
 **B2（`~/.gstack/projects` の symlink）**
@@ -107,7 +108,7 @@ mise の設定を、パスではなく中身で信頼させる（mise の parano
 ### 6.1 mise の paranoid
 
 - `mise/mise_config.toml`（`~/.config/mise/config.toml` の実体）に `[settings]` を足し、`paranoid = ["config", "env_files"]` にする。採らなかった 2 つの分類の理由を、コメントに 1〜2 行で書く。
-- Claude は `mise trust` を実行しない（C7 で、できない）。信頼されていないという警告やエラーが出たら、人間に、差分を確かめてから `mise trust` するよう頼む。
+- Claude は `mise trust` を実行しない（C7 で、できない）。信頼されていないという警告やエラーが出たら、人間に、ファイルの全体と読み込む env ファイルを確かめてから `mise trust <ファイル>` するよう頼む（/review で直した。mise は前の中身を持たないので、差分では確かめられない）。
 
 <a name="design-sandbox"></a>
 
@@ -118,6 +119,7 @@ mise の設定を、パスではなく中身で信頼させる（mise の parano
   - `~/.config/mise`: グローバルの設定のディレクトリ。paranoid でもパスで信頼される。
   - `~/dotfiles/mise`: グローバルの設定の実体（`~/.config/mise/config.toml` のリンク先）がある。
   - `~/.local/state/mise`: 信頼の記録がある。ここに書けると、Claude が自分で信頼を済ませられる。
+- **Edit・Write ツール:** denyWrite は Bash しか止めない。`~` で起動したセッションでは、作業ディレクトリの外を止める設定も効かない。そのため、ユーザー設定の permissions に `Edit(~/.local/state/mise/**)` を deny、`Edit(~/dotfiles/mise/**)` を ask で足す（/review の指摘、2026-11-18、人間の判断）。`~/.config/mise` には、mise の Edit の ask（`**/.config/mise/**`）が当たる。
 - **`~` で起動したセッション:** この 3 つのほかは、対象外のまま。`~/Library/LaunchAgents` なども書けるので、グローバルの CLAUDE.md の指示どおり、リポジトリのルートで起動し直してもらう。
 - **残す:**
   - mise の Edit の ask（接頭辞のない形と `//**/` の形の 20 項目）。
@@ -132,9 +134,12 @@ mise の設定を、パスではなく中身で信頼させる（mise の parano
 - **動き:**
   - `HOME` が空なら拒否する（終了コード 2）。
   - `$HOME/.gstack/projects` がなければ通す（終了コード 0）。
-  - あって、symlink であるか、実体のパス（`cd -P` で解決したもの）が `$HOME/.gstack/projects` と違えば、拒否する。メッセージは英語で、パスと解決した先を示し、人間に確かめてもらうよう書く。親の `~/.gstack` が symlink の場合も、実体のパスの比較で拒否になる。
+  - あって、symlink であるか、実体のパス（`cd -P` で解決したもの）が `$HOME/.gstack/projects` と違えば、拒否する。メッセージは英語で、人間に確かめてもらうよう書く。親の `~/.gstack` が symlink の場合も、実体のパスの比較で拒否になる。
   - それ以外は通す。
-  - 入力（stdin の JSON）は読まない。jq に頼らないので、jq が動かないときも動く。
+  - 入力（stdin の JSON）の中身は使わない。jq に頼らないので、jq が動かないときも動く。
+  - /review で次の 2 点を変えた（2026-11-18、人間の判断）。比べる相手を「`HOME` を実体のパスに直したもの」にしたのは plan の判断。
+    - 入力は最後まで読み捨てる。読まずに終わると、パイプの容量を超える入力で書き手が SIGPIPE で切られる（テストで確かめた）。
+    - 拒否の理由は固定の文にし、symlink の先や解決した先を入れない。仕込んだ側が決められる文字列を、フックの理由として次のセッションの Claude に渡さないため。
 - **すべての呼び出しを拒否する理由:** 起動時に symlink が解決されるので、解決した先は作業ディレクトリとして扱われる。対象のパスで絞ると、解決した先への直接の書き込みを通してしまう。
 - **テスト:** `claude/hooks/tests/test-guard-additional-dirs.sh`（新規）。今のフックのテストと同じく、`HOME` を一時ディレクトリに差し替える。少なくとも、実体のディレクトリ（0）、symlink（2）、ない（0）、`HOME` が空（2）、親の `~/.gstack` が symlink（2）を確かめる。
 
@@ -159,6 +164,7 @@ mise の設定を、パスではなく中身で信頼させる（mise の parano
 - **`.claude/rules/CLAUDE_CONFIG.md`:** 「Edit・Write ツールの書き込み」の mise の 2 項目を、paranoid で守る理由と、`~/.config/mise` だけを残す理由に書き換える。`additionalDirectories` の項目に、フックの理由を足す。
 - **グローバルの `claude/CLAUDE.md`:**
   - Safety の「sandbox の中の git が、mise の設定で `unable to unlink`…」の行を消す。ほかのリポジトリでは起きなくなるため。dotfiles では、ルートの CLAUDE.md の手順が引き続き当てはまる。
+    - /review で、この前提は誤りと分かった。ほかのリポジトリでも、Edit の deny から変換された denyWrite（`.env*`・lock ファイルなど）と、Claude Code が守る `.claude/settings.json` などで、git の操作は途中で止まる。そのため消さずに、mise に限らない形で残し、`!` で続きを頼む前に変わるファイルを確かめる手順を足した（2026-11-18、人間の判断）。
   - mise の信頼の警告が出たら、自分で信頼しようとせず、人間に頼む旨を 1 行で足す。
 - **`claude/README.md`:** フックの一覧があれば足す。
 - **research:** 判断の章を足し、この設計書にリンクする。
@@ -207,10 +213,11 @@ C1 のとおり、変更は書いた時点で効く。paranoid が効く前に d
 
 ### 6.9 戻し方
 
-- **paranoid:** `mise/mise_config.toml` の行を消す。パスでの信頼に戻る。
-- **`claude/settings.json`:** 当てた変更を戻す（denyWrite の 10 項目を戻し、フックの登録を消す）。
+- **順番:** 6.7 と逆にする。先に `claude/settings.json` で denyWrite の 10 項目を戻し、その後で paranoid を外す。paranoid だけを先に外すと、sandbox から書ける設定がパスで信頼される状態になる（/review の指摘）。
+- **paranoid:** `mise/mise_config.toml` の行を消す。パスでの信頼に戻る。`~/.local/state/mise/trusted-configs` には、paranoid の前のディレクトリ単位の信頼の記録（`~/dotfiles` など）が残っていて、パスでの信頼に戻るとその下の設定がすべて信頼される。戻すときは、要らない記録を `mise trust --untrust` で消すことも考える。
+- **`claude/settings.json`:** 当てた変更を戻す（denyWrite の 10 項目を戻し、フックの登録と、mise の 2 つの Edit の規則を消す）。
 - **フックの誤検知で Edit・Write が止まったとき:** `~/.gstack/projects` を確かめる。直せなければ、人間がフックの登録を外す。
-- **マージの前:** `git switch main` で、すべて戻る。sandbox の中では途中で止まるので、人間が `!` で行う。
+- **マージの前:** `git switch main` で、すべて戻る。sandbox の中では途中で止まるので、人間が `!` で行う。切り替えたら、起動済みのセッションをすべて起動し直す。フックの登録が起動時のまま残っていると、スクリプトがなくなった時点で、onFailure block によって Edit・Write がすべて止まる見込み（推測）。
 
 <a name="design-after-merge"></a>
 
@@ -225,13 +232,16 @@ C1 のとおり、変更は書いた時点で効く。paranoid が効く前に d
 ## 7. 受け入れるリスク
 
 - **`.env`:** 作業ディレクトリの外の書ける場所（`$TMPDIR`・`~/.gstack/projects`）と、そこへの symlink のディレクトリ。人間がそこに cd しないと起きない。
-- **信頼の判断:** paranoid は、人間が中身を確かめずに `mise trust` すると守れない。Claude は信頼を頼むときに、差分を見るよう添える。
+  - /review で、git を経由する経路もあると分かった。sandbox の中で `.env` を含むコミットや index を作り、人間が `!` で `git switch`・`restore` をすると、作業ディレクトリに `.env` が書かれ、次の cd で env-zsh が読み込む。人間の cd は要らない。非目標の 1 つ目と同じ経路なので、次の作業で扱い、当面はグローバルの CLAUDE.md の手順（`!` を頼む前に変わるファイルを確かめる）で手当てする（2026-11-18、人間の判断）。
+- **信頼の判断:** paranoid は、人間が中身を確かめずに `mise trust` すると守れない。Claude は信頼を頼むときに、ファイルの全体と読み込む env ファイルを確かめるよう添える。拒否のメッセージ（`validate-command.sh`・`protect-main-branch.sh`）も同じ案内にした。
 - **paranoid の外:**
   - tasks の `run` が呼ぶスクリプト（人間が `mise run` を選ぶ）。
+  - 信頼済みの設定が PATH に足すディレクトリの中身（`[env] _.path = ["{{config_root}}/node_modules/.bin"]` など）。そこに sandbox から書けると、人間が cd した後に打ったコマンドが sandbox の外で動く。今の 6 つの設定は使っていない。Claude は信頼を頼むときに、このことも添える（/review の指摘）。
+  - lockfile（`mise.lock`）。`config` の信頼の対象外で、sandbox から書ける。今の 6 つのリポジトリにはない。`provenance` が備えになる見込みだが確かめていないので、次の作業で扱う（/review の指摘）。
   - グローバルの設定への直接の書き込み（`./mise` の denyWrite、作業ディレクトリの外、6.2 の 3 つの denyWrite で守る）。
   - プロジェクトの `[env]` に `MISE_PARANOID` を書いたときの動き（文書にない。設定そのものに信頼が要るので、信頼されるまでは効かない）。
 - **dotfiles の、リンクで使われているファイルの git 経由の書き換え:** [2 章](#goals)の非目標の 1 つ目。この作業の前からある経路で、この作業では広がりも狭まりもしない。グローバルの mise 設定もここに入り、paranoid では守れない。次の作業で扱う（2026-11-17、人間の判断）。
-- **フックの迂回（B2）:** フックは、呼ばれた時点の状態だけを見る。前のセッションで `~/.gstack/projects` を symlink に差し替えておき、次のセッションで、Bash が実体のディレクトリに戻してから Write ツールを使うと、フックは通す。起動時に解決した先は、作業ディレクトリのまま残る見込み（推測）。成り立たせるには、gstack の記録を消して差し替え、次のセッションに指示を持ち越す、という 2 段階の仕込みが要る。sandbox から根を差し替えられるかも未確認（[research の 4 章](research-path-gaps.md#remaining)）。受け入れて記録する（2026-11-17、人間の判断）。起動時の状態を SessionStart のフックで記録して比べる案は、フックが 2 つになり、入力の JSON を読む（jq に頼る）必要が出るので採らない。
+- **フックの迂回（B2）:** フックは、呼ばれた時点の状態だけを見る。前のセッションで `~/.gstack/projects` を symlink に差し替えておき、次のセッションで、Bash が実体のディレクトリに戻してから Write ツールを使うと、フックは通す。起動時に解決した先は、作業ディレクトリのまま残る見込み（推測）。成り立たせるには、根を差し替え、次のセッションに指示を持ち越す、という 2 段階の仕込みが要る。sandbox から根を差し替えられるかも未確認（[research の 4 章](research-path-gaps.md#remaining)）。/review で、根ごと `$TMPDIR` に移せるなら gstack の記録を消さずに済み、気付かれにくいことが指摘された。受け入れの判断は、2 段階の仕込みが要ることに基づくので変えない。受け入れて記録する（2026-11-17、人間の判断）。起動時の状態を SessionStart のフックで記録して比べる案は、フックが 2 つになり、入力の JSON を読む（jq に頼る）必要が出るので採らない。
 - **ホームの外:** `/tmp` に clone したものなどは、もともと denyWrite で守れなかった。paranoid で守れるようになる。
 
 <a name="builder"></a>

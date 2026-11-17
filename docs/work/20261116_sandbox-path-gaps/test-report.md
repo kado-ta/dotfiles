@@ -11,7 +11,7 @@ created: 2026-11-18
 
 ## 1. 自動の検査
 
-2026-11-17 に、Task 5 のコミット（文書）の後で実行した。
+2026-11-18 に、Task 5 のコミット（文書）の後で実行した。
 
 | 検査 | 結果 |
 | --- | --- |
@@ -81,9 +81,41 @@ created: 2026-11-18
 4. **信頼されていない設定のあるディレクトリの Bash:** この環境では、jq は mise の shim ではなくインストール先に解決され、信頼されていない設定のあるディレクトリでも動いた（V1-2）。そのため、フックが jq で止まることはなかった。PATH で jq が shim に解決される環境では止まりうる（推測）。そのときは、ルートの CLAUDE.md の今の案内（`mise trust`）で戻す。
 5. **フックを登録した後の普段の書き込み:** 通った（V3）。
 
+<a name="review"></a>
+
+## 4. /review
+
+2026-11-18 に実行した。専門の担当 5 つ（Testing・Maintainability・Security・Performance・Simplification）、反対の立場の担当、Red Team が読み、私が中心の確認をした。Codex は使っていない（Task 7 で人間が実行する）。
+
+| 指摘 | 出どころ | 対応 |
+| --- | --- | --- |
+| グローバルの CLAUDE.md から消した、git が途中で止まったときの注意書きは、ほかのリポジトリでもまだ要る（`.env*`・lock ファイル・`.claude/settings.json`） | 中心・反対・Red Team | 一般的な形で残し、`!` を頼む前に変わるファイルを確かめる手順を足した |
+| git を経由する経路は、すべてのリポジトリの `.env*`・`.claude/settings.json`・`.mcp.json` にも当てはまる | Red Team | design の非目標 1 と 7 章を直し、次の作業の範囲を広げた |
+| フックが入力を読まずに終わり、大きな入力で書き手が SIGPIPE で切られる | 反対 | 入力を読み捨てる。テストで 141 から 0 になることを確かめた |
+| フックの拒否の理由に、仕込んだ側が決められるパスが入る | 反対 | 固定の文にした。仕込んだ文字列が出ないことをテストで確かめた |
+| ガードのコマンドを別のフックに差し替えても、検査が通る | Testing | テストを足した |
+| `~` で起動したセッションでは、Write ツールで信頼の記録に書ける | Red Team | `Edit(~/.local/state/mise/**)` を deny、`Edit(~/dotfiles/mise/**)` を ask で足した |
+| 「差分を確かめて mise trust」は守れない。拒否のメッセージは確かめずに trust するよう促す | 反対・Red Team | 「ファイル全体と読み込む env ファイルを確かめ、ファイルを指定して」にそろえた（フック 2 つとテストを含む） |
+| 「mise がルートの設定を自動で信頼する」という古い説明が 3 か所 | 中心 | 直した。dotfiles の `mise.toml` は人間が信頼し直した |
+| フックの表に新しいフックがない | Maintainability | 足した |
+| 戻す順番、切り替えた後の再起動、B2 の受け入れ理由、`_.path`、`mise.lock` と provenance | 反対・Red Team | design に書いた |
+| 確認記録の日付 | 中心 | 直した |
+| matcher が Edit・Write・MultiEdit・NotebookEdit だけ | 反対 | 直していない（判断）。Artifact の既定の外への保存は人間に確認がある。`*` にすると、すべてのツールを止めることになる |
+| `trusted_config_paths` を足されても、`mise-paranoid` が通る | Security（確信度 4） | 直していない。今その設定はない |
+
+直した後に、自動の検査を記録し直した（2026-11-18）。
+
+| 検査 | 結果 |
+| --- | --- |
+| `check-repo.py` | 10 項目すべて PASS |
+| `test-check-repo.py` | 69 件 OK |
+| フックのテスト 5 本 | 失敗 0（`test-guard-additional-dirs.sh` は 17 件） |
+| `test-update-skills.py` | OK |
+| shellcheck・actionlint | 出力なし |
+
 <a name="unverified"></a>
 
-## 4. 確かめられなかったこと
+## 5. 確かめられなかったこと
 
 - **フックが実際のセッションで呼ばれていること:** 確かめるセッションの記録には、SessionStart のフックの記録だけがあり、PreToolUse のフックの跡はなかった。出力のないフックは記録されないと考える（推測）。分かっているのは次のこと。
   - 読み込まれている（事実）: 新しいセッションの `/hooks` に、PreToolUse の `[User] /bin/bash ~/.claude/hooks/guard-additional-dirs.sh`（`Edit|Write|MultiEdit|NotebookEdit`）が表示された（2026-11-18）。

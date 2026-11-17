@@ -137,7 +137,7 @@ S3 の文面:
 - **sandbox は、書ける範囲の根が symlink に変わっても、その先に書かせない（事実）:** S2-1・S2-2 のとおり、symlink の先（`target`）への書き込みは、経由しても直接でも止まった。sandbox は symlink を解決した先のパスで判定し、起動時に allowWrite の symlink を解決して範囲に入れることもしない。allowWrite だけに入っている `~/.gstack/security/cso` と、Claude Code が既定で入れる `~/.claude/debug`・`~/.npm/_logs` も、同じ理由でこの経路には当たらないと考える（推測。ダミーでの結果からの類推）。
 - **Edit・Write ツールは、`additionalDirectories` の根が symlink なら、その先に書く（事実）:** S2-3 のとおり。止めたのは auto mode の判定だけだった。一方、作業ディレクトリの中の symlink を経由した書き込みは、解決した先で判定されて止まった（S3）。このことから、`additionalDirectories` の symlink は起動時に解決され、その先が作業ディレクトリとして扱われると考える（推測）。
   - 根より下に symlink を作る形（`~/.gstack/projects/x` を外への symlink にする）は、S3 と同じ判定で止まる見込み（推測。未実測）。
-  - 成り立つには、`~/.gstack/projects` そのものを symlink に差し替える必要がある。sandbox の中から差し替えられるかは、S1 が止められたので分からない。差し替えるには gstack の記録を先にすべて消す必要があり、気付かれやすい（推測）。
+  - 成り立つには、`~/.gstack/projects` そのものを symlink に差し替える必要がある。sandbox の中から差し替えられるかは、S1 が止められたので分からない。差し替えるには gstack の記録を先にすべて消す必要があり、気付かれやすい（推測）。ただし、根ごと `$TMPDIR` に移せるなら記録は消さずに済む（/review の指摘。未確認）。
 
 <a name="remaining"></a>
 
@@ -155,4 +155,4 @@ S3 の文面:
 - **B2:** PreToolUse のフックで、`~/.gstack/projects` が symlink のあいだは Edit・Write 系のツールをすべて止める。symlink を戻されたときの迂回は受け入れる（[design の 6.3](design.md#design-hook)・[7 章](design.md#accepted-risks)）。
 - **B4（`.env`）:** 作業ディレクトリの外の書ける場所と、そこへの symlink に置ける経路は、受け入れて記録する（[design の 7 章](design.md#accepted-risks)）。
 - **B3:** 抜け道は見つからなかったので、何も変えない。
-- **dotfiles の、リンクで使われているファイルの git 経由の書き換え:** この作業の範囲外にし、次の作業の先頭にする（[design の 2 章](design.md#goals)）。
+- **dotfiles の、リンクで使われているファイルの git 経由の書き換え:** この作業の範囲外にし、次の作業の先頭にする（[design の 2 章](design.md#goals)）。/review で、同じ経路がすべてのリポジトリの `.env*`・`.claude/settings.json`・`.mcp.json` などにも当てはまると分かったので、次の作業の範囲を広げ、当面はグローバルの CLAUDE.md の手順で手当てする（2026-11-18）。
