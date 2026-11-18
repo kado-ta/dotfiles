@@ -63,9 +63,38 @@ created: 2026-11-18
 - **sandbox の中のブラウザ**: Claude の Bash から Playwright で起動すると、Google Chrome は crashpad の Mach ポートの登録が拒否されて失敗し、同梱のヘッドレス Chromium は起動の直後に終了した（[plan の調査結果](plan.md#findings-sandbox)）。
 - **ほかの作業の混入**: 作業中に、`claude/hooks/tests/test-guard-additional-dirs.sh` の 2 行目が、この作業と関係なく書き換えられていた（11:26。shellcheck の SC1090 で気づいた）。コミットには含めず、ユーザーが `git restore` で戻した。
 
+<a name="review"></a>
+## レビューの指摘と対応
+
+`/review` の指摘で、npx をやめて固定の場所に入れる形に変え、Crit のポートを止め、`--no-webmcp` を足した（[plan のレビューで変えたこと](plan.md#review-changes)）。上の完了条件の結果は、変える前の定義で確かめたもの。変えた後の確認は[再確認](#recheck)に書く。
+
+<a name="recheck"></a>
+## 再確認
+
+2026-11-19 に、変えた後の定義（`7d2fe4f` の時点）で確かめた。
+
+| # | 確かめたこと | 結果 | 観測 |
+| --- | --- | --- | --- |
+| R1 | 新しい定義で登録し、接続できる | 合格 | `register-mcp.sh` が `~/.local/share/claude-mcp/playwright` に 3 パッケージを入れた。`claude mcp list` で `…/bin/node …/@playwright/mcp/cli.js --isolated --browser chrome --output-dir … --no-webmcp --blocked-origins *:47800;…;*:47819 - ✔ Connected` |
+| R2 | 入れた場所と出力先に sandbox から書けない | 合格 | sandbox の中の `touch` が、どちらも `Operation not permitted` |
+| R3 | 同じ名前の `.mcp.json` があっても user スコープの定義が使われる | 合格 | `playwright` を `/usr/bin/false` で定義した `.mcp.json` のある場所で、`claude mcp get playwright` が `Scope: User config` と `…/bin/node`。`.mcp.json` 側は一覧に「承認待ち」としても出ず、同じ名前が複数のスコープにあるという診断だけが出た。`disabledMcpjsonServers` が外したとみている（推測。設定を外した場合とは比べていない） |
+| R4 | Salesforce Help の本文を読める | 合格 | 新しいセッションで salesforce-help スキルが読み込まれ、WebFetch では目次だけ（3 回とも）だったので、Playwright MCP の `browser_navigate` → `browser_wait_for` → `browser_evaluate` で本文を読んだ |
+| R5 | 1440px と 390px のスクリーンショット | 合格 | `~/Library/Caches/playwright-mcp/page-<時刻>.png` に 2 つ（68,986 バイトと 28,735 バイト） |
+| R6 | `filename` を止める | 合格 | フックが `Blocked: Playwright MCP calls must not pass filename, …` で止めた |
+| R7 | Crit のポートを `url` で開かせない | 合格 | `browser_navigate` の `http://127.0.0.1:47802/` を、フックが `Blocked: Playwright MCP must not open ports 47800-47819, …` で止めた |
+| R8 | JS での Crit のポートへの移動を止める | 合格 | `https://example.com` で `location.href = "http://127.0.0.1:47803/"` を実行すると、`[GET] http://127.0.0.1:47803/ => [FAILED] net::ERR_BLOCKED_BY_CLIENT`（`--blocked-origins` が効いた。止まらなければ `ERR_CONNECTION_REFUSED` になる） |
+| R9 | `~/.crit` を読ませない | 合格 | 新しいセッションの `ls -la ~/.crit` が権限の設定で拒否された。このセッションの sandbox の設定にも `~/.crit` の denyRead が入った |
+| R10 | 出力が `git status` に出ない | 合格 | 前後の `git status --short` が同じ。`--ignored` でも `test.png` はない |
+| R11 | ブラウザが UNIX ソケットで公開されても、sandbox からはつなげない | 合格 | sandbox の中から `/var/run/mDNSResponder` への接続が `Operation not permitted`（Playwright のソケットそのものでは試していない） |
+
+このセッションでは、`!` のコマンドが sandbox の中で動いた（`claude mcp list` の出力に `sandbox_violations` が出て、`mktemp -d` が sandbox の外の一時ディレクトリに書けなかった）。前の調査（`!` は sandbox の外で動く）と違うので、`!` で sandbox の外の操作を頼むときは、端末で実行してもらう。
+
 <a name="unverified"></a>
 ## 確かめていないこと
 
 - Claude のデスクトップアプリや、Dock から起動した VS Code から Claude Code を始めたときの動き。3a の `env -i` で、最小の PATH での起動を代わりに確かめた。
 - フックの、Python が起動できないときの分岐（`/usr/bin/python3` を差し替えられないため）。入力を解釈できないときに止まることは確かめた。
 - `paths` を止める修正の、実際のセッションでの動き（単体テストだけ）。
+- 変えた後の定義での、headless の既定（ウィンドウが出ないこと）。変える前の定義では確かめた（3b）。`PLAYWRIGHT_MCP_HEADLESS` の書き方は変えていない。
+- `disabledMcpjsonServers` を外した場合との比較（R3 の推測の裏付け）。
+- Playwright が公開する UNIX ソケットそのものへの、sandbox からの接続（R11 は別のソケットで確かめた）。
