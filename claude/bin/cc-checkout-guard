@@ -203,8 +203,9 @@ WORKTREE_ADD_FLAGS = frozenset(
     "--no-guess-remote".split()
 )
 WORKTREE_ADD_VALUES = frozenset(("-b", "-B", "--reason"))
-WORKTREE_OTHERS = frozenset("list prune lock unlock remove repair".split())  # 作業ツリーの中身を書かない
-WORKTREE_MOVE_FLAGS = frozenset(("-f", "--force"))
+WORKTREE_OTHERS = frozenset("list prune lock unlock repair".split())  # 作業ツリーの中身を書かない
+WORKTREE_MOVE_FLAGS = frozenset(("-f", "--force"))  # move と remove
+GITFILE_MAX = 4096  # 読む .git ファイルと gitdir ファイルの大きさの上限（バイト）
 # git がパスを C の形で引用するときの、\ の後の文字と、その値。
 C_ESCAPES = {ord("a"): 7, ord("b"): 8, ord("t"): 9, ord("n"): 10, ord("v"): 11, ord("f"): 12, ord("r"): 13,
              ord('"'): 34, ord("\\"): 92}
@@ -1471,27 +1472,89 @@ def _protected_place(inv: Invocation, place: str) -> None:
             raise GuardError(f"{place} は自動で読み込まれるパスの中です")
 
 
-def _worktree_name(inv: Invocation, arg: str) -> str:
-    """worktree move が動かす worktree の、登録されたパスの最後の名前。
+def _worktree_candidates(inv: Invocation, arg: str) -> set[str]:
+    """arg が指しうる worktree の、登録されたパス。
 
     git の find_worktree は、登録されたパスの後ろ（名前の区切りから）が arg と一致するものがちょうど 1 つならそれを、
-    なければ arg の実パスと同じものを使う。どちらの候補も集め、最後の名前が 1 つに決まらなければ止める。
+    なければ arg の実パスと同じものを使う。どちらの候補も集める（呼ぶ側は、1 つに決まらなければ止める）。
     """
     out = run_git(inv.cwd, "worktree", "list", "--porcelain", "-z", config=inv.config)
     paths = [os.fsdecode(rec[len(b"worktree "):]) for rec in out.split(b"\0") if rec.startswith(b"worktree ")]
     key = _norm(arg)
-    found = [p for p in paths if key and (_norm(p) == key or _norm(p).endswith("/" + key))]
+    found = {p for p in paths if key and (_norm(p) == key or _norm(p).endswith("/" + key))}
     target = os.path.join(os.path.realpath(inv.cwd), arg)
     for p in paths:
         try:
             if os.path.samefile(p, target):
-                found.append(p)
+                found.add(p)
         except OSError:
             continue  # ない worktree（prunable）と、ない arg
-    names = {os.path.basename(p) for p in found}
+    return found
+
+
+def _worktree_name(inv: Invocation, arg: str) -> str:
+    """worktree move が動かす worktree の、登録されたパスの最後の名前。1 つに決まらなければ止める。"""
+    names = {os.path.basename(p) for p in _worktree_candidates(inv, arg)}
     if len(names) != 1 or "" in names:
         raise GuardError(f"{arg} がどの worktree かを確かめられません")
     return names.pop()
+
+
+def _read_regular(path: str, limit: int, what: str) -> bytes:
+    """path を、symlink をたどらずに、通常のファイルとして limit バイトまで読む。ほかの種類と、大きすぎるものは止める。
+
+    O_NONBLOCK で開くので、FIFO に替えられていても固まらない（種類を確かめてから読む）。
+    """
+    try:
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    except OSError:
+        raise GuardError(f"{what} を読めません") from None
+    with os.fdopen(fd, "rb") as f:
+        if not stat.S_ISREG(os.fstat(f.fileno()).st_mode):
+            raise GuardError(f"{what} は通常のファイルではありません")
+        data = f.read(limit + 1)
+    if len(data) > limit:
+        raise GuardError(f"{what} が大きすぎます")
+    return data
+
+
+def _worktree_remove(inv: Invocation, args: Sequence[str]) -> None:
+    """worktree remove が消す場所を、git と同じく決めて確かめる（I3）。
+
+    git は、登録（<共通の gitdir>/worktrees/<id>/gitdir。sandbox が書けうる）の指すパスを、中身ごと消す。
+    登録のパスに // や symlink があると、名前の上では一致しても、別の場所を消す（最終レビューで実測）。
+    登録のパスが実パス（normpath と realpath が同じ）の実体のディレクトリで、その .git が通常のファイルで
+    この登録を指し、共通の gitdir の中でないときだけ許可する。
+    """
+    a = split_args("worktree", args, WORKTREE_MOVE_FLAGS)
+    pos = a.positional + (a.pathspec or ())
+    if len(pos) != 1:
+        raise GuardError("worktree remove の引数を確かめられません")
+    found = _worktree_candidates(inv, pos[0])
+    if len(found) != 1:
+        raise GuardError(f"{pos[0]} がどの worktree かを確かめられません")
+    place = found.pop()
+    if place != os.path.normpath(place) or place != os.path.realpath(place):
+        raise GuardError(f"worktree の登録 {place} は実パスではありません（// や symlink を含みます）")
+    try:
+        is_dir = stat.S_ISDIR(os.lstat(place).st_mode)
+    except OSError:
+        is_dir = False
+    if not is_dir:
+        raise GuardError(f"worktree {place} のディレクトリがありません")
+    common = _git_line(inv, "rev-parse", "--path-format=absolute", "--git-common-dir")
+    if _inside(place, Path(common)) is not None:
+        raise GuardError(f"worktree {place} は git のディレクトリの中です")
+    # git の read_gitfile と同じく、gitdir: の後のパス（相対なら .git ファイルの場所から）を実パスにして比べる。
+    gitfile = os.fsdecode(_read_regular(os.path.join(place, ".git"), GITFILE_MAX, f"{place}/.git")).rstrip("\r\n")
+    back = os.path.realpath(os.path.join(place, gitfile.removeprefix("gitdir: ")))
+    registered = ""
+    if gitfile.startswith("gitdir: ") and os.path.dirname(back) == os.path.realpath(os.path.join(common, "worktrees")):
+        # git の get_worktrees と同じく、gitdir ファイルの中身の末尾の空白と /.git を除いたものが登録のパス。
+        text = os.fsdecode(_read_regular(os.path.join(back, "gitdir"), GITFILE_MAX, "worktree の登録")).rstrip()
+        registered = text.removesuffix("/.git")
+    if registered != place:
+        raise GuardError(f"{place}/.git がこの worktree の登録を指していません")
 
 
 def _worktree_move(inv: Invocation, args: Sequence[str]) -> None:
@@ -1516,6 +1579,9 @@ def plan_worktree(inv: Invocation, after_fetch: bool) -> Plan | None:
     if sub == "move":
         _worktree_move(inv, inv.args[1:])
         return None  # 中身は書かない
+    if sub == "remove":
+        _worktree_remove(inv, inv.args[1:])
+        return None  # 消すだけで、中身は書かない
     if sub != "add":
         raise GuardError(f"worktree {sub} は確かめられません")
     a = split_args("worktree", inv.args[1:], WORKTREE_ADD_FLAGS, WORKTREE_ADD_VALUES)

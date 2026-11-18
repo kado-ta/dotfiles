@@ -1274,6 +1274,62 @@ class OtherWriteTests(TreeBase):
         self.assertEqual(result, (1, ""))
         self.assertIn("どの worktree かを確かめられません", err)
 
+    def test_worktree_remove_checks_the_registered_path(self):
+        # git worktree remove は、登録（.git/worktrees/<id>/gitdir。sandbox が書けうる）の指す場所を消す。
+        # 登録のパスに // や symlink があると、名前の上では一致しても別の場所を消す（最終レビューで実測）。
+        # 登録のパスが実パスの実体のディレクトリで、その .git がこの登録を指すときだけ許可する（I3）。
+        wt = self.root / "wt"
+        local_git(self.repo, "worktree", "add", "-q", "--detach", str(wt), "docs")
+        admin = self.repo / ".git" / "worktrees" / "wt"
+        registered = (admin / "gitdir").read_text(encoding="utf-8")
+        for argv in (("../wt",), ("wt",), (str(wt),), ("--force", "--force", "../wt")):
+            with self.subTest(allowed=argv):
+                self.assertEqual(self.check("worktree", "remove", *argv)[0], (0, ""))
+        # 戻りの .git を置いた別の場所 T と、そこへの symlink。
+        target = self.root / "valuable"
+        (target / "sub").mkdir(parents=True)
+        (target / "sub" / "keep.txt").write_text("k\n", encoding="utf-8")
+        (target / ".git").write_text(f"gitdir: {admin}\n", encoding="utf-8")
+        q = self.root / "q"
+        link = Path(str(q) + str(wt))
+        link.parent.mkdir(parents=True)
+        os.symlink(target, link)
+        inner = self.repo / ".git" / "inner"
+        inner.mkdir()
+        (inner / ".git").write_text(f"gitdir: {admin}\n", encoding="utf-8")
+        cases = (
+            # 形 B: 後ろの一致で wt に当たり、symlink の先の T を消す。
+            ("double slash", f"{q}/{wt}/.git\n", str(wt), "実パスではありません"),
+            ("symlink", f"{link}/.git\n", "wt", "実パスではありません"),
+            ("inside the git directory", f"{inner}/.git\n", "inner", "git のディレクトリの中です"),
+        )
+        for name, gitdir, arg, reason in cases:
+            with self.subTest(case=name):
+                (admin / "gitdir").write_text(gitdir, encoding="utf-8")
+                result, err = self.check("worktree", "remove", "--force", arg)
+                self.assertEqual(result, (1, ""))
+                self.assertIn(reason, err)
+        (admin / "gitdir").write_text(registered, encoding="utf-8")
+        # .git がほかを指す、.git が symlink、ディレクトリがない。
+        (wt / ".git").rename(self.root / "wt.git")
+        (wt / ".git").write_text("gitdir: /nowhere\n", encoding="utf-8")
+        result, err = self.check("worktree", "remove", "../wt")
+        self.assertEqual(result, (1, ""))
+        self.assertIn("登録を指していません", err)
+        (wt / ".git").unlink()
+        os.symlink(self.root / "wt.git", wt / ".git")
+        self.assertEqual(self.check("worktree", "remove", "../wt")[0], (1, ""))
+        (wt / ".git").unlink()
+        (self.root / "wt.git").rename(wt / ".git")
+        self.assertEqual(self.check("worktree", "remove", "../wt")[0], (0, ""))
+        wt.rename(self.root / "wt-moved")
+        result, err = self.check("worktree", "remove", str(wt))
+        self.assertEqual(result, (1, ""))
+        self.assertIn("ディレクトリがありません", err)
+        # どの worktree にも当たらない名前と、元のチェックアウト。
+        self.assertEqual(self.check("worktree", "remove", "none")[0], (1, ""))
+        self.assertEqual(self.check("worktree", "remove", ".")[0], (1, ""))
+
     def test_worktree_main_checkout_must_be_known(self):
         # --separate-git-dir の共通の gitdir は .git という名前ではなく、元のチェックアウトの場所が決まらない（R19）。
         sep = self.root / "sep"
@@ -1380,6 +1436,8 @@ class WorktreeCreateTests(TreeBase):
         st = os.lstat(self.place)
         self.assertEqual((key / ".verified" / "x").read_text(encoding="utf-8"), f"{st.st_dev} {st.st_ino}\n")
         self.assertFalse(os.path.lexists(self.main / ".claude" / "worktrees"))
+        # 案内する消し方（README・MSG_WT_UNVERIFIED）は、worktree remove の確認を通る（I3）。
+        self.assertEqual(self.check("worktree", "remove", "--force", str(self.place), start=self.main)[0], (0, ""))
 
     def test_key_of_odd_repository_name(self):
         # 名前の英数字と ._- 以外は _ にし、先頭の . も _ にする。続けて、物理パスの sha256 の先頭 12 桁（R22）。
