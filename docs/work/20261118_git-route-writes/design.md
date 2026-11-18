@@ -201,7 +201,7 @@ sandbox の中で作られた git の中身（コミット・index・ref）が�
 - **作業ツリーに書かないもの**（`status`・`diff`・`log`・`fetch`・`add`・`commit`・`push` など）: すぐに許可する。
 - **作業ツリーに書くもの:** 書きうる中身を計算する。少なくとも、[research の 3.2](research-git-route.md#results-hooks) の 21 個を含める。ほかに、`apply`・`am`・`bisect`・`sparse-checkout`・`submodule update`・`rm`・`mv`・`clean`・`worktree add`、`merge`・`rebase`・`cherry-pick`・`revert`・`am` の `--continue`・`--skip`・`--abort` を含める。
   - 2026-11-19 に追記（最終レビュー）: 実装は、`rebase`・`am`・`apply`・`bisect`・`sparse-checkout`・`submodule` の書き込みを計算せず、知らないサブコマンドと同じく止める（plan の Task 1・3）。`cherry-pick`・`revert` は 1 つのコミットだけを計算し、範囲と `--continue`・`--skip`・`--abort` は止める。範囲の各コミットや手順のファイルを git と同じに計算するのは、この作業に収まらなかったので、止める側に倒した（fail closed）。これらは、人間が自動で読み込まれるファイルが変わらないことを確かめてから、`command git` で実行する。
-  - 2026-11-19 に追記（最終レビュー）: 作業ツリーに書かないサブコマンドでも、`--output`（`show`・`log`・`diff`・`blame` など）と `config` の `-f`・`--file` はファイルに書くので止める。`archive`・`bundle`・`format-patch` も止める。
+  - 2026-11-19 に追記（最終レビュー）: 作業ツリーに書かないサブコマンドでも、`--output`（`show`・`log`・`diff`・`blame` など）と `config` の `-f`・`--file` はファイルに書くので止める。`archive`・`bundle`・`format-patch` も止める。`init` の `--separate-git-dir`・`--template` と、人間の `-c init.templateDir` も止める（既存のリポジトリでの init は、sandbox が書ける `.git` を丸ごと動かすか、テンプレートを `.git/hooks` などに写す。実測）。
 - **知らないサブコマンドと、確かめられない形:** 止める（下の「止める場合」）。
 
 **書きうる中身の計算**

@@ -340,7 +340,7 @@ sudo install -o root -g wheel -m 0755 claude/bin/cc-checkout-guard /usr/local/li
 - 対象のパスが symlink か gitlink（submodule）になる。対象のパスの親が symlink である。新しい中身が NUL を含む
 - 対象のパスに、書くときに中身を変える属性（`filter`・`working-tree-encoding`・`ident`）が付く
 - 確かめる方法を持たない形。`rebase` などのサブコマンド、知らないオプション、`!` で始まる alias、`GIT_DIR` などの環境変数があるとき
-- ファイルに書く読み取りのコマンド。`--output` 付きの `show`・`log`・`diff` など、`config -f`、`archive`・`bundle`・`format-patch`
+- ファイルに書く読み取りのコマンド。`--output` 付きの `show`・`log`・`diff` など、`config -f`、`archive`・`bundle`・`format-patch`、`init` の `--separate-git-dir`・`--template`・`-c init.templateDir`
 - `worktree remove` で、登録のパスが実パスの実体のディレクトリでないか、その `.git` が登録を指していないとき
 
 確認して許可した `merge` が対象のファイルで衝突した後の `git merge --abort` は、確かめられないので止まる。`command git merge --abort` で戻す前に、`git diff HEAD -- <対象のパス>` で、戻した後の中身（HEAD。sandbox が動かしうる）を確かめる。
