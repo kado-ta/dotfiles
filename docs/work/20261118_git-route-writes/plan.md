@@ -114,7 +114,7 @@ CI は、`claude/hooks/tests/test-*.py` をすべて実行するので、ワー�
 **Interfaces（Produces）:**
 
 - 定数: 上の「対象の一覧」、`GIT`、`GUARD_PATH = "/usr/local/libexec/claude-guard/cc-checkout-guard"`、`EXIT_ALLOW = 0`・`EXIT_STOP = 1`・`EXIT_FETCH = 3`、メッセージの定数。
-- `READ_ONLY: frozenset[str]`: 作業ツリーに書かないサブコマンド。`add archive blame branch bundle cat-file check-attr check-ignore check-mailmap check-ref-format cherry clone commit commit-graph commit-tree config count-objects describe diff diff-files diff-index diff-tree fetch for-each-ref format-patch fsck gc grep hash-object help init log ls-files ls-remote ls-tree maintenance merge-base merge-tree mktag mktree name-rev notes prune push range-diff reflog remote repack replace rev-list rev-parse shortlog show show-branch show-ref status symbolic-ref tag update-index update-ref var verify-commit verify-pack verify-tag version whatchanged write-tree`。
+- `READ_ONLY: frozenset[str]`: 作業ツリーに書かないサブコマンド。`add blame branch cat-file check-attr check-ignore check-mailmap check-ref-format cherry clone commit commit-graph commit-tree config count-objects describe diff diff-files diff-index diff-tree fetch for-each-ref fsck gc grep hash-object help init log ls-files ls-remote ls-tree maintenance merge-base merge-tree mktag mktree name-rev notes prune push range-diff reflog remote repack replace rev-list rev-parse shortlog show show-branch show-ref status symbolic-ref tag update-index update-ref var verify-commit verify-pack verify-tag version whatchanged write-tree`（`commit` は Task 3 で移す。`archive`・`bundle`・`format-patch` は最終レビューで外した。下の「最終レビューで変えたもの」）。
 - `ALLOWED_GIT_ENV: frozenset[str]`: 人間の環境にあってよい `GIT_` の名前。`GIT_EDITOR GIT_SEQUENCE_EDITOR GIT_PAGER GIT_SSH GIT_SSH_COMMAND GIT_ASKPASS GIT_TERMINAL_PROMPT GIT_AUTHOR_NAME GIT_AUTHOR_EMAIL GIT_AUTHOR_DATE GIT_COMMITTER_NAME GIT_COMMITTER_EMAIL GIT_COMMITTER_DATE GIT_MERGE_AUTOEDIT GIT_PROGRESS_DELAY`。
 - `class GuardError(Exception)`: 確かめられない、または失敗した。`str(e)` が理由。
 - `class FetchFirst(Exception)`: `argv: list[str]`（先に実行する git の引数）。
@@ -145,6 +145,12 @@ CI は、`claude/hooks/tests/test-*.py` をすべて実行するので、ワー�
 3. 次のときは `(0, "")`。`sub` が `""` か `READ_ONLY` にある。`args` の最初の要素が `-h` か `--help` である（それ以外の位置の `-h` は、オプションの値やパスとして読まれるので許可しない。Task 1 のレビューで変更）。`root` が `None`。
 4. `sub` が `HANDLERS` にあれば、Task 2 の流れへ進む。なければ、`MSG_UNSUPPORTED`（理由は「{sub} は確かめられません」）を出して `(1, "")`。
 5. 予期しない例外は `MSG_ERROR` を出して `(1, "")`。
+
+**最終レビューで変えたもの**（2026-11-19。どれもテストがある）
+
+- ファイルに書く形を止める（`file_writes`。`parse` の直後、リポジトリの外の判定より前に調べる）。READ_ONLY のサブコマンドの `--output`（`--outp` などの省略形と `--output=…`。`--output-indicator-*` は除く）、`config` の `-f`・`--file`（省略形と、`-` 1 つで `f` を含むまとめ書き）。`archive`・`bundle`・`format-patch` は READ_ONLY から外して `FILE_WRITERS` にし、alias として展開せず、リポジトリの外でも止める。`init` の `--separate-git-dir`・`--template`（省略形と `=` の形）と、人間の `-c init.templateDir` も止める（修正の再レビューで追加。既存のリポジトリでは、`.git` を丸ごと動かすか、テンプレートを `.git/hooks` に写す。実測）。
+- 早道（`fast_allow`）。スクリプトの先頭で、重い import の前に、引数だけで次を許可する。READ_ONLY のサブコマンドで `file_writes` に当たらないもの、`HANDLERS` のサブコマンドの直後の `-h`・`--help`、`--version` などの全体のオプションだけの形。全体のオプションと `--git-env` は `parse` と同じく読み、確かでなければ今までの処理に任せる。モジュールとして読み込んだときは動かない（check-repo とテストは `SourceFileLoader`）。1 回あたりの時間は、sandbox の中の測定で約 135 ms から約 42 ms になった（空の `python3 -I` は約 33 ms）。CLT の git が読めないリポジトリでも READ_ONLY を許可する点だけ、今までの処理（「リポジトリを読めません」で止める）と違う。READ_ONLY は作業ツリーに書かないので、許可した。この違いは `test_fast_path_agrees_with_full_path` で、そのまま確かめる。
+- y と答えた後に、同じ計算をし直し、変わるファイル・`danger`・状態の JSON が確認のときと同じときだけ許可する。違えば（計算し直しの失敗を含む）`MSG_CHANGED_WHILE_ASKING` を出して、git を実行せずに `(1, "")`。
 
 **テスト**（Base は一時ディレクトリにリポジトリを作り、`guard.in_sandbox` を偽に差し替える）
 
@@ -187,7 +193,7 @@ CI は、`claude/hooks/tests/test-*.py` をすべて実行するので、ワー�
   - `tree_entries(cwd: Path, treeish: str, *, config=()) -> dict[str, Entry]`（`ls-tree -r -z --full-tree`）、`index_entries(cwd: Path, *pathspec, root=None, home=None, config=()) -> dict[str, Entry]`（`ls-files -s -z --full-name`。対象のパスに stage 1〜3 があれば `GuardError`）。
   - `changed_paths(inv: Invocation, *diff_args: str) -> list[str]`: `diff --name-only -z` を `inv.cwd` で実行し、ルートからの相対パスで返す。
   - `danger(plan: Plan, inv: Invocation) -> str | None`: 止める理由（`MSG_DANGER` の文）か `None`。
-  - `render(plan: Plan) -> str`: 変わるファイルの一覧と差分。
+  - `render(plan: Plan, config: Sequence[str] = ()) -> str`: 変わるファイルの一覧と差分。`check` は人間の `-c`（`inv.config`）を渡す（最終レビューで変更）。
   - `state_of(plan: Plan, inv: Invocation) -> str`、`verify(state: str, stderr: TextIO) -> int`。
 
 **計算の決まり**（`HEAD` が解決できないときは、空の tree として扱う）
@@ -223,13 +229,13 @@ CI は、`claude/hooks/tests/test-*.py` をすべて実行するので、ワー�
   - `check-attr -z <DANGEROUS_ATTRS> -- <paths>` で、`unspecified`・`unset` 以外の値がある。作業ツリーの属性と、`sources` の各 tree の属性（`--source=<tree>`）と、index の属性（`--cached`。常に調べる）を調べる。
   - 書かれる通常のファイルの中身に NUL がある（kind は `バイナリの中身`）。
 - `render`: 1 行目は `MSG_CHANGES`。続けてパスごとに、`変更`・`追加`・`削除`・`モードの変更（{old}→{new}）` の印とパスを出す。そのあとに `difflib.unified_diff` の差分を出す。
-  - 古い中身はディスクから読む。新しい中身は `cat-file blob <oid>`（フィルタなし）で読む。
+  - 古い中身はディスクから読む。新しい中身は `cat-file blob <oid>`（フィルタなし。人間の `-c` を渡すので、`core.useReplaceRefs` などが git の書く中身と一致する）で読む。
   - UTF-8 として読めないバイトは `errors="surrogateescape"` で読み、差分を取った後に、各行を表示用に変える（読めないバイトは `\xNN`、`\t` を除く Unicode の C*・Zl・Zp は `<U+XXXX>`）。差分は省略しない。パスと `MSG_UNSUPPORTED` の理由も同じく変える。
 - `check` の続き:
   - `danger` があれば、その文を出して `(1, "")`。確認を求めない。
   - 変わるものがなければ、何も出さずに `(0, state)`。
   - 変わるものがあれば、次のとおりにする。
-    - `tty`（標準入力と標準エラー出力の両方が端末）のとき: `render` と `MSG_ASK` を stderr に出し、`stdin` から 1 行読む。`y` か `yes`（大文字と小文字を区別しない）なら `(0, state)`。それ以外か EOF なら `MSG_DECLINED` を出して `(1, "")`。
+    - `tty`（標準入力と標準エラー出力の両方が端末）のとき: `render` と `MSG_ASK` を stderr に出し、`stdin` から 1 行読む。`y` か `yes`（大文字と小文字を区別しない）なら、計算をし直して確認のときと同じなら `(0, state)`（Task 1 の「最終レビューで変えたもの」）。それ以外か EOF なら `MSG_DECLINED` を出して `(1, "")`。
     - `tty` でないとき: 一覧と `MSG_NO_TTY` を出して `(1, "")`。表示するコマンドは `git -C <start> <argv>` で、どの語も `shlex.quote` する。
 - 状態の JSON: `{"root": "<絶対パス>", "expect": {"<相対パス>": [<旧>, <新>]}}`。各 entry は `[mode, oid]` か `null` で書く。
   - 対象には、変わるファイルと、index にある対象のファイル（変わらないもの。旧と新が同じ）を入れる。
@@ -285,12 +291,13 @@ CI は、`claude/hooks/tests/test-*.py` をすべて実行するので、ワー�
 | `stash list`・`show`・`drop`・`clear`・`create`・`store` | `(0, "")`。ほかの `stash` は `GuardError` |
 | `cherry-pick [-n] [-x] [--no-edit] [-e] [-s] <commit>` | `merge-tree --write-tree --merge-base=<c>^ HEAD <c>`。範囲（`..` を含む）、マージコミット、`--continue`・`--skip`・`--abort`・`--quit` は `GuardError` |
 | `revert`（同じオプション） | `merge-tree --write-tree --merge-base=<c> HEAD <c>^` |
-| `rm [-r] [-f] [-q] [--ignore-unmatch] [--] <pathspec>` | `ls-files -z -- <pathspec>` の対象のファイルを削除の候補にする。`--cached` か `-n` があれば `(0, "")` |
+| `rm [-r] [-f] [-q] [--ignore-unmatch] [--] <pathspec>` | `ls-files -z -- <pathspec>` の対象のファイルを削除の候補にする。`--cached` か `-n` があれば `(0, "")`。`--` より前の `r`・`f`・`q`・`n` のまとめ書き（`-rf` など）は 1 文字ずつに分けて読む（最終レビューで変更） |
 | `clean` | `-n`・`--dry-run` があれば `(0, "")`。`-i` は `GuardError`。ほかは、同じ引数から `-f`・`--force` を除いて `--dry-run` を付けて実行する。`Would remove <path>` の対象のファイルを削除の候補にする |
 | `mv` | 位置引数のどれか（移動先のディレクトリの中の行き先を含む）が対象なら `GuardError`。ほかは `(0, "")` |
 | `worktree add [opts] <path> [<commit>]` | T は `<commit>`。なければ、`-b`・`-B` があるときは `HEAD`、ないときは `<path>` の最後の名前のローカルのブランチ、それもなければ `HEAD`。`Plan(root=<path の絶対パス>, changes=compare_with_main(...), fresh=True)`。`--orphan` は `GuardError`、`--no-checkout` は `(0, "")` |
 | `worktree move [-f] <worktree> <new-path>` | 行き先（ディレクトリなら、git の `find_worktree` が選びうる登録パスの最後の名前をつないだもの）が、今か元のチェックアウトの対象のパスか、その下なら `GuardError`。ほかは `(0, "")` |
-| `worktree list`・`prune`・`lock`・`unlock`・`remove`・`repair` | `(0, "")` |
+| `worktree remove [-f] <worktree>`（最終レビューで変更） | 対象は move と同じ `find_worktree` の解決で決め、ちょうど 1 つでなければ `GuardError`。登録のパス P が `normpath` と `realpath` に等しい実体のディレクトリで、共通の gitdir の外にあり、`P/.git`（通常のファイル）が `<共通の gitdir>/worktrees/<id>` を指し、その `gitdir` ファイルが P を指すときだけ `(0, "")`。ほかは `GuardError` |
+| `worktree list`・`prune`・`lock`・`unlock`・`repair` | `(0, "")` |
 
 実装とレビューで変えたもの（どれも止める側。実測とテストがある）:
 
@@ -298,7 +305,7 @@ CI は、`claude/hooks/tests/test-*.py` をすべて実行するので、ワー�
 - merge-tree は設定の merge ドライバーを動かす（作業ツリーの `.gitattributes` と `.git/info/attributes` の `merge=x` で実測）。`merge.<x>.driver`・`.recursive` が 1 つでも設定にあれば、merge-tree を使う確認（merge・pull・stash apply/pop・cherry-pick・revert）をすべて止める。`merge.renormalize` が真でも止める。
 - MERGE_AUTOSTASH（`rev-parse --git-path MERGE_AUTOSTASH` のファイルか `rev-parse --verify MERGE_AUTOSTASH`）があれば、merge・pull・`merge --abort`・`--continue`・commit・cherry-pick・revert を止める。git はこれらの後に置かれた stash を書く（実測）。
 - merge・pull の設定: `merge.autoStash`・`pull.autoStash`・`pull.twohead`（`ort` 以外）・`branch.<b>.mergeOptions` があれば止める。`branch.<b>.rebase` を `pull.rebase` より先に読み、bool で読めない値も止める。オプションと設定の確認は FetchFirst の前にする。
-- `merge FETCH_HEAD` は、FETCH_HEAD のファイルを git と同じく読み、取り込む行がちょうど 1 つでなければ止める（git は octopus で取り込む）。pull は自分の fetch で FETCH_HEAD を書き直すので対象外（実測）。
+- `merge FETCH_HEAD` は、FETCH_HEAD のファイルを git と同じく読み、取り込む行がちょうど 1 つでなければ止める（git は octopus で取り込む）。pull は自分の fetch で FETCH_HEAD を書き直すので対象外（実測）。FETCH_HEAD は symlink をたどらずに開き、通常のファイルで 1 MiB 以下のときだけ読む（最終レビューで変更。`--path-format=absolute` の `--git-path` は symlink をたどるので、既定の形を使う）。
 - rev の解決は、merge・cherry-pick・revert・`worktree add --detach` は `_rev`（tag が先）、`worktree add` は `_target`（ブランチが先）にする（コマンドごとに実測）。cherry-pick・revert は、`..` を含むもの・`^` で始まるもの・マージコミット・親のないコミットを止める。
 - 衝突の印のラベルは、merge と pull（`@{upstream}` は oid にする）では git と一致する。cherry-pick・revert・stash apply/pop では一致しないので、対象のパスが衝突したら止める。`.git/rr-cache` があれば（`rerere.enabled` がなくても）git は記録した解決を書くので、merge・pull で対象のパスが衝突し、rerere が働きうるときも止める。
 - stash apply/pop・cherry-pick・revert（`-n` を含む）は、index が HEAD と違えば止める。`stash -k` は index の中身を書くので、対象の index が HEAD と違えば止める。`stash save`・`stash branch` は止める。
@@ -344,7 +351,7 @@ CI は、`claude/hooks/tests/test-*.py` をすべて実行するので、ワー�
    - `<H>` はホームの物理パス。キーは、元のチェックアウトの物理パスの最後の名前（`[A-Za-z0-9._-]` 以外と先頭の `.` を `_` にする）、`-`、物理パスの sha256 の先頭 12 桁。
    - `.cc-worktrees`・`<キー>`・`<キー>/.verified` は、なければ 0o700 で作る。どれも、実体のディレクトリで、自分の持ち物で、group と other が書けないことを、親から順に `lstat` で確かめる。違えば何も作らずに 1。
    - 理由: 初版の `<ルート>/.claude/worktrees/<name>` は、元のチェックアウトのセッションの sandbox が書ける。確かめてから `worktree add` までの間に `.claude/worktrees` を symlink に替えると、git は sandbox の外に書いた（レビューの実測。30 回中 7 回）。ホームの下は sandbox から書けないので、この競合が成り立たない。
-3. 置き場所が `worktree list --porcelain` にあり、実体のディレクトリで、確かめ終わった印（`<キー>/.verified/<name>`。置き場所の `st_dev` と `st_ino`）が一致するときだけ、そのパスを出して 0。印がない・違うときは、消すコマンド（`git -C <ルート> worktree remove --force <置き場所>` と `git -C <ルート> branch -D worktree-<name>`）を案内して 1。自分では消さない。登録がなく何かがあるとき、ブランチ `worktree-<name>` だけがあるときも 1（触らない）。
+3. 置き場所が `worktree list --porcelain` にあり、実体のディレクトリで、確かめ終わった印（`<キー>/.verified/<name>`。置き場所の `st_dev` と `st_ino`）が一致するときだけ、そのパスを出して 0。印がない・違うときは、消すコマンド（`git -C <ルート> worktree remove --force <置き場所>` と `git -C <ルート> branch -D worktree-<name>`）を案内して 1。自分では消さない。登録がなく何かがあるとき、ブランチ `worktree-<name>` だけがあるときも 1（触らない）。ブランチだけがあるときは、中身を確かめてから `git -C <ルート> branch -D worktree-<name>` で消すよう案内する（`MSG_WT_BRANCH_EXISTS`。Claude Code の `Remove worktree` がブランチを残すため。最終レビューで変更）。
 4. 作成元は、`refs/remotes/origin/HEAD^{commit}` が解決できればそれ、できなければ `HEAD^{commit}`。どちらもなければ 1。`worktree add` には oid で渡す。
 5. `compare_with_main` で作成元の tree を比べる。違いがあれば、作らずに 7 へ。作成元の tree の対象に symlink・gitlink がないかと、書くときの属性（`danger` に `fresh` の Plan を渡す）も、作る前に確かめる。
 6. `worktree add -b worktree-<name> <置き場所> <作成元の oid>` で作る。
@@ -354,7 +361,7 @@ CI は、`claude/hooks/tests/test-*.py` をすべて実行するので、ワー�
    - 違いがあれば、`worktree remove --force --force <置き場所>` と `branch -D worktree-<name>` で片付けてから 7 へ。`worktree add` 自体が 0 以外で終わったときは、ブランチが作成元を指すときだけ消し、置き場所には触らない（git が自分で消すので、そこにあるのはこの呼び出しのものではない）。
    - 期限: フックの開始から 50 秒。この動きの git の timeout はすべて残りの時間にする。`worktree add` の前に 10 秒残っていなければ作らない。片付けには 8 秒まで延ばす（フックの timeout 60 秒の中に収める）。
 7. 違ったファイルの一覧と、design 6.6 の手順 6 の案内のうち当てはまる 1 つを出して、1 を返す。案内の判断の順は、次のとおり。
-   1. 元のチェックアウトのブランチの名前が、`origin/HEAD` の指すブランチの名前と違う。
+   1. 元のチェックアウトのブランチの名前が、`origin/HEAD` の指すブランチの名前と違う。案内は両方の名前を出し、`git ls-remote --symref origin HEAD` で確かめてから `git remote set-head origin --auto` で直すよう勧める。`origin/HEAD` の先へ切り替える案内はしない（最終レビューで変更。差し替えられた先へ人間を向けないため）。
    2. 違ったパスに、コミットしていない変更がある。`status` は clean フィルタを動かすので使わず、index と HEAD の entry、ディスク（`hash-object --no-filters`）と index の entry を比べる。
    3. 元のチェックアウトの `HEAD` が、作成元と違う。
    4. それ以外（差し替えのおそれ）。
@@ -511,7 +518,7 @@ MISE_ENV_FILES = ("bin/.zshrc", "bin/.zprofile", "mise/mise_config.toml")  # ほ
 
 - [ ] **Step 1: `claude/CLAUDE.md`（グローバル）の Safety。** 「sandbox の中の git が … 途中で止まったら」の項目の最後に、次を足す。
 
-  > 人間の zsh の `git` は、それらのファイルが変わる操作を `!` では止める（cc-checkout-guard）。含まれるときは、`!` ではなく普段の端末で打つ `git -C <パス> …` を示す。`command git`・`\git`・絶対パスの git を頼まない。
+  > 人間の zsh の `git` は、cc-checkout-guard の一覧のファイル（mise の設定はふつう `mise.lock` だけで、dotfiles の元のチェックアウトでは `mise/`・`mise.toml` も）が変わる操作を `!` では止める。含まれるときは、`!` ではなく普段の端末で打つ `git -C <パス> …` を示す。`command git`・`\git`・絶対パスの git を頼まない。
 
 - [ ] **Step 2: リポジトリの `CLAUDE.md`。**
   - 「sandbox と権限の禁止事項」に 2 項目を足す。
