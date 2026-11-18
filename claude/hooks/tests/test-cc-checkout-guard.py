@@ -1,9 +1,11 @@
 import contextlib
+import hashlib
 import importlib.machinery
 import importlib.util
 import io
 import json
 import os
+import re
 import select
 import signal
 import subprocess
@@ -1158,7 +1160,18 @@ class WorktreeCreateTests(TreeBase):
         local_git(self.root, "clone", "-q", "--bare", str(self.repo), str(self.origin))
         self.main = self.root / "main"
         local_git(self.root, "clone", "-q", str(self.origin), str(self.main))
-        self.place = self.main / ".claude" / "worktrees" / "x"
+        self.place = self.place_of(self.main)
+
+    def key_of(self, root):
+        """置き場所のキー（R22）。物理パスの最後の名前を英数字と ._- にし、物理パスの sha256 の先頭 12 桁を付ける。"""
+        real = os.path.realpath(root)
+        name = re.sub(r"[^A-Za-z0-9._-]", "_", os.path.basename(real))
+        if name.startswith("."):
+            name = "_" + name[1:]
+        return f"{name}-{hashlib.sha256(os.fsencode(real)).hexdigest()[:12]}"
+
+    def place_of(self, repo, name="x"):
+        return self.home / ".cc-worktrees" / self.key_of(repo) / name
 
     def create(self, name="x", cwd=None, payload=None):
         """フックを呼ぶ。self.adds に、worktree add を呼んだ回数を残す（作る前に止めたかを確かめる）。"""
@@ -1173,7 +1186,7 @@ class WorktreeCreateTests(TreeBase):
             return real(cwd, *args, **kwargs)
 
         with mock.patch.object(guard, "_git_process", side_effect=spy):
-            code = guard.worktree_create(payload, stdout=out, stderr=err)
+            code = guard.worktree_create(payload, stdout=out, stderr=err, home=self.home)
         return code, out.getvalue(), err.getvalue()
 
     def has_branch(self, repo, name):
@@ -1182,8 +1195,9 @@ class WorktreeCreateTests(TreeBase):
 
     def assert_nothing_left(self, repo=None, name="x"):
         repo = repo or self.main
-        place = repo / ".claude" / "worktrees" / name
+        place = self.place_of(repo, name)
         self.assertFalse(os.path.lexists(place))
+        self.assertFalse(os.path.lexists(place.parent / ".verified" / name))
         self.assertFalse(os.path.lexists(repo / ".git" / "worktrees" / name))
         self.assertFalse(self.has_branch(repo, f"worktree-{name}"))
         self.assertNotIn(f"worktree {place}", local_git(repo, "worktree", "list", "--porcelain").split("\n"))
@@ -1213,6 +1227,24 @@ class WorktreeCreateTests(TreeBase):
         self.assertEqual(local_git(self.place, "rev-parse", "HEAD"), local_git(self.main, "rev-parse", "origin/main"))
         settings = ".claude/settings.json"
         self.assertEqual((self.place / settings).read_bytes(), (self.main / settings).read_bytes())
+        # 置き場所はリポジトリの外（R22）。基のディレクトリは 0o700 で作り、確かめ終わった印を置く。
+        key = self.place.parent
+        self.assertEqual(key.parent, self.home / ".cc-worktrees")
+        for d in (key.parent, key, key / ".verified"):
+            with self.subTest(d=d.name):
+                self.assertEqual(os.lstat(d).st_mode & 0o777, 0o700)
+        st = os.lstat(self.place)
+        self.assertEqual((key / ".verified" / "x").read_text(encoding="utf-8"), f"{st.st_dev} {st.st_ino}\n")
+        self.assertFalse(os.path.lexists(self.main / ".claude" / "worktrees"))
+
+    def test_key_of_odd_repository_name(self):
+        # 名前の英数字と ._- 以外は _ にし、先頭の . も _ にする。続けて、物理パスの sha256 の先頭 12 桁（R22）。
+        odd = self.root / ".my repo+x"
+        local_git(self.root, "clone", "-q", str(self.origin), str(odd))
+        code, out, err = self.create(cwd=odd)
+        self.assertEqual(code, 0, err)
+        digest = hashlib.sha256(os.fsencode(str(odd))).hexdigest()[:12]
+        self.assertEqual(out, f"{self.home}/.cc-worktrees/_my_repo_x-{digest}/x\n")
 
     def test_tampered_origin_head_is_rejected(self):
         local_git(self.main, "update-ref", "refs/remotes/origin/evil", "refs/remotes/origin/feature")
@@ -1250,7 +1282,7 @@ class WorktreeCreateTests(TreeBase):
                 code, out, err = self.create(payload=payload)
                 self.assertEqual((code, out), (1, ""))
                 self.assertIn("止めました", err)
-        self.assertFalse(os.path.lexists(self.main / ".claude" / "worktrees"))
+        self.assertFalse(os.path.lexists(self.home / ".cc-worktrees"))
         self.assertEqual(local_git(self.main, "for-each-ref", "refs/heads/worktree-*"), "")
         self.assertEqual(self.create("a" * 64)[0], 0)
 
@@ -1305,7 +1337,7 @@ class WorktreeCreateTests(TreeBase):
         self.assert_nothing_left()
 
     def test_no_origin_uses_head(self):
-        place = self.repo / ".claude" / "worktrees" / "x"
+        place = self.place_of(self.repo)
         code, out, err = self.create(cwd=self.repo)
         self.assertEqual((code, out, err), (0, f"{place}\n", ""))
         self.assertEqual(local_git(place, "rev-parse", "HEAD"), local_git(self.repo, "rev-parse", "HEAD"))
@@ -1367,23 +1399,73 @@ class WorktreeCreateTests(TreeBase):
     def test_interrupted_add_is_cleaned_up(self):
         # 止められた worktree add は lock（initializing）を残す。フックの timeout（60 秒）より前に止め、片付ける。
         real = guard._git_process
-        timeouts = []
+        groups = []
 
         def add_then_timeout(cwd, *args, **kwargs):
             cp = real(cwd, *args, **kwargs)
             if args[:2] == ("worktree", "add"):
-                timeouts.append(kwargs.get("timeout"))
+                groups.append(kwargs.get("group"))
                 (self.main / ".git" / "worktrees" / "x" / "locked").write_text("initializing", encoding="utf-8")
-                raise subprocess.TimeoutExpired(args, kwargs.get("timeout"))
+                raise subprocess.TimeoutExpired(args, 1)
             return cp
 
         with mock.patch.object(guard, "_git_process", side_effect=add_then_timeout):
             code, out, err = self.create()
         self.assertEqual((code, out), (1, ""))
         self.assertIn("TimeoutExpired", err)
-        self.assertEqual(timeouts, [guard.WORKTREE_ADD_TIMEOUT])
-        self.assertLess(guard.WORKTREE_ADD_TIMEOUT, 60)
+        self.assertEqual(groups, [True])
+        self.assertLess(guard.WORKTREE_BUDGET + guard.WORKTREE_DISCARD_TIME, 60)
         self.assert_nothing_left()
+
+    def test_add_timeout_kills_grandchildren(self):
+        # worktree add は自分の session で動かし、期限を過ぎたら、git が動かした子（フィルタなど）もまとめて止める（Minor 2）。
+        pidfile = self.root / "filter.pid"
+        local_git(self.main, "config", "filter.slow.smudge", f"echo $$ > '{pidfile}'; exec sleep 30")
+        info = self.main / ".git" / "info"
+        info.mkdir(exist_ok=True)
+        (info / "attributes").write_text("README.md filter=slow\n", encoding="utf-8")
+        start = time.monotonic()
+        with mock.patch.object(guard, "WORKTREE_BUDGET", 4), mock.patch.object(guard, "WORKTREE_ADD_MIN", 1):
+            code, out, err = self.create()
+        self.assertLess(time.monotonic() - start, 20)
+        self.assertEqual((code, out, self.adds), (1, "", 1))
+        self.assertIn("TimeoutExpired", err)
+        self.assert_nothing_left()
+        pid = int(pidfile.read_text(encoding="utf-8"))
+        for _ in range(50):
+            try:
+                os.kill(pid, 0)
+            except ProcessLookupError:
+                break
+            time.sleep(0.1)
+        else:
+            self.fail(f"filter process {pid} is still running")
+
+    def test_deadline_bounds_every_git_call(self):
+        # フックの開始からの期限（50 秒）の残りを、このモードの git のすべての timeout にする（Minor 3）。
+        timeouts = []
+        real_run = guard.subprocess.run
+
+        def spy_run(*args, **kwargs):
+            timeouts.append(kwargs.get("timeout"))
+            return real_run(*args, **kwargs)
+
+        with mock.patch.object(guard.subprocess, "run", side_effect=spy_run):
+            self.assertEqual(self.create()[0], 0)
+        self.assertTrue(timeouts)
+        self.assertTrue(all(0 < t <= guard.WORKTREE_BUDGET for t in timeouts), timeouts)
+        # 残りが worktree add に足りなければ、作らずに止める。
+        with mock.patch.object(guard, "WORKTREE_ADD_MIN", guard.WORKTREE_BUDGET + 1):
+            code, out, err = self.create("y")
+        self.assertEqual((code, out, self.adds), (1, "", 0))
+        self.assertIn("時間", err)
+        self.assert_nothing_left(name="y")
+        # 期限を過ぎたら、次の git を動かさずに止める。
+        with mock.patch.object(guard, "WORKTREE_BUDGET", 0):
+            code, out, err = self.create("z")
+        self.assertEqual((code, out, self.adds), (1, "", 0))
+        self.assertIn("時間", err)
+        self.assert_nothing_left(name="z")
 
     def test_lfs_path_only_for_worktree_add(self):
         # PATH に /opt/homebrew/bin を足すのは worktree add だけ（R3）。ほかの git は確認コマンドの環境で動く。
@@ -1402,22 +1484,58 @@ class WorktreeCreateTests(TreeBase):
                          {k: v for k, v in guard.git_env(guard.user_home()).items() if k != "PATH"})
         self.assertEqual([args for args, env in calls if env is not None], [("worktree", "add")])
 
-    def test_symlinked_place_stops(self):
+    def test_old_location_symlink_has_no_effect(self):
+        # 置き場所はリポジトリの外なので、sandbox が書ける .claude/worktrees を、確かめる途中で symlink にしても
+        # 書く先は変わらない（レビューの probe の形 A）。
+        outside = self.root / "outside"
+        outside.mkdir()
+        real = guard.compare_with_main
+
+        def swap_then_compare(*args):
+            os.symlink(outside, self.main / ".claude" / "worktrees")
+            return real(*args)
+
+        with mock.patch.object(guard, "compare_with_main", side_effect=swap_then_compare):
+            code, out, err = self.create()
+        self.assertEqual((code, out, err), (0, f"{self.place}\n", ""))
+        self.assertEqual(os.listdir(outside), [])
+        self.assertIn(f"worktree {self.place}", local_git(self.main, "worktree", "list", "--porcelain").split("\n"))
+
+    def test_unsafe_base_stops(self):
+        # 置き場所の基（.cc-worktrees・キー・.verified）は、自分だけが書ける実体のディレクトリでなければ止める（R22）。
+        base = self.home / ".cc-worktrees"
+        key = self.place.parent
         elsewhere = self.root / "elsewhere"
         elsewhere.mkdir()
-        os.symlink(elsewhere, self.main / ".claude" / "worktrees")
-        plain = self.root / "plain"
-        local_git(self.root, "clone", "-q", str(self.origin), str(plain))
-        local_git(plain, "rm", "-q", "-r", ".claude")
-        local_git(plain, "-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-q", "-m", "rm")
-        os.symlink(elsewhere, plain / ".claude")
-        for repo in (self.main, plain):
-            with self.subTest(repo=repo.name):
-                code, out, err = self.create(cwd=repo)
-                self.assertEqual((code, out), (1, ""))
-                self.assertIn("symlink", err)
+
+        def check(label):
+            with self.subTest(label=label):
+                code, out, err = self.create()
+                self.assertEqual((code, out, self.adds), (1, "", 0))
+                self.assertIn("自分だけが書ける", err)
                 self.assertEqual(os.listdir(elsewhere), [])
-                self.assertFalse(self.has_branch(repo, "worktree-x"))
+                self.assert_nothing_left()
+
+        os.symlink(elsewhere, base)
+        check("base symlink")
+        base.unlink()
+        base.mkdir(mode=0o700)
+        os.symlink(elsewhere, key)
+        check("key symlink")
+        key.unlink()
+        key.mkdir(mode=0o700)
+        os.chmod(key, 0o770)
+        check("key group-writable")
+        os.chmod(key, 0o700)
+        os.symlink(elsewhere, key / ".verified")
+        check("verified symlink")
+        (key / ".verified").unlink()
+        # ほかの人のディレクトリは作れないので、uid を差し替えて確かめる。
+        home = guard.user_home()
+        with mock.patch.object(guard.os, "getuid", return_value=os.getuid() + 1), \
+                mock.patch.object(guard, "user_home", return_value=home):
+            check("owned by someone else")
+        self.assertEqual(self.create()[0], 0)
 
     def test_bare_and_separate_gitdir_stop(self):
         code, out, err = self.create(cwd=self.origin)
@@ -1497,13 +1615,58 @@ class WorktreeCreateTests(TreeBase):
 
         payload = {"session_id": "s", "transcript_path": "/dev/null", "cwd": str(self.main),
                    "hook_event_name": "WorktreeCreate", "name": "x"}
-        self.assertEqual(run(json.dumps(payload).encode("utf-8")), (0, f"{self.place}\n", ""))
+        # main はホームの下に作る。sandbox はホームに書けないので、テストではホームを一時ディレクトリに差し替える。
+        with mock.patch.object(guard, "user_home", return_value=self.home):
+            self.assertEqual(run(json.dumps(payload).encode("utf-8")), (0, f"{self.place}\n", ""))
         for data in (b"", b"{", b"[]", b'"x"'):
             with self.subTest(data=data):
                 code, out, err = run(data)
                 self.assertEqual((code, out), (1, ""))
                 self.assertIn("止めました", err)
         self.assertEqual(guard.main(["worktree-create", "x"]), 1)
+
+    def test_unverified_worktree_is_left_alone(self):
+        # 確かめ終わった印のない登録（作る途中で止められたものなど）は返さず、消すコマンドを案内して触らない（R22・R20）。
+        self.assertEqual(self.create()[0], 0)
+        marker = self.place.parent / ".verified" / "x"
+        oid = local_git(self.main, "rev-parse", "worktree-x")
+
+        def check(label, name="x"):
+            place = self.place_of(self.main, name)
+            with self.subTest(label=label):
+                code, out, err = self.create(name)
+                self.assertEqual((code, out, self.adds), (1, "", 0))
+                self.assertIn(f"git -C {self.main} worktree remove --force {place}", err)
+                self.assertIn(f"git -C {self.main} branch -D worktree-{name}", err)
+                self.assertTrue((place / ".claude" / "settings.json").exists())
+                self.assertIn(f"worktree {place}", local_git(self.main, "worktree", "list", "--porcelain").split("\n"))
+
+        marker.unlink()
+        check("no marker")
+        st = os.lstat(self.place)
+        marker.write_text(f"{st.st_dev} {st.st_ino + 1}\n", encoding="utf-8")
+        check("other inode")
+        self.assertEqual(local_git(self.main, "rev-parse", "worktree-x"), oid)
+        # フックを通さずに作った worktree も、同じく返さない。
+        local_git(self.main, "worktree", "add", "-q", "-b", "worktree-plain", str(self.place_of(self.main, "plain")))
+        check("made without the hook", "plain")
+
+    def test_failed_add_leaves_others_branch(self):
+        # 確認の後に別のものが作ったブランチは、作成元を指していなければ消さない（Minor 1）。
+        feature = local_git(self.main, "rev-parse", "origin/feature")
+        real = guard._git_process
+
+        def branch_appears(cwd, *args, **kwargs):
+            if args[:2] == ("worktree", "add"):
+                local_git(self.main, "branch", "worktree-x", feature)
+                return subprocess.CompletedProcess(args, 128, b"", b"")
+            return real(cwd, *args, **kwargs)
+
+        with mock.patch.object(guard, "_git_process", side_effect=branch_appears):
+            code, out, err = self.create()
+        self.assertEqual((code, out), (1, ""))
+        self.assertIn("worktree add が失敗しました", err)
+        self.assertEqual(local_git(self.main, "rev-parse", "worktree-x"), feature)
 
 
 if __name__ == "__main__":
