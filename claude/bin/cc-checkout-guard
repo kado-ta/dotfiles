@@ -220,10 +220,22 @@ def _hidden(ch: str) -> bool:
 
 
 def _show(text: str) -> str:
-    """制御文字や見えない文字を <U+XXXX> にする。差分の表示で端末をだまされないため。"""
+    """制御文字や見えない文字を <U+XXXX> に、UTF-8 として読めないバイト（surrogateescape）を \\xNN にする。
+
+    差分の表示で端末をだまされないため。差分を取った後に使う（先に使うと、別の中身が同じ行になる）。
+    """
     if text.isprintable():
         return text
-    return "".join(f"<U+{ord(ch):04X}>" if ch != "\t" and _hidden(ch) else ch for ch in text)
+    out: list[str] = []
+    for ch in text:
+        code = ord(ch)
+        if 0xDC80 <= code <= 0xDCFF:
+            out.append(f"\\x{code - 0xDC00:02x}")
+        elif ch != "\t" and _hidden(ch):
+            out.append(f"<U+{code:04X}>")
+        else:
+            out.append(ch)
+    return "".join(out)
 
 
 def git_env(home: Path) -> dict[str, str]:
@@ -458,6 +470,17 @@ def _commit_tree(inv: Invocation, commit: str) -> str:
     return tree
 
 
+def _branch_oid(inv: Invocation, name: str) -> str | None:
+    """refs/heads/<name> を、git の read_ref と同じく読む。
+
+    loose の ref は、大文字と小文字を区別しないファイルシステムでは、名前の大文字と小文字を区別せずに読まれる
+    （for-each-ref の名前の照らし合わせは区別するので使わない）。show-ref --verify は read_ref で読み、
+    読めないときは 128 で終わる。
+    """
+    out = run_git(inv.cwd, "show-ref", "--verify", "--hash", "refs/heads/" + name, config=inv.config, ok=(0, 128))
+    return os.fsdecode(out).strip() or None
+
+
 def _target(inv: Invocation, rev: str, kind: str) -> str | None:
     """switch・checkout・restore が読む rev。git と同じく、同じ名前のブランチを tag などより先に使う。"""
     if rev == "-":
@@ -466,16 +489,17 @@ def _target(inv: Invocation, rev: str, kind: str) -> str | None:
         rev = "HEAD"
     if "..." in rev:
         raise GuardError(f"{rev} は確かめられません")
-    if "@{" not in rev:
-        ref = "refs/heads/" + rev
-        out = run_git(inv.cwd, "for-each-ref", "--format=%(refname)%00%(objectname)", ref, config=inv.config)
-        for line in os.fsdecode(out).split("\n"):
-            name, _, oid = line.partition("\0")
-            if name == ref:
-                peeled = _peel(inv, oid, kind)
-                if peeled is None:
-                    raise GuardError(f"{rev} を解決できません")
-                return peeled
+    name = rev
+    if rev.startswith("@{-") and rev.endswith("}"):
+        # git は @{-N} をブランチの名前に戻してから refs/heads/<名前> を読む。rev-parse は同じ名前の tag を先に使う。
+        name = _git_line(inv, "check-ref-format", "--branch", rev, ok=(0, 128))
+    if name and "@{" not in name:
+        oid = _branch_oid(inv, name)
+        if oid is not None:
+            peeled = _peel(inv, oid, kind)
+            if peeled is None:
+                raise GuardError(f"{rev} を解決できません")
+            return peeled
     return _rev(inv, rev, kind)
 
 
@@ -737,6 +761,11 @@ def danger(plan: Plan, inv: Invocation) -> str | None:
         if c.new is not None and c.new.mode in (SYMLINK, GITLINK):
             kind = "symlink" if c.new.mode == SYMLINK else "submodule（gitlink）"
             return MSG_DANGER.format(path=_show(c.path), kind=kind)
+    # NUL を含む中身は、差分で見せても読めないので、聞かずに止める。
+    for c in plan.changes:
+        if c.new is not None and c.new.mode in REGULAR:
+            if b"\0" in run_git(plan.root, "cat-file", "blob", c.new.oid, config=inv.config):
+                return MSG_DANGER.format(path=_show(c.path), kind="バイナリの中身")
     for c in plan.changes:
         parts = c.path.split("/")
         for i in range(1, len(parts)):
@@ -782,18 +811,15 @@ def _disk_bytes(root: Path, rel: str, entry: Entry | None) -> bytes:
         return f.read()
 
 
-def _lines(data: bytes) -> list[str] | None:
-    """差分の行。UTF-8 として読めないか、NUL を含むときは None（バイナリ）。"""
-    if b"\0" in data:
-        return None
-    try:
-        text = data.decode("utf-8")
-    except UnicodeDecodeError:
-        return None
-    lines = text.split("\n")
+def _lines(data: bytes) -> list[str]:
+    """差分の行。UTF-8 として読めないバイトは surrogateescape で残し、表示のときに \\xNN にする。
+
+    backslashreplace で読むと、読めないバイトと「\\xNN」という文字列が同じ行になり、差分から消える。
+    """
+    lines = data.decode("utf-8", "surrogateescape").split("\n")
     if lines[-1] == "":
         lines.pop()
-    return [_show(line) for line in lines]
+    return lines
 
 
 def render(plan: Plan) -> str:
@@ -803,13 +829,10 @@ def render(plan: Plan) -> str:
         if c.new is not None and c.new.mode in (*REGULAR, SYMLINK):
             new_data = run_git(plan.root, "cat-file", "blob", c.new.oid)
         old, new = _lines(_disk_bytes(plan.root, c.path, c.old)), _lines(new_data)
-        name = _show(c.path)
-        before = f"a/{name}" if c.old is not None else "/dev/null"
-        after = f"b/{name}" if c.new is not None else "/dev/null"
-        if old is None or new is None:
-            out.append(f"--- {before}\n+++ {after}\n（バイナリ）\n")
-            continue
-        diff = list(difflib.unified_diff(old, new, before, after, lineterm=""))
+        before = f"a/{c.path}" if c.old is not None else "/dev/null"
+        after = f"b/{c.path}" if c.new is not None else "/dev/null"
+        # 差分を取ってから表示用に変える。逆にすると、実際の ESC と「<U+001B>」という文字列が同じ行になる。
+        diff = [_show(line) for line in difflib.unified_diff(old, new, before, after, lineterm="")]
         if diff:
             out.append("\n".join(diff) + "\n")
     return "".join(out)
@@ -840,6 +863,12 @@ def state_of(plan: Plan, inv: Invocation) -> str:
     return json.dumps({"root": str(plan.root), "expect": expect}, sort_keys=True, separators=(",", ":"))
 
 
+def _index_paths(root: Path) -> set[str]:
+    """index のすべてのパス（stage を問わない。ルートから）。"""
+    out = run_git(root, "ls-files", "-s", "-z", "--full-name")
+    return {os.fsdecode(rec.partition(b"\t")[2]) for rec in out.split(b"\0") if rec}
+
+
 def verify(state: str, stderr: TextIO) -> int:
     """git の後に、対象のファイルが確認の旧か新のどちらかと一致するかを確かめる。"""
     try:
@@ -851,7 +880,13 @@ def verify(state: str, stderr: TextIO) -> int:
                 raise ValueError("expect")
             allowed[rel] = tuple(_dec(v) for v in pair)
         now = disk_entries(root, allowed)
-        bad = sorted(rel for rel, pair in allowed.items() if now[rel] not in pair)
+        found = {rel for rel, pair in allowed.items() if now[rel] not in pair}
+        # 確認したときに index になかった対象のファイルを、git が書いていないか（確認の後に ref を差し替えられた場合）。
+        home = user_home()
+        for rel in _index_paths(root) - set(allowed):
+            if is_protected(root, rel, home) and os.path.lexists(os.path.join(root, rel)):
+                found.add(rel)
+        bad = sorted(found)
     except Exception as e:
         stderr.write(MSG_ERROR.format(reason=type(e).__name__) + "\n")
         return EXIT_STOP

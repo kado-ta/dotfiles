@@ -188,8 +188,12 @@ class TreeBase(Base):
         self.branch("feature", "main", {".claude/settings.json": '{"v": 2}\n', "README.md": "b\n"})
         self.branch("docs", "main", {"README.md": "c\n"})
 
-    def blob(self, text):
-        return local_git(self.repo, "hash-object", "-w", "--stdin", input=text)
+    def blob(self, data):
+        if isinstance(data, str):
+            data = data.encode("utf-8")
+        cp = subprocess.run(["git", "-C", str(self.repo), "hash-object", "-w", "--stdin"],
+                            input=data, capture_output=True, check=True)
+        return cp.stdout.decode().strip()
 
     def branch(self, name, base, files):
         """作業ツリーを変えずに、base に files を当てたブランチを作る。None は削除、(mode, 値) はその mode で入れる。"""
@@ -456,6 +460,109 @@ class SwitchTests(TreeBase):
         self.assertNotIn("\x1b", err)
         self.assertNotIn("\r", err)
         self.assertIn("<U+001B>", err)
+
+    def evil_branch_and_tag(self):
+        """ブランチ evil に悪い中身、同じ名前の tag に今の中身を置き、@{-1} を evil にする。"""
+        self.branch("evil", "main", {".claude/settings.json": '{"evil": 1}\n'})
+        local_git(self.repo, "switch", "-q", "evil")
+        local_git(self.repo, "switch", "-q", "main")
+        local_git(self.repo, "tag", "evil", "main")
+
+    def test_previous_branch_wins_over_tag(self):
+        # git は - と @{-N} をブランチの名前に戻して refs/heads を読む。rev-parse は同じ名前の tag を先に使う。
+        self.evil_branch_and_tag()
+        for argv in (("switch", "-"), ("checkout", "-"), ("checkout", "-", "--", ".claude/settings.json"),
+                     ("switch", "@{-1}")):
+            with self.subTest(argv=argv):
+                result, err = self.check(*argv, tty=True, answer="n\n")
+                self.assertEqual(result, (1, ""))
+                self.assertIn('+{"evil": 1}', err)
+
+    def test_case_changed_branch_name(self):
+        # 大文字と小文字を区別しないファイルシステムでは、git は loose の refs/heads/evil を EVIL として読む。
+        self.evil_branch_and_tag()
+        if not (self.repo / ".git" / "refs" / "heads" / "EVIL").exists():
+            self.skipTest("大文字と小文字を区別するファイルシステムでは、git も tag を使う")
+        for argv in (("switch", "EVIL"), ("checkout", "EVIL"), ("checkout", "EVIL", "--", ".claude")):
+            with self.subTest(argv=argv):
+                result, err = self.check(*argv, tty=True, answer="n\n")
+                self.assertEqual(result, (1, ""))
+                self.assertIn('+{"evil": 1}', err)
+
+    def approve_and_run(self, *argv):
+        """確認で y と答え、本物の git を同じ引数で動かし、verify の結果を返す。"""
+        (code, state), err = self.check(*argv, tty=True, answer="y\n")
+        self.assertEqual(code, 0, err)
+        local_git(self.repo, *argv)
+        out = io.StringIO()
+        return guard.verify(state, out), out.getvalue()
+
+    def test_real_git_matches_state(self):
+        self.assertEqual(self.approve_and_run("switch", "-q", "feature"), (0, ""))
+        self.assertEqual(self.approve_and_run("switch", "-q", "main"), (0, ""))
+        self.stage('{"v": 9}\n')
+        self.assertEqual(self.approve_and_run("restore", ".claude/settings.json"), (0, ""))
+        local_git(self.repo, "update-ref", "refs/heads/main", "feature")
+        self.assertEqual(self.approve_and_run("reset", "-q", "--hard"), (0, ""))
+        self.evil_branch_and_tag()
+        self.assertEqual(self.approve_and_run("switch", "-q", "-"), (0, ""))
+        self.assertEqual(self.settings.read_text(encoding="utf-8"), '{"evil": 1}\n')
+
+    def test_verify_catches_content_git_wrote_differently(self):
+        (code, state), _ = self.check("switch", "feature", tty=True, answer="y\n")
+        self.assertEqual(code, 0)
+        # 確認と実行のあいだに、ブランチを差し替えられる。
+        self.branch("swapped", "main", {".claude/settings.json": '{"evil": 1}\n'})
+        local_git(self.repo, "update-ref", "refs/heads/feature", "swapped")
+        local_git(self.repo, "switch", "-q", "feature")
+        err = io.StringIO()
+        self.assertEqual(guard.verify(state, err), 1)
+        self.assertIn(guard.MSG_VERIFY, err.getvalue())
+        self.assertIn(".claude/settings.json", err.getvalue())
+
+    def test_verify_catches_new_protected_file(self):
+        (code, state), _ = self.check("switch", "feature", tty=True, answer="y\n")
+        self.assertEqual(code, 0)
+        # 差し替えたブランチが、確認になかった対象のファイルを持ち込む。
+        self.branch("extra", "feature", {".mcp.json": '{"servers": {}}\n'})
+        local_git(self.repo, "update-ref", "refs/heads/feature", "extra")
+        local_git(self.repo, "switch", "-q", "feature")
+        err = io.StringIO()
+        self.assertEqual(guard.verify(state, err), 1)
+        self.assertIn(guard.MSG_VERIFY, err.getvalue())
+        self.assertIn(".mcp.json", err.getvalue())
+        self.assertNotIn(".claude/settings.json", err.getvalue())
+
+    def test_invalid_utf8_is_shown_as_text(self):
+        self.branch("latin", "main", {".claude/settings.json": b'{"v": "caf\xe9"}\n'})
+        result, err = self.check("switch", "latin", tty=True, answer="n\n")
+        self.assertEqual(result, (1, ""))
+        self.assertIn(guard.MSG_ASK, err)
+        self.assertIn('+{"v": "caf\\xe9"}', err)
+        # 読めないバイトと「\xe9」という文字列は、表示は同じでも差分の行として出る。
+        self.branch("literal", "main", {".claude/settings.json": '{"v": "caf\\xe9"}\n'})
+        local_git(self.repo, "switch", "-q", "literal")
+        result, err = self.check("switch", "latin", tty=True, answer="n\n")
+        self.assertEqual(result, (1, ""))
+        self.assertIn('-{"v": "caf\\xe9"}', err)
+        self.assertIn('+{"v": "caf\\xe9"}', err)
+
+    def test_nul_content_stops_without_asking(self):
+        self.branch("nul", "main", {".claude/settings.json": b'{"v": 1}\x00\n'})
+        result, err = self.check("switch", "nul", tty=True, answer="y\n")
+        self.assertEqual(result, (1, ""))
+        self.assertIn("バイナリの中身", err)
+        self.assertNotIn(guard.MSG_ASK, err)
+
+    def test_literal_escape_text_and_real_escape_differ(self):
+        self.branch("literal", "main", {".claude/settings.json": '{"v": "<U+001B>"}\n'})
+        self.branch("real", "main", {".claude/settings.json": '{"v": "\x1b"}\n'})
+        local_git(self.repo, "switch", "-q", "literal")
+        result, err = self.check("switch", "real", tty=True, answer="n\n")
+        self.assertEqual(result, (1, ""))
+        self.assertIn('-{"v": "<U+001B>"}', err)
+        self.assertIn('+{"v": "<U+001B>"}', err)
+        self.assertNotIn("\x1b", err)
 
     def test_prompt_through_pty(self):
         for answer, expected in ((b"y\n", 0), (b"n\n", 1), (None, 1)):
