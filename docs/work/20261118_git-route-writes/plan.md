@@ -136,13 +136,13 @@ CI は、`claude/hooks/tests/test-*.py` をすべて実行するので、ワー�
   - `--version`・`--help`・`-h` だけなら、`sub = ""`。
 - `git_env` に `ALLOWED_GIT_ENV` にない名前があれば `GuardError`。
 - alias は、`sub` が `READ_ONLY` にも `HANDLERS` にもないときだけ調べる（git も組み込みのコマンドを優先する）。`run_git(cwd, "config", "--get", f"alias.{name}")` で読み、`shlex.split` して展開する。5 段まで。それを超えるか、`!` で始まる alias は `GuardError`。alias でもなければ、そのまま `sub` にする（`check` の 4 で止まる）。
-- `root` は `rev-parse --show-toplevel` から求める。失敗したら `None`。
+- `root` は `rev-parse --show-toplevel` から求める。`cwd` とその親のどこにも `.git`（ディレクトリかファイル）がないときだけ `None` にする。それ以外で失敗したら `GuardError`（Task 1 のレビューで変更。確かめる側の CLT の git だけが読めないリポジトリで、書き込みを通さないため）。
 
 **`check` の流れ（この Task の分）**
 
 1. `in_sandbox()` が真なら `(0, "")`。
 2. `parse` する。`GuardError` なら `MSG_UNSUPPORTED` を出して `(1, "")`。
-3. 次のときは `(0, "")`。`sub` が `""` か `READ_ONLY` にある。`args` に `-h` か `--help` がある。`root` が `None`。
+3. 次のときは `(0, "")`。`sub` が `""` か `READ_ONLY` にある。`args` の最初の要素が `-h` か `--help` である（それ以外の位置の `-h` は、オプションの値やパスとして読まれるので許可しない。Task 1 のレビューで変更）。`root` が `None`。
 4. `sub` が `HANDLERS` にあれば、Task 2 の流れへ進む。なければ、`MSG_UNSUPPORTED`（理由は「{sub} は確かめられません」）を出して `(1, "")`。
 5. 予期しない例外は `MSG_ERROR` を出して `(1, "")`。
 
