@@ -1455,6 +1455,11 @@ class WorktreeCreateTests(TreeBase):
         self.assertEqual((code, out, self.adds), (1, "", 0))
         self.assertIn("変更 .claude/settings.json", err)
         self.assert_nothing_left()
+        # 案内は 2 つのブランチの名前を出し、差し替えた先へ切り替えさせない（I4）。
+        self.assertIn("元のチェックアウトのブランチは main、origin/HEAD の指す先は origin/evil", err)
+        self.assertIn("git ls-remote --symref origin HEAD", err)
+        self.assertIn("git remote set-head origin --auto", err)
+        self.assertNotIn("既定ブランチに戻す", err)
 
     def test_replaced_blob_is_caught_after_checkout(self):
         original = local_git(self.main, "rev-parse", "HEAD:.claude/settings.json")
@@ -1507,6 +1512,8 @@ class WorktreeCreateTests(TreeBase):
         code, out, err = self.create()
         self.assertEqual((code, out), (1, ""))
         self.assertIn("worktree-x", err)
+        # Claude Code の Remove worktree はブランチを残すので、消し方を案内する（M2）。
+        self.assertIn(f"git -C {self.main} branch -D worktree-x", err)
         self.assertEqual(local_git(self.main, "rev-parse", "worktree-x"), oid)
         self.assertFalse(os.path.lexists(self.place))
         local_git(self.main, "branch", "-D", "worktree-x")
@@ -1522,7 +1529,7 @@ class WorktreeCreateTests(TreeBase):
         code, out, err = self.create()
         self.assertEqual((code, out), (1, ""))
         self.assertIn("変更 .claude/settings.json", err)
-        self.assertIn(guard.MSG_WT_BRANCH, err)
+        self.assertIn(guard.MSG_WT_BRANCH.format(current="feature", origin="origin/main"), err)
         self.assert_nothing_left()
 
     def test_guidance_for_uncommitted_and_behind(self):

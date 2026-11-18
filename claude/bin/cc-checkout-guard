@@ -246,7 +246,18 @@ WORKTREE_BUDGET = 50  # フックの開始からの期限。このモードの g
 WORKTREE_ADD_MIN = 10  # worktree add の前に、これだけ残っていなければ作らない
 WORKTREE_DISCARD_TIME = 8  # 片付けは、期限を過ぎていても、ここまで延ばして行う
 # 違ったときの案内（design 6.6 の手順 6）。
-MSG_WT_BRANCH = "cc-checkout-guard: 元のチェックアウトが別のブランチにあります。既定ブランチに戻すか、元のチェックアウトで作業してください。"
+# origin/HEAD は sandbox が差し替えうるので、その先へ切り替えさせずに、origin で確かめさせる（I4）。
+MSG_WT_BRANCH = (
+    "cc-checkout-guard: 元のチェックアウトのブランチは {current}、origin/HEAD の指す先は {origin} で、違います。"
+    "origin/HEAD は差し替えられていることがあります。元のチェックアウトで git ls-remote --symref origin HEAD を実行して"
+    " origin の既定ブランチを確かめ、origin/HEAD と違えば git remote set-head origin --auto で直してから、"
+    "もう一度 claude -w を実行してください。同じなら、元のチェックアウトで作業してください"
+    "（claude -w は、元のチェックアウトが origin/HEAD と同じブランチにあるときだけ作れます）。"
+)
+MSG_WT_BRANCH_EXISTS = (
+    "cc-checkout-guard: ブランチ {branch} がすでにあります（Claude Code の Remove worktree は、ブランチを残します）。"
+    "中身が要らないことを確かめてから、次で消して、もう一度 claude -w を実行してください:\n  {drop}"
+)
 MSG_WT_UNCOMMITTED = "cc-checkout-guard: 元のチェックアウトの対象のファイルに、コミットしていない変更があります。その変更を片付けてください。"
 MSG_WT_BEHIND = (
     "cc-checkout-guard: 元のチェックアウトが origin より遅れています。元のチェックアウトで git pull をして"
@@ -2032,8 +2043,12 @@ def _guidance(inv: Invocation, paths: Sequence[str], base: str, from_origin: boo
         prefix = "refs/remotes/origin/"
         target = _git_line(inv, "symbolic-ref", "--quiet", "refs/remotes/origin/HEAD", ok=(0, 1))
         default = target[len(prefix):] if target.startswith(prefix) else None
-        if default is None or _current_branch(inv) != default:
-            return MSG_WT_BRANCH
+        current = _current_branch(inv)
+        if default is None or current != default:
+            return MSG_WT_BRANCH.format(
+                current=_show(current) if current is not None else "（ブランチなし）",
+                origin=_show(target.removeprefix("refs/remotes/")) if target else "（ブランチを指していません）",
+            )
     if _uncommitted(inv, paths):
         return MSG_WT_UNCOMMITTED
     if _rev(inv, "HEAD", "commit") != base:
@@ -2081,7 +2096,10 @@ def _worktree_create(payload: Mapping[str, object], stdout: TextIO, stderr: Text
         raise GuardError(f"{place} がすでにあります")
     branch = f"worktree-{name}"
     if _branch_oid(inv, branch) is not None:
-        raise GuardError(f"ブランチ {branch} がすでにあります")
+        # Claude Code の Remove worktree の後に同じ名前で作るときも、ここで止まる（Task 9 で確かめた）。
+        drop = shlex.join(["git", "-C", str(main), "branch", "-D", branch])
+        stderr.write(MSG_WT_BRANCH_EXISTS.format(branch=_show(branch), drop=_show(drop)) + "\n")
+        return EXIT_STOP
     base = _rev(inv, "refs/remotes/origin/HEAD", "commit")
     from_origin = base is not None
     base = base or _rev(inv, "HEAD", "commit")
