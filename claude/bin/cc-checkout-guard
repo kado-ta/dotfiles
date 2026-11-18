@@ -8,13 +8,16 @@ sandbox の外で動くので、リポジトリの設定やフックを読まな
 """
 from __future__ import annotations
 
+import difflib
+import json
 import os
 import pwd
 import shlex
+import stat
 import subprocess
 import sys
 import unicodedata
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TextIO
@@ -57,6 +60,36 @@ ALLOWED_GIT_ENV = frozenset(
 SKIPPED_GLOBALS = frozenset(("--no-pager", "-p", "--paginate", "--no-optional-locks"))
 HELP_GLOBALS = frozenset(("--version", "--help", "-h"))
 
+# diff は作業ツリーを読まない形（tree 同士、index と tree）だけで使う。
+# 作業ツリーと比べる diff は、設定の clean フィルタを動かし、assume-unchanged の entry を見落とすため。
+DIFF_OPTS = ("--no-ext-diff", "--no-textconv", "--ignore-submodules=all", "--no-renames")
+REGULAR = ("100644", "100755")
+SYMLINK = "120000"
+GITLINK = "160000"
+TREE = "040000"
+INDEX = ":index"  # Plan.sources で index を表す
+HASH_CHUNK = 200  # hash-object に一度に渡すパスの数
+
+# サブコマンドごとに許すオプション。ほかのオプションと、短いオプションのまとめ書きは止める。
+SWITCH_FLAGS = frozenset(
+    "-q --quiet -f --force --discard-changes --detach -d --no-track --guess --no-guess --progress "
+    "--no-progress --ignore-other-worktrees -t --track".split()
+)
+CHECKOUT_FLAGS = SWITCH_FLAGS | {"--no-overlay", "--overlay"}
+BRANCH_VALUES = frozenset(("-c", "-C", "-b", "-B"))
+RESTORE_FLAGS = frozenset(
+    "-W --worktree -S --staged -q --quiet --overlay --no-overlay --ignore-unmerged --progress "
+    "--no-progress".split()
+)
+RESTORE_VALUES = frozenset(("-s", "--source"))
+CHECKOUT_INDEX_FLAGS = frozenset("-a --all -f --force -q --quiet -u --index".split())
+RESET_FLAGS = frozenset(
+    "-q --quiet --no-quiet --soft --mixed --hard --merge --keep --refresh --no-refresh -N "
+    "--intent-to-add -p --patch".split()
+)
+RESET_WRITES = frozenset(("--hard", "--merge", "--keep"))
+RESET_MODES = RESET_WRITES | {"--soft", "--mixed"}
+
 MSG_UNSUPPORTED = (
     "cc-checkout-guard: この git の呼び出しは確かめられないので止めました（{reason}）。"
     "自動で読み込まれるファイルが変わらないことを自分で確かめてから、command git で実行してください。"
@@ -98,14 +131,46 @@ class Invocation:
     args: tuple[str, ...]
     argv: tuple[str, ...]  # 元の引数
     start: Path  # 呼ばれたときのカレントディレクトリ
+    home: Path  # 対象の判定（DOTFILES_PROTECTED）に使う
 
 
+@dataclass(frozen=True)
+class Entry:
+    mode: str  # "100644"・"100755"・"120000"・"160000"・"040000"
+    oid: str
+
+
+@dataclass(frozen=True)
+class Change:
+    path: str  # ルートからの相対パス
+    old: Entry | None  # 今のディスク。None は無い
+    new: Entry | None  # 書かれるもの。None は削除
+
+
+@dataclass(frozen=True)
 class Plan:
-    """Task 2 以降で、サブコマンドごとの確認の内容を持たせる。"""
+    root: Path  # 書かれる作業ツリー
+    changes: tuple[Change, ...]
+    sources: tuple[str, ...]  # 属性を確かめる tree の oid。index なら INDEX
+    fresh: bool = False  # 新しいディレクトリに書くとき（Task 3）
 
 
-# サブコマンド名 -> 確認の内容を作る関数（第 2 引数は after_fetch）。
-HANDLERS: dict[str, Callable[[Invocation, bool], Plan]] = {}
+@dataclass(frozen=True)
+class Args:
+    opts: tuple[tuple[str, str | None], ...]  # (名前, 値)。値を取らないものは None
+    positional: tuple[str, ...]
+    pathspec: tuple[str, ...] | None  # -- の後。-- がなければ None
+
+    def has(self, *names: str) -> bool:
+        return any(name in names for name, _ in self.opts)
+
+    def last(self, *names: str) -> str | None:
+        found = [name for name, _ in self.opts if name in names]
+        return found[-1] if found else None
+
+    def value(self, *names: str) -> str | None:
+        found = [value for name, value in self.opts if name in names]
+        return found[-1] if found else None
 
 
 def user_home() -> Path:
@@ -147,6 +212,18 @@ def is_protected(root: Path, rel: str, home: Path) -> bool:
             if joined == item or joined.startswith(item + "/"):
                 return True
     return False
+
+
+def _hidden(ch: str) -> bool:
+    category = unicodedata.category(ch)
+    return category[0] == "C" or category in ("Zl", "Zp")
+
+
+def _show(text: str) -> str:
+    """制御文字や見えない文字を <U+XXXX> にする。差分の表示で端末をだまされないため。"""
+    if text.isprintable():
+        return text
+    return "".join(f"<U+{ord(ch):04X}>" if ch != "\t" and _hidden(ch) else ch for ch in text)
 
 
 def git_env(home: Path) -> dict[str, str]:
@@ -238,8 +315,550 @@ def parse(start: Path, argv: Sequence[str], git_env_names: Sequence[str], home: 
         root = None
     return Invocation(
         cwd=cwd, root=root, globals=tuple(glob), config=tuple(config), sub=sub,
-        args=args, argv=tuple(argv), start=start,
+        args=args, argv=tuple(argv), start=start, home=home,
     )
+
+
+def split_args(sub: str, args: Sequence[str], flags: frozenset[str],
+               values: frozenset[str] = frozenset()) -> Args:
+    """サブコマンドの引数を、許したオプション・位置引数・-- の後に分ける。"""
+    opts: list[tuple[str, str | None]] = []
+    positional: list[str] = []
+    i = 0
+    while i < len(args):
+        tok = args[i]
+        if tok == "--":
+            return Args(tuple(opts), tuple(positional), tuple(args[i + 1:]))
+        if tok == "-" or not tok.startswith("-"):
+            positional.append(tok)
+        elif tok.startswith("--") and "=" in tok:
+            name, _, value = tok.partition("=")
+            if name not in values and not (name == "--track" and name in flags):
+                raise GuardError(f"{sub} のオプション {name} は確かめられません")
+            opts.append((name, value))
+        elif tok in flags:
+            opts.append((tok, None))
+        elif tok in values:
+            if i + 1 >= len(args):
+                raise GuardError(f"{tok} の値がありません")
+            opts.append((tok, args[i + 1]))
+            i += 1
+        else:
+            # 知らないオプション、長いオプションの省略形（--har）、まとめ書き（-qf）。
+            raise GuardError(f"{sub} のオプション {tok} は確かめられません")
+        i += 1
+    return Args(tuple(opts), tuple(positional), None)
+
+
+def _hash(root: Path, data: bytes) -> str:
+    return os.fsdecode(run_git(root, "hash-object", "--no-filters", "--stdin", stdin=data)).strip()
+
+
+def disk_entries(root: Path, rels: Iterable[str]) -> dict[str, Entry | None]:
+    """ディスクの今の状態を lstat で調べる。中身はフィルタを通さずに hash する。"""
+    found: dict[str, Entry | None] = {}
+    files: list[tuple[str, str]] = []
+    for rel in rels:
+        path = os.path.join(root, rel)
+        try:
+            st = os.lstat(path)
+        except (FileNotFoundError, NotADirectoryError):
+            found[rel] = None
+            continue
+        if stat.S_ISLNK(st.st_mode):
+            found[rel] = Entry(SYMLINK, _hash(root, os.readlink(os.fsencode(path))))
+        elif stat.S_ISDIR(st.st_mode):
+            found[rel] = Entry(TREE, "")
+        elif stat.S_ISREG(st.st_mode):
+            files.append((rel, "100755" if st.st_mode & stat.S_IXUSR else "100644"))
+        else:
+            raise GuardError(f"{rel} は通常のファイルではありません")
+    for i in range(0, len(files), HASH_CHUNK):
+        chunk = files[i:i + HASH_CHUNK]
+        oids = os.fsdecode(run_git(root, "hash-object", "--no-filters", "--", *(rel for rel, _ in chunk))).split()
+        if len(oids) != len(chunk):
+            raise GuardError("hash-object の出力を読めません")
+        for (rel, mode), oid in zip(chunk, oids):
+            found[rel] = Entry(mode, oid)
+    return found
+
+
+def disk_entry(root: Path, rel: str) -> Entry | None:
+    return disk_entries(root, [rel])[rel]
+
+
+def tree_entries(cwd: Path, treeish: str, *, config: Sequence[str] = ()) -> dict[str, Entry]:
+    entries: dict[str, Entry] = {}
+    for rec in run_git(cwd, "ls-tree", "-r", "-z", "--full-tree", treeish, config=config).split(b"\0"):
+        if not rec:
+            continue
+        meta, _, path = rec.partition(b"\t")
+        mode, _type, oid = os.fsdecode(meta).split(" ")
+        entries[os.fsdecode(path)] = Entry(mode, oid)
+    return entries
+
+
+def index_entries(cwd: Path, *pathspec: str, root: Path | None = None, home: Path | None = None,
+                  config: Sequence[str] = ()) -> dict[str, Entry]:
+    """index の stage 0 の entry（パスはルートから）。対象のパスに衝突（stage 1〜3）があれば止める。
+
+    pathspec がなければ cwd の下だけを返すので、全体が要るときは cwd にルートを渡す。
+    """
+    args = ["ls-files", "-s", "-z", "--full-name"]
+    if pathspec:
+        args += ["--", *pathspec]
+    entries: dict[str, Entry] = {}
+    for rec in run_git(cwd, *args, config=config).split(b"\0"):
+        if not rec:
+            continue
+        meta, _, path = rec.partition(b"\t")
+        mode, oid, stage = os.fsdecode(meta).split(" ")
+        rel = os.fsdecode(path)
+        if stage != "0":
+            if is_protected(root or cwd, rel, home or user_home()):
+                raise GuardError(f"{rel} に未解決の衝突があります")
+            continue
+        entries[rel] = Entry(mode, oid)
+    return entries
+
+
+def changed_paths(inv: Invocation, *diff_args: str) -> list[str]:
+    # pathspec は inv.cwd から読む。出力は diff.relative の設定によらずルートから。
+    out = run_git(inv.cwd, "diff", "--name-only", "-z", "--no-relative", *DIFF_OPTS, *diff_args, config=inv.config)
+    return [os.fsdecode(p) for p in out.split(b"\0") if p]
+
+
+def _git_line(inv: Invocation, *args: str, ok: Sequence[int] = (0,)) -> str:
+    return os.fsdecode(run_git(inv.cwd, *args, config=inv.config, ok=ok)).strip()
+
+
+def _peel(inv: Invocation, oid: str, kind: str) -> str | None:
+    return _git_line(inv, "rev-parse", "--verify", "--quiet", f"{oid}^{{{kind}}}", ok=(0, 1)) or None
+
+
+def _rev(inv: Invocation, rev: str, kind: str) -> str | None:
+    """rev を kind（commit・tree）の oid にする。解決できなければ None。"""
+    oid = _git_line(inv, "rev-parse", "--verify", "--quiet", "--end-of-options", rev, ok=(0, 1))
+    return _peel(inv, oid, kind) if oid else None
+
+
+def _empty_tree(inv: Invocation) -> str:
+    return _git_line(inv, "hash-object", "-t", "tree", "--stdin")
+
+
+def _head_tree(inv: Invocation) -> str:
+    # HEAD が解決できない（コミットのない）ときは、空の tree として扱う。
+    return _rev(inv, "HEAD", "tree") or _empty_tree(inv)
+
+
+def _commit_tree(inv: Invocation, commit: str) -> str:
+    tree = _peel(inv, commit, "tree")
+    if tree is None:
+        raise GuardError(f"{commit} の tree を読めません")
+    return tree
+
+
+def _target(inv: Invocation, rev: str, kind: str) -> str | None:
+    """switch・checkout・restore が読む rev。git と同じく、同じ名前のブランチを tag などより先に使う。"""
+    if rev == "-":
+        rev = "@{-1}"
+    if rev == "@":
+        rev = "HEAD"
+    if "..." in rev:
+        raise GuardError(f"{rev} は確かめられません")
+    if "@{" not in rev:
+        ref = "refs/heads/" + rev
+        out = run_git(inv.cwd, "for-each-ref", "--format=%(refname)%00%(objectname)", ref, config=inv.config)
+        for line in os.fsdecode(out).split("\n"):
+            name, _, oid = line.partition("\0")
+            if name == ref:
+                peeled = _peel(inv, oid, kind)
+                if peeled is None:
+                    raise GuardError(f"{rev} を解決できません")
+                return peeled
+    return _rev(inv, rev, kind)
+
+
+def _tree_of(inv: Invocation, rev: str) -> str:
+    tree = _target(inv, rev, "tree")
+    if tree is None and rev in ("HEAD", "@"):
+        return _empty_tree(inv)
+    if tree is None:
+        raise GuardError(f"{rev} を解決できません")
+    return tree
+
+
+def _remote_commit(inv: Invocation, name: str) -> str | None:
+    """refs/remotes/*/<name> にちょうど 1 つ当たれば、そのコミット（git の --guess と同じ）。"""
+    if any(c in name for c in "*?[\\"):
+        return None
+    out = os.fsdecode(run_git(inv.cwd, "for-each-ref", "--format=%(refname)", "refs/remotes/", config=inv.config))
+    prefix = "refs/remotes/"
+    found = [r for r in out.split("\n") if r.startswith(prefix) and r[len(prefix):].partition("/")[2] == name]
+    if len(found) > 1:
+        # checkout.defaultRemote で git が 1 つを選ぶことがあるので、決めずに止める。
+        raise GuardError(f"{name} は複数のリモートのブランチに当たります")
+    return _rev(inv, found[0], "commit") if found else None
+
+
+def _guess(inv: Invocation, a: Args, name: str) -> str | None:
+    """-- のない checkout <name> を、リモートのブランチから作るブランチとして読むときのコミット。"""
+    commit = _remote_commit(inv, name)
+    if commit is None:
+        return None
+    if a.has("-t", "--track", "--no-track"):
+        raise GuardError(f"{name} がブランチかパスかを確かめられません")
+    guess = _git_line(inv, "config", "--type=bool", "--get", "checkout.guess", ok=(0, 1))
+    if a.last("--guess", "--no-guess") == "--no-guess" or (guess == "false" and not a.has("--guess")):
+        return None  # git はパスとして読む
+    if os.path.lexists(inv.cwd / name):
+        raise GuardError(f"{name} がブランチかパスかを確かめられません")
+    return commit
+
+
+def _gitlinks(source: dict[str, Entry], base: dict[str, Entry]) -> set[str]:
+    # diff の --ignore-submodules=all は gitlink の追加と削除も隠すので、entry で比べる。
+    found: set[str] = set()
+    for path in source.keys() | base.keys():
+        new, old = source.get(path), base.get(path)
+        if new != old and any(e is not None and e.mode == GITLINK for e in (new, old)):
+            found.add(path)
+    return found
+
+
+def _stale(inv: Invocation, pathspec: Sequence[str]) -> set[str]:
+    """ディスクの中身が index と違う対象のファイル。
+
+    git diff は index の stat と assume-unchanged を信じるが、checkout・restore・reset --hard は
+    それを無視して書くので、中身で比べる。pathspec がなければ全体。
+    """
+    assert inv.root is not None
+    if pathspec:
+        entries = index_entries(inv.cwd, *pathspec, root=inv.root, home=inv.home, config=inv.config)
+    else:
+        entries = index_entries(inv.root, root=inv.root, home=inv.home, config=inv.config)
+    targets = {p: e for p, e in entries.items() if is_protected(inv.root, p, inv.home)}
+    disk = disk_entries(inv.root, targets)
+    stale: set[str] = set()
+    for path, entry in targets.items():
+        if entry.mode == GITLINK:
+            # 中身のある submodule のディレクトリは書かない。ないときだけ作られる。
+            if disk[path] is None:
+                stale.add(path)
+        elif disk[path] != entry:
+            stale.add(path)
+    return stale
+
+
+def _effective(inv: Invocation, entry: Entry) -> Entry:
+    """replace の ref を効かせた中身の oid にする。書く git と同じ中身を比べるため。"""
+    assert inv.root is not None
+    if entry.mode not in (*REGULAR, SYMLINK):
+        return entry
+    data = run_git(inv.root, "cat-file", "blob", entry.oid, config=inv.config)
+    return Entry(entry.mode, _hash(inv.root, data))
+
+
+def _plan(inv: Invocation, source: dict[str, Entry], paths: Iterable[str], sources: tuple[str, ...],
+          delete: bool) -> Plan:
+    """候補のパスのうち対象のものについて、ディスクの今と、書く元の entry を比べる。"""
+    assert inv.root is not None
+    root, home = inv.root, inv.home
+    candidates = set(paths)
+    targets = {p for p in candidates if is_protected(root, p, home)}
+    # 対象のパスの親が symlink か gitlink になるときは、その親も変わるものに入れる。
+    for path in candidates - targets:
+        entry = source.get(path)
+        if entry is not None and entry.mode in (SYMLINK, GITLINK):
+            prefix = _norm(path) + "/"
+            if any(_norm(t).startswith(prefix) for t in targets):
+                targets.add(path)
+    ordered = sorted(targets)
+    disk = disk_entries(root, ordered)
+    changes: list[Change] = []
+    for path in ordered:
+        new = source.get(path)
+        if new is None and not delete:
+            continue
+        if new is not None:
+            new = _effective(inv, new)
+        if disk[path] != new:
+            changes.append(Change(path, disk[path], new))
+    return Plan(root=root, changes=tuple(changes), sources=sources)
+
+
+def _tree_plan(inv: Invocation, tree: str, *, switch: bool, force: bool) -> Plan:
+    """作業ツリーを tree にする操作。switch は HEAD との差、force は index とディスクとの差を書く。"""
+    source = tree_entries(inv.cwd, tree, config=inv.config)
+    paths: set[str] = set()
+    if switch:
+        head = _head_tree(inv)
+        paths |= set(changed_paths(inv, head, tree))
+        paths |= _gitlinks(source, tree_entries(inv.cwd, head, config=inv.config))
+    if force:
+        assert inv.root is not None
+        index = index_entries(inv.root, root=inv.root, home=inv.home, config=inv.config)
+        paths |= set(changed_paths(inv, "--cached", tree)) | _stale(inv, ()) | _gitlinks(source, index)
+    return _plan(inv, source, paths, (tree,), delete=True)
+
+
+def _index_plan(inv: Invocation, pathspec: Sequence[str]) -> Plan:
+    assert inv.root is not None
+    source = index_entries(inv.root, root=inv.root, home=inv.home, config=inv.config)
+    return _plan(inv, source, _stale(inv, pathspec), (INDEX,), delete=False)
+
+
+def _path_plan(inv: Invocation, tree: str | None, pathspec: Sequence[str], delete: bool) -> Plan:
+    """pathspec に当たるパスを、tree（None なら index）から書く操作。"""
+    if not pathspec:
+        raise GuardError(f"{inv.sub} のパスがありません")
+    if tree is None:
+        return _index_plan(inv, pathspec)
+    assert inv.root is not None
+    source = tree_entries(inv.cwd, tree, config=inv.config)
+    index = index_entries(inv.root, root=inv.root, home=inv.home, config=inv.config)
+    paths = set(changed_paths(inv, "--cached", tree, "--", *pathspec))
+    paths |= _stale(inv, pathspec) | _gitlinks(source, index)
+    return _plan(inv, source, paths, (tree,), delete)
+
+
+def plan_switch(inv: Invocation, after_fetch: bool) -> Plan:
+    a = split_args("switch", inv.args, SWITCH_FLAGS, BRANCH_VALUES)
+    if a.pathspec is not None or len(a.positional) > 1:
+        raise GuardError("switch の引数を確かめられません")
+    force = a.has("-f", "--force", "--discard-changes")
+    if a.positional:
+        name = a.positional[0]
+        commit = _target(inv, name, "commit") or _remote_commit(inv, name)
+        if commit is None:
+            raise GuardError(f"{name} を解決できません")
+        return _tree_plan(inv, _commit_tree(inv, commit), switch=True, force=force)
+    if not a.has(*BRANCH_VALUES, "--detach", "-d"):
+        raise GuardError("切り替え先がありません")
+    return _tree_plan(inv, _head_tree(inv), switch=True, force=force)
+
+
+def plan_checkout(inv: Invocation, after_fetch: bool) -> Plan:
+    a = split_args("checkout", inv.args, CHECKOUT_FLAGS, BRANCH_VALUES)
+    branch = a.has(*BRANCH_VALUES, "--detach", "-d")
+    force = a.has("-f", "--force", "--discard-changes")
+    delete = a.last("--overlay", "--no-overlay") == "--no-overlay"
+    pos = a.positional
+    if a.pathspec is not None:
+        # checkout [<tree-ish>] -- <pathspec>
+        if branch or len(pos) > 1:
+            raise GuardError("checkout の引数を確かめられません")
+        return _path_plan(inv, _tree_of(inv, pos[0]) if pos else None, a.pathspec, delete)
+    if len(pos) > 1:
+        # -- のない checkout <tree-ish> <path>...。最初が tree-ish でなければ、すべて index からのパス。
+        if branch:
+            raise GuardError("checkout の引数を確かめられません")
+        tree = _target(inv, pos[0], "tree")
+        return _path_plan(inv, tree, pos[1:] if tree else pos, delete)
+    if not pos:
+        return _tree_plan(inv, _head_tree(inv), switch=True, force=force)
+    commit = _target(inv, pos[0], "commit")
+    if commit is None:
+        commit = _remote_commit(inv, pos[0]) if branch else _guess(inv, a, pos[0])
+    if commit is not None:
+        return _tree_plan(inv, _commit_tree(inv, commit), switch=True, force=force)
+    if branch:
+        raise GuardError(f"{pos[0]} を解決できません")
+    return _path_plan(inv, None, pos, delete)
+
+
+def plan_restore(inv: Invocation, after_fetch: bool) -> Plan | None:
+    a = split_args("restore", inv.args, RESTORE_FLAGS, RESTORE_VALUES)
+    worktree = a.has("-W", "--worktree")
+    staged = a.has("-S", "--staged")
+    if staged and not worktree:
+        return None  # index だけを書く
+    source = a.value("-s", "--source")
+    if source is None and staged:
+        source = "HEAD"
+    tree = _tree_of(inv, source) if source is not None else None
+    delete = a.last("--overlay", "--no-overlay") != "--overlay"
+    return _path_plan(inv, tree, a.positional + (a.pathspec or ()), delete)
+
+
+def plan_checkout_index(inv: Invocation, after_fetch: bool) -> Plan | None:
+    a = split_args("checkout-index", inv.args, CHECKOUT_INDEX_FLAGS)
+    paths = a.positional + (a.pathspec or ())
+    if a.has("-a", "--all"):
+        if paths:
+            raise GuardError("checkout-index の引数を確かめられません")
+        return _index_plan(inv, ())
+    if not paths:
+        return None
+    # checkout-index のパスは pathspec ではないので、名前のとおりに照らし合わせる。
+    return _index_plan(inv, tuple(":(literal)" + p for p in paths))
+
+
+def plan_reset(inv: Invocation, after_fetch: bool) -> Plan | None:
+    a = split_args("reset", inv.args, RESET_FLAGS)
+    if a.last(*RESET_MODES) not in RESET_WRITES:
+        return None  # 作業ツリーを書かない
+    if a.pathspec or len(a.positional) > 1:
+        raise GuardError("reset の引数を確かめられません")
+    if a.positional:
+        commit = _rev(inv, a.positional[0], "commit")
+        if commit is None:
+            raise GuardError(f"{a.positional[0]} を解決できません")
+        tree = _commit_tree(inv, commit)
+    else:
+        tree = _head_tree(inv)
+    return _tree_plan(inv, tree, switch=False, force=True)
+
+
+# サブコマンド名 -> 確認の内容を作る関数（第 2 引数は after_fetch）。None は作業ツリーの対象を書かない。
+HANDLERS: dict[str, Callable[[Invocation, bool], Plan | None]] = {
+    "switch": plan_switch,
+    "checkout": plan_checkout,
+    "restore": plan_restore,
+    "checkout-index": plan_checkout_index,
+    "reset": plan_reset,
+}
+
+
+def _attr_danger(inv: Invocation, paths: Sequence[str], where: Sequence[str]) -> str | None:
+    assert inv.root is not None
+    data = b"".join(os.fsencode(p) + b"\0" for p in paths)
+    out = run_git(inv.root, "check-attr", "-z", "--stdin", *where, *DANGEROUS_ATTRS, config=inv.config, stdin=data)
+    items = [os.fsdecode(x) for x in out.split(b"\0")]
+    for i in range(0, len(items) - 2, 3):
+        path, attr, value = items[i:i + 3]
+        if value not in ("unspecified", "unset"):
+            return MSG_DANGER.format(path=_show(path), kind=f"書くときに中身を変える属性（{attr}）")
+    return None
+
+
+def danger(plan: Plan, inv: Invocation) -> str | None:
+    for c in plan.changes:
+        if c.new is not None and c.new.mode in (SYMLINK, GITLINK):
+            kind = "symlink" if c.new.mode == SYMLINK else "submodule（gitlink）"
+            return MSG_DANGER.format(path=_show(c.path), kind=kind)
+    for c in plan.changes:
+        parts = c.path.split("/")
+        for i in range(1, len(parts)):
+            parent = "/".join(parts[:i])
+            if os.path.islink(os.path.join(plan.root, parent)):
+                return MSG_DANGER.format(path=_show(parent), kind="symlink")
+    paths = [c.path for c in plan.changes if c.new is not None]
+    if not paths:
+        return None
+    # 書くときの属性は、作業ツリー・index・書く元の tree のどれからも来うる。
+    wheres: list[tuple[str, ...]] = [(), ("--cached",)]
+    wheres += [(f"--source={s}",) for s in plan.sources if s != INDEX]
+    for where in wheres:
+        reason = _attr_danger(inv, paths, where)
+        if reason is not None:
+            return reason
+    return None
+
+
+def _mark(c: Change) -> str:
+    if c.old is None:
+        return "追加"
+    if c.new is None:
+        return "削除"
+    if c.old.mode != c.new.mode:
+        return f"モードの変更（{c.old.mode}→{c.new.mode}）"
+    return "変更"
+
+
+def listing(plan: Plan) -> str:
+    lines = [MSG_CHANGES] + [f"  {_mark(c)} {_show(c.path)}" for c in plan.changes]
+    return "\n".join(lines) + "\n"
+
+
+def _disk_bytes(root: Path, rel: str, entry: Entry | None) -> bytes:
+    path = os.path.join(root, rel)
+    if entry is None or entry.mode not in (*REGULAR, SYMLINK):
+        return b""
+    if entry.mode == SYMLINK:
+        return os.readlink(os.fsencode(path))
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+    with os.fdopen(fd, "rb") as f:
+        return f.read()
+
+
+def _lines(data: bytes) -> list[str] | None:
+    """差分の行。UTF-8 として読めないか、NUL を含むときは None（バイナリ）。"""
+    if b"\0" in data:
+        return None
+    try:
+        text = data.decode("utf-8")
+    except UnicodeDecodeError:
+        return None
+    lines = text.split("\n")
+    if lines[-1] == "":
+        lines.pop()
+    return [_show(line) for line in lines]
+
+
+def render(plan: Plan) -> str:
+    out = [listing(plan)]
+    for c in plan.changes:
+        new_data = b""
+        if c.new is not None and c.new.mode in (*REGULAR, SYMLINK):
+            new_data = run_git(plan.root, "cat-file", "blob", c.new.oid)
+        old, new = _lines(_disk_bytes(plan.root, c.path, c.old)), _lines(new_data)
+        name = _show(c.path)
+        before = f"a/{name}" if c.old is not None else "/dev/null"
+        after = f"b/{name}" if c.new is not None else "/dev/null"
+        if old is None or new is None:
+            out.append(f"--- {before}\n+++ {after}\n（バイナリ）\n")
+            continue
+        diff = list(difflib.unified_diff(old, new, before, after, lineterm=""))
+        if diff:
+            out.append("\n".join(diff) + "\n")
+    return "".join(out)
+
+
+def _enc(entry: Entry | None) -> list[str] | None:
+    return None if entry is None else [entry.mode, entry.oid]
+
+
+def _dec(value: object) -> Entry | None:
+    if value is None:
+        return None
+    if isinstance(value, list) and len(value) == 2 and all(isinstance(v, str) for v in value):
+        return Entry(value[0], value[1])
+    raise ValueError("entry")
+
+
+def state_of(plan: Plan, inv: Invocation) -> str:
+    """verify に渡す状態。変わるファイルは [旧, 新]、index にある変わらない対象は [今, 今]。"""
+    expect: dict[str, list[list[str] | None]] = {}
+    if not plan.fresh:
+        entries = index_entries(plan.root, root=plan.root, home=inv.home, config=inv.config)
+        targets = [p for p in entries if is_protected(plan.root, p, inv.home)]
+        for path, entry in disk_entries(plan.root, targets).items():
+            expect[path] = [_enc(entry), _enc(entry)]
+    for c in plan.changes:
+        expect[c.path] = [None if plan.fresh else _enc(c.old), _enc(c.new)]
+    return json.dumps({"root": str(plan.root), "expect": expect}, sort_keys=True, separators=(",", ":"))
+
+
+def verify(state: str, stderr: TextIO) -> int:
+    """git の後に、対象のファイルが確認の旧か新のどちらかと一致するかを確かめる。"""
+    try:
+        data = json.loads(state)
+        root = Path(data["root"])
+        allowed: dict[str, tuple[Entry | None, ...]] = {}
+        for rel, pair in data["expect"].items():
+            if not isinstance(pair, list) or len(pair) != 2:
+                raise ValueError("expect")
+            allowed[rel] = tuple(_dec(v) for v in pair)
+        now = disk_entries(root, allowed)
+        bad = sorted(rel for rel, pair in allowed.items() if now[rel] not in pair)
+    except Exception as e:
+        stderr.write(MSG_ERROR.format(reason=type(e).__name__) + "\n")
+        return EXIT_STOP
+    if bad:
+        stderr.write(MSG_VERIFY + "\n" + "".join(f"  {_show(rel)}\n" for rel in bad))
+        return EXIT_STOP
+    return EXIT_ALLOW
 
 
 def check(argv: Sequence[str], *, start: Path, git_env: Sequence[str], after_fetch: bool, home: Path,
@@ -251,12 +870,32 @@ def check(argv: Sequence[str], *, start: Path, git_env: Sequence[str], after_fet
         # -h / --help がヘルプになるのは先頭の引数のときだけ（-m の値やパスのこともある）。
         if inv.sub == "" or inv.sub in READ_ONLY or inv.args[:1] in (("-h",), ("--help",)) or inv.root is None:
             return EXIT_ALLOW, ""
-        if inv.sub not in HANDLERS:
+        handler = HANDLERS.get(inv.sub)
+        if handler is None:
             raise GuardError(f"{inv.sub} は確かめられません")
-        # Task 2 で、ここに HANDLERS[inv.sub](inv, after_fetch) の Plan の処理を足す。
-        raise GuardError(f"{inv.sub} は確かめられません")
+        plan = handler(inv, after_fetch)
+        if plan is None:
+            return EXIT_ALLOW, ""
+        reason = danger(plan, inv)
+        if reason is not None:
+            stderr.write(reason + "\n")
+            return EXIT_STOP, ""
+        state = state_of(plan, inv)
+        if not plan.changes:
+            return EXIT_ALLOW, state
+        if not tty:
+            command = " ".join(shlex.quote(w) for w in ("git", "-C", str(inv.start), *inv.argv))
+            stderr.write(listing(plan) + MSG_NO_TTY.format(command=command) + "\n")
+            return EXIT_STOP, ""
+        stderr.write(render(plan) + MSG_ASK)
+        stderr.flush()
+        answer = stdin.readline()
+        if answer.strip().lower() in ("y", "yes"):
+            return EXIT_ALLOW, state
+        stderr.write(("" if answer.endswith("\n") else "\n") + MSG_DECLINED + "\n")
+        return EXIT_STOP, ""
     except GuardError as e:
-        stderr.write(MSG_UNSUPPORTED.format(reason=e) + "\n")
+        stderr.write(MSG_UNSUPPORTED.format(reason=_show(str(e))) + "\n")
         return EXIT_STOP, ""
     except Exception as e:
         stderr.write(MSG_ERROR.format(reason=type(e).__name__) + "\n")
@@ -267,6 +906,8 @@ def main(argv: list[str]) -> int:
     if argv == ["status"]:
         sys.stdout.write("sandbox: yes\n" if in_sandbox() else "sandbox: no\n")
         return 0
+    if len(argv) == 2 and argv[0] == "verify":
+        return verify(argv[1], sys.stderr)
     if argv[:1] == ["check"] and "--" in argv:
         sep = argv.index("--")
         opts, git_args = argv[1:sep], argv[sep + 1:]

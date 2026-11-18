@@ -2,10 +2,15 @@ import contextlib
 import importlib.machinery
 import importlib.util
 import io
+import json
 import os
+import select
+import signal
 import subprocess
 import sys
 import tempfile
+import time
+import traceback
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -18,8 +23,8 @@ sys.modules[spec.name] = guard
 loader.exec_module(guard)
 
 
-def local_git(cwd, *args):
-    cp = subprocess.run(["git", "-C", str(cwd), *args], capture_output=True, text=True)
+def local_git(cwd, *args, env=None, input=None):
+    cp = subprocess.run(["git", "-C", str(cwd), *args], capture_output=True, text=True, env=env, input=input)
     if cp.returncode:
         raise AssertionError(cp.stderr)
     return cp.stdout.strip()
@@ -47,11 +52,11 @@ class Base(unittest.TestCase):
         patcher.start()
         self.addCleanup(patcher.stop)
 
-    def check(self, *argv, start=None, git_env=()):
+    def check(self, *argv, start=None, git_env=(), tty=False, answer=""):
         err = io.StringIO()
         result = guard.check(
             list(argv), start=start or self.repo, git_env=git_env, after_fetch=False,
-            home=self.home, stdin=io.StringIO(), stderr=err, tty=False,
+            home=self.home, stdin=io.StringIO(answer), stderr=err, tty=tty,
         )
         return result, err.getvalue()
 
@@ -134,7 +139,9 @@ class CheckTests(Base):
     def test_unreadable_repository_stops(self):
         local_git(self.repo, "config", "extensions.cc-probe", "1")
         local_git(self.repo, "config", "core.repositoryformatversion", "1")
-        self.assertEqual(self.check("switch", "x")[0], (1, ""))
+        result, err = self.check("switch", "x")
+        self.assertEqual(result, (1, ""))
+        self.assertIn("リポジトリを読めません", err)
 
     def test_unknown_subcommand_stops(self):
         result, err = self.check("rebase", "main")
@@ -165,6 +172,353 @@ class CheckTests(Base):
             result, err = self.check("status")
         self.assertEqual(result, (1, ""))
         self.assertIn("止めました", err)
+
+
+class TreeBase(Base):
+    """main: settings={"v": 1}・README=a。feature は両方を変え、docs は README だけを変える。"""
+
+    def setUp(self):
+        super().setUp()
+        (self.repo / ".claude").mkdir()
+        self.settings = self.repo / ".claude" / "settings.json"
+        self.settings.write_text('{"v": 1}\n', encoding="utf-8")
+        (self.repo / "README.md").write_text("a\n", encoding="utf-8")
+        local_git(self.repo, "add", ".claude/settings.json", "README.md")
+        local_git(self.repo, "commit", "-q", "-m", "main")
+        self.branch("feature", "main", {".claude/settings.json": '{"v": 2}\n', "README.md": "b\n"})
+        self.branch("docs", "main", {"README.md": "c\n"})
+
+    def blob(self, text):
+        return local_git(self.repo, "hash-object", "-w", "--stdin", input=text)
+
+    def branch(self, name, base, files):
+        """作業ツリーを変えずに、base に files を当てたブランチを作る。None は削除、(mode, 値) はその mode で入れる。"""
+        env = {**os.environ, "GIT_INDEX_FILE": str(self.root / f"index-{name}")}
+        local_git(self.repo, "read-tree", base, env=env)
+        for path, value in files.items():
+            if value is None:
+                local_git(self.repo, "update-index", "--force-remove", "--", path, env=env)
+                continue
+            mode, data = value if isinstance(value, tuple) else ("100644", value)
+            oid = data if mode == "160000" else self.blob(data)
+            local_git(self.repo, "update-index", "--add", "--cacheinfo", f"{mode},{oid},{path}", env=env)
+        tree = local_git(self.repo, "write-tree", env=env)
+        commit = local_git(self.repo, "commit-tree", tree, "-p", base, "-m", name, env=env)
+        local_git(self.repo, "update-ref", f"refs/heads/{name}", commit)
+
+    def stage(self, text):
+        """作業ツリーを変えずに、index の settings だけを変える。"""
+        local_git(self.repo, "update-index", "--cacheinfo", f"100644,{self.blob(text)},.claude/settings.json")
+
+
+class SwitchTests(TreeBase):
+    def test_switch_without_protected_change_allows(self):
+        (code, out), err = self.check("switch", "docs")
+        self.assertEqual(code, 0)
+        self.assertEqual(err, "")
+        state = json.loads(out)
+        self.assertEqual(state["root"], str(self.repo))
+        old, new = state["expect"][".claude/settings.json"]
+        self.assertEqual(old, new)
+
+    def test_switch_stops_without_tty(self):
+        result, err = self.check("switch", "feature")
+        self.assertEqual(result, (1, ""))
+        self.assertIn(".claude/settings.json", err)
+        self.assertIn("git -C", err)
+        self.assertNotIn(guard.MSG_ASK, err)
+
+    def test_switch_asks_on_tty(self):
+        blob = local_git(self.repo, "rev-parse", "feature:.claude/settings.json")
+        for answer in ("y\n", "Y\n", "yes\n"):
+            with self.subTest(answer=answer):
+                (code, out), err = self.check("switch", "feature", tty=True, answer=answer)
+                self.assertEqual(code, 0)
+                self.assertEqual(json.loads(out)["expect"][".claude/settings.json"][1], ["100644", blob])
+                self.assertIn(guard.MSG_ASK, err)
+                self.assertIn('-{"v": 1}', err)
+                self.assertIn('+{"v": 2}', err)
+        for answer in ("\n", "n\n", ""):
+            with self.subTest(answer=answer):
+                result, err = self.check("switch", "feature", tty=True, answer=answer)
+                self.assertEqual(result, (1, ""))
+                self.assertIn(guard.MSG_DECLINED, err)
+
+    def test_checkout_forms(self):
+        local_git(self.repo, "config", "alias.co", "checkout")
+        self.assertEqual(self.check("co", "feature")[0], (1, ""))
+        self.assertEqual(self.check("checkout", "feature", "--", "README.md")[0][0], 0)
+        self.assertEqual(self.check("checkout", "feature", "--", ".claude")[0], (1, ""))
+
+    def test_branch_wins_over_tag(self):
+        # git の switch・checkout は、同じ名前の tag よりブランチを使う。tag で計算すると、確認を素通りする。
+        local_git(self.repo, "tag", "feature", "docs")
+        for argv in (("switch", "feature"), ("checkout", "feature"), ("checkout", "feature", "--", ".claude")):
+            with self.subTest(argv=argv):
+                self.assertEqual(self.check(*argv)[0], (1, ""))
+
+    def test_unsupported_options_stop(self):
+        for argv in (("switch", "-qf", "feature"), ("switch", "--merge", "feature"),
+                     ("checkout", "--ours", "--", "README.md"), ("restore", "--source=feature", "-p", "x"),
+                     ("checkout-index", "--prefix=x/", "-a"), ("reset", "--har"),
+                     ("reset", "--hard", "--recurse-submodules")):
+            with self.subTest(argv=argv):
+                result, err = self.check(*argv)
+                self.assertEqual(result, (1, ""))
+                self.assertIn("command git", err)
+
+    def test_index_only_change_is_caught(self):
+        self.stage('{"v": 9}\n')
+        for argv in (("restore", ".claude/settings.json"), ("checkout", "--", ".claude/settings.json"),
+                     ("checkout-index", "-f", "-a")):
+            with self.subTest(argv=argv):
+                result, err = self.check(*argv, tty=True, answer="n\n")
+                self.assertEqual(result, (1, ""))
+                self.assertIn('{"v": 9}', err)
+        self.assertEqual(self.check("restore", "--staged", ".claude/settings.json")[0], (0, ""))
+
+    def test_assume_unchanged_index_is_caught(self):
+        # git diff は assume-unchanged の entry を変わっていないとみなすが、checkout はその中身を書く。
+        self.stage('{"v": 9}\n')
+        local_git(self.repo, "update-index", "--assume-unchanged", ".claude/settings.json")
+        for argv in (("restore", ".claude/settings.json"), ("checkout", "--", ".claude"),
+                     ("checkout-index", "-f", ".claude/settings.json")):
+            with self.subTest(argv=argv):
+                result, err = self.check(*argv, tty=True, answer="n\n")
+                self.assertEqual(result, (1, ""))
+                self.assertIn('{"v": 9}', err)
+
+    def test_reset_hard_to_moved_branch(self):
+        local_git(self.repo, "update-ref", "refs/heads/main", "feature")
+        result, err = self.check("reset", "--hard")
+        self.assertEqual(result, (1, ""))
+        self.assertIn("変更 .claude/settings.json", err)
+
+    def test_reset_forms(self):
+        self.assertEqual(self.check("reset", "--soft", "feature")[0], (0, ""))
+        self.assertEqual(self.check("reset", "feature")[0], (0, ""))
+        self.assertEqual(self.check("reset", "--hard", "docs")[0][0], 0)
+        self.assertEqual(self.check("reset", "--keep", "feature")[0], (1, ""))
+
+    def test_replace_ref_content_is_shown(self):
+        original = local_git(self.repo, "rev-parse", "feature:.claude/settings.json")
+        evil = self.blob('{"evil": 1}\n')
+        local_git(self.repo, "replace", original, evil)
+        result, err = self.check("switch", "feature", tty=True, answer="n\n")
+        self.assertEqual(result, (1, ""))
+        self.assertIn('"evil"', err)
+        # 書く git も replace を効かせるので、状態の新は差し替えた後の中身になる。
+        (code, out), _ = self.check("switch", "feature", tty=True, answer="y\n")
+        self.assertEqual(code, 0)
+        self.assertEqual(json.loads(out)["expect"][".claude/settings.json"][1], ["100644", evil])
+
+    def test_symlink_and_gitlink_stop_without_asking(self):
+        head = local_git(self.repo, "rev-parse", "HEAD")
+        self.branch("link", "main", {".claude/settings.json": ("120000", "../README.md")})
+        self.branch("glink", "main", {".claude/hooks": ("160000", head)})
+        for name, word in (("link", "symlink"), ("glink", "gitlink")):
+            with self.subTest(name=name):
+                result, err = self.check("switch", name, tty=True, answer="y\n")
+                self.assertEqual(result, (1, ""))
+                self.assertIn(word, err)
+                self.assertNotIn(guard.MSG_ASK, err)
+
+    def test_parent_becoming_symlink_stops(self):
+        self.branch("nest", "main", {"x/.claude/settings.json": '{"n": 1}\n'})
+        self.branch("nestlink", "nest", {"x/.claude/settings.json": None, "x": ("120000", "/tmp")})
+        local_git(self.repo, "switch", "-q", "nest")
+        result, err = self.check("switch", "nestlink", tty=True, answer="y\n")
+        self.assertEqual(result, (1, ""))
+        self.assertIn("symlink", err)
+        self.assertNotIn(guard.MSG_ASK, err)
+
+    def test_dangerous_attributes_stop(self):
+        info = self.repo / ".git" / "info"
+        info.mkdir(exist_ok=True)
+        (info / "attributes").write_text(".claude/** filter=lfs\n", encoding="utf-8")
+        result, err = self.check("switch", "feature", tty=True, answer="y\n")
+        self.assertEqual(result, (1, ""))
+        self.assertIn("filter", err)
+        self.assertNotIn(guard.MSG_ASK, err)
+        (info / "attributes").unlink()
+        self.branch("enc", "feature", {".gitattributes": ".claude/settings.json working-tree-encoding=UTF-16\n"})
+        result, err = self.check("switch", "enc", tty=True, answer="y\n")
+        self.assertEqual(result, (1, ""))
+        self.assertIn("working-tree-encoding", err)
+        self.assertNotIn(guard.MSG_ASK, err)
+        # index だけにある .gitattributes も、checkout が書くときに読む。
+        # lfs だと、テストの git が index を書くときに git-lfs を呼ぶので、設定のない名前にする。
+        attrs = self.blob(".claude/** filter=probe\n")
+        local_git(self.repo, "update-index", "--add", "--cacheinfo", f"100644,{attrs},.gitattributes")
+        result, err = self.check("checkout", "feature", "--", ".claude/settings.json", tty=True, answer="y\n")
+        self.assertEqual(result, (1, ""))
+        self.assertIn("filter", err)
+
+    def test_deletion_is_shown(self):
+        self.branch("gone", "main", {".claude/settings.json": None})
+        result, err = self.check("switch", "gone", tty=True, answer="n\n")
+        self.assertEqual(result, (1, ""))
+        self.assertIn("削除", err)
+        # tree にないパスを消すのは、restore と --no-overlay の checkout だけ。
+        for argv in (("checkout", "--no-overlay", "gone", "--", ".claude"), ("restore", "--source", "gone", ".claude")):
+            with self.subTest(argv=argv):
+                result, err = self.check(*argv, tty=True, answer="n\n")
+                self.assertEqual(result, (1, ""))
+                self.assertIn("削除", err)
+        self.assertEqual(self.check("checkout", "gone", "--", ".claude")[0][0], 0)
+
+    def test_pathspec_relative_to_subdirectory(self):
+        self.stage('{"v": 9}\n')
+        sub = self.repo / "sub"
+        self.assertEqual(self.check("restore", "../.claude/settings.json", start=sub)[0], (1, ""))
+        self.assertEqual(self.check("-C", "sub", "restore", "../.claude/settings.json")[0], (1, ""))
+        # sub から見た .claude/settings.json は sub/.claude/settings.json で、ない。
+        self.assertEqual(self.check("restore", ".claude/settings.json", start=sub)[0][0], 0)
+
+    def test_unborn_and_detached_head(self):
+        empty = self.root / "empty"
+        empty.mkdir()
+        local_git(empty, "init", "-q", "-b", "main")
+        local_git(empty, "fetch", "-q", str(self.repo), "feature:feature")
+        result, err = self.check("checkout", "feature", start=empty)
+        self.assertEqual(result, (1, ""))
+        self.assertIn("追加 .claude/settings.json", err)
+        local_git(self.repo, "switch", "-q", "--detach", "main")
+        result, err = self.check("switch", "feature")
+        self.assertEqual(result, (1, ""))
+        self.assertIn("変更 .claude/settings.json", err)
+
+    def test_verify(self):
+        tasks = self.repo / ".vscode" / "tasks.json"
+        tasks.parent.mkdir()
+        tasks.write_text("{}\n", encoding="utf-8")
+        local_git(self.repo, "add", ".vscode/tasks.json")
+        (code, state), _ = self.check("switch", "feature", tty=True, answer="y\n")
+        self.assertEqual(code, 0)
+
+        def verify():
+            err = io.StringIO()
+            return guard.verify(state, err), err.getvalue()
+
+        self.settings.write_text('{"v": 2}\n', encoding="utf-8")
+        self.assertEqual(verify(), (0, ""))
+        self.settings.write_text('{"v": 1}\n', encoding="utf-8")
+        self.assertEqual(verify(), (0, ""))
+        self.settings.write_text('{"v": 3}\n', encoding="utf-8")
+        code, err = verify()
+        self.assertEqual(code, 1)
+        self.assertIn(guard.MSG_VERIFY, err)
+        self.assertIn(".claude/settings.json", err)
+        self.settings.write_text('{"v": 2}\n', encoding="utf-8")
+        tasks.write_text('{"x": 1}\n', encoding="utf-8")
+        code, err = verify()
+        self.assertEqual(code, 1)
+        self.assertIn(".vscode/tasks.json", err)
+        self.assertNotIn(".claude/settings.json", err)
+        with contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(guard.main(["verify", state]), 1)
+            self.assertEqual(guard.main(["verify", "{"]), 1)
+
+    def test_does_not_run_configured_programs(self):
+        canary = self.root / "canary"
+        script = self.root / "touch-canary"
+        script.write_text(f"#!/bin/sh\ntouch '{canary}'\ncat\n", encoding="utf-8")
+        script.chmod(0o755)
+        (self.repo / ".gitattributes").write_text("* diff=x\nREADME.md filter=x\n", encoding="utf-8")
+        (self.repo / "README.md").write_text("changed\n", encoding="utf-8")
+        self.settings.write_text('{"v": 5}\n', encoding="utf-8")
+        for key in ("core.fsmonitor", "core.pager", "diff.external", "diff.x.textconv",
+                    "filter.x.clean", "filter.x.smudge"):
+            local_git(self.repo, "config", key, str(script))
+        # 仕掛けが効くことを、テストの git で確かめる。
+        subprocess.run(["git", "-C", str(self.repo), "status"], capture_output=True)
+        self.assertTrue(canary.exists())
+        canary.unlink()
+        for argv in (("switch", "feature"), ("restore", ".claude/settings.json"), ("reset", "--hard")):
+            with self.subTest(argv=argv):
+                result, err = self.check(*argv, tty=True, answer="n\n")
+                self.assertEqual(result, (1, ""))
+                self.assertIn(guard.MSG_ASK, err)
+                self.assertFalse(canary.exists())
+
+    def test_bang_message_quotes_arguments(self):
+        spaced = self.root / "with space"
+        local_git(self.root, "clone", "-q", str(self.repo), str(spaced))
+        (spaced / ".claude" / "settings.json").write_text('{"v": 5}\n', encoding="utf-8")
+        result, err = self.check("restore", "--", ".claude/settings.json", start=spaced)
+        self.assertEqual(result, (1, ""))
+        self.assertIn(f"git -C '{spaced}' restore -- .claude/settings.json", err)
+
+    def test_control_characters_are_escaped(self):
+        self.branch("esc", "main", {".claude/settings.json": '{"v": 1}\x1b[2K\r{"v": 2}\n'})
+        result, err = self.check("switch", "esc", tty=True, answer="n\n")
+        self.assertEqual(result, (1, ""))
+        self.assertNotIn("\x1b", err)
+        self.assertNotIn("\r", err)
+        self.assertIn("<U+001B>", err)
+
+    def test_prompt_through_pty(self):
+        for answer, expected in ((b"y\n", 0), (b"n\n", 1), (None, 1)):
+            with self.subTest(answer=answer):
+                code, out = self.run_in_pty(answer)
+                self.assertEqual(code, expected, out)
+                if answer is None:
+                    # 標準入力が端末でなければ、聞かずに止める。
+                    self.assertNotIn(guard.MSG_ASK, out)
+                    self.assertIn("git -C", out)
+                else:
+                    self.assertIn(guard.MSG_ASK, out)
+
+    def run_in_pty(self, answer):
+        import pty
+
+        sys.stdout.flush()
+        sys.stderr.flush()
+        try:
+            pid, fd = pty.fork()
+        except OSError as e:
+            # Claude Code の sandbox の中では疑似端末を開けない。CI（macOS）では実際に動く。
+            self.skipTest(f"疑似端末を開けません: {e}")
+        if pid == 0:
+            code = 99
+            try:
+                os.chdir(self.repo)
+                if answer is None:
+                    os.dup2(os.open(os.devnull, os.O_RDONLY), 0)
+                # 起動したばかりのプロセスと同じく、0〜2 番から標準入出力を作り直す（テストの実行環境によらないため）。
+                sys.stdin = open(0, encoding="utf-8", closefd=False)
+                sys.stdout = open(1, "w", encoding="utf-8", closefd=False)
+                sys.stderr = open(2, "w", encoding="utf-8", closefd=False)
+                code = guard.main(["check", "--", "switch", "feature"])
+            except BaseException:
+                traceback.print_exc()
+            finally:
+                sys.stdout.flush()
+                sys.stderr.flush()
+                os._exit(code)
+        out = b""
+        sent = answer is None
+        prompt = guard.MSG_ASK.strip().encode()
+        deadline = time.monotonic() + 30
+        while time.monotonic() < deadline:
+            ready, _, _ = select.select([fd], [], [], 1)
+            if not ready:
+                continue
+            try:
+                chunk = os.read(fd, 4096)
+            except OSError:
+                break
+            if not chunk:
+                break
+            out += chunk
+            if not sent and prompt in out:
+                os.write(fd, answer)
+                sent = True
+        else:
+            os.kill(pid, signal.SIGKILL)
+        os.close(fd)
+        _, status = os.waitpid(pid, 0)
+        return os.waitstatus_to_exitcode(status), out.decode("utf-8", "replace")
 
 
 if __name__ == "__main__":
