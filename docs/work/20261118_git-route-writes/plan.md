@@ -184,7 +184,7 @@ CI は、`claude/hooks/tests/test-*.py` をすべて実行するので、ワー�
   - `@dataclass(frozen=True) class Change`: `path: str`（ルートからの相対パス）、`old: Entry | None`、`new: Entry | None`（`None` は無い・削除）。
   - `@dataclass(frozen=True) class Plan`: `root: Path`（書かれる作業ツリー）、`changes: tuple[Change, ...]`、`sources: tuple[str, ...]`（属性を確かめる tree の oid。index なら `":index"`）、`fresh: bool = False`（新しいディレクトリに書くとき。Task 3）。
   - `disk_entry(root: Path, rel: str) -> Entry | None`: `lstat` で調べる。通常のファイルは `hash-object --no-filters`、symlink はリンク先の文字列を `hash-object --stdin` で、ディレクトリは `Entry("040000", "")`。
-  - `tree_entries(cwd: Path, treeish: str) -> dict[str, Entry]`（`ls-tree -r -z --full-tree`）、`index_entries(cwd: Path) -> dict[str, Entry]`（`ls-files -s -z`。対象のパスに stage 1〜3 があれば `GuardError`）。
+  - `tree_entries(cwd: Path, treeish: str, *, config=()) -> dict[str, Entry]`（`ls-tree -r -z --full-tree`）、`index_entries(cwd: Path, *pathspec, root=None, home=None, config=()) -> dict[str, Entry]`（`ls-files -s -z --full-name`。対象のパスに stage 1〜3 があれば `GuardError`）。
   - `changed_paths(inv: Invocation, *diff_args: str) -> list[str]`: `diff --name-only -z` を `inv.cwd` で実行し、ルートからの相対パスで返す。
   - `danger(plan: Plan, inv: Invocation) -> str | None`: 止める理由（`MSG_DANGER` の文）か `None`。
   - `render(plan: Plan) -> str`: 変わるファイルの一覧と差分。
@@ -194,11 +194,22 @@ CI は、`claude/hooks/tests/test-*.py` をすべて実行するので、ワー�
 
 | 呼び出し | 書く元 | 候補にするパス |
 | --- | --- | --- |
-| `switch [opts] [<target>]`、`checkout [opts] <commit>`（`--` がなく、位置引数が 1 つで、コミットに解決できるか、`refs/remotes/*/<x>` にちょうど 1 つ当たる） | target の tree。`-c`・`-C`・`-b`・`-B` で位置引数がなければ `HEAD` | `diff HEAD T` のパス。`-f`・`--force`・`--discard-changes` があれば、`diff T`（作業ツリーとの差）のパスも足す |
-| `checkout [<tree-ish>] -- <pathspec>`、`--` のない checkout で上に当たらないもの | `<tree-ish>` があればその tree、なければ index | tree なら `diff T -- <pathspec>`、index なら `diff -- <pathspec>`。checkout の tree からは削除しない |
-| `restore [opts] <pathspec>` | `--source`・`-s` の tree。なければ index。`--staged` と `--worktree` の両方なら `HEAD` | 同上。tree から restore するときは、tree にないパスを削除とする。`--staged` だけなら `(0, "")` |
-| `checkout-index [-a] [-f] [-q] [-u] [<path>...]` | index | `diff --` のパス（`-a` なら全体） |
-| `reset --hard`・`--merge`・`--keep [<commit>]` | `<commit>` か `HEAD` の tree | `diff T` のパス。ほかの reset は `(0, "")` |
+| `switch [opts] [<target>]`、`checkout [opts] <commit>`（`--` がなく、位置引数が 1 つで、コミットに解決できるか、`refs/remotes/*/<x>` にちょうど 1 つ当たる） | target の tree。`-c`・`-C`・`-b`・`-B` で位置引数がなければ `HEAD` | `diff HEAD T` のパス。`-f`・`--force`・`--discard-changes` があれば、`diff --cached T` のパスと、対象の index entry とディスクの中身が違うパス（`_stale`）も足す |
+| `checkout [<tree-ish>] -- <pathspec>`、`--` のない checkout で上に当たらないもの | `<tree-ish>` があればその tree、なければ index | tree なら `diff --cached T -- <pathspec>` と `_stale`、index なら `_stale`。checkout の tree からは削除しない（`--no-overlay` なら削除も数える） |
+| `restore [opts] <pathspec>` | `--source`・`-s` の tree。なければ index。`--staged` と `--worktree` の両方なら `HEAD` | 同上。tree から restore するときは、tree にないパスを削除とする（`--overlay` なら削除しない）。`--staged` だけなら `(0, "")` |
+| `checkout-index [-a] [-f] [-q] [-u] [<path>...]` | index | `_stale` のパス（`-a` なら全体） |
+| `reset --hard`・`--merge`・`--keep [<commit>]` | `<commit>` か `HEAD` の tree | `diff --cached T` のパスと `_stale`。ほかの reset は `(0, "")`。reset のオプションも許可リストで判定する（`--har` は git では `--hard`） |
+
+- 作業ツリーと比べる `diff`（`diff T`・`diff -- <pathspec>`）は使わない（実装で変更）。assume-unchanged の entry を見落とし、設定の clean フィルタを動かすため（実測）。`_stale` は、対象の index entry とディスクの `disk_entry` を直接比べる。
+- gitlink の追加と削除は `--ignore-submodules=all` で隠れるので、tree と index の entry を比べて拾う（`_gitlinks`）。
+- 行き先の解決（`_target`）は git に合わせる（実装とレビューで変更）。
+  - `-` は `@{-1}`、`@` は `HEAD` として読む。`...` を含む rev は止める。
+  - `@{-N}` は `check-ref-format --branch` でブランチの名前に戻す。戻せなければ止める（前のチェックアウトの名前が `HEAD` のときなど。rev-parse は git と違う解決をする）。
+  - ブランチは `show-ref --verify --quiet refs/heads/<名前>` で調べ、tag より先に使う（APFS の loose の ref を、git と同じく大文字と小文字を区別せずに読む）。終了コードが 0・1 以外（ない object を指すなど）なら止める。
+  - reset の rev は、git と同じく `rev-parse` で解決する。
+  - リモートのブランチの推測（DWIM）で 2 つ以上当たれば止める。`--` のない checkout で `--no-guess`・`checkout.guess=false` ならパスとして読み、`-t`・`--track`・`--no-track` があるか、同じ名前のパスがあれば止める。`checkout X --` のように `--` の後が空なら止める。
+- 新の oid は、`cat-file blob` の中身（replace を効かせたもの）を `hash-object --stdin` にかけた値にする。
+- 書く元で対象のパスの親が symlink・gitlink になるときは、その親も変更に入れる。
 
 - 許可するオプション:
   - `switch`: `-q --quiet -f --force --discard-changes --detach -d --no-track --guess --no-guess --progress --no-progress --ignore-other-worktrees -t --track`。値を取るものは `-c -C -b -B` と `--track=<x>`。
@@ -209,20 +220,22 @@ CI は、`claude/hooks/tests/test-*.py` をすべて実行するので、ワー�
 - `danger`: 次のどれかなら止める。
   - `new.mode` が `120000` か `160000`。
   - 対象のパスの、ルートの下の親ディレクトリのどれかが、今 symlink である。
-  - `check-attr -z <DANGEROUS_ATTRS> -- <paths>` で、`unspecified`・`unset` 以外の値がある。作業ツリーの属性と、`sources` の各 tree の属性（`--source=<tree>`。index なら `--cached`）の両方を調べる。
+  - `check-attr -z <DANGEROUS_ATTRS> -- <paths>` で、`unspecified`・`unset` 以外の値がある。作業ツリーの属性と、`sources` の各 tree の属性（`--source=<tree>`）と、index の属性（`--cached`。常に調べる）を調べる。
+  - 書かれる通常のファイルの中身に NUL がある（kind は `バイナリの中身`）。
 - `render`: 1 行目は `MSG_CHANGES`。続けてパスごとに、`変更`・`追加`・`削除`・`モードの変更（{old}→{new}）` の印とパスを出す。そのあとに `difflib.unified_diff` の差分を出す。
   - 古い中身はディスクから読む。新しい中身は `cat-file blob <oid>`（フィルタなし）で読む。
-  - UTF-8 として読めないか、NUL を含むときは `（バイナリ）` とだけ出す。差分は省略しない。
+  - UTF-8 として読めないバイトは `errors="surrogateescape"` で読み、差分を取った後に、各行を表示用に変える（読めないバイトは `\xNN`、`\t` を除く Unicode の C*・Zl・Zp は `<U+XXXX>`）。差分は省略しない。パスと `MSG_UNSUPPORTED` の理由も同じく変える。
 - `check` の続き:
   - `danger` があれば、その文を出して `(1, "")`。確認を求めない。
   - 変わるものがなければ、何も出さずに `(0, state)`。
   - 変わるものがあれば、次のとおりにする。
-    - `tty` のとき: `render` と `MSG_ASK` を stderr に出し、`stdin` から 1 行読む。`y` か `yes`（大文字と小文字を区別しない）なら `(0, state)`。それ以外か EOF なら `MSG_DECLINED` を出して `(1, "")`。
+    - `tty`（標準入力と標準エラー出力の両方が端末）のとき: `render` と `MSG_ASK` を stderr に出し、`stdin` から 1 行読む。`y` か `yes`（大文字と小文字を区別しない）なら `(0, state)`。それ以外か EOF なら `MSG_DECLINED` を出して `(1, "")`。
     - `tty` でないとき: 一覧と `MSG_NO_TTY` を出して `(1, "")`。表示するコマンドは `git -C <start> <argv>` で、どの語も `shlex.quote` する。
 - 状態の JSON: `{"root": "<絶対パス>", "expect": {"<相対パス>": [<旧>, <新>]}}`。各 entry は `[mode, oid]` か `null` で書く。
   - 対象には、変わるファイルと、index にある対象のファイル（変わらないもの。旧と新が同じ）を入れる。
   - `fresh` のときの旧は `null`。
 - `verify`: 各パスの今の `disk_entry` が、旧か新のどちらかと一致すればよい（git が途中で止まった場合も、旧のままなら通す）。一致しないパスがあれば、`MSG_VERIFY` とそのパスを出して 1 を返す。
+  - git の後の index（`ls-files -s -z --full-name`）にあり、ディスクにもあり、`expect` にない対象のパスも、同じく報告して 1 を返す（git が新しく書いた対象のファイルを見落とさないため。実装とレビューで追加）。
 
 **テスト**（fixture: `main` に `.claude/settings.json`＝`{"v": 1}` と `README.md`＝`a`。`feature` は両方を変える（`{"v": 2}`）。`docs` は `README.md` だけを変える）
 
