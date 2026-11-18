@@ -65,7 +65,7 @@ PR と main への push では、GitHub Actions が macOS の `/bin/bash` と `/
 
 `mcp/<name>.json` の定義を、`scripts/register-mcp.sh` が Claude Code の user スコープに `<name>` で登録する（`setup.sh` からも呼ばれる）。同じ名前の user スコープの登録を消してから足すので、何度実行してもよく、定義を変えれば置き換わる。`~/.claude.json` は状態や認証情報も持つので、直接編集・リンク・コミットしない。
 
-定義の `npmPackage` は、`register-mcp.sh` が `~/.local/share/claude-mcp/<name>` に `npm install --ignore-scripts` で入れ、登録する定義からは外す。実行時に npx を使わないのは、npx が作業ディレクトリ（sandbox から書けるプロジェクト）の `node_modules`・`node_modules/.bin`・`.npmrc` を使い、そこに置かれたコードが sandbox の外で動くため。入れる場所は sandbox から書けないので、`sandbox.filesystem.allowWrite` に入れない。
+定義の `npmPackage` は、`register-mcp.sh` が `~/.local/share/claude-mcp/<name>` に `npm install --ignore-scripts` で入れ、登録する定義からは外す。実行時に npx を使わないのは、npx が作業ディレクトリ（sandbox から書けるプロジェクト）の `node_modules`・`node_modules/.bin`・`.npmrc` を使い、そこに置かれたコードが sandbox の外で動くため。入れる場所は、`settings.json` の `sandbox.filesystem.denyWrite` と `permissions.deny` の `Edit(~/.local/share/claude-mcp/**)` で、どこで起動したセッションからも書かせない（`~` で起動すると作業ディレクトリの中になるため）。`sandbox.filesystem.allowWrite` に入れない。
 
 定義の `${HOME}`・`${NODE_BIN}`（mise のグローバル設定の Node.js の `bin`）・`${PACKAGE_DIR}`（上の入れる場所）は、登録するときに実際のパスに置き換える。公開リポジトリにユーザー名を入れないためと、端末以外から起動したときの PATH や、プロジェクトの mise の設定（信頼していないと shim が失敗する）に左右されないようにするため。ほかの `${VAR:-default}` は、Claude Code がサーバーの起動時に展開する。Node.js を更新したら、`register-mcp.sh` を再実行する。
 
@@ -83,7 +83,7 @@ PR と main への push では、GitHub Actions が macOS の `/bin/bash` と `/
 | `command`・`args` の先頭 | `${NODE_BIN}/node` で `${PACKAGE_DIR}/node_modules/@playwright/mcp/cli.js` を起動 | npx を使わない（上記）。ネットワークも要らない |
 | `--isolated` | プロファイルをメモリに置く | ログイン状態を残さない。並行したセッションでプロファイルがぶつからない |
 | `--browser chrome` | インストール済みの Google Chrome | ダウンロードが要らない。Chrome の自動更新でセキュリティ修正が入る。既定値と同じだが、版を上げて既定が変わったときに気づけるよう明示する |
-| `--output-dir` | `~/Library/Caches/playwright-mcp` | どのリポジトリにも出力しない。sandbox から書けない場所なので、symlink で出力先を向け替えられない |
+| `--output-dir` | `~/Library/Caches/playwright-mcp` | どのリポジトリにも出力しない。sandbox からも Edit・Write ツールからも書かせない（下記）ので、symlink で出力先を向け替えられない |
 | `--no-webmcp` | ページが登録するツールを使わない | 説明をページが決めたツールが、Claude のツールの一覧に入るのを防ぐ。今の用途では使わない |
 | `--blocked-origins` | ポート 47800〜47819（`*:47800;…;*:47819`） | cc-crit の Crit の画面を開かせない。JS やリンクでの移動も止める（リダイレクトは止まらない） |
 | `PLAYWRIGHT_MCP_HEADLESS` | 既定は `true` | ウィンドウを出さない。`--headless` 引数は環境変数より優先されて切り替えられなくなるので使わない |
@@ -94,6 +94,7 @@ MCP サーバーは sandbox の外で、ユーザーの権限で動く。sandbox
 - `settings.json` の `permissions.deny`: `mcp__playwright__browser_run_code_unsafe`（Node のプロセスで任意のコードが動く。オプションでは無効にできない）と `mcp__playwright__browser_file_upload`（プロジェクトのファイルをページに送れる）。
 - フック `hooks/guard-playwright-mcp.sh`: `filename` 引数（相対パスはプロジェクトのルートから解決され、プロジェクトの中のどこにでも書ける）と、`paths` 引数（`browser_drop` などがローカルのファイルをページに渡す）。`browser_drop` は `data`（テキスト）なら使える。`url` が Crit のポートを指す呼び出しも止める（ブラウザは localhost に届くので、開けば人間の承認を偽造できる）。`url` が `file:` で始まる呼び出しも止める（Playwright MCP の `file:` の拒否は、Node が解析できる URL にしか効かない）。
 - `settings.json` の `sandbox.filesystem.denyRead` の `~/.crit` と `permissions.deny` の `Read(~/.crit/**)`: cc-crit 以外の crit（プラグインの自動プランレビュー、端末の crit）はランダムなポートで待ち受け、そのポートを `~/.crit/sessions` に書く。読めると、モデルがポートを知って開き、承認を偽造できる。`~/.crit` を読み書きする crit は sandbox の外で動くので、影響しない。ポートを端から試して見つける経路は残る。
+- `settings.json` の `sandbox.filesystem.denyWrite` と `permissions.deny` の `Edit(…/**)`: 入れる場所（`~/.local/share/claude-mcp`）と出力先（`~/Library/Caches/playwright-mcp`）。`~` で起動したセッションでは作業ディレクトリの中になり、`cli.js` を書き換えれば次の起動時に sandbox の外で動き、出力先は symlink で向け替えられる。`check-repo.py` は、定義の `--output-dir` がこの出力先であることも確かめる。
 - `settings.json` の `disabledMcpjsonServers` の `playwright`: プロジェクトの `.mcp.json` に同じ名前のサーバーがあると、user スコープの定義より優先され、上の起動オプションが外れるため。`claude mcp add`（既定は local スコープ）でも `playwright` を登録しない。別の名前で Playwright を起動するプロジェクトのサーバーは、deny もフックも効かないので承認しない。
 - `check-repo.py` は、`mcp/playwright.json` 以外の定義に `playwright` が含まれていれば失敗する（`playwright`・`playwright-core` の CLI の `mcp` サブコマンドでも同じサーバーが動くため）。deny・フック・検査が、ツール名 `mcp__playwright__*` に結び付いているため。
 
@@ -117,7 +118,7 @@ headless のブラウザを止めるサイトもある（login.salesforce.com �
 
 #### 出力
 
-スクリーンショット・ページの構造・コンソールのログは、`~/Library/Caches/playwright-mcp` に自動の名前で溜まる。自動では消えないので、いつ消してもよい。
+スクリーンショット・ページの構造・コンソールのログは、`~/Library/Caches/playwright-mcp` に自動の名前で溜まる。自動では消えないので、中身はいつ消してもよい。ディレクトリは残す。ないあいだは、大文字・小文字だけ違う名前（`Playwright-MCP` など）を sandbox の書き込み禁止が止めるかを確かめていないため（ホームの APFS は大文字・小文字を区別しない）。
 
 <a name="playwright-mcp-update"></a>
 
@@ -135,7 +136,7 @@ headless のブラウザを止めるサイトもある（login.salesforce.com �
 
 1. `claude mcp remove playwright -s user`
 2. `mcp/playwright.json` を消す（残すと `setup.sh` が登録し直す）。
-3. `settings.json` の deny（`mcp__playwright__*` の 2 つと `Read(~/.crit/**)`）、denyRead の `~/.crit`、`disabledMcpjsonServers` の `playwright`、フックの登録を消す。定義がなければ、`check-repo.py` はこれらを求めない。
+3. `settings.json` の deny（`mcp__playwright__*` の 2 つ、`Read(~/.crit/**)`、`Edit(~/.local/share/claude-mcp/**)`、`Edit(~/Library/Caches/playwright-mcp/**)`）、denyRead の `~/.crit`、denyWrite の `~/.local/share/claude-mcp` と `~/Library/Caches/playwright-mcp`、`disabledMcpjsonServers` の `playwright`、フックの登録を消す。定義がなければ、`check-repo.py` はこれらを求めない。
 4. 入れた `~/.local/share/claude-mcp/playwright` と、出力の `~/Library/Caches/playwright-mcp` を消す。
 
 ## cc-safe-push
