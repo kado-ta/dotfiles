@@ -101,7 +101,15 @@ MCP サーバーは sandbox の外で、ユーザーの権限で動く。sandbox
 
 #### ブラウザのウィンドウを表示する
 
-`PLAYWRIGHT_MCP_HEADLESS=false claude` でセッションを始める。`PLAYWRIGHT_MCP_HEADLESS=`（空）は既定値ではなく空に展開され、Playwright MCP が解釈できずに headed になる。
+`PLAYWRIGHT_MCP_HEADLESS=false claude` でセッションを始める。`PLAYWRIGHT_MCP_HEADLESS=`（空）は既定値ではなく空に展開され、Playwright MCP が解釈できずに headed になる。`claude mcp get playwright` は、この値を既定値（`:-true`）を省いて表示するが、登録には含まれている。
+
+headless のブラウザを止めるサイトもある（login.salesforce.com の宣伝の枠は Access Denied になった）。そのときも headed で始める。
+
+<a name="playwright-mcp-output"></a>
+
+#### 出力
+
+スクリーンショット・ページの構造・コンソールのログは、`~/Library/Caches/playwright-mcp` に自動の名前で溜まる。自動では消えないので、いつ消してもよい。
 
 <a name="playwright-mcp-update"></a>
 
