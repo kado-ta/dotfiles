@@ -71,7 +71,7 @@ Playwright MCP（`@playwright/mcp`）を Claude Code の user スコープに登
 | `browser_run_code_unsafe` | `permissions.deny` | Node のプロセスで任意のコードが動く。オプションでは外せない |
 | `browser_file_upload` | `permissions.deny` | sandbox の denyRead の外で、`.env*` などをページに送れる。今の用途で使わない |
 | `filename` 引数 | PreToolUse フックで、`filename` を含む `mcp__playwright__*` の呼び出しを拒否する | プロジェクトの中の任意のパス（`.claude/settings.json`・`.git/config` など）に書ける。`browser_evaluate` は任意の JSON を書けるので、hooks を書き込めば次のセッションで sandbox の外でコードが動く見込み |
-| 設定の消失 | `check-repo.py` で、deny の 2 つとフックの登録（`onFailure: block`）を確かめる | `guard-additional-dirs.sh` と同じ扱い |
+| 設定の消失 | `check-repo.py` で、定義（`claude/mcp/playwright.json`）があるあいだ、deny の 2 つとフックの登録（`onFailure: block`）を確かめる | `guard-additional-dirs.sh` と同じ扱い。定義を消したときは求めない |
 
 `filename` を拒否すると、スクリーンショットなどは出力先に自動の名前（`page-<時刻>.png` など）で保存される。スナップショットや `browser_evaluate` の結果は、ファイルではなく応答で返る。
 

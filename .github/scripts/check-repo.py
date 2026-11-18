@@ -92,6 +92,13 @@ ADDITIONAL_DIRECTORIES = ("~/.gstack/projects",)
 # 既定ではフックの失敗（タイムアウトなど）でツールが通るので、onFailure を block にする。
 GUARD_HOOK = "hooks/guard-additional-dirs.sh"
 GUARD_TOOLS = ("Edit", "Write", "MultiEdit", "NotebookEdit")
+# Playwright MCP は sandbox の外でユーザーの権限で動く。定義があるあいだは、任意のコードを動かすツールと
+# プロジェクトのファイルをページに渡すツールを deny にし、プロジェクトの中に書ける filename 引数をフックで止める。
+# matcher は完全一致で比べる（一部のツールにしか当たらないと、ほかのツールの filename が通る）。
+PLAYWRIGHT_DEFINITION = "claude/mcp/playwright.json"
+PLAYWRIGHT_DENY = ("mcp__playwright__browser_run_code_unsafe", "mcp__playwright__browser_file_upload")
+PLAYWRIGHT_HOOK = "hooks/guard-playwright-mcp.sh"
+PLAYWRIGHT_MATCHER = "mcp__playwright__.*"
 JSONC_FILES = {"vscode/settings.json", "vscode/keybindings.json"}
 SETTINGS = "claude/settings.json"
 PROJECT_SETTINGS = ".claude/settings.json"
@@ -246,13 +253,17 @@ def check_push_permissions(root):
     return errors
 
 
+def blocking_hook(group, script):
+    return any(hook.get("command", "").endswith(script) and hook.get("onFailure") == "block"
+               for hook in group.get("hooks", []))
+
+
 def guard_hook_registered(settings):
     for group in settings.get("hooks", {}).get("PreToolUse", []):
         # MultiEdit・NotebookEdit が Edit を含むので、部分一致ではなく | で分けて比べる。
         if not set(GUARD_TOOLS) <= set(group.get("matcher", "").split("|")):
             continue
-        if any(hook.get("command", "").endswith(GUARD_HOOK) and hook.get("onFailure") == "block"
-               for hook in group.get("hooks", [])):
+        if blocking_hook(group, GUARD_HOOK):
             return True
     return False
 
@@ -282,6 +293,20 @@ def check_edit_permissions(root):
     errors += [f"{SETTINGS}: sandbox.filesystem.{key} has an unprefixed path {path}"
                for key in SANDBOX_PATH_LISTS for path in filesystem.get(key, [])
                if not path.startswith(("~/", "/"))]
+    return errors
+
+
+def check_playwright_mcp(root):
+    if not (root / PLAYWRIGHT_DEFINITION).exists():
+        return []
+    settings = load_settings(root)
+    deny = set(settings.get("permissions", {}).get("deny", []))
+    errors = [f"{SETTINGS}: permissions.deny lacks {rule} (required while {PLAYWRIGHT_DEFINITION} exists)"
+              for rule in PLAYWRIGHT_DENY if rule not in deny]
+    if not any(group.get("matcher") == PLAYWRIGHT_MATCHER and blocking_hook(group, PLAYWRIGHT_HOOK)
+               for group in settings.get("hooks", {}).get("PreToolUse", [])):
+        errors.append(f"{SETTINGS}: hooks.PreToolUse lacks {PLAYWRIGHT_HOOK} for {PLAYWRIGHT_MATCHER} "
+                      f"with onFailure block (required while {PLAYWRIGHT_DEFINITION} exists)")
     return errors
 
 
@@ -430,6 +455,7 @@ CHECKS = (
     ("hook-scripts", check_hook_scripts),
     ("push-permissions", check_push_permissions),
     ("edit-permissions", check_edit_permissions),
+    ("playwright-mcp", check_playwright_mcp),
     ("project-permissions", check_project_permissions),
     ("mise-paranoid", check_mise_paranoid),
     ("syntax", check_syntax),

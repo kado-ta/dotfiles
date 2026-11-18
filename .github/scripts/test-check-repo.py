@@ -44,6 +44,8 @@ MISE_EDIT_DENY = ["Edit(~/.local/state/mise/**)"]
 MISE_EDIT_ASK = ["Edit(~/dotfiles/mise/**)"]
 GUARD_TOOLS = ["Edit", "Write", "MultiEdit", "NotebookEdit"]
 GUARD_ERROR = "hooks.PreToolUse lacks hooks/guard-additional-dirs.sh"
+PLAYWRIGHT_DENY = ["mcp__playwright__browser_run_code_unsafe", "mcp__playwright__browser_file_upload"]
+PLAYWRIGHT_HOOK_ERROR = "hooks.PreToolUse lacks hooks/guard-playwright-mcp.sh"
 PROJECT_ASK = [
     "Edit(/claude/**)",
     "Edit(/zsh/**)",
@@ -88,7 +90,7 @@ def settings():
     return {
         "permissions": {
             "allow": [f"Bash({c})" for c in WRAPPER_COMMANDS],
-            "deny": list(DENY_PUSH) + CRIT_DENY + LIMA_DENY + EDIT_DENY + MISE_EDIT_DENY,
+            "deny": list(DENY_PUSH) + CRIT_DENY + LIMA_DENY + EDIT_DENY + MISE_EDIT_DENY + PLAYWRIGHT_DENY,
             "ask": list(MISE_ASK) + EDIT_ASK + MISE_EDIT_ASK,
             "blockWritesOutsideWorkingDirectories": True,
             "additionalDirectories": ["~/.gstack/projects"],
@@ -108,6 +110,18 @@ def settings():
                     "hooks": [
                         {"type": "command", "command": "~/.claude/hooks/direct.sh"},
                         {"type": "command", "command": "/bin/bash ~/.claude/hooks/viabash.sh"},
+                    ],
+                },
+                # guard-additional-dirs.sh の組は、テストが [-1] で触るので最後に置く。
+                {
+                    "matcher": "mcp__playwright__.*",
+                    "hooks": [
+                        {
+                            "type": "command",
+                            "command": "/bin/bash ~/.claude/hooks/guard-playwright-mcp.sh",
+                            "timeout": 10,
+                            "onFailure": "block",
+                        },
                     ],
                 },
                 {
@@ -146,6 +160,8 @@ class CheckRepoTests(unittest.TestCase):
         self.write("claude/hooks/direct.sh", "#!/bin/bash\n", 0o755)
         self.write("claude/hooks/viabash.sh", "#!/bin/bash\n")
         self.write("claude/hooks/guard-additional-dirs.sh", "#!/bin/bash\n")
+        self.write("claude/hooks/guard-playwright-mcp.sh", "#!/bin/bash\n")
+        self.write("claude/mcp/playwright.json", "{}\n")
         self.write("claude/scripts/status.sh", "#!/bin/bash\n", 0o755)
         self.write("README.md", README)
         self.write("mise/mise_config.toml", PARANOID_CONFIG)
@@ -419,6 +435,53 @@ class CheckRepoTests(unittest.TestCase):
         del data["hooks"]["PreToolUse"][-1]["hooks"][0]["onFailure"]
         self.write_settings(data)
         self.assert_fails("FAIL edit-permissions", GUARD_ERROR)
+
+    def playwright_group(self, data):
+        return next(g for g in data["hooks"]["PreToolUse"] if g["matcher"] == "mcp__playwright__.*")
+
+    def test_missing_playwright_deny_fails(self):
+        # Playwright MCP は sandbox の外で動く。run_code_unsafe は任意のコード、file_upload はプロジェクトのファイルを渡せる。
+        for rule in PLAYWRIGHT_DENY:
+            with self.subTest(rule=rule):
+                data = settings()
+                data["permissions"]["deny"].remove(rule)
+                self.write_settings(data)
+                self.assert_fails("FAIL playwright-mcp", f"permissions.deny lacks {rule}")
+
+    def test_missing_playwright_hook_fails(self):
+        data = settings()
+        data["hooks"]["PreToolUse"].remove(self.playwright_group(data))
+        self.write_settings(data)
+        self.assert_fails("FAIL playwright-mcp", PLAYWRIGHT_HOOK_ERROR)
+
+    def test_playwright_hook_narrower_matcher_fails(self):
+        # 一部のツールにしか当たらない matcher では、ほかのツールの filename が通る。
+        data = settings()
+        self.playwright_group(data)["matcher"] = "mcp__playwright__browser_take_screenshot"
+        self.write_settings(data)
+        self.assert_fails("FAIL playwright-mcp", PLAYWRIGHT_HOOK_ERROR)
+
+    def test_playwright_hook_other_command_fails(self):
+        data = settings()
+        self.playwright_group(data)["hooks"][0]["command"] = "/bin/bash ~/.claude/hooks/viabash.sh"
+        self.write_settings(data)
+        self.assert_fails("FAIL playwright-mcp", PLAYWRIGHT_HOOK_ERROR)
+
+    def test_playwright_hook_without_block_fails(self):
+        data = settings()
+        del self.playwright_group(data)["hooks"][0]["onFailure"]
+        self.write_settings(data)
+        self.assert_fails("FAIL playwright-mcp", PLAYWRIGHT_HOOK_ERROR)
+
+    def test_without_playwright_definition_passes(self):
+        # 定義を消して登録をやめたら、deny とフックは求めない。
+        self.git("rm", "-q", "--cached", "claude/mcp/playwright.json")
+        (self.root / "claude/mcp/playwright.json").unlink()
+        data = settings()
+        data["permissions"]["deny"] = [r for r in data["permissions"]["deny"] if r not in PLAYWRIGHT_DENY]
+        data["hooks"]["PreToolUse"].remove(self.playwright_group(data))
+        self.write_settings(data)
+        self.assert_passes()
 
     def test_missing_mise_global_config_fails(self):
         self.git("rm", "-q", "--cached", "mise/mise_config.toml")

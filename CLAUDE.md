@@ -59,6 +59,7 @@ worktree は `claude -w <name>` で始める。この設定では EnterWorktree�
 - `Edit(//**/.git/**/hooks/**)` と `Edit(//**/.git/config)` を deny にしない。Edit の deny は sandbox の denyWrite にもなり、どこでも `git init`・`git clone` が失敗する見込み（`edit-permissions` が失敗する）。
 - ユーザー設定の `sandbox.filesystem` に、接頭辞のないパスを書かない。`~/` か `/` で始める（接頭辞がないと `~/.claude` が基準になる。`edit-permissions` が失敗する）。
 - Read の deny の `*.pem` を `~/**` に広げない。
+- `claude/mcp/playwright.json` があるあいだは、`permissions.deny` の `mcp__playwright__browser_run_code_unsafe`・`mcp__playwright__browser_file_upload` と、PreToolUse の `guard-playwright-mcp.sh` の登録（matcher `mcp__playwright__.*`、`onFailure: block`）を外さない（`check-repo.py` の `playwright-mcp` が失敗する）。
 
 ## 規約
 

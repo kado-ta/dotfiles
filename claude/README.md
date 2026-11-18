@@ -84,7 +84,7 @@ PR と main への push では、GitHub Actions が macOS の `/bin/bash` と `/
 | `PLAYWRIGHT_MCP_HEADLESS` | 既定は `true` | ウィンドウを出さない。`--headless` 引数は環境変数より優先されて切り替えられなくなるので使わない |
 | `command`・`env.PATH` | mise のグローバル設定の Node.js | 上の `${NODE_BIN}` の理由 |
 
-MCP サーバーは sandbox の外で、ユーザーの権限で動く。sandbox の denyWrite・denyRead、Edit・Write の規則、ネットワークのプロキシは効かない。そのため、次を止めている。
+MCP サーバーは sandbox の外で、ユーザーの権限で動く。sandbox の denyWrite・denyRead、Edit・Write の規則、ネットワークのプロキシは効かない。そのため、次を止めている。定義（`mcp/playwright.json`）があるあいだは、`check-repo.py` の `playwright-mcp` が、これらがあることを確かめる。
 
 - `settings.json` の `permissions.deny`: `mcp__playwright__browser_run_code_unsafe`（Node のプロセスで任意のコードが動く。オプションでは無効にできない）と `mcp__playwright__browser_file_upload`（プロジェクトのファイルをページに送れる）。
 - フック `hooks/guard-playwright-mcp.sh`: `filename` 引数（相対パスはプロジェクトのルートから解決され、プロジェクトの中のどこにでも書ける）。
@@ -118,7 +118,7 @@ MCP サーバーは sandbox の外で、ユーザーの権限で動く。sandbox
 
 1. `claude mcp remove playwright -s user`
 2. `mcp/playwright.json` を消す（残すと `setup.sh` が登録し直す）。
-3. `settings.json` の deny の 2 つとフックの登録、`.github/scripts/check-repo.py` のその検査を消す。
+3. `settings.json` の deny の 2 つとフックの登録を消す。定義がなければ、`check-repo.py` はこれらを求めない。
 4. 出力の `~/Library/Caches/playwright-mcp` を消す。npx のキャッシュは `~/.npm/_npx` にある。
 
 ## cc-safe-push

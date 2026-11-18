@@ -43,6 +43,18 @@ Claude から Crit の対話レビューを開くときは、`claude/bin/cc-crit
 - sandbox の中で動くのは静的な監査だけ。スキャナと `--comprehensive` は Docker が要り、Docker のソケットには上の理由で届かない。
 - helper は、`.env*`・`*.pem`・`*.key` などの秘密ファイルも一度読んでマスキングし、写しを保存する。`permissions.deny` の `Read(...)` は sandbox の `denyRead` になり、`sandbox.filesystem.allowRead` でも外せない（2026-11-16 に実測）。そのため、これらを追跡しているリポジトリでは `start` が失敗する。回避の手順は [SKILL_INVENTORY.md](../../claude/SKILL_INVENTORY.md#cso-sandbox) にある。
 
+<a name="playwright-mcp"></a>
+
+## Playwright MCP
+
+Playwright MCP（`claude/mcp/playwright.json`）は Claude Code が起動し、sandbox の外でユーザーの権限で動く。sandbox の denyWrite・denyRead、Edit・Write の規則、ネットワークのプロキシは効かない。定義があるあいだ、`check-repo.py` の `playwright-mcp` が次を確かめる。
+
+- `permissions.deny` の `mcp__playwright__browser_run_code_unsafe`: Node のプロセスで任意のコードが動く。capability が `core` なので、オプションでは無効にできない。
+- `permissions.deny` の `mcp__playwright__browser_file_upload`: ワークスペースのルートの中のファイル（`.env*` も）をページに渡せる。
+- PreToolUse の `hooks/guard-playwright-mcp.sh`（matcher `mcp__playwright__.*`、`onFailure: block`）: `filename` 引数の相対パスはワークスペースのルートから解決され、プロジェクトの中のどこにでも書ける。`browser_evaluate` は戻り値を JSON で書くので、`.claude/settings.json` に hooks を書けば、次のセッションで sandbox の外でコードが動く見込み。権限の規則では引数を見られないので、フックで止める。matcher を一部のツールに絞ると、ほかのツールの `filename` が通る。
+
+出力先（`--output-dir`）は `~/Library/Caches/playwright-mcp` にしている。リポジトリに出力しないためと、sandbox から書けない場所にして、symlink で出力先を向け替えさせないため。ページの内容によるプロンプトインジェクションと、プロキシを通らない通信（localhost の確認に要る）は受け入れた。経緯は [docs/work/20261118_playwright-mcp/plan.md](../../docs/work/20261118_playwright-mcp/plan.md#decisions) を参照する。
+
 <a name="edit-write-rules"></a>
 
 ## Edit・Write ツールの書き込み
