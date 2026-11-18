@@ -118,7 +118,7 @@ headless のブラウザを止めるサイトもある（login.salesforce.com �
 
 #### 出力
 
-スクリーンショット・ページの構造・コンソールのログは、`~/Library/Caches/playwright-mcp` に自動の名前で溜まる。自動では消えないので、いつ消してもよい。
+スクリーンショット・ページの構造・コンソールのログは、`~/Library/Caches/playwright-mcp` に自動の名前で溜まる。自動では消えないので、中身はいつ消してもよい。ディレクトリは残す。ないあいだは、大文字・小文字だけ違う名前（`Playwright-MCP` など）を sandbox の書き込み禁止が止めるかを確かめていないため（ホームの APFS は大文字・小文字を区別しない）。
 
 <a name="playwright-mcp-update"></a>
 

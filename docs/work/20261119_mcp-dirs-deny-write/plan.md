@@ -118,18 +118,18 @@ Claude が 2 か所に書く理由がない。スクリーンショットは Rea
 
 | # | 作業 | 確かめること | 誰が |
 | --- | --- | --- | --- |
-| 1 | 設定を変える前に、`~` で起動した短いセッションで、Bash の[測る命令](#probe)を実行する（再現） | 2 か所が `writable` になる。D5 の判断の材料に、`~/.local/share/mise` も見る | あなた |
+| 1 | 設定を変える前に、`~` で起動した短いセッションで、Bash の[測る命令](#probe)を実行する（再現） | 2 か所が `writable` になる。D5 の判断の材料に、`~/.local/share/mise` も見る | あなた（実行しなかった。設定を先に編集したので、変更前の状態はもう測れない） |
 | 2 | `test-check-repo.py` にテストを足す | 新しいテストが失敗する | Claude |
 | 3 | `check-repo.py` に検査を足す | `test-check-repo.py` がすべて通る。実際のリポジトリの `check-repo.py` は、設定を足す前なので `playwright-mcp` が失敗する | Claude |
 | 4 | `claude/settings.json` を編集する（[変更](#changes)の 2 つの断片） | `check-repo.py` がすべて通る | あなた |
 | 5 | 文書とコメントを直す | `check-repo.py` の `markdown-links` が通る | Claude |
 | 6 | 検証: `check-repo.py`・`test-check-repo.py`・shellcheck・actionlint・フックのテスト・`test-register-mcp.py` | すべて通る | Claude |
-| 7 | 新しく `~` で起動したセッションで、手順 1 の命令と、Write ツールでの 2 か所への書き込みを試す | 2 か所が `denied`、Write も拒否される。対照の `~/Library/Caches`・`~/.local/share` は `writable`（`.` がホームであることの確認） | あなた |
+| 7 | 新しく `~` で起動したセッションで、[測る命令](#probe)の 2 つと、Write ツールでの 2 か所への書き込み（大文字・小文字を変えた綴りも）を試す | 2 か所が `denied`、綴りを変えても `denied`、Write も拒否される。対照の `~/Library/Caches`・`~/.local/share` は `writable`（`.` がホームであることの確認）。出力先がないときの結果で、[D8](#decision-case) の次の対応を決める | あなた |
 | 8 | `/review` → `/security-review`。Codex のレビューは通常の端末で実行し、2 回以上なら全部の結果を貼ってもらう | 指摘への対応が決まる | Claude・あなた |
 | 9 | コミット（`settings.json` は HEAD の版に今回の追加だけを入れたものを index に置く）。`/crit-review` でブランチの差分を開く | `approved: true` | Claude・あなた |
 | 10 | `cc-safe-push`、`cc-safe-pr create`、`gh pr checks` を最大 60 分待つ | CI が通る。マージはあなた | Claude |
 
-セッションの開始時の sandbox の設定の表示は、項目が多いと途中で切れる（このセッションでも `... and 111 more`）。表示で 2 か所を確かめられなければ、手順 7 の結果で判断する。
+セッションの開始時の sandbox の設定の表示は、項目が多いと途中で切れる（このセッションでも `... and 111 more`）。表示で 2 か所を確かめられなければ、手順 7 の結果で判断する。設定を編集した後、このセッションの表示は `... and 115 more` になった（4 件増えた。どのパスかは表示されない）。
 
 <a name="probe"></a>
 ### 測る命令
@@ -144,13 +144,52 @@ done
 if touch -c ~/.claude.json 2>/dev/null; then echo "writable: ~/.claude.json"; else echo "denied:   ~/.claude.json"; fi
 ```
 
+手順 7 では、続けて大文字・小文字を変えた綴りを試す（どちらもあるディレクトリに解決される）。
+
+```bash
+for d in ~/.local/share/CLAUDE-MCP ~/Library/Caches/Playwright-MCP; do
+  if touch "$d/.cc-probe" 2>/dev/null; then rm -f "$d/.cc-probe"; echo "writable: $d"; else echo "denied:   $d"; fi
+done
+```
+
+出力先がないときの確認は、次の順で行う。1 と 3 は通常の端末で、2 は `~` で起動したセッションの Bash ツールで実行する。
+
+1. `mv ~/Library/Caches/playwright-mcp ~/Library/Caches/playwright-mcp.bak`
+2. `if mkdir ~/Library/Caches/Playwright-MCP 2>/dev/null; then rmdir ~/Library/Caches/Playwright-MCP; echo "writable: missing dir with another case"; else echo "denied:   missing dir with another case"; fi`
+3. `mv ~/Library/Caches/playwright-mcp.bak ~/Library/Caches/playwright-mcp`
+
 <a name="done"></a>
 ## 完了条件
 
 - `test-check-repo.py` の新しいテストが、検査を足す前に失敗し、足した後に通る。
 - 設定を足した後、`check-repo.py`・`test-check-repo.py`・shellcheck・actionlint・フックのテスト・`test-register-mcp.py` が通る。
-- `~` で起動したセッションで、2 か所への Bash と Write ツールの書き込みが拒否される（手順 7）。
+- `~` で起動したセッションで、2 か所への Bash と Write ツールの書き込みが拒否される。大文字・小文字を変えた綴りでも拒否される（手順 7）。
 - PR の CI が通る。
+
+<a name="review-decisions"></a>
+## レビューでの決定
+
+`/review`（2026-11-19）の指摘への対応。どれも、あなたの判断。
+
+<a name="decision-test-gap"></a>
+### D6. 定義を消したときのテストに、denyWrite も含める
+
+`test_without_playwright_definition_passes` が、定義を消したときに新しい denyWrite を求めないことを確かめていなかった（testing の指摘）。fixture の denyWrite から 2 か所も外した。検査を定義の有無の前に動かす変更を入れると、このテストが落ちることを確かめた。
+
+<a name="decision-node-modules"></a>
+### D7. Node がさかのぼる親の `node_modules` は守らず、残るリスクとして記録する
+
+0.0.85 は起動時に、入っていない `bufferutil` を `require` する。Node は入れる場所の外の親（`~/.local/share/node_modules`・`~/.local/node_modules`・`~/node_modules`）と `~/.node_modules`・`~/.node_libraries` まで探す。偽の HOME で、置いたコードが動くことを実測した（敵対的レビュー）。`~` で起動したセッションがここにコードを置くと、以後のすべてのセッションで、MCP の起動時に sandbox の外で動く。D5 と同じ種類の経路なので、同じく守らない。
+
+<a name="decision-case"></a>
+### D8. 大文字・小文字だけ違う名前は、手順 7 で測り、出力先を消さない運用にする
+
+ホームの APFS は大文字・小文字を区別しない。sandbox の照合が区別するなら、出力先がないあいだに `Playwright-MCP` のような名前で作られ、MCP がそこ（symlink の先も）に出力するおそれがある（Red Team と敵対的レビュー。どちらも未測定）。今は 2 か所ともある。README を「中身は消してよい、ディレクトリは残す」に直した。手順 7 で、出力先がないときに綴りを変えて作れたら、`register-mcp.sh` で出力先を作っておく修正を別に相談する。
+
+<a name="decision-npmrc"></a>
+### D9. `register-mcp.sh` が読む `~/.npmrc` は、残るリスクとして記録する
+
+`register-mcp.sh` は sandbox の外で `cd ~` してから `npm install` するので、`~/.npmrc` を読む。`~` で起動したセッションが `registry=` を書き換えておくと、次に版を上げて登録したときに、差し替えた registry のパッケージを入れる場所に入れる。以前からある問題で、この差分で悪化していない。
 
 <a name="rollback"></a>
 ## ロールバック
@@ -160,7 +199,8 @@ PR を revert し、`claude/settings.json` から 4 項目を消す。設定は�
 <a name="residual-risks"></a>
 ## 残るリスク
 
-次の 2 つは受け入れた（2026-11-19 にレビューで決定）。
+次のリスクは受け入れた（2026-11-19 に、計画のレビューと `/review` の後に決定）。
 
-- `~` で起動したセッションでは、2 か所以外の、sandbox の外で動く場所に書ける（D5 の node、`~/Library/LaunchAgents` など）。`~/.claude.json` に書けるかは手順 1 で測り、書けるならこの文書と CLAUDE_CONFIG.md に記録して、別の作業の候補にする。
+- `~` で起動したセッションでは、2 か所以外の、sandbox の外で動く場所に書ける。D5 の node、[D7](#decision-node-modules) の親の `node_modules`、[D9](#decision-npmrc) の `~/.npmrc`、`~/Library/LaunchAgents` などがある。`~/.claude.json` に書けるかは測っていない（手順 1 を実行しなかったため）。
 - 親のディレクトリ（`~/Library/Caches`・`~/.local/share`）を別の名前に移して作り直す迂回を、sandbox が止めるかは確かめていない。移すと多くのものが壊れるので、測らない。
+- 大文字・小文字だけ違う名前の迂回は、手順 7 の結果が出るまで未確認（[D8](#decision-case)）。
