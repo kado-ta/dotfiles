@@ -77,7 +77,7 @@
 | | `/commit-staged-pr` | ステージ済みの変更の commit・push・PR | 自動 |
 | 組み込み | `/security-review` | セキュリティレビュー | 自動 |
 | | `/simplify` | 変更したコードの整理 | 自動 |
-| Codex | `codex review --base <base> -c 'sandbox_mode="read-only"' -c skills.include_instructions=false` | 別モデルの独立レビュー（ユーザーが通常の端末で実行する。`!` では失敗することがある） | 明示 |
+| Codex | `cd <repo> && codex review --base <base> -c 'sandbox_mode="read-only"' -c skills.include_instructions=false` | 別モデルの独立レビュー（ユーザーが通常の端末で実行する。`!` では失敗することがある） | 明示 |
 
 <a name="comparisons"></a>
 

@@ -33,10 +33,10 @@ description: Use after adding, removing or updating a Claude Code plugin or skil
    - crit: sandbox の外で `mise run crit:profile-test` を実行してもらう。
    - understand-anything: hooks が変わったら、続けて使うか判断してもらう。
 10. `git diff claude/settings.json` に差分があれば、CLI がキーの並びを変えただけかを `jq -S` で確かめる（中身が変わっていたら伝える）。
-11. 文書が合ったら、スナップショットの作り直しをユーザーに頼む。通常の端末で実行するよう、次のコマンドをそのまま入力できる形で示す。sandbox の中の Bash は `claude/` に書けない（dotfiles の `.claude/settings.json` の `denyWrite`）ので、Claude は実行しない。Claude Code のプロンプトの `!` も、セッションによっては sandbox の中で動き、失敗する。
+11. 文書が合ったら、スナップショットの作り直しをユーザーに頼む。通常の端末で実行するよう、次のコマンドの `<root>` を、このセッションの作業ツリーのルート（`git rev-parse --show-toplevel`。worktree ならそのパス）の絶対パスに置き換え、そのまま入力できる形で示す。スナップショットは、スクリプトがあるツリーに書かれる。sandbox の中の Bash は `claude/` に書けない（dotfiles の `.claude/settings.json` の `denyWrite`）ので、Claude は実行しない。Claude Code のプロンプトの `!` も、セッションによっては sandbox の中で動き、失敗する。
 
     ```
-    cd ~/dotfiles && /usr/bin/python3 -B claude/scripts/skills-check.py snapshot
+    /usr/bin/python3 -B <root>/claude/scripts/skills-check.py snapshot
     ```
 
     ユーザーが実行したら、`mise run claude:skills-check` が終了コード 0 になることと、`python3 -B .github/scripts/check-repo.py` を確かめる。

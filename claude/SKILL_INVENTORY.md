@@ -307,7 +307,7 @@ sandbox の外で `/cso` を実行すると、保存先に秘密ファイルの�
 
 ### 共通の手順
 
-更新は、sandbox の外で `claude/scripts/update-skills.sh` を実行してまとめて行う。通常の端末で `/bin/bash ~/dotfiles/claude/scripts/update-skills.sh` を実行する（dotfiles では `mise run claude:update` でもよい）。gstack・user スコープのプラグイン・crit の CLI を更新し、gstack が `claude/settings.json` に書いた絶対パスを `~/` に戻し、cc-crit の profile テストまで実行する。Claude Code のプロンプトの `!` は、セッションによっては sandbox の中で動く（2026-11-19 に観測）。そのときは更新が失敗するうえ、cc-crit の profile テストがスキップされて終了コード 0 になり、成功に数えられる。
+更新は、sandbox の外で `claude/scripts/update-skills.sh` を実行してまとめて行う。通常の端末で `/bin/bash ~/dotfiles/claude/scripts/update-skills.sh` を実行する（dotfiles では `mise run claude:update` でもよい）。gstack・user スコープのプラグイン・crit の CLI を更新し、gstack が `claude/settings.json` に書いた絶対パスを `~/` に戻し、cc-crit の profile テストまで実行する。Claude Code のプロンプトの `!` は、セッションによっては sandbox の中で動く（2026-11-19 に観測）。そのときは更新が失敗するうえ、cc-crit の profile テストはスキップされて終了コード 0 で終わり、「失敗した手順」に出ない。
 
 - Claude Code から `mise run` を使わないのは、mise が dotfiles のルートの設定ファイル（`mise.local.toml` など）を読み込み、ルートには sandbox から書けるため。paranoid で、信頼されていない設定は読み込まれないが、念のため mise を通さない。
 - 確認が要るプラグイン（マーケットプレイスが宣言したインストールコマンドが変わったもの）は、TTY がないと拒否されて失敗に数えられる。端末で `claude plugin update <id> --scope user` を実行する。
@@ -324,7 +324,7 @@ sandbox の外で `/cso` を実行すると、保存先に秘密ファイルの�
      - 入っているスキルとエージェントが、すべてこの文書に載っているか
      - 「提供元」の表の版
      - gstack の状態ごとの節
-2. 終了コードが 0 なら終わり。1 なら、Claude に `/sync-skill-docs` を頼む（「gstack を更新した」と伝えるだけでもよい）。スキルが元のファイルを読んで文書を直し、差分を `/crit-review` で開く。スナップショットの作り直し（通常の端末で、dotfiles で `mise run claude:skills-snapshot` か `/usr/bin/python3 -B claude/scripts/skills-check.py snapshot`）は、ユーザーが行う。sandbox の中の Bash は `claude/` に書けず、Claude Code のプロンプトの `!` もセッションによっては sandbox の中で動くため。2 は照合できない状態（ファイルが読めない、この文書のアンカーがない）。
+2. 終了コードが 0 なら終わり。1 なら、Claude に `/sync-skill-docs` を頼む（「gstack を更新した」と伝えるだけでもよい）。スキルが元のファイルを読んで文書を直し、差分を `/crit-review` で開く。スナップショットの作り直し（通常の端末で、作業しているツリー（worktree ならそのディレクトリ）に移って `mise run claude:skills-snapshot` か `/usr/bin/python3 -B claude/scripts/skills-check.py snapshot`）は、ユーザーが行う。sandbox の中の Bash は `claude/` に書けず、Claude Code のプロンプトの `!` もセッションによっては sandbox の中で動くため。2 は照合できない状態（ファイルが読めない、この文書のアンカーがない）。
 3. `claude/settings.json` が書き換わっていないかを見る。CLI はキーの並びを変えることがあるので、`jq -S` で比べる。
 
 <a name="upgrade-source"></a>
