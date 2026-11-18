@@ -489,6 +489,42 @@ class SwitchTests(TreeBase):
                 self.assertEqual(result, (1, ""))
                 self.assertIn('+{"evil": 1}', err)
 
+    def test_previous_checkout_named_head_stops(self):
+        # 前のチェックアウトの名前が HEAD だと、git は refs/heads/HEAD を使うが、check-ref-format --branch は失敗し、
+        # rev-parse @{-1} は今の HEAD を返す。どちらにも合わせられないので止める。
+        self.branch("evil", "main", {".claude/settings.json": '{"evil": 1}\n'})
+        main = local_git(self.repo, "rev-parse", "main")
+        heads = self.repo / ".git" / "refs" / "heads"
+        (heads / "HEAD").write_text(local_git(self.repo, "rev-parse", "evil") + "\n", encoding="utf-8")
+        with open(self.repo / ".git" / "logs" / "HEAD", "a", encoding="utf-8") as f:
+            f.write(f"{main} {main} Test <test@example.com> 1900000000 +0000\tcheckout: moving from HEAD to main\n")
+        for argv in (("switch", "-"), ("checkout", "-"), ("switch", "@{-1}"),
+                     ("checkout", "-", "--", ".claude/settings.json")):
+            with self.subTest(argv=argv):
+                result, err = self.check(*argv, tty=True, answer="y\n")
+                self.assertEqual(result, (1, ""))
+                self.assertIn("@{-1} がどのブランチかを確かめられません", err)
+                self.assertNotIn(guard.MSG_ASK, err)
+
+    def test_previous_detached_checkout_still_resolves(self):
+        # 前が detached のときは、check-ref-format --branch が oid を出し、これまでどおり計算する。
+        local_git(self.repo, "switch", "-q", "--detach", "feature")
+        local_git(self.repo, "switch", "-q", "main")
+        result, err = self.check("switch", "-", tty=True, answer="n\n")
+        self.assertEqual(result, (1, ""))
+        self.assertIn('+{"v": 2}', err)
+
+    def test_broken_branch_stops(self):
+        # ない object を指すブランチは、同じ名前の tag に落とさずに止める。
+        oid = local_git(self.repo, "rev-parse", "main")
+        local_git(self.repo, "tag", "ghost", "main")
+        (self.repo / ".git" / "refs" / "heads" / "ghost").write_text("1" * len(oid) + "\n", encoding="utf-8")
+        for argv in (("switch", "ghost"), ("checkout", "ghost"), ("checkout", "ghost", "--", ".claude")):
+            with self.subTest(argv=argv):
+                result, err = self.check(*argv)
+                self.assertEqual(result, (1, ""))
+                self.assertIn("ブランチ ghost を読めません", err)
+
     def approve_and_run(self, *argv):
         """確認で y と答え、本物の git を同じ引数で動かし、verify の結果を返す。"""
         (code, state), err = self.check(*argv, tty=True, answer="y\n")

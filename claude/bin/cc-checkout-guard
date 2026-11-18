@@ -246,19 +246,24 @@ def git_env(home: Path) -> dict[str, str]:
     }
 
 
-def run_git(cwd: Path, *args: str, config: Sequence[str] = (), stdin: bytes | None = None,
-            ok: Sequence[int] = (0,)) -> bytes:
+def _git_process(cwd: Path, *args: str, config: Sequence[str] = (),
+                 stdin: bytes | None = None) -> subprocess.CompletedProcess[bytes]:
     # 人間の -c より後に自分の値を置き、こちらを勝たせる。
     cmd = [GIT, "-C", str(cwd)]
     for value in config:
         cmd += ["-c", value]
     cmd += ["-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null", "--no-pager", *args]
     # text=True にしない。CR を LF に変換するので、CR を含むパスを別のパスと誤認する。
-    cp = subprocess.run(
+    return subprocess.run(
         cmd, env=git_env(user_home()), input=stdin,
         stdin=None if stdin is not None else subprocess.DEVNULL,
         capture_output=True, check=False, timeout=GIT_TIMEOUT,
     )
+
+
+def run_git(cwd: Path, *args: str, config: Sequence[str] = (), stdin: bytes | None = None,
+            ok: Sequence[int] = (0,)) -> bytes:
+    cp = _git_process(cwd, *args, config=config, stdin=stdin)
     if cp.returncode not in ok:
         # stderr はメッセージに含めない。リポジトリ内のファイルの内容が出ることがある。
         raise GuardError(f"git {args[0]} が失敗しました")
@@ -471,14 +476,20 @@ def _commit_tree(inv: Invocation, commit: str) -> str:
 
 
 def _branch_oid(inv: Invocation, name: str) -> str | None:
-    """refs/heads/<name> を、git の read_ref と同じく読む。
+    """refs/heads/<name> を、git の read_ref と同じく読む。ないときは None。
 
     loose の ref は、大文字と小文字を区別しないファイルシステムでは、名前の大文字と小文字を区別せずに読まれる
-    （for-each-ref の名前の照らし合わせは区別するので使わない）。show-ref --verify は read_ref で読み、
-    読めないときは 128 で終わる。
+    （for-each-ref の名前の照らし合わせは区別するので使わない）。show-ref --verify --quiet は read_ref で読み、
+    あれば 0、なければ 1 で終わる。ない object を指す ref は 128（bad ref）で終わるので止める
+    （同じ名前の tag に落とすと、git と違う中身を見せる）。
     """
-    out = run_git(inv.cwd, "show-ref", "--verify", "--hash", "refs/heads/" + name, config=inv.config, ok=(0, 128))
-    return os.fsdecode(out).strip() or None
+    ref = "refs/heads/" + name
+    code = _git_process(inv.cwd, "show-ref", "--verify", "--quiet", ref, config=inv.config).returncode
+    if code == 1:
+        return None
+    if code != 0:
+        raise GuardError(f"ブランチ {name} を読めません")
+    return _git_line(inv, "show-ref", "--verify", "--hash", ref)
 
 
 def _target(inv: Invocation, rev: str, kind: str) -> str | None:
@@ -492,8 +503,11 @@ def _target(inv: Invocation, rev: str, kind: str) -> str | None:
     name = rev
     if rev.startswith("@{-") and rev.endswith("}"):
         # git は @{-N} をブランチの名前に戻してから refs/heads/<名前> を読む。rev-parse は同じ名前の tag を先に使う。
+        # 名前に戻せない（前のチェックアウトがない、名前が HEAD など）ときは、rev-parse に落とさずに止める。
         name = _git_line(inv, "check-ref-format", "--branch", rev, ok=(0, 128))
-    if name and "@{" not in name:
+        if not name:
+            raise GuardError(f"{rev} がどのブランチかを確かめられません")
+    if "@{" not in name:
         oid = _branch_oid(inv, name)
         if oid is not None:
             peeled = _peel(inv, oid, kind)
