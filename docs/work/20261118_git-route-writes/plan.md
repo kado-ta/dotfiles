@@ -276,10 +276,11 @@ CI は、`claude/hooks/tests/test-*.py` をすべて実行するので、ワー�
 | 呼び出し | 計算 |
 | --- | --- |
 | `merge [opts] <commit>`（位置引数はちょうど 1 つ） | `merge-tree --write-tree HEAD <commit>` の 1 行目を結果の tree R とする（終了コード 0 と 1 を受け入れる）。候補は `diff HEAD R`。`sources` は R と `<commit>`。許可するオプションは `-q --quiet --ff --no-ff --ff-only --no-edit --edit -m --squash --no-commit --commit --stat --no-stat --log --no-log --no-verify --progress --no-progress` |
-| `merge --abort` | `HEAD` の tree に戻す。候補は `diff HEAD` |
-| `merge --continue`・`--quit` | `(0, "")` |
+| `merge --abort` | `HEAD` の tree に戻す。候補は `diff --cached HEAD` と `_stale`（reset --hard と同じ計算） |
+| `merge --continue`・`--quit` | `(0, "")`（`--continue` は MERGE_AUTOSTASH がないときだけ） |
+| `commit`（READ_ONLY から移す） | MERGE_AUTOSTASH があれば `GuardError`。ほかは `(0, "")` |
 | `pull [opts]`（位置引数なし） | `after_fetch` でなければ `FetchFirst(globals + ["fetch", <branch.<b>.remote>])` を投げ、`check` は `(3, NUL 区切りの引数)` を返す。`after_fetch` なら、`@{upstream}` を `<commit>` とする merge として計算する。`pull.rebase` か `branch.<b>.rebase` が真なら `GuardError`。許可するオプションは `--ff-only --ff --no-ff --no-rebase -q --quiet -v --verbose --no-edit --stat --no-stat` |
-| `stash`・`stash push [-q] [-m <msg>] [-u] [-k]`（pathspec なし） | 候補は `diff HEAD`（`HEAD` に戻る）。`-u`・`--include-untracked` があれば、`ls-files --others --exclude-standard` の対象のファイルを削除の候補に足す |
+| `stash`・`stash push [-q] [-m <msg>] [-u] [-k]`（pathspec なし） | 候補は `diff --cached HEAD` と `_stale`（`HEAD` に戻る）。`-u`・`--include-untracked` があれば、`ls-files --others --exclude-standard` の対象のファイルを削除の候補に足す |
 | `stash apply`・`stash pop [-q] [--index] [<stash>]` | s は `<stash>` か `stash@{0}`。R は `merge-tree --write-tree --merge-base=<s>^1 HEAD <s>`。候補は `diff HEAD R`。`<s>^3` があれば、その tree の対象のファイルを追加の候補に足す |
 | `stash list`・`show`・`drop`・`clear`・`create`・`store` | `(0, "")`。ほかの `stash` は `GuardError` |
 | `cherry-pick [-n] [-x] [--no-edit] [-e] [-s] <commit>` | `merge-tree --write-tree --merge-base=<c>^ HEAD <c>`。範囲（`..` を含む）、マージコミット、`--continue`・`--skip`・`--abort`・`--quit` は `GuardError` |
@@ -288,7 +289,23 @@ CI は、`claude/hooks/tests/test-*.py` をすべて実行するので、ワー�
 | `clean` | `-n`・`--dry-run` があれば `(0, "")`。`-i` は `GuardError`。ほかは、同じ引数から `-f`・`--force` を除いて `--dry-run` を付けて実行する。`Would remove <path>` の対象のファイルを削除の候補にする |
 | `mv` | 位置引数のどれか（移動先のディレクトリの中の行き先を含む）が対象なら `GuardError`。ほかは `(0, "")` |
 | `worktree add [opts] <path> [<commit>]` | T は `<commit>`。なければ、`-b`・`-B` があるときは `HEAD`、ないときは `<path>` の最後の名前のローカルのブランチ、それもなければ `HEAD`。`Plan(root=<path の絶対パス>, changes=compare_with_main(...), fresh=True)`。`--orphan` は `GuardError`、`--no-checkout` は `(0, "")` |
-| `worktree list`・`prune`・`lock`・`unlock`・`remove`・`move`・`repair` | `(0, "")` |
+| `worktree move [-f] <worktree> <new-path>` | 行き先（ディレクトリなら、git の `find_worktree` が選びうる登録パスの最後の名前をつないだもの）が、今か元のチェックアウトの対象のパスか、その下なら `GuardError`。ほかは `(0, "")` |
+| `worktree list`・`prune`・`lock`・`unlock`・`remove`・`repair` | `(0, "")` |
+
+実装とレビューで変えたもの（どれも止める側。実測とテストがある）:
+
+- 作業ツリーと比べる `diff HEAD` は使わず、`diff --cached HEAD` と `_stale` にする（Task 2 と同じ理由）。
+- merge-tree は設定の merge ドライバーを動かす（作業ツリーの `.gitattributes` と `.git/info/attributes` の `merge=x` で実測）。`merge.<x>.driver`・`.recursive` が 1 つでも設定にあれば、merge-tree を使う確認（merge・pull・stash apply/pop・cherry-pick・revert）をすべて止める。`merge.renormalize` が真でも止める。
+- MERGE_AUTOSTASH（`rev-parse --git-path MERGE_AUTOSTASH` のファイルか `rev-parse --verify MERGE_AUTOSTASH`）があれば、merge・pull・`merge --abort`・`--continue`・commit・cherry-pick・revert を止める。git はこれらの後に置かれた stash を書く（実測）。
+- merge・pull の設定: `merge.autoStash`・`pull.autoStash`・`pull.twohead`（`ort` 以外）・`branch.<b>.mergeOptions` があれば止める。`branch.<b>.rebase` を `pull.rebase` より先に読み、bool で読めない値も止める。オプションと設定の確認は FetchFirst の前にする。
+- `merge FETCH_HEAD` は、FETCH_HEAD のファイルを git と同じく読み、取り込む行がちょうど 1 つでなければ止める（git は octopus で取り込む）。pull は自分の fetch で FETCH_HEAD を書き直すので対象外（実測）。
+- rev の解決は、merge・cherry-pick・revert・`worktree add --detach` は `_rev`（tag が先）、`worktree add` は `_target`（ブランチが先）にする（コマンドごとに実測）。cherry-pick・revert は、`..` を含むもの・`^` で始まるもの・マージコミット・親のないコミットを止める。
+- 衝突の印のラベルは、merge と pull（`@{upstream}` は oid にする）では git と一致する。cherry-pick・revert・stash apply/pop では一致しないので、対象のパスが衝突したら止める。`.git/rr-cache` があれば（`rerere.enabled` がなくても）git は記録した解決を書くので、merge・pull で対象のパスが衝突し、rerere が働きうるときも止める。
+- stash apply/pop・cherry-pick・revert（`-n` を含む）は、index が HEAD と違えば止める。`stash -k` は index の中身を書くので、対象の index が HEAD と違えば止める。`stash save`・`stash branch` は止める。
+- clean は `--dry-run` に `--no-quiet` を足す（`-q` で一覧が空になる）。`-f` は外さない。clean だけは短いオプションのまとめ書き（`-fdx` など）を読む。
+- mv は、ディレクトリを動かすときのその下のファイルと行き先も確かめる。
+- worktree add・move の行き先は物理パスで決め、途中に symlink があれば止める。中にあるかどうかは祖先の `(st_dev, st_ino)` で判定する（APFS の大文字と小文字の違いも捉える）。worktree add は、新しい作業ツリーに書かれる対象のすべてに属性の確認をし、行き先が今か元のチェックアウトの対象のパスの下なら止める（`--no-checkout` も）。元のチェックアウトを省くのは `core.bare` が真のときだけ。
+- HEAD のないブランチでは、merge・pull・stash・cherry-pick・revert と、rev のない worktree add を止める。
 
 - `compare_with_main` は、すべてのリポジトリ向けの対象（`DOTFILES_PROTECTED` を除く）について、`treeish` の tree と、元のチェックアウトの index のパスを合わせて調べる。旧は元のチェックアウトの `disk_entry`、新は tree の entry とし、違うものを返す。元のチェックアウトのルートは `rev-parse --path-format=absolute --git-common-dir` の親とする。
 - 対象のファイルが変わる取り込みでは、`check` が `(3, ...)` を返したあと、関数が fetch してから `--after-fetch` で呼び直す（Task 5）。
