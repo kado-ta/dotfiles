@@ -177,6 +177,38 @@ class CheckTests(Base):
         self.assertEqual(result, (1, ""))
         self.assertIn("止めました", err)
 
+    def test_read_only_commands_that_write_files_stop(self):
+        # 作業ツリーに書かないサブコマンドも、--output などでファイルに書く（最終レビューで実測）。
+        # 中身は sandbox が書けるコミットから来るので、確かめずに止める（C1）。
+        local_git(self.repo, "config", "alias.l", "log")
+        local_git(self.repo, "config", "alias.archive", "status")  # git は builtin の alias を使わない
+        for argv in (("show", "-s", "--format=%B", "--output=.claude/settings.local.json"),
+                     ("log", "-1", "--format=%B", "--output", ".env.local"), ("l", "--output=.env"),
+                     ("diff-tree", "-p", "HEAD", "--output=x"), ("range-diff", "--output=x", "a...b"),
+                     ("blame", "--output=x", "README.md"), ("whatchanged", "--output=x"), ("log", "--outp=x"),
+                     ("format-patch", "-1", "-o", ".claude/rules"), ("format-patch", "-1", "--output=x"),
+                     ("archive", "-o", "x.tar", "HEAD"), ("bundle", "create", "x.bundle", "HEAD"),
+                     ("config", "-f", ".claude/settings.json", "a.b", "c"), ("config", "--file=x", "a.b", "c"),
+                     ("config", "--fil=x", "a.b", "c"), ("config", "-fx", "a.b", "c"), ("config", "-lfx"),
+                     ("config", "set", "--file", "x", "a.b", "c"), ("-C", "sub", "show", "--output=x")):
+            with self.subTest(argv=argv):
+                result, err = self.check(*argv)
+                self.assertEqual(result, (1, ""))
+                self.assertIn("ファイルに書きます", err)
+                self.assertIn("command git", err)
+        # リポジトリの外でも、書き先は絶対パスで対象を指せる。
+        outside = self.root / "outside"
+        outside.mkdir()
+        for argv in (("diff", "--no-index", "a", "b", f"--output={self.repo}/.env"),
+                     ("archive", f"--remote={self.repo}", "-o", f"{self.repo}/.env", "HEAD")):
+            with self.subTest(argv=argv):
+                self.assertEqual(self.check(*argv, start=outside)[0], (1, ""))
+        # 書かない形は今までどおり通す。
+        for argv in (("show", "--output-indicator-new=>", "HEAD"), ("config", "--get", "user.name"),
+                     ("config", "--fixed-value", "--get", "a.b", "c"), ("log", "--oneline"), ("ls-files", "-o")):
+            with self.subTest(argv=argv):
+                self.assertEqual(self.check(*argv)[0], (0, ""))
+
 
 class TreeBase(Base):
     """main: settings={"v": 1}・README=a。feature は両方を変え、docs は README だけを変える。"""
@@ -1002,6 +1034,18 @@ class OtherWriteTests(TreeBase):
         self.assertEqual(self.check("clean", "-n")[0], (0, ""))
         self.assertEqual(self.check("mv", "README.md", ".claude/x.md")[0], (1, ""))
         self.assertEqual(self.check("mv", "README.md", "R.md")[0], (0, ""))
+
+    def test_rm_combined_short_options(self):
+        # rm の短いオプション（r・f・q・n）のまとめ書きを、clean と同じく読む（M4）。
+        result, err = self.check("rm", "-" + "rf", ".claude")
+        self.assertEqual(result, (1, ""))
+        self.assertIn("削除 .claude/settings.json", err)
+        self.assertNotIn("確かめられない", err)
+        self.assertEqual(self.check("rm", "-" + "fq", "README.md")[0][0], 0)
+        self.assertEqual(self.check("rm", "-" + "rn", ".claude")[0], (0, ""))  # -n は消さない
+        result, err = self.check("rm", "-rx", ".claude")
+        self.assertEqual(result, (1, ""))
+        self.assertIn("確かめられない", err)
 
     def test_clean_counts_quiet_quoted_and_directory_removals(self):
         (self.repo / "sub" / "deep").mkdir()

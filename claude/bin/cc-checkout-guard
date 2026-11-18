@@ -48,16 +48,40 @@ DOTFILES_PROTECTED = (  # check-repo.py の PROJECT_DENY_WRITE と同じ文字�
 )
 DANGEROUS_ATTRS = ("filter", "working-tree-encoding", "ident")
 
-# 作業ツリーに書かないサブコマンド。
+# 作業ツリーに書かないサブコマンド。ファイルに書くオプション（file_writes）があれば止める。
 READ_ONLY = frozenset(
-    "add archive blame branch bundle cat-file check-attr check-ignore check-mailmap check-ref-format "
+    "add blame branch cat-file check-attr check-ignore check-mailmap check-ref-format "
     "cherry clone commit-graph commit-tree config count-objects describe diff diff-files "
-    "diff-index diff-tree fetch for-each-ref format-patch fsck gc grep hash-object help init log "
+    "diff-index diff-tree fetch for-each-ref fsck gc grep hash-object help init log "
     "ls-files ls-remote ls-tree maintenance merge-base merge-tree mktag mktree name-rev notes prune "
     "push range-diff reflog remote repack replace rev-list rev-parse shortlog show show-branch "
     "show-ref status symbolic-ref tag update-index update-ref var verify-commit verify-pack "
     "verify-tag version whatchanged write-tree".split()
 )
+# 中身をファイルに書く builtin（-o・--output-directory・create <file>）。確かめずに止める（C1）。
+FILE_WRITERS = frozenset(("archive", "bundle", "format-patch"))
+
+
+def file_writes(sub: str, args: Sequence[str]) -> str | None:
+    """sub と args がファイルに書くなら、その理由（C1）。書かないなら None。
+
+    --output は diff の系統（show・log・blame・range-diff など）で、引数を読む時点でファイルを作る（実測）。
+    省略形（--outp）も止める。config の -f・--file は別のファイルを読み書きする。値をつないだ形（-fx）、
+    まとめ書き（-lfx）、省略形（--fil）も止める。-- の後も見る（止める側に倒す）。
+    """
+    if sub in FILE_WRITERS:
+        return f"{sub} はファイルに書きます"
+    if sub not in READ_ONLY:
+        return None
+    for tok in args:
+        name = tok.partition("=")[0]
+        long = name.startswith("--") and len(name) > 2
+        if long and "--output".startswith(name):
+            return f"{sub} の {name} はファイルに書きます"
+        if sub == "config" and ((long and "--file".startswith(name))
+                                or (tok.startswith("-") and not long and "f" in tok[1:])):
+            return f"config の {name} はファイルに書きます"
+    return None
 # 人間の環境にあってよい GIT_ の名前。
 ALLOWED_GIT_ENV = frozenset(
     "GIT_EDITOR GIT_SEQUENCE_EDITOR GIT_PAGER GIT_SSH GIT_SSH_COMMAND GIT_ASKPASS GIT_TERMINAL_PROMPT "
@@ -108,6 +132,7 @@ STASH_APPLY_FLAGS = frozenset(("-q", "--index"))
 STASH_READS = frozenset("list show drop clear create store".split())  # 作業ツリーに書かない stash
 PICK_FLAGS = frozenset(("-n", "-x", "--no-edit", "-e", "-s"))
 RM_FLAGS = frozenset(("-r", "-f", "-q", "--ignore-unmatch", "--cached", "-n"))
+RM_LETTERS = "rfqn"  # rm の、値を取らない短いオプション。まとめ書き（-rf）を読む（M4）
 CLEAN_LETTERS = "qnfidxX"  # 値を取らない短いオプション。-e は値を取る
 CLEAN_LONG = {"--quiet": "q", "--dry-run": "n", "--force": "f", "--interactive": "i"}
 MV_FLAGS = frozenset(("-f", "-k", "-v"))
@@ -398,7 +423,8 @@ def parse(start: Path, argv: Sequence[str], git_env_names: Sequence[str], home: 
             sub, args = tok, tuple(argv[i + 1:])
             break
         i += 1
-    if sub and sub not in READ_ONLY and sub not in HANDLERS:
+    # git は builtin を alias で置き換えない（FILE_WRITERS も builtin）。
+    if sub and sub not in READ_ONLY and sub not in HANDLERS and sub not in FILE_WRITERS:
         for _ in range(ALIAS_DEPTH):
             value = os.fsdecode(run_git(cwd, "config", "--get", f"alias.{sub}", config=config, ok=(0, 1))).strip()
             if not value:
@@ -412,7 +438,7 @@ def parse(start: Path, argv: Sequence[str], git_env_names: Sequence[str], home: 
             if not words or words[0].startswith("-"):
                 raise GuardError(f"alias {sub} は展開できません")
             sub, args = words[0], tuple(words[1:]) + args
-            if sub in READ_ONLY or sub in HANDLERS:
+            if sub in READ_ONLY or sub in HANDLERS or sub in FILE_WRITERS:
                 break
         else:
             raise GuardError("alias の展開が深すぎます")
@@ -1109,8 +1135,21 @@ def plan_revert(inv: Invocation, after_fetch: bool) -> Plan:
     return _pick_plan(inv, revert=True)
 
 
+def _split_letters(args: Sequence[str], letters: str) -> list[str]:
+    """-- より前の、letters だけのまとめ書き（-rf）を、1 文字ずつのオプションに分ける。"""
+    out: list[str] = []
+    for i, tok in enumerate(args):
+        if tok == "--":
+            return out + list(args[i:])
+        if len(tok) > 2 and tok[0] == "-" and tok[1] != "-" and all(c in letters for c in tok[1:]):
+            out += ["-" + c for c in tok[1:]]
+        else:
+            out.append(tok)
+    return out
+
+
 def plan_rm(inv: Invocation, after_fetch: bool) -> Plan | None:
-    a = split_args("rm", inv.args, RM_FLAGS)
+    a = split_args("rm", _split_letters(inv.args, RM_LETTERS), RM_FLAGS)
     if a.has("--cached", "-n"):
         return None  # 作業ツリーを書かない
     paths = a.positional + (a.pathspec or ())
@@ -1638,6 +1677,10 @@ def check(argv: Sequence[str], *, start: Path, git_env: Sequence[str], after_fet
         return EXIT_ALLOW, ""
     try:
         inv = parse(start, argv, git_env, home)
+        # ファイルに書く形は、リポジトリの外でも止める（書き先は絶対パスで対象を指せる）。
+        writes = file_writes(inv.sub, inv.args)
+        if writes is not None:
+            raise GuardError(writes)
         # -h / --help がヘルプになるのは先頭の引数のときだけ（-m の値やパスのこともある）。
         if inv.sub == "" or inv.sub in READ_ONLY or inv.args[:1] in (("-h",), ("--help",)) or inv.root is None:
             return EXIT_ALLOW, ""
