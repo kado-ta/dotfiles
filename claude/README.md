@@ -34,6 +34,7 @@ pstack はサードパーティのマーケットプレイスなので自動更�
 | `hooks/protect-main-branch.sh` | PreToolUse（Bash） | `main`・`master`・`staging` ブランチへの `git commit` をブロックする                                                                                                                                                          |
 | `hooks/ask-gh-pr-write.sh`     | PreToolUse（Bash） | `gh` の PR 書き込みと `gh api` を、表記ゆれも含めて人間の承認に回す                                                                                                                                                           |
 | `hooks/guard-additional-dirs.sh` | PreToolUse（Edit・Write・MultiEdit・NotebookEdit） | `~/.gstack/projects`（`additionalDirectories`）が symlink に差し替えられているあいだ、Edit・Write 系のツールをすべてブロックする |
+| `hooks/guard-playwright-mcp.sh` | PreToolUse（`mcp__playwright__.*`） | Playwright MCP の呼び出しのうち、`filename` 引数を含むものをブロックする。入力を検査できないときもブロックする |
 | `hooks/precompact-context.sh`  | PreCompact         | ブランチ名・未コミットの変更・直近のコミットを、コンテキスト圧縮後も残す情報として Claude に渡す                                                                                                                              |
 | `hooks/herdr-agent-state.sh`   | SessionStart       | herdr 上で起動したセッションの開始を herdr に通知する。herdr が生成・管理するため、直接編集しない                                                                                                                             |
 | `hooks/gh-read-token.sh`       | SessionStart       | sandbox 内の Bash に、作業中のリポジトリの owner 用の読み取り専用トークンを `GH_TOKEN` として渡す                                                                                                                             |
@@ -50,6 +51,7 @@ bash claude/hooks/tests/test-validate-command.sh
 bash claude/hooks/tests/test-ask-gh-pr-write.sh
 bash claude/hooks/tests/test-gh-read-token.sh
 bash claude/hooks/tests/test-guard-additional-dirs.sh
+bash claude/hooks/tests/test-guard-playwright-mcp.sh
 /usr/bin/python3 -B claude/hooks/tests/test-cc-safe-push.py
 /usr/bin/python3 -B claude/hooks/tests/test-cc-safe-pr.py
 ```
