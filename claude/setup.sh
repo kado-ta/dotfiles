@@ -157,6 +157,9 @@ for skill_dir in "${SCRIPT_DIR}/skills"/*/; do
 done
 
 # MCP サーバー（mcp/*.json）を user スコープに登録する。登録済みなら置き換える。
-/bin/bash "${SCRIPT_DIR}/scripts/register-mcp.sh"
+# ネットワークや npm が使えずに失敗しても、登録されないだけなので、setup.command の後の手順を止めない。
+if ! /bin/bash "${SCRIPT_DIR}/scripts/register-mcp.sh"; then
+  echo "Warning: MCP servers were not registered. Rerun: /bin/bash ${SCRIPT_DIR}/scripts/register-mcp.sh" >&2
+fi
 
 echo "Success!"
