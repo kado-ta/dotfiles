@@ -210,9 +210,9 @@ HOOK_PATH="$BROKEN_GIT:$PATH" check 2 "$MAIN" 'git commit -m x' 'broken git: com
 HOOK_PATH="$BROKEN_GIT:$PATH" check 2 "$FEAT" 'git commit -m x' 'broken git: commit on feature branch'
 check 0 "$DETACHED" 'git commit -m x' 'commit on a detached HEAD'
 
-# The block message tells how to recover
+# The block message tells how to recover; with mise paranoid, trusting is the human's review, not Claude's step
 message=$(HOME="$T" PATH="$BROKEN_JQ:$PATH" "$BASH" "$HOOK" <<<'{}' 2>&1 >/dev/null)
-if [[ "$message" == *'mise trust'* ]]; then
+if [[ "$message" == *'ask the human'*'mise trust'* ]]; then
   pass=$((pass + 1))
   echo "PASS block message mentions the recovery"
 else

@@ -70,14 +70,28 @@ MISE_CONFIG = (
     "**/.tool-versions",
 )
 MISE_ASK = tuple(f"Edit({p})" for p in MISE_CONFIG) + tuple(f"Edit(//{p})" for p in MISE_CONFIG)
-# Bash（sandbox の中）からも書かせない。denyWrite はディレクトリの中も止めるので、末尾の /** は付けない。
-# sandbox のパスは、接頭辞がないとユーザー設定では ~/.claude が基準になり、作業ディレクトリに当たらないので、~/ を付ける。
-MISE_DENY_WRITE = tuple("~/" + p.removesuffix("/**") for p in MISE_CONFIG)
+# paranoid の土台は、どこで起動したセッションでも Bash（sandbox の中）から書かせない。グローバルの設定（paranoid でも
+# パスで信頼される）、その実体、信頼の記録。ほかの mise の設定は paranoid が中身で守るので入れない（入れると、
+# ほかのリポジトリの git の操作が途中で止まる）。sandbox のパスは、接頭辞がないとユーザー設定では ~/.claude が基準になるので、~/ を付ける。
+MISE_DENY_WRITE = ("~/.config/mise", "~/dotfiles/mise", "~/.local/state/mise")
+# 上の denyWrite は Bash しか止めない。Edit・Write ツールは、~ で起動したセッションでは作業ディレクトリの外を止める設定も
+# 効かないので、規則でも止める。信頼の記録は Claude が書く理由がないので deny（sandbox の denyWrite にもなる）、
+# グローバルの設定の実体は ask にする。~/.config/mise は MISE_ASK の **/.config/mise/** が当たる。
+MISE_EDIT_DENY = ("Edit(~/.local/state/mise/**)",)
+MISE_EDIT_ASK = ("Edit(~/dotfiles/mise/**)",)
+# グローバルの mise 設定（~/.config/mise/config.toml の実体）。paranoid は、グローバルの設定でだけ効く。
+MISE_GLOBAL_CONFIG = "mise/mise_config.toml"
+# config は設定を、env_files は _.source などが読むファイルを、パスではなく中身で信頼させる。true（すべて）でもよい。
+PARANOID_REQUIRED = ("config", "env_files")
 # ユーザー設定のこれらのリストは、~/ でも / でも始まらないパスが ~/.claude を起点にし、黙って効かない。
 SANDBOX_PATH_LISTS = ("denyRead", "denyWrite", "allowWrite", "allowRead")
 # additionalDirectories は作業ディレクトリとして数えられ、そこでは WRITE_BLOCK が効かない。
 # gstack の置き場所は sandbox の allowWrite にも入っていて、Bash はもともと書けるので、これだけを許す。
 ADDITIONAL_DIRECTORIES = ("~/.gstack/projects",)
+# その根が symlink に差し替えられているあいだ、Edit・Write 系のツールをすべて止めるフック。
+# 既定ではフックの失敗（タイムアウトなど）でツールが通るので、onFailure を block にする。
+GUARD_HOOK = "hooks/guard-additional-dirs.sh"
+GUARD_TOOLS = ("Edit", "Write", "MultiEdit", "NotebookEdit")
 JSONC_FILES = {"vscode/settings.json", "vscode/keybindings.json"}
 SETTINGS = "claude/settings.json"
 PROJECT_SETTINGS = ".claude/settings.json"
@@ -232,6 +246,17 @@ def check_push_permissions(root):
     return errors
 
 
+def guard_hook_registered(settings):
+    for group in settings.get("hooks", {}).get("PreToolUse", []):
+        # MultiEdit・NotebookEdit が Edit を含むので、部分一致ではなく | で分けて比べる。
+        if not set(GUARD_TOOLS) <= set(group.get("matcher", "").split("|")):
+            continue
+        if any(hook.get("command", "").endswith(GUARD_HOOK) and hook.get("onFailure") == "block"
+               for hook in group.get("hooks", [])):
+            return True
+    return False
+
+
 def check_edit_permissions(root):
     settings = load_settings(root)
     permissions = settings.get("permissions", {})
@@ -241,8 +266,9 @@ def check_edit_permissions(root):
     errors += [f"{SETTINGS}: permissions.additionalDirectories must not list {path}"
                for path in permissions.get("additionalDirectories", []) if path not in ADDITIONAL_DIRECTORIES]
     deny, ask = set(permissions.get("deny", [])), set(permissions.get("ask", []))
-    errors += [f"{SETTINGS}: permissions.deny lacks {rule}" for rule in EDIT_DENY if rule not in deny]
-    errors += [f"{SETTINGS}: permissions.ask lacks {rule}" for rule in MISE_ASK + EDIT_ASK if rule not in ask]
+    errors += [f"{SETTINGS}: permissions.deny lacks {rule}" for rule in EDIT_DENY + MISE_EDIT_DENY if rule not in deny]
+    errors += [f"{SETTINGS}: permissions.ask lacks {rule}" for rule in MISE_ASK + EDIT_ASK + MISE_EDIT_ASK
+               if rule not in ask]
     errors += [f"{SETTINGS}: permissions.deny: {rule} must not be a deny rule" for rule in EDIT_ASK if rule in deny]
     filesystem = settings.get("sandbox", {}).get("filesystem", {})
     errors += [f"{SETTINGS}: sandbox.filesystem.allowWrite lacks {path} (listed in permissions.additionalDirectories)"
@@ -251,6 +277,8 @@ def check_edit_permissions(root):
     deny_write = filesystem.get("denyWrite", [])
     errors += [f"{SETTINGS}: sandbox.filesystem.denyWrite lacks {path}" for path in MISE_DENY_WRITE
                if path not in deny_write]
+    if not guard_hook_registered(settings):
+        errors.append(f"{SETTINGS}: hooks.PreToolUse lacks {GUARD_HOOK} for {'|'.join(GUARD_TOOLS)} with onFailure block")
     errors += [f"{SETTINGS}: sandbox.filesystem.{key} has an unprefixed path {path}"
                for key in SANDBOX_PATH_LISTS for path in filesystem.get(key, [])
                if not path.startswith(("~/", "/"))]
@@ -280,6 +308,17 @@ def check_project_permissions(root):
         f"{PROJECT_SETTINGS}: sandbox.filesystem.denyWrite lacks {path}" for path in PROJECT_DENY_WRITE if path not in deny_write
     ]
     return errors
+
+
+def check_mise_paranoid(root):
+    path = root / MISE_GLOBAL_CONFIG
+    if not path.exists():
+        return [f"{MISE_GLOBAL_CONFIG}: missing"]
+    paranoid = tomllib.loads(path.read_text(encoding="utf-8")).get("settings", {}).get("paranoid")
+    # 文字列は部分一致で通ってしまうので、リストのときだけ中身を見る。
+    if paranoid is True or (isinstance(paranoid, list) and all(c in paranoid for c in PARANOID_REQUIRED)):
+        return []
+    return [f"{MISE_GLOBAL_CONFIG}: settings.paranoid must be true or a list with {', '.join(PARANOID_REQUIRED)}"]
 
 
 def check_syntax(root):
@@ -392,6 +431,7 @@ CHECKS = (
     ("push-permissions", check_push_permissions),
     ("edit-permissions", check_edit_permissions),
     ("project-permissions", check_project_permissions),
+    ("mise-paranoid", check_mise_paranoid),
     ("syntax", check_syntax),
     ("markdown-names", check_markdown_names),
     ("markdown-links", check_markdown_links),

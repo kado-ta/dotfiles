@@ -57,7 +57,8 @@ https://x.com/ai_database/status/2114184481951330365?s=12
 - シークレット（`.env`、認証情報、`*.tfstate`）の内容を出力・ハードコード・コミットしない。
 - Edit・Write ツールは、作業ディレクトリの外と Claude Code の設定ファイルに書けない（`blockWritesOutsideWorkingDirectories`）。外に書く必要があるときは、書き込み先の最小のディレクトリを人間に `/add-dir` で足してもらい、この設定を外すことは提案しない。`/add-dir` はそのディレクトリの `.claude/skills`・`commands`・`agents` も読み込むので、信頼していないリポジトリと、sandbox から書ける場所（`$TMPDIR` など）は頼まない。
 - worktree は人間に `claude -w <name>` で作ってもらう。EnterWorktree は使えず、sandbox の中の `git worktree add` は途中で失敗する。サブエージェントに `isolation: "worktree"` を使わない（作業ディレクトリの外になり、編集が拒否される）。バックグラウンドのセッションが要るときは、人間に `claude --bg -w <name>` で始めてもらう。
-- sandbox の中の git が、mise の設定（`mise.toml`・`.tool-versions` など）で `unable to unlink` や `Operation not permitted` を出したら、続けずに `git status` を確かめて報告する。その状態の作業ツリーをコミットしない。
+- mise が、設定を信頼していないという警告やエラーを出したら、自分で `mise trust` を実行しない（sandbox からは信頼の記録に書けない）。人間に、そのファイルの全体と、それが読み込む env ファイルを確かめてから、`mise trust <ファイル>` でファイルごとに信頼するよう頼む。作業ディレクトリの中を PATH に足す設定（`_.path` など）があれば、そこに sandbox から書けることも伝える。
+- sandbox の中の git が `unable to unlink` や `Operation not permitted` で途中で止まったら（sandbox が書き込みを止める `.env*`・lock ファイル・`.claude/settings.json` などを書き換えるとき）、続けずに `git status` を確かめて報告する。その状態の作業ツリーをコミットしない。続きを人間に `!` で頼むときは、先に `git diff --name-only HEAD <対象>` で変わるファイルを確かめ、sandbox の外で自動で読み込まれたり動いたりするファイル（`.env*`・`.claude/`・`.mcp.json`・mise の設定など）が含まれていれば伝える。
 - 起動したディレクトリが `~` や `~/Dev` のように複数のリポジトリを含むときは、作業ディレクトリの外を止める設定が効かず、sandbox の書き込み範囲も広がる。作業の前に、リポジトリのルートで起動し直すよう人間に頼む。
 
 ## Verification

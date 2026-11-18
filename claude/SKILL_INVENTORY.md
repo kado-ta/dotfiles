@@ -257,6 +257,7 @@ sandbox の外で `/cso` を実行すると、保存先に秘密ファイルの�
 | イベント | 提供元 | 内容 |
 | --- | --- | --- |
 | PreToolUse（Bash） | settings | `validate-command.sh`（`rm -rf`・`prod` などを含むコマンドを止める）、`protect-main-branch.sh`、`ask-gh-pr-write.sh` |
+| PreToolUse（Edit・Write・MultiEdit・NotebookEdit） | settings | `guard-additional-dirs.sh`（`~/.gstack/projects` が symlink のあいだ、Edit・Write 系をすべて止める） |
 | PostToolUse（Bash） | settings | PR の URL を表示する |
 | PostToolUse（Bash） | understand-anything | commit・merge などの後にグラフの更新を指示する |
 | SessionStart | settings | `herdr-agent-state.sh`、`gh-read-token.sh`（読み取り専用のトークン） |
@@ -308,7 +309,7 @@ sandbox の外で `/cso` を実行すると、保存先に秘密ファイルの�
 
 更新は、sandbox の外で `claude/scripts/update-skills.sh` を実行してまとめて行う（Claude Code からは `! /bin/bash ~/dotfiles/claude/scripts/update-skills.sh`、端末では `mise run claude:update` でもよい）。gstack・user スコープのプラグイン・crit の CLI を更新し、gstack が `claude/settings.json` に書いた絶対パスを `~/` に戻し、cc-crit の profile テストまで実行する。
 
-- Claude Code から `mise run` を使わないのは、mise が dotfiles のルートの設定ファイル（`mise.local.toml` など）を自動で信頼して読み込み、ルートには sandbox から書けるため。
+- Claude Code から `mise run` を使わないのは、mise が dotfiles のルートの設定ファイル（`mise.local.toml` など）を読み込み、ルートには sandbox から書けるため。paranoid で、信頼されていない設定は読み込まれないが、念のため mise を通さない。
 - 確認が要るプラグイン（マーケットプレイスが宣言したインストールコマンドが変わったもの）は、TTY がないと拒否されて失敗に数えられる。端末で `claude plugin update <id> --scope user` を実行する。
 - 更新した hooks は、Claude Code を再起動した後のセッションで動き始める。再起動する前に、次の手順で見直す。
 

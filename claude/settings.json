@@ -176,7 +176,8 @@
       "Read(~/.lima/_config/**)",
       "Skill(pstack:setup-pstack)",
       "Agent(pstack:poteto-agent)",
-      "Agent(pstack:comment-sicko)"
+      "Agent(pstack:comment-sicko)",
+      "Edit(~/.local/state/mise/**)"
     ],
     "ask": [
       "Bash(gh pr create*)",
@@ -215,7 +216,8 @@
       "Edit(//**/mise/conf.d/**)",
       "Edit(//**/.mise/**)",
       "Edit(//**/.config/mise/**)",
-      "Edit(//**/.tool-versions)"
+      "Edit(//**/.tool-versions)",
+      "Edit(~/dotfiles/mise/**)"
     ],
     "disableBypassPermissionsMode": "disable",
     "blockWritesOutsideWorkingDirectories": true,
@@ -291,6 +293,17 @@
             "type": "command",
             "command": "/bin/bash ~/.claude/hooks/ask-gh-pr-write.sh",
             "timeout": 30,
+            "onFailure": "block"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/bin/bash ~/.claude/hooks/guard-additional-dirs.sh",
+            "timeout": 10,
             "onFailure": "block"
           }
         ]
@@ -425,16 +438,9 @@
         "~/.lima/_config"
       ],
       "denyWrite": [
-        "~/**/mise.toml",
-        "~/**/.mise.toml",
-        "~/**/mise.*.toml",
-        "~/**/.mise.*.toml",
-        "~/**/mise/config.toml",
-        "~/**/mise/config.*.toml",
-        "~/**/mise/conf.d",
-        "~/**/.mise",
-        "~/**/.config/mise",
-        "~/**/.tool-versions"
+        "~/.config/mise",
+        "~/dotfiles/mise",
+        "~/.local/state/mise"
       ]
     },
     "credentials": {
