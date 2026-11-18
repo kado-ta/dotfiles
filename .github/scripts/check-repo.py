@@ -362,7 +362,12 @@ def check_checkout_guard(root):
         loader = importlib.machinery.SourceFileLoader("cc_checkout_guard", str(root / CHECKOUT_GUARD))
         spec = importlib.util.spec_from_loader(loader.name, loader)
         guard = importlib.util.module_from_spec(spec)
-        loader.exec_module(guard)
+        # dataclass は sys.modules からモジュールを引くので、読み込みの間だけ登録する（古い Python で失敗する）。
+        sys.modules[loader.name] = guard
+        try:
+            loader.exec_module(guard)
+        finally:
+            sys.modules.pop(loader.name, None)
         pairs = (
             (PROJECT_DENY_WRITE, "DOTFILES_PROTECTED"),
             (GUARD_REQUIRED_DIRS, "PROTECTED_DIRS"),

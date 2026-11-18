@@ -474,6 +474,14 @@ class CheckRepoTests(unittest.TestCase):
         self.write("claude/bin/cc-checkout-guard", "def (:\n")
         self.assert_fails("FAIL checkout-guard", "cannot load")
 
+    def test_checkout_guard_with_dataclass_loads(self):
+        # 本物のガードは from __future__ import annotations と dataclass を使う。sys.modules に登録せずに読み込むと、
+        # Python 3.9 の dataclass が AttributeError で失敗する。
+        source = ("from __future__ import annotations\nfrom dataclasses import dataclass\n\n\n@dataclass\nclass Spec:\n"
+                  "    name: str\n\n\n" + guard_source())
+        self.write("claude/bin/cc-checkout-guard", source)
+        self.assert_passes()
+
     def test_worktree_create_hook_fails_when_changed(self):
         other = {"type": "command", "command": "/usr/local/libexec/claude-guard/other"}
         for name, hooks in (("none", None), ("other", [other]), ("two", [{"type": "command", "command": GUARD_COMMAND}, other])):
