@@ -69,7 +69,7 @@ PR と main への push では、GitHub Actions が macOS の `/bin/bash` と `/
 
 定義の `${HOME}`・`${NODE_BIN}`（mise のグローバル設定の Node.js の `bin`）・`${PACKAGE_DIR}`（上の入れる場所）は、登録するときに実際のパスに置き換える。公開リポジトリにユーザー名を入れないためと、端末以外から起動したときの PATH や、プロジェクトの mise の設定（信頼していないと shim が失敗する）に左右されないようにするため。ほかの `${VAR:-default}` は、Claude Code がサーバーの起動時に展開する。Node.js を更新したら、`register-mcp.sh` を再実行する。
 
-`~/.claude.json` に書くので、sandbox の外で実行する。端末で `/bin/bash ~/dotfiles/claude/scripts/register-mcp.sh` を実行するか、Claude Code のプロンプトで先頭に `!` を付けて実行する。登録したサーバーは、次に始めたセッションから使える。
+`~/.claude.json` と `~/.local/share/claude-mcp` に書くので、sandbox の外で実行する。通常の端末で `/bin/bash ~/dotfiles/claude/scripts/register-mcp.sh` を実行する。Claude Code のプロンプトの `!` は、セッションによっては sandbox の中で動き、失敗する（2026-11-19 に観測）。登録したサーバーは、次に始めたセッションから使える。
 
 <a name="playwright-mcp"></a>
 

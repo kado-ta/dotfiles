@@ -1,9 +1,9 @@
 #!/bin/bash
 # claude/mcp/<name>.json の MCP サーバーを、Claude Code の user スコープに <name> で登録する。
 # 同じ名前の user スコープの登録は消してから足すので、何度実行しても登録は 1 つで、定義を変えれば置き換わる。
-# ~/.claude.json に書くので、sandbox の外で実行する。~/.claude.json は claude の CLI だけが書く。
-#   Claude Code から: ! /bin/bash ~/dotfiles/claude/scripts/register-mcp.sh
-#   端末から: 上と同じ（claude/setup.sh からも呼ばれる）
+# ~/.claude.json と ~/.local/share/claude-mcp に書くので、sandbox の外（通常の端末）で実行する。
+# ~/.claude.json は claude の CLI だけが書く。Claude Code の ! は、セッションによっては sandbox の中で動き、失敗する。
+#   端末から: /bin/bash ~/dotfiles/claude/scripts/register-mcp.sh（claude/setup.sh からも呼ばれる）
 # 定義の npmPackage は、~/.local/share/claude-mcp/<name> に npm install し、登録する定義からは外す。
 # 実行時に npx を使わないのは、npx が作業ディレクトリ（sandbox から書けるプロジェクト）の node_modules・
 # node_modules/.bin・.npmrc を使い、そこに置かれたコードが sandbox の外で動くため。入れる場所は sandbox から書けない。
