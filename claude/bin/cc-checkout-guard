@@ -206,6 +206,7 @@ WORKTREE_ADD_VALUES = frozenset(("-b", "-B", "--reason"))
 WORKTREE_OTHERS = frozenset("list prune lock unlock repair".split())  # 作業ツリーの中身を書かない
 WORKTREE_MOVE_FLAGS = frozenset(("-f", "--force"))  # move と remove
 GITFILE_MAX = 4096  # 読む .git ファイルと gitdir ファイルの大きさの上限（バイト）
+FETCH_HEAD_MAX = 1 << 20  # 読む FETCH_HEAD の大きさの上限（バイト）
 # git がパスを C の形で引用するときの、\ の後の文字と、その値。
 C_ESCAPES = {ord("a"): 7, ord("b"): 8, ord("t"): 9, ord("n"): 10, ord("v"): 11, ord("f"): 12, ord("r"): 13,
              ord('"'): 34, ord("\\"): 92}
@@ -1060,9 +1061,11 @@ def _fetch_head(inv: Invocation) -> str:
     取り込む行がちょうど 1 つでなければ止める。
     """
     size = len(_head_commit(inv))
-    path = _git_line(inv, "rev-parse", "--path-format=absolute", "--git-path", "FETCH_HEAD")
-    with open(path, "rb") as f:
-        lines = f.read().split(b"\n")
+    # --path-format=absolute は、symlink をたどった先のパスを返す（実測）。既定の形（cwd からの相対か、
+    # 最後の名前をたどらない絶対パス）を使い、symlink（/dev/zero など）や FIFO に替えられても、
+    # 固まらず、メモリを使い切らないようにする（M5）。
+    path = os.path.join(inv.cwd, _git_line(inv, "rev-parse", "--git-path", "FETCH_HEAD"))
+    lines = _read_regular(path, FETCH_HEAD_MAX, "FETCH_HEAD").split(b"\n")
     if lines[-1] == b"":
         lines.pop()
     picked: list[str] = []
@@ -1721,13 +1724,14 @@ def _lines(data: bytes) -> list[str]:
     return lines
 
 
-def render(plan: Plan) -> str:
+def render(plan: Plan, config: Sequence[str] = ()) -> str:
+    """変わるファイルの一覧と差分。config は人間の -c（書く git と同じ見え方で中身を読む。M6）。"""
     out = [listing(plan)]
     base = plan.old_root or plan.root
     for c in plan.changes:
         new_data = b""
         if c.new is not None and c.new.mode in (*REGULAR, SYMLINK):
-            new_data = run_git(base, "cat-file", "blob", c.new.oid)
+            new_data = run_git(base, "cat-file", "blob", c.new.oid, config=config)
         old, new = _lines(_disk_bytes(base, c.path, c.old)), _lines(new_data)
         before = f"a/{c.path}" if c.old is not None else "/dev/null"
         after = f"b/{c.path}" if c.new is not None else "/dev/null"
@@ -1844,7 +1848,7 @@ def check(argv: Sequence[str], *, start: Path, git_env: Sequence[str], after_fet
             command = " ".join(shlex.quote(w) for w in ("git", "-C", str(inv.start), *inv.argv))
             stderr.write(listing(plan) + MSG_NO_TTY.format(command=command) + "\n")
             return EXIT_STOP, ""
-        stderr.write(render(plan) + MSG_ASK)
+        stderr.write(render(plan, inv.config) + MSG_ASK)
         stderr.flush()
         answer = stdin.readline()
         newline = "" if answer.endswith("\n") else "\n"

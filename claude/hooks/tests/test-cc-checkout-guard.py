@@ -408,6 +408,15 @@ class SwitchTests(TreeBase):
         self.assertEqual(code, 0)
         self.assertEqual(json.loads(out)["expect"][".claude/settings.json"][1], ["100644", evil])
 
+    def test_config_of_the_command_is_used_to_show_content(self):
+        # 人間の -c（core.useReplaceRefs=false など）は、見せる中身にも効かせる。git はその設定で書く（M6）。
+        original = local_git(self.repo, "rev-parse", "feature:.claude/settings.json")
+        local_git(self.repo, "replace", original, self.blob('{"evil": 1}\n'))
+        result, err = self.check("-c", "core.useReplaceRefs=false", "switch", "feature", tty=True, answer="n\n")
+        self.assertEqual(result, (1, ""))
+        self.assertIn('+{"v": 2}', err)
+        self.assertNotIn('"evil"', err)
+
     def test_symlink_and_gitlink_stop_without_asking(self):
         head = local_git(self.repo, "rev-parse", "HEAD")
         self.branch("link", "main", {".claude/settings.json": ("120000", "../README.md")})
@@ -910,6 +919,27 @@ class MergeTests(TreeBase):
         fetch_head.write_text(f"{feature}\t\tbranch 'feature' of x\n", encoding="utf-8")
         self.assertEqual(self.approve_and_run("merge", "--no-edit", "-q", "FETCH_HEAD", codes=(1,)), (0, ""))
         self.assertIn(f">>>>>>> {feature}", self.settings.read_text(encoding="utf-8"))
+
+    def test_fetch_head_is_read_as_a_bounded_regular_file(self):
+        # FETCH_HEAD（sandbox が書ける）は、symlink をたどらずに、通常のファイルとして上限まで読む（M5）。
+        line = f"{local_git(self.repo, 'rev-parse', 'feature')}\t\tbranch 'feature' of x\n"
+        fetch_head = self.repo / ".git" / "FETCH_HEAD"
+        real = self.root / "fetch-head"
+        real.write_text(line, encoding="utf-8")
+        fetch_head.symlink_to(real)
+        result, err = self.check("merge", "FETCH_HEAD")
+        self.assertEqual(result, (1, ""))
+        self.assertIn("FETCH_HEAD を読めません", err)
+        fetch_head.unlink()
+        fetch_head.write_text(line + "#" * (1 << 20), encoding="utf-8")
+        result, err = self.check("merge", "FETCH_HEAD")
+        self.assertEqual(result, (1, ""))
+        self.assertIn("FETCH_HEAD が大きすぎます", err)
+        fetch_head.unlink()
+        os.mkfifo(fetch_head)  # 書く側がいなくても、固まらずに止まる
+        result, err = self.check("merge", "FETCH_HEAD")
+        self.assertEqual(result, (1, ""))
+        self.assertIn("FETCH_HEAD は通常のファイルではありません", err)
 
     def test_merge_driver_is_not_run(self):
         # merge-tree は、作業ツリーの .gitattributes と .git/info/attributes の merge 属性で、設定のドライバーを動かす（実測）。
