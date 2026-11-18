@@ -61,7 +61,9 @@ Playwright MCP（`claude/mcp/playwright.json`）は Claude Code が起動し、s
 
 実行時に npx を使わない。npx はサーバーの作業ディレクトリ（プロジェクト）の `node_modules`・`node_modules/.bin`・`.npmrc` を使うので、sandbox の中で置かれたコードが、次のセッションの開始時に sandbox の外で動く。`register-mcp.sh` が `~/.local/share/claude-mcp/playwright` に入れ、mise の `node` で `cli.js` を起動する。
 
-入れる場所と出力先（`--output-dir` の `~/Library/Caches/playwright-mcp`）は、どちらも sandbox から書けない場所にしているので、`sandbox.filesystem.allowWrite` に入れない。出力先をそうしたのは、リポジトリに出力しないためと、symlink で出力先を向け替えさせないため。ページの内容によるプロンプトインジェクションと、プロキシを通らない通信（localhost の確認に要る）は受け入れた。経緯は [docs/work/20261118_playwright-mcp/plan.md](../../docs/work/20261118_playwright-mcp/plan.md#decisions) を参照する。
+入れる場所（`~/.local/share/claude-mcp`）と出力先（`--output-dir` の `~/Library/Caches/playwright-mcp`）は、sandbox からも Edit・Write ツールからも書かせない。`cli.js` を書き換えられると、次の MCP の起動時に sandbox の外で動く。出力先を symlink に差し替えられると、出力が別の場所に向く。リポジトリのルートで起動したセッションからは、もともと書けない。しかし `~` で起動すると allowWrite の `.` に入り、`blockWritesOutsideWorkingDirectories` も効かない（PR #46 の Codex のレビューの指摘）。そのため、mise の土台と同じく、`sandbox.filesystem.denyWrite` と `permissions.deny` の `Edit(<場所>/**)` を両方置き、`allowWrite` には入れない。Edit の deny も sandbox の denyWrite になるが、Edit を ask に緩めても Bash の守りが残るように、denyWrite にも置く。定義があるあいだ、`check-repo.py` の `playwright-mcp` が、この 4 つがあることと、定義の `--output-dir` がこの出力先であることを確かめる。MCP を起動する mise の node（`~/.local/share/mise` の下）は守っていない。`~` で起動したセッションは、ほかにも sandbox の外で動く場所に書けるので、リポジトリのルートで起動し直す規則を主な守りとする（[受け入れたリスク](../../docs/work/20261119_mcp-dirs-deny-write/plan.md#residual-risks)）。
+
+出力先をこの場所にしたのは、リポジトリに出力しないため。ページの内容によるプロンプトインジェクションと、プロキシを通らない通信（localhost の確認に要る）は受け入れた。経緯は [docs/work/20261118_playwright-mcp/plan.md](../../docs/work/20261118_playwright-mcp/plan.md#decisions) を参照する。
 
 <a name="edit-write-rules"></a>
 

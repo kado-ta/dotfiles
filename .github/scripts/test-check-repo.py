@@ -48,8 +48,12 @@ PLAYWRIGHT_DENY = [
     "mcp__playwright__browser_run_code_unsafe",
     "mcp__playwright__browser_file_upload",
     "Read(~/.crit/**)",
+    "Edit(~/.local/share/claude-mcp/**)",
+    "Edit(~/Library/Caches/playwright-mcp/**)",
 ]
 PLAYWRIGHT_DENY_READ = ["~/.crit"]
+PLAYWRIGHT_DENY_WRITE = ["~/.local/share/claude-mcp", "~/Library/Caches/playwright-mcp"]
+PLAYWRIGHT_OUTPUT_DIR = "${HOME}/Library/Caches/playwright-mcp"
 PLAYWRIGHT_HOOK_ERROR = "hooks.PreToolUse lacks hooks/guard-playwright-mcp.sh"
 PROJECT_ASK = [
     "Edit(/claude/**)",
@@ -105,7 +109,7 @@ def settings():
             "filesystem": {
                 "allowWrite": ["~/.gstack/projects"],
                 "denyRead": CRIT_DENY_READ + LIMA_DENY_READ + PLAYWRIGHT_DENY_READ,
-                "denyWrite": list(MISE_DENY_WRITE),
+                "denyWrite": list(MISE_DENY_WRITE) + PLAYWRIGHT_DENY_WRITE,
             },
         },
         "hooks": {
@@ -167,7 +171,7 @@ class CheckRepoTests(unittest.TestCase):
         self.write("claude/hooks/viabash.sh", "#!/bin/bash\n")
         self.write("claude/hooks/guard-additional-dirs.sh", "#!/bin/bash\n")
         self.write("claude/hooks/guard-playwright-mcp.sh", "#!/bin/bash\n")
-        self.write("claude/mcp/playwright.json", "{}\n")
+        self.write_playwright_args(["cli.js", "--output-dir", PLAYWRIGHT_OUTPUT_DIR])
         self.write("claude/scripts/status.sh", "#!/bin/bash\n", 0o755)
         self.write("README.md", README)
         self.write("mise/mise_config.toml", PARANOID_CONFIG)
@@ -188,6 +192,9 @@ class CheckRepoTests(unittest.TestCase):
 
     def write_project_settings(self, data):
         self.write(".claude/settings.json", json.dumps(data, indent=2))
+
+    def write_playwright_args(self, args):
+        self.write("claude/mcp/playwright.json", json.dumps({"args": args}, indent=2))
 
     def check(self):
         cp = subprocess.run([sys.executable, "-B", str(SCRIPT), str(self.root)], capture_output=True, text=True)
@@ -453,6 +460,29 @@ class CheckRepoTests(unittest.TestCase):
                 data["permissions"]["deny"].remove(rule)
                 self.write_settings(data)
                 self.assert_fails("FAIL playwright-mcp", f"permissions.deny lacks {rule}")
+
+    def test_missing_playwright_deny_write_fails(self):
+        # ~ で起動したセッションでは、入れる場所と出力先が allowWrite の "." に入る。cli.js は次の MCP の起動時に
+        # sandbox の外で動き、出力先は symlink で向け替えられる。
+        for path in PLAYWRIGHT_DENY_WRITE:
+            with self.subTest(path=path):
+                data = settings()
+                data["sandbox"]["filesystem"]["denyWrite"].remove(path)
+                self.write_settings(data)
+                self.assert_fails("FAIL playwright-mcp", f"sandbox.filesystem.denyWrite lacks {path}")
+
+    def test_playwright_output_dir_not_protected_fails(self):
+        # denyWrite は、実際の出力先と同じパスのときだけ意味がある。指定がなければ、出力先はプロジェクトの中になる。
+        for name, args in (
+            ("elsewhere", ["cli.js", "--output-dir", "${HOME}/Library/Caches/other"]),
+            ("missing", ["cli.js"]),
+            ("equals-form", ["cli.js", f"--output-dir={PLAYWRIGHT_OUTPUT_DIR}"]),
+            ("overridden", ["cli.js", "--output-dir", PLAYWRIGHT_OUTPUT_DIR, "--output-dir", "/tmp/x"]),
+            ("no-value", ["cli.js", "--output-dir"]),
+        ):
+            with self.subTest(name=name):
+                self.write_playwright_args(args)
+                self.assert_fails("FAIL playwright-mcp", "claude/mcp/playwright.json: --output-dir")
 
     def test_missing_crit_deny_read_fails(self):
         # ほかの crit（プラグインの自動プランレビュー、端末の crit）は、ランダムなポートを ~/.crit/sessions に書く。

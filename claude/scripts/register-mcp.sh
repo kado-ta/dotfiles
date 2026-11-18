@@ -6,7 +6,8 @@
 #   端末から: /bin/bash ~/dotfiles/claude/scripts/register-mcp.sh（claude/setup.sh からも呼ばれる）
 # 定義の npmPackage は、~/.local/share/claude-mcp/<name> に npm install し、登録する定義からは外す。
 # 実行時に npx を使わないのは、npx が作業ディレクトリ（sandbox から書けるプロジェクト）の node_modules・
-# node_modules/.bin・.npmrc を使い、そこに置かれたコードが sandbox の外で動くため。入れる場所は sandbox から書けない。
+# node_modules/.bin・.npmrc を使い、そこに置かれたコードが sandbox の外で動くため。入れる場所は settings.json の
+# denyWrite と Edit の deny で、~ で起動したセッションからも書かせない。場所を変えるときは、それらと check-repo.py も変える。
 # 定義の ${HOME}・${NODE_BIN}・${PACKAGE_DIR} は、登録するときに実際のパスに置き換える（公開リポジトリにユーザー名を
 # 入れないため）。ほかの ${...} は置き換えずに残し、Claude Code がサーバーの起動時に展開する。
 # NODE_BIN は mise のグローバル設定の Node.js の bin。Claude Code の起動元（端末以外の PATH）と、プロジェクトの

@@ -99,7 +99,17 @@ GUARD_TOOLS = ("Edit", "Write", "MultiEdit", "NotebookEdit")
 # 書く ~/.crit も読ませない（ポートを知って開けば、承認を偽造できる）。プロジェクトの .mcp.json の playwright は、
 # 強化した user スコープの定義を上書きするので拒否する。
 PLAYWRIGHT_DEFINITION = "claude/mcp/playwright.json"
-PLAYWRIGHT_DENY = ("mcp__playwright__browser_run_code_unsafe", "mcp__playwright__browser_file_upload", "Read(~/.crit/**)")
+# 入れる場所（register-mcp.sh の packages_dir）と出力先（定義の --output-dir）。cli.js は次の MCP の起動時に sandbox の外で
+# 動き、出力先は symlink で向け替えられる。リポジトリのルートで起動したセッションからは書けないが、~ で起動すると
+# allowWrite の "." に入り、作業ディレクトリの外を止める設定も効かないので、mise と同じく denyWrite と Edit の deny で止める。
+# Edit の deny も sandbox の denyWrite になるが、Edit を ask に緩めても Bash の守りが残るよう、denyWrite にも置く。
+PLAYWRIGHT_OUTPUT_DIR = "~/Library/Caches/playwright-mcp"
+PLAYWRIGHT_DENY_WRITE = ("~/.local/share/claude-mcp", PLAYWRIGHT_OUTPUT_DIR)
+PLAYWRIGHT_DENY = (
+    "mcp__playwright__browser_run_code_unsafe",
+    "mcp__playwright__browser_file_upload",
+    "Read(~/.crit/**)",
+) + tuple(f"Edit({path}/**)" for path in PLAYWRIGHT_DENY_WRITE)
 PLAYWRIGHT_DENY_READ = ("~/.crit",)
 PLAYWRIGHT_SERVER = "playwright"
 PLAYWRIGHT_HOOK = "hooks/guard-playwright-mcp.sh"
@@ -334,6 +344,17 @@ def check_playwright_mcp(root):
     deny_read = settings.get("sandbox", {}).get("filesystem", {}).get("denyRead", [])
     errors += [f"{SETTINGS}: sandbox.filesystem.denyRead lacks {path} (required while {PLAYWRIGHT_DEFINITION} exists)"
                for path in PLAYWRIGHT_DENY_READ if path not in deny_read]
+    deny_write = settings.get("sandbox", {}).get("filesystem", {}).get("denyWrite", [])
+    errors += [f"{SETTINGS}: sandbox.filesystem.denyWrite lacks {path} (required while {PLAYWRIGHT_DEFINITION} exists)"
+               for path in PLAYWRIGHT_DENY_WRITE if path not in deny_write]
+    # denyWrite は、実際の出力先と同じパスのときだけ効く。--output-dir=… の形や 2 回目の指定は、照合しにくいので失敗にする。
+    args = json.loads((root / PLAYWRIGHT_DEFINITION).read_text(encoding="utf-8")).get("args", [])
+    output_dir = PLAYWRIGHT_OUTPUT_DIR.replace("~", "${HOME}", 1)
+    given = [arg for arg in args if arg.startswith("--output-dir")]
+    i = args.index("--output-dir") if given == ["--output-dir"] else -1
+    if i < 0 or args[i + 1:i + 2] != [output_dir]:
+        errors.append(f"{PLAYWRIGHT_DEFINITION}: --output-dir must be given once as {output_dir} "
+                      f"(the path in sandbox.filesystem.denyWrite)")
     if PLAYWRIGHT_SERVER not in settings.get("disabledMcpjsonServers", []):
         errors.append(f"{SETTINGS}: disabledMcpjsonServers lacks {PLAYWRIGHT_SERVER} "
                       f"(required while {PLAYWRIGHT_DEFINITION} exists)")

@@ -180,7 +180,9 @@
       "Agent(pstack:comment-sicko)",
       "Edit(~/.local/state/mise/**)",
       "mcp__playwright__browser_run_code_unsafe",
-      "mcp__playwright__browser_file_upload"
+      "mcp__playwright__browser_file_upload",
+      "Edit(~/.local/share/claude-mcp/**)",
+      "Edit(~/Library/Caches/playwright-mcp/**)"
     ],
     "ask": [
       "Bash(gh pr create*)",
@@ -458,7 +460,9 @@
       "denyWrite": [
         "~/.config/mise",
         "~/dotfiles/mise",
-        "~/.local/state/mise"
+        "~/.local/state/mise",
+        "~/.local/share/claude-mcp",
+        "~/Library/Caches/playwright-mcp"
       ]
     },
     "credentials": {
