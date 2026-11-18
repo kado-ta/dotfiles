@@ -51,19 +51,35 @@ check 0 'nested key named filename' '{"tool_name":"mcp__playwright__browser_fill
 check 0 'drop with data only' '{"tool_name":"mcp__playwright__browser_drop","tool_input":{"target":"e1","data":{"text/plain":"hello"}}}'
 # A cookie path is a URL path, not a file.
 check 0 'cookie path' '{"tool_name":"mcp__playwright__browser_cookie_list","tool_input":{"path":"/"}}'
-# Claude Code writes the whole input; a hook that exits without reading it breaks the pipe once the input outgrows the buffer.
-{
-  printf '%s' '{"tool_name":"mcp__playwright__browser_type","tool_input":{"text":"'
-  head -c 300000 /dev/zero | tr '\0' a
-  printf '%s\n' '"}}'
-} >"$T/big.json"
-"$BASH" "$HOOK" <"$T/big.json" >/dev/null 2>&1
-actual=$?
-if [ "$actual" = 0 ]; then
-  ok '[0] large input is read to the end'
-else
-  ng "[want 0, got $actual] large input is read to the end"
-fi
+check 0 'local dev server' '{"tool_name":"mcp__playwright__browser_navigate","tool_input":{"url":"http://localhost:3000/"}}'
+check 0 'port just below the Crit range' '{"tool_name":"mcp__playwright__browser_navigate","tool_input":{"url":"http://localhost:47799/"}}'
+check 0 'port just above the Crit range' '{"tool_name":"mcp__playwright__browser_navigate","tool_input":{"url":"http://localhost:47820/"}}'
+
+# Claude Code writes the whole input through a pipe; a hook that exits without reading it
+# makes the writer fail (SIGPIPE) once the input outgrows the buffer. A file redirect would not show that.
+# pipe_check <expected-hook-exit> <description> <input-file>
+pipe_check() {
+  local expected="$1" desc="$2" file="$3" codes
+  cat "$file" | "$BASH" "$HOOK" >/dev/null 2>&1
+  codes=("${PIPESTATUS[@]}")
+  if [ "${codes[0]}" = 0 ] && [ "${codes[1]}" = "$expected" ]; then
+    ok "[$expected] $desc"
+  else
+    ng "[want writer 0 and hook $expected, got ${codes[0]} and ${codes[1]}] $desc"
+  fi
+}
+# big_input <file> <json-prefix>: write the prefix, 300KB of padding and the closing.
+big_input() {
+  {
+    printf '%s' "$2"
+    head -c 300000 /dev/zero | tr '\0' a
+    printf '%s\n' '"}}'
+  } >"$1"
+}
+big_input "$T/big.json" '{"tool_name":"mcp__playwright__browser_type","tool_input":{"text":"'
+pipe_check 0 'large input is read to the end' "$T/big.json"
+big_input "$T/big-block.json" "{${shot},\"tool_input\":{\"filename\":\"x.png\",\"pad\":\""
+pipe_check 2 'large blocked input is read to the end' "$T/big-block.json"
 
 # filename is blocked, whatever its value
 check 2 'screenshot with filename' "{${shot},\"tool_input\":{\"filename\":\"login-1440.png\"}}"
@@ -98,6 +114,25 @@ esac
 check 2 'drop with paths and data' '{"tool_name":"mcp__playwright__browser_drop","tool_input":{"target":"e1","paths":["a.txt"],"data":{"text/plain":"x"}}}'
 check 2 'file upload with paths' '{"tool_name":"mcp__playwright__browser_file_upload","tool_input":{"paths":["a.txt"]}}'
 check 2 'empty paths' '{"tool_name":"mcp__playwright__browser_drop","tool_input":{"target":"e1","paths":[]}}'
+
+# cc-crit's Crit waits on 47800-47819; opening it would let the model press Finish Review itself.
+nav='"tool_name":"mcp__playwright__browser_navigate"'
+check 2 'Crit on localhost' "{${nav},\"tool_input\":{\"url\":\"http://localhost:47802/\"}}"
+err=$(<"$T/err")
+case "$err" in
+  Blocked:*Crit*) ok 'message starts with Blocked: and names Crit' ;;
+  *) ng "message starts with Blocked: and names Crit (got '$err')" ;;
+esac
+check 2 'Crit without a scheme' "{${nav},\"tool_input\":{\"url\":\"127.0.0.1:47819\"}}"
+check 2 'Crit port on another host name' "{${nav},\"tool_input\":{\"url\":\"http://localhost.example:47800/\"}}"
+check 2 'Crit port after a backslash' "{${nav},\"tool_input\":{\"url\":\"http://127.0.0.1:47810\\\\@example.com/\"}}"
+check 2 'Crit port in a new tab' '{"tool_name":"mcp__playwright__browser_tabs","tool_input":{"action":"new","url":"http://[::1]:47810"}}'
+# The WHATWG URL parser (Chrome, Node) drops leading zeros in the port and removes TAB, LF and CR.
+check 2 'Crit port with leading zeros' "{${nav},\"tool_input\":{\"url\":\"http://127.0.0.1:00047800/\"}}"
+check 2 'Crit port split by a tab' "{${nav},\"tool_input\":{\"url\":\"http://localhost:478\\t00/\"}}"
+check 2 'Crit port split by a line feed' "{${nav},\"tool_input\":{\"url\":\"http://localhost:47\\n800/\"}}"
+check 2 'Crit port split by a carriage return' "{${nav},\"tool_input\":{\"url\":\"http://localhost:4780\\r0/\"}}"
+check 0 'zeros before another port' "{${nav},\"tool_input\":{\"url\":\"http://localhost:0003000/\"}}"
 
 # Input that cannot be checked is blocked (fail closed)
 check 2 'invalid JSON' '{"tool_name":'
