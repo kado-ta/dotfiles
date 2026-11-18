@@ -80,6 +80,27 @@ PROJECT_DENY_WRITE = [
     "./CLAUDE.md",
     "./.claude/rules",
 ]
+GUARD_COMMAND = "/usr/local/libexec/claude-guard/cc-checkout-guard worktree-create"
+MISE_LOCK_DENY = ["Edit(**/mise.lock)"]
+ZSHRC = (
+    'eval "$(mise activate zsh)"\n'
+    "# >>> cc-checkout-guard\n"
+    "git() {\n"
+    "  local guard=/usr/local/libexec/claude-guard/cc-checkout-guard\n"
+    "}\n"
+    "# <<< cc-checkout-guard\n"
+)
+
+
+def guard_source(dirs=(".claude", ".vscode", ".idea"), names=(".mcp.json", "mise.lock"), prefixes=(".env",),
+                 dotfiles=tuple(PROJECT_DENY_WRITE)):
+    # 本物の cc-checkout-guard から定数だけを写した偽物。
+    return (
+        f"PROTECTED_DIRS = {tuple(dirs)!r}\nPROTECTED_NAMES = {tuple(names)!r}\n"
+        f"PROTECTED_PREFIXES = {tuple(prefixes)!r}\nDOTFILES_PROTECTED = {tuple(dotfiles)!r}\n"
+    )
+
+
 README = "## Foo Bar\n\n[x](#foo-bar)\n\n"
 PARANOID_CONFIG = '[settings]\nparanoid = ["config", "env_files"]\n'
 
@@ -88,7 +109,7 @@ def settings():
     return {
         "permissions": {
             "allow": [f"Bash({c})" for c in WRAPPER_COMMANDS],
-            "deny": list(DENY_PUSH) + CRIT_DENY + LIMA_DENY + EDIT_DENY + MISE_EDIT_DENY,
+            "deny": list(DENY_PUSH) + CRIT_DENY + LIMA_DENY + EDIT_DENY + MISE_EDIT_DENY + MISE_LOCK_DENY,
             "ask": list(MISE_ASK) + EDIT_ASK + MISE_EDIT_ASK,
             "blockWritesOutsideWorkingDirectories": True,
             "additionalDirectories": ["~/.gstack/projects"],
@@ -122,6 +143,7 @@ def settings():
                     ],
                 },
             ],
+            "WorktreeCreate": [{"hooks": [{"type": "command", "command": GUARD_COMMAND, "timeout": 60}]}],
         },
         "statusLine": {"type": "command", "command": "~/.claude/scripts/status.sh"},
     }
@@ -149,6 +171,8 @@ class CheckRepoTests(unittest.TestCase):
         self.write("claude/scripts/status.sh", "#!/bin/bash\n", 0o755)
         self.write("README.md", README)
         self.write("mise/mise_config.toml", PARANOID_CONFIG)
+        self.write("claude/bin/cc-checkout-guard", guard_source())
+        self.write("bin/.zshrc", ZSHRC)
 
     def git(self, *args):
         subprocess.run(["git", "-C", str(self.root), *args], check=True, capture_output=True)
@@ -435,6 +459,60 @@ class CheckRepoTests(unittest.TestCase):
             with self.subTest(value=value):
                 self.write("mise/mise_config.toml", f"[settings]\nparanoid = {value}\n")
                 self.assert_fails("FAIL mise-paranoid", "settings.paranoid")
+
+    def test_checkout_guard_missing_dotfiles_entry_fails(self):
+        self.write("claude/bin/cc-checkout-guard", guard_source(dotfiles=[p for p in PROJECT_DENY_WRITE if p != "./zsh"]))
+        self.assert_fails("FAIL checkout-guard", "./zsh")
+
+    def test_checkout_guard_missing_general_pattern_fails(self):
+        for key, value in (("dirs", (".claude", ".idea")), ("names", (".mcp.json",)), ("prefixes", ())):
+            with self.subTest(key=key):
+                self.write("claude/bin/cc-checkout-guard", guard_source(**{key: value}))
+                self.assert_fails("FAIL checkout-guard")
+
+    def test_checkout_guard_unloadable_fails(self):
+        self.write("claude/bin/cc-checkout-guard", "def (:\n")
+        self.assert_fails("FAIL checkout-guard", "cannot load")
+
+    def test_worktree_create_hook_fails_when_changed(self):
+        other = {"type": "command", "command": "/usr/local/libexec/claude-guard/other"}
+        for name, hooks in (("none", None), ("other", [other]), ("two", [{"type": "command", "command": GUARD_COMMAND}, other])):
+            with self.subTest(case=name):
+                data = settings()
+                if hooks is None:
+                    del data["hooks"]["WorktreeCreate"]
+                else:
+                    data["hooks"]["WorktreeCreate"] = [{"hooks": hooks}]
+                self.write_settings(data)
+                self.assert_fails("FAIL checkout-guard", "WorktreeCreate")
+
+    def test_zshrc_block_fails_when_missing_or_early(self):
+        early = ZSHRC.split("\n", 1)[1] + 'eval "$(mise activate zsh)"\n'
+        for name, text in (("missing", 'eval "$(mise activate zsh)"\n'), ("early", early)):
+            with self.subTest(case=name):
+                self.write("bin/.zshrc", text)
+                self.assert_fails("FAIL checkout-guard", "bin/.zshrc")
+
+    def test_missing_mise_lock_deny_fails(self):
+        data = settings()
+        data["permissions"]["deny"].remove("Edit(**/mise.lock)")
+        self.write_settings(data)
+        self.assert_fails("FAIL edit-permissions", "Edit(**/mise.lock)")
+
+    def test_trusted_config_paths_fails(self):
+        for value in ("[]", '["~/Dev"]'):
+            with self.subTest(value=value):
+                self.write("mise/mise_config.toml", PARANOID_CONFIG + f"trusted_config_paths = {value}\n")
+                self.assert_fails("FAIL mise-paranoid", "trusted_config_paths")
+
+    def test_mise_env_override_fails(self):
+        for rel, text in (("bin/.zshrc", ZSHRC + "export MISE_PARANOID=0\n"),
+                          ("zsh/x.zsh", "export MISE_TRUSTED_CONFIG_PATHS=~/Dev\n")):
+            with self.subTest(rel=rel):
+                self.write(rel, text)
+                self.assert_fails("FAIL mise-paranoid", rel)
+                self.write("bin/.zshrc", ZSHRC)
+                (self.root / "zsh/x.zsh").unlink(missing_ok=True)
 
     def test_paranoid_true_passes(self):
         self.write("mise/mise_config.toml", "[settings]\nparanoid = true\n")

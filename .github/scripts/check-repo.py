@@ -6,6 +6,8 @@
 CI は push の後に動くので、公開前に防ぐには push する前に手元で実行する。そのとき git add 前のファイルも見る。
 """
 
+import importlib.machinery
+import importlib.util
 import json
 import posixpath
 import re
@@ -141,6 +143,28 @@ PROJECT_DENY_WRITE = (
     "./.claude/rules",
 )
 
+# checkout guard（root 所有でインストールして使う）の元のファイルと、WorktreeCreate フックのコマンド。
+CHECKOUT_GUARD = "claude/bin/cc-checkout-guard"
+CHECKOUT_GUARD_COMMAND = "/usr/local/libexec/claude-guard/cc-checkout-guard worktree-create"
+# ガードの関数が zsh に入っていること。mise の初期化より後でなければ、git が mise の shim に上書きされうる。
+ZSHRC = "bin/.zshrc"
+ZSHRC_BLOCK = (
+    "# >>> cc-checkout-guard",
+    "git() {",
+    "local guard=/usr/local/libexec/claude-guard/cc-checkout-guard",
+    "# <<< cc-checkout-guard",
+)
+ZSHRC_AFTER = 'eval "$(mise activate zsh)"'
+# ガードの対象に必ず含める一般パターン（ガード側の定数の部分集合であること）。
+GUARD_REQUIRED_DIRS = (".claude", ".vscode", ".idea")
+GUARD_REQUIRED_NAMES = (".mcp.json", "mise.lock")
+GUARD_REQUIRED_PREFIXES = (".env",)
+# mise.lock は mise が sandbox の外で読むので、Edit も止める。
+MISE_LOCK_DENY = ("Edit(**/mise.lock)",)
+# 環境変数で paranoid や信頼済みパスを上書きさせない。
+MISE_ENV_FORBIDDEN = ("MISE_TRUSTED_CONFIG_PATHS", "MISE_PARANOID")
+MISE_ENV_FILES = ("bin/.zshrc", "bin/.zprofile", "mise/mise_config.toml")  # ほかに zsh/*.zsh
+
 HOOK_SCRIPT = re.compile(r"\.claude/(?:hooks|scripts)/")
 LOCAL_PATH = re.compile(r"/(?:Users|home)/([A-Za-z0-9._-]+)")
 FENCE = re.compile(r"^\s*(`{3,}|~{3,})(.*)$")
@@ -266,7 +290,8 @@ def check_edit_permissions(root):
     errors += [f"{SETTINGS}: permissions.additionalDirectories must not list {path}"
                for path in permissions.get("additionalDirectories", []) if path not in ADDITIONAL_DIRECTORIES]
     deny, ask = set(permissions.get("deny", [])), set(permissions.get("ask", []))
-    errors += [f"{SETTINGS}: permissions.deny lacks {rule}" for rule in EDIT_DENY + MISE_EDIT_DENY if rule not in deny]
+    errors += [f"{SETTINGS}: permissions.deny lacks {rule}" for rule in EDIT_DENY + MISE_EDIT_DENY + MISE_LOCK_DENY
+               if rule not in deny]
     errors += [f"{SETTINGS}: permissions.ask lacks {rule}" for rule in MISE_ASK + EDIT_ASK + MISE_EDIT_ASK
                if rule not in ask]
     errors += [f"{SETTINGS}: permissions.deny: {rule} must not be a deny rule" for rule in EDIT_ASK if rule in deny]
@@ -314,11 +339,55 @@ def check_mise_paranoid(root):
     path = root / MISE_GLOBAL_CONFIG
     if not path.exists():
         return [f"{MISE_GLOBAL_CONFIG}: missing"]
-    paranoid = tomllib.loads(path.read_text(encoding="utf-8")).get("settings", {}).get("paranoid")
+    config = tomllib.loads(path.read_text(encoding="utf-8")).get("settings", {})
+    paranoid = config.get("paranoid")
+    errors = []
     # 文字列は部分一致で通ってしまうので、リストのときだけ中身を見る。
-    if paranoid is True or (isinstance(paranoid, list) and all(c in paranoid for c in PARANOID_REQUIRED)):
-        return []
-    return [f"{MISE_GLOBAL_CONFIG}: settings.paranoid must be true or a list with {', '.join(PARANOID_REQUIRED)}"]
+    if not (paranoid is True or (isinstance(paranoid, list) and all(c in paranoid for c in PARANOID_REQUIRED))):
+        errors.append(f"{MISE_GLOBAL_CONFIG}: settings.paranoid must be true or a list with {', '.join(PARANOID_REQUIRED)}")
+    # 空のリストでも、パスによる信頼の経路を開く。
+    if "trusted_config_paths" in config:
+        errors.append(f"{MISE_GLOBAL_CONFIG}: settings.trusted_config_paths must not be set")
+    for rel in MISE_ENV_FILES + tuple(sorted(p.relative_to(root).as_posix() for p in (root / "zsh").glob("*.zsh"))):
+        file = root / rel
+        if file.is_file():
+            text = file.read_text(encoding="utf-8")
+            errors += [f"{rel}: must not mention {name}" for name in MISE_ENV_FORBIDDEN if name in text]
+    return errors
+
+
+def check_checkout_guard(root):
+    errors = []
+    try:
+        loader = importlib.machinery.SourceFileLoader("cc_checkout_guard", str(root / CHECKOUT_GUARD))
+        spec = importlib.util.spec_from_loader(loader.name, loader)
+        guard = importlib.util.module_from_spec(spec)
+        loader.exec_module(guard)
+        pairs = (
+            (PROJECT_DENY_WRITE, "DOTFILES_PROTECTED"),
+            (GUARD_REQUIRED_DIRS, "PROTECTED_DIRS"),
+            (GUARD_REQUIRED_NAMES, "PROTECTED_NAMES"),
+            (GUARD_REQUIRED_PREFIXES, "PROTECTED_PREFIXES"),
+        )
+        for required, name in pairs:
+            errors += [f"{CHECKOUT_GUARD}: {name} lacks {item}" for item in required if item not in getattr(guard, name)]
+    except Exception as e:
+        errors.append(f"{CHECKOUT_GUARD}: cannot load: {type(e).__name__}: {e}")
+    commands = [hook.get("command") for group in load_settings(root).get("hooks", {}).get("WorktreeCreate", [])
+                for hook in group.get("hooks", [])]
+    if commands != [CHECKOUT_GUARD_COMMAND]:
+        errors.append(f"{SETTINGS}: hooks.WorktreeCreate must be exactly [{CHECKOUT_GUARD_COMMAND}], got {commands}")
+    lines = [line.strip() for line in (root / ZSHRC).read_text(encoding="utf-8").splitlines()]
+    after = next((i for i, line in enumerate(lines) if line == ZSHRC_AFTER), None)
+    position = -1
+    for expected in ZSHRC_BLOCK:
+        position = next((i for i in range(position + 1, len(lines)) if lines[i] == expected), None)
+        if position is None:
+            errors.append(f"{ZSHRC}: lacks '{expected}' in the checkout guard block (in order)")
+            break
+        if expected == ZSHRC_BLOCK[0] and (after is None or position < after):
+            errors.append(f"{ZSHRC}: the checkout guard block must come after {ZSHRC_AFTER}")
+    return errors
 
 
 def check_syntax(root):
@@ -432,6 +501,7 @@ CHECKS = (
     ("edit-permissions", check_edit_permissions),
     ("project-permissions", check_project_permissions),
     ("mise-paranoid", check_mise_paranoid),
+    ("checkout-guard", check_checkout_guard),
     ("syntax", check_syntax),
     ("markdown-names", check_markdown_names),
     ("markdown-links", check_markdown_links),
