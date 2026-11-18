@@ -156,6 +156,7 @@
       "Read(~/**/.pgpass)",
       "Edit(/etc/**)",
       "Edit(**/.env*)",
+      "Edit(**/mise.lock)",
       "Edit(**/.git/config)",
       "Edit(**/.git/**/hooks/**)",
       "Edit(**/package-lock.json)",
@@ -370,6 +371,17 @@
             "type": "command",
             "command": "/bin/bash ~/.claude/hooks/gh-read-token.sh install",
             "timeout": 10
+          }
+        ]
+      }
+    ],
+    "WorktreeCreate": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/usr/local/libexec/claude-guard/cc-checkout-guard worktree-create",
+            "timeout": 60
           }
         ]
       }
