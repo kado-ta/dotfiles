@@ -51,9 +51,17 @@ Playwright MCP（`claude/mcp/playwright.json`）は Claude Code が起動し、s
 
 - `permissions.deny` の `mcp__playwright__browser_run_code_unsafe`: Node のプロセスで任意のコードが動く。capability が `core` なので、オプションでは無効にできない。
 - `permissions.deny` の `mcp__playwright__browser_file_upload`: ワークスペースのルートの中のファイル（`.env*` も）をページに渡せる。
-- PreToolUse の `hooks/guard-playwright-mcp.sh`（matcher `mcp__playwright__.*`、`onFailure: block`）: `filename` 引数の相対パスはワークスペースのルートから解決され、プロジェクトの中のどこにでも書ける。`browser_evaluate` は戻り値を JSON で書くので、`.claude/settings.json` に hooks を書けば、次のセッションで sandbox の外でコードが動く見込み。`paths` 引数も止める。`browser_drop`（既定で有効）と `browser_file_upload` が、そのファイルをページに渡すため。権限の規則では引数を見られないので、フックで止める。matcher を一部のツールに絞ると、ほかのツールの引数が通る。
+- PreToolUse の `hooks/guard-playwright-mcp.sh`（matcher `mcp__playwright__.*`、`onFailure: block`）: `filename` 引数の相対パスはワークスペースのルートから解決され、プロジェクトの中のどこにでも書ける。`browser_evaluate` は戻り値を JSON で書くので、`.claude/settings.json` に hooks を書けば、次のセッションで sandbox の外でコードが動く見込み。`paths` 引数も止める。`browser_drop`（既定で有効）と `browser_file_upload` が、そのファイルをページに渡すため。`url` が cc-crit の Crit のポート（47800〜47819）を指す呼び出しも止める。ブラウザは sandbox の外で localhost に届くので、開けばモデルが Finish Review を押して、人間の承認を偽造できる。権限の規則では引数を見られないので、フックで止める。matcher を一部のツールに絞ると、ほかのツールの引数が通る。
+- `sandbox.filesystem.denyRead` の `~/.crit` と `permissions.deny` の `Read(~/.crit/**)`: cc-crit 以外の crit（crit プラグインの自動プランレビュー、端末の crit）は、ランダムなポートで待ち受けてポートを `~/.crit/sessions` に書く。読めると、モデルがポートを知って開き、承認を偽造できる。`~/.crit` を使う crit は sandbox の外で動くので、影響しない。ポートを端から試して見つける経路は残る（受け入れた）。
+- `disabledMcpjsonServers` の `playwright`: プロジェクトの `.mcp.json` の同じ名前のサーバーは、user スコープの定義より優先され、起動オプションの守り（npx を使わない、`--blocked-origins` など）が外れる。local スコープの登録は止められないので、文書で禁じる。
+- `check-repo.py` は、`claude/mcp/playwright.json` 以外の定義に `playwright` が含まれていれば失敗する（`playwright`・`playwright-core` の CLI の `mcp` サブコマンドでも同じサーバーが動く）。上の 3 つはツール名 `mcp__playwright__*` に結び付いている。
+- 0.0.85 は、起動したブラウザを認証のない UNIX ソケット（サーバーの一時ディレクトリの `pw-<hash>/browser/<guid>.sock`）でも公開する。つなげば、フック・deny・`--blocked-origins` を通らずに操作できる。sandbox の中からの UNIX ソケットへの接続は `Operation not permitted` で止まる（2026-11-18 に `/var/run/mDNSResponder` で実測）ので、`allowUnixSockets`・`allowAllUnixSockets` を設定しない理由はここにもある。
 
-出力先（`--output-dir`）は `~/Library/Caches/playwright-mcp` にしている。リポジトリに出力しないためと、sandbox から書けない場所にして、symlink で出力先を向け替えさせないため。ページの内容によるプロンプトインジェクションと、プロキシを通らない通信（localhost の確認に要る）は受け入れた。経緯は [docs/work/20261118_playwright-mcp/plan.md](../../docs/work/20261118_playwright-mcp/plan.md#decisions) を参照する。
+定義の起動オプションでも守る。`--blocked-origins` で Crit のポートへの通信を止める（フックは `url` 引数しか見ないので、`browser_evaluate` の JS やリンクでの移動はこちらで止める。HTTP のリダイレクトは止まらない）。`--no-webmcp` で、ページが登録したツール（説明もページが決める）が Claude のツールの一覧に入らないようにする。
+
+実行時に npx を使わない。npx はサーバーの作業ディレクトリ（プロジェクト）の `node_modules`・`node_modules/.bin`・`.npmrc` を使うので、sandbox の中で置かれたコードが、次のセッションの開始時に sandbox の外で動く。`register-mcp.sh` が `~/.local/share/claude-mcp/playwright` に入れ、mise の `node` で `cli.js` を起動する。
+
+入れる場所と出力先（`--output-dir` の `~/Library/Caches/playwright-mcp`）は、どちらも sandbox から書けない場所にしているので、`sandbox.filesystem.allowWrite` に入れない。出力先をそうしたのは、リポジトリに出力しないためと、symlink で出力先を向け替えさせないため。ページの内容によるプロンプトインジェクションと、プロキシを通らない通信（localhost の確認に要る）は受け入れた。経緯は [docs/work/20261118_playwright-mcp/plan.md](../../docs/work/20261118_playwright-mcp/plan.md#decisions) を参照する。
 
 <a name="edit-write-rules"></a>
 

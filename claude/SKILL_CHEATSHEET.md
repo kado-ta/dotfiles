@@ -42,7 +42,7 @@
 | パフォーマンス改善 | `systematic-debugging`（計測から） | `/benchmark`（ブラウザが使えれば） | 遅い原因が分からない | 計測せずに直すこと |
 | テストの設計・実装 | `test-driven-development` | `/test-audit` | 振る舞いの変更、テストの整理 | — |
 | コードレビュー | `/review` | `/pstack:interrogate`（明示）、Codex | PR の前 | 軽微な変更（`/crit-review` だけ） |
-| E2E・ブラウザ QA | `/qa`（直す）、`/qa-only`（報告だけ） | Playwright MCP（個別のブラウザ操作・調査） | 動く環境がある | sandbox でブラウザが動かないとき |
+| E2E・ブラウザ QA | `/qa`（直す）、`/qa-only`（報告だけ） | Playwright MCP（個別のブラウザ操作・調査） | 動く環境がある | `/qa`・`/qa-only` は sandbox でブラウザが動かないとき（Playwright MCP は sandbox の外で動くので使える） |
 | 技術選定・PoC | Claude の調査（WebFetch） | `anthropic-skills:deep-research`、`/pstack:arena`（明示） | 候補が複数ある | 答えが公式ドキュメントで決まる |
 | PR 作成・リリース | CLAUDE.md の Git 節、`/commit-staged-pr` | `/crit-review`（push の前に必須） | — | `/ship`、`/document-release`、`finishing-a-development-branch` の push |
 | ドキュメント作成 | 通常の編集（DOCUMENTS.md に従う） | — | — | `/document-generate`（commit・push する） |

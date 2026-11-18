@@ -105,6 +105,9 @@ Playwright MCP（`@playwright/mcp`）を Claude Code の user スコープに登
 <a name="decision-node"></a>
 ### D4. npx は登録するときに絶対パスで固定する
 
+> [!WARNING]
+> `/review` で、npx を実行時に使うこと自体が sandbox を抜ける経路だと分かり、固定の場所に入れて `node` で起動する形に変えた（[レビューで変えたこと](#review-changes)）。以下は元の判断。
+
 定義ファイルに `${NODE_BIN}` と `${HOME}` を書き、登録スクリプトが実際のパスに置き換える。それ以外の `${...}`（[D2a](#decision-headless) の `PLAYWRIGHT_MCP_HEADLESS`）は置き換えずに残し、Claude Code が起動時に展開する。`NODE_BIN` は、ホームで `mise where node` を実行して得たグローバルの Node.js の `bin`。
 
 - `command` は `${NODE_BIN}/npx` にする。npx と、npx が起動する `playwright-mcp` は `#!/usr/bin/env node` で始まるので、`env.PATH` も `${NODE_BIN}:/usr/bin:/bin:/usr/sbin:/sbin` に固定する。
@@ -130,15 +133,42 @@ salesforce-help スキルの「本文を読めないとき」は、Playwright MC
 ### D7. 受け入れるリスク
 
 - ページの内容によるプロンプトインジェクション。外部のページを読む方法なら、どれでも残る。
+- cc-crit 以外の crit のポートを、ブラウザで端から試して見つける経路（`~/.crit` は読めなくした）。
+- プロジェクトの `.mcp.json` が、別の名前で Playwright を起動するサーバー。deny もフックも効かないので、プロジェクトごとの承認の画面で断ることが最後の守りになる。
+- 外部のページから Crit のポート（47800〜47819）への HTTP のリダイレクト。フックも `--blocked-origins` も止めない（route の割り込みはリダイレクトの先に掛からない）。攻撃者はポートを当て、さらにモデルに Finish Review を押させる必要がある。Crit 側でトークンを確かめる案を、別の作業で提案する。
+- 起動元の環境の `PLAYWRIGHT_MCP_*` の変数（`ALLOW_UNRESTRICTED_FILE_ACCESS`・`CAPS`・`INIT_PAGE` など）が、引数で固定していない設定を上書きしうる。起動元の環境（プロジェクトの settings の `env` など）を書き換えられるなら、hooks でも同じことができるので、新しい経路ではない。
+- `register-mcp.sh` は、`mise` と `claude` を引き継いだ PATH から探す。`!` で実行すると PATH はセッションのものになる。`update-skills.sh` と同じ扱いにする。
+- 出力先（`~/Library/Caches/playwright-mcp`）は sandbox の中から読める。ほかのプロジェクトのセッションが残したページの構造・コンソール・ネットワークのログ（URL のトークンを含みうる）が見える。今の用途は公開ページなので受け入れる。ログインするページを扱うようになったら、denyRead か `--redact-url-params` を考える。
 - ブラウザの通信がプロキシを通らない。WebFetch のドメイン許可の運用の外になる。用途 3 の localhost の確認には、この性質が要る。`--allowed-origins` は境界ではないので付けない。
-- 出力先の自動の名前のファイルは、symlink の先が仕込まれていても、名前を選べないので意味のあるファイルを上書きできない見込み。
+- ページが始めたダウンロードは、ページが付けた名前（`/` などを `-` に置き換えたもの）で出力先に保存され、同じ名前のファイルは上書きされる。大きさの上限もない（`--output-max-size` を付けていない）。出力先は sandbox から書けず、何かに読み込まれて動く場所でもないので受け入れる（`/review` の指摘で訂正した。前は「名前を選べない」と書いていた）。
+
+<a name="review-changes"></a>
+## レビューで変えたこと
+
+`/review`（専門のレビュアー 5 つと adversarial のレビュー）の指摘で、次を変えた。判断はユーザーと合意した（2026-11-18）。
+
+| 指摘 | 変えたこと |
+| --- | --- |
+| npx は、サーバーの作業ディレクトリ（プロジェクト）の `node_modules/@playwright/mcp`・`node_modules/.bin/node`・`.npmrc` を使う（`libnpmexec/lib/index.js:191-203` で確認）。sandbox の中で置かれたコードが、次のセッションの開始時に sandbox の外で動く | 定義に `npmPackage` を置き、`register-mcp.sh` が sandbox から書けない `~/.local/share/claude-mcp/playwright` に `npm install --ignore-scripts` で入れる。`command` は `${NODE_BIN}/node`、`args` の先頭は `${PACKAGE_DIR}/node_modules/@playwright/mcp/cli.js`。依存は完全に固定した版なので、lockfile は置かない |
+| ブラウザは localhost の Crit（47800〜47819）に届き、Finish Review を押して人間の承認を偽造できる | フックで、`url` に `:47800`〜`:47819` を含む呼び出しを止める。定義に `--blocked-origins`（`*:47800;…;*:47819`）を足し、JS やリンクでの移動も止める。リダイレクトは[受け入れた](#decision-risks) |
+| ページが登録した WebMCP のツールが、Claude のツールの一覧に入る | `--no-webmcp` を足す |
+| deny・フック・検査がサーバー名 `playwright` に依存している | `check-repo.py` で、`@playwright/mcp` を `playwright.json` 以外で定義すると失敗させる |
+| 定義がない（`mcp/` もない）と `register-mcp.sh` が失敗し、削除の手順の後に `setup.sh` が止まる | 通知して成功で終える |
+| 大きな入力のテストがファイルのリダイレクトで、stdin を読まないフックでも通る | パイプで渡し、書き手とフックの終了コードを確かめる。止める側の大きな入力も足した |
+| （2 回目）フックの URL の照合が、ポートの先頭のゼロや、TAB・LF・CR を挟んだ形で抜ける（WHATWG の解析器はこれらを正規化する） | TAB・LF・CR を取り除き、先頭のゼロも含めて照合する |
+| （2 回目）別名の検出が `@playwright/mcp` の部分一致だけで、`playwright` の CLI の `mcp` サブコマンドや JSON のエスケープで抜ける | JSON を読んでから、大文字・小文字を区別せずに `playwright` を含む定義を止める。読めない定義も失敗にする |
+| （2 回目）ブラウザが認証のない UNIX ソケットで公開される | sandbox が UNIX ソケットへの接続を止めることを実測し、`CLAUDE_CONFIG.md` に記録した |
+| （2 回目）文書の古い箇所（この Plan の定義の例・ロールバック、README の更新の手順） | 直した。更新の前にセッションを閉じる手順も足した |
+| （2 回目）cc-crit 以外の crit（プラグインの自動プランレビュー、端末の crit）はランダムなポートで待ち受け、ポートを sandbox から読める `~/.crit/sessions` に書く | `sandbox.filesystem.denyRead` に `~/.crit`、`permissions.deny` に `Read(~/.crit/**)` を足す（ユーザーが編集）。`check-repo.py` が確かめる |
+| （2 回目）プロジェクトの `.mcp.json` や local スコープの同じ名前の `playwright` が、強化した user スコープの定義を上書きする | ユーザー設定の `disabledMcpjsonServers` に `playwright` を足す（ユーザーが編集。効くかは[試験記録](test-report.md#recheck)で確かめる）。`check-repo.py` が確かめる。local スコープは文書で禁じる |
+| （2 回目）`setup.sh` が登録の失敗で止まり、`setup.command` の後の手順も止まる | 警告を出して先に進む |
 
 <a name="changes"></a>
 ## 変更するファイル
 
 | ファイル | 変更 |
 | --- | --- |
-| `claude/mcp/playwright.json` | 新規。定義（`${HOME}`・`${NODE_BIN}` を含む） |
+| `claude/mcp/playwright.json` | 新規。定義（`npmPackage` と、`${HOME}`・`${NODE_BIN}`・`${PACKAGE_DIR}` を含む） |
 | `claude/scripts/register-mcp.sh` | 新規。登録スクリプト |
 | `claude/scripts/test-register-mcp.py` | 新規。`claude`・`mise` の偽物で、置き換え（ほかの `${...}` は残す）・呼び出しの順番・失敗を確かめる |
 | `claude/setup.sh` | `register-mcp.sh` を呼ぶ |
@@ -177,20 +207,23 @@ salesforce-help スキルの「本文を読めないとき」は、Playwright MC
 }
 ```
 
-`claude/mcp/playwright.json`:
+`claude/mcp/playwright.json`（[レビューで変えたこと](#review-changes)を反映した形。`--blocked-origins` の値は 47800〜47819 の 20 個を `;` でつなぐ）:
 
 ```json
 {
+  "npmPackage": "@playwright/mcp@0.0.85",
   "type": "stdio",
-  "command": "${NODE_BIN}/npx",
+  "command": "${NODE_BIN}/node",
   "args": [
-    "-y",
-    "@playwright/mcp@0.0.85",
+    "${PACKAGE_DIR}/node_modules/@playwright/mcp/cli.js",
     "--isolated",
     "--browser",
     "chrome",
     "--output-dir",
-    "${HOME}/Library/Caches/playwright-mcp"
+    "${HOME}/Library/Caches/playwright-mcp",
+    "--no-webmcp",
+    "--blocked-origins",
+    "*:47800;*:47801;…;*:47819"
   ],
   "env": {
     "PATH": "${NODE_BIN}:/usr/bin:/bin:/usr/sbin:/sbin",
@@ -239,7 +272,7 @@ salesforce-help スキルの「本文を読めないとき」は、Playwright MC
 
 1. `claude mcp remove -s user playwright`
 2. `claude/settings.json` の deny とフックの登録を消し、`check-repo.py` の検査を戻す（ブランチのコミットを revert する）。
-3. `~/Library/Caches/playwright-mcp` と、必要なら `~/.npm/_npx` の該当のキャッシュを消す。
+3. `~/.local/share/claude-mcp/playwright` と `~/Library/Caches/playwright-mcp` を消す。
 
 <a name="out-of-scope"></a>
 ## 範囲外と提案

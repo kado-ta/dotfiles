@@ -59,7 +59,7 @@ worktree は `claude -w <name>` で始める。この設定では EnterWorktree�
 - `Edit(//**/.git/**/hooks/**)` と `Edit(//**/.git/config)` を deny にしない。Edit の deny は sandbox の denyWrite にもなり、どこでも `git init`・`git clone` が失敗する見込み（`edit-permissions` が失敗する）。
 - ユーザー設定の `sandbox.filesystem` に、接頭辞のないパスを書かない。`~/` か `/` で始める（接頭辞がないと `~/.claude` が基準になる。`edit-permissions` が失敗する）。
 - Read の deny の `*.pem` を `~/**` に広げない。
-- `claude/mcp/playwright.json` があるあいだは、`permissions.deny` の `mcp__playwright__browser_run_code_unsafe`・`mcp__playwright__browser_file_upload` と、PreToolUse の `guard-playwright-mcp.sh` の登録（matcher `mcp__playwright__.*`、`onFailure: block`）を外さない（`check-repo.py` の `playwright-mcp` が失敗する）。
+- `claude/mcp/playwright.json` があるあいだは、`permissions.deny` の `mcp__playwright__browser_run_code_unsafe`・`mcp__playwright__browser_file_upload`・`Read(~/.crit/**)`、`sandbox.filesystem.denyRead` の `~/.crit`、`disabledMcpjsonServers` の `playwright`、PreToolUse の `guard-playwright-mcp.sh` の登録（matcher `mcp__playwright__.*`、`onFailure: block`）を外さない（`check-repo.py` の `playwright-mcp` が失敗する）。Playwright MCP を実行時に npx で起動しない。`sandbox.filesystem.allowWrite` に `~/.local/share/claude-mcp` と `~/Library/Caches/playwright-mcp` を入れない（理由は [.claude/rules/CLAUDE_CONFIG.md](.claude/rules/CLAUDE_CONFIG.md#playwright-mcp)）。
 
 ## 規約
 
