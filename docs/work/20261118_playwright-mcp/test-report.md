@@ -97,6 +97,11 @@ created: 2026-11-18
 - `file:` の URL の検査の抜け（確度 4/10）: フックで止めた（`59d520b`。[plan のレビューで変えたこと](plan.md#review-changes)）。
 - 実行中の Chrome のプロファイルを sandbox から読める: 新しい経路ではないので、[plan の受け入れたリスク](plan.md#decision-risks)に記録した。
 
+<a name="codex-review"></a>
+## Codex のレビュー
+
+2026-11-19 に、ユーザーが端末で `codex review --base main -c 'sandbox_mode="read-only"' -c skills.include_instructions=false` を実行した（main の取り込み `a850ec1` の後）。直すべき不具合はなかった。Codex は、リポジトリの検査、Playwright の定義のテスト 7 件、フックの読み取りだけの確認 18 件、shellcheck、actionlint を実行して通った。read-only の制約のため、一時ファイルを作る登録スクリプトの回帰テスト全体と、実際の登録・ブラウザの操作は実行していない（この 2 つは[自動の試験](#automated)と[再確認](#recheck)で確かめた）。
+
 <a name="unverified"></a>
 ## 確かめていないこと
 
