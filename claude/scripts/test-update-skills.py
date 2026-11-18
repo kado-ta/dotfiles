@@ -3,16 +3,22 @@
 偽のリポジトリ（スクリプトの写しと crit の profile テストの偽物）、偽の HOME（gstack-upgrade の偽物と
 settings.json）、claude・brew の偽物を置いた PATH で、スクリプトを /bin/bash のサブプロセスとして実行し、
 呼ばれたコマンドの順番・出力・終了コードを確かめる。
+crit の profile テストの偽物がまねている契約（CC_CRIT_PROFILE_REQUIRED=1 で、スキップを失敗に変える）は、
+本物の profile テストを読み込んで確かめる。
 
 実行: python3 -B claude/scripts/test-update-skills.py
 """
+import importlib.util
+import os
 import shutil
 import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 SCRIPTS = Path(__file__).resolve().parent
+PROFILE_TEST = SCRIPTS.parent / "hooks" / "tests" / "test-cc-crit-profile.py"
 
 PLUGINS = ('[{"id":"a@m","scope":"user"},{"id":"s@m","scope":"local"},'
            '{"id":"b@m","scope":"user"},{"id":"s@m","scope":"local"}]')
@@ -153,6 +159,42 @@ class UpdateSkillsTest(unittest.TestCase):
     def test_closing_message_asks_review_before_restart(self):
         result, _ = self.run_script()
         self.assertEqual(result.stdout.rstrip().splitlines()[-1], CLOSING)
+
+
+class ProfileRequiredContractTest(unittest.TestCase):
+    # PROFILE_STUB がまねている、本物の profile テストの契約を確かめる。CI は本物を変数なしでしか実行しない。
+    def setUp(self):
+        spec = importlib.util.spec_from_file_location("cc_crit_profile", PROFILE_TEST)
+        self.profile = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(self.profile)
+
+    def assert_skips_or_fails(self, run):
+        for required, expected in (("1", AssertionError), (None, unittest.SkipTest)):
+            with self.subTest(required=required), mock.patch.dict(os.environ):
+                os.environ.pop("CC_CRIT_PROFILE_REQUIRED", None)
+                if required:
+                    os.environ["CC_CRIT_PROFILE_REQUIRED"] = required
+                # SkipTest がテストから抜けると unittest はスキップに数えるので、受け止めて種類を比べる。
+                try:
+                    run()
+                except (AssertionError, unittest.SkipTest) as e:
+                    raised = type(e)
+                else:
+                    raised = None
+                self.assertIs(raised, expected)
+
+    def test_missing_tool(self):
+        with mock.patch.object(self.profile, "CRIT", "/nonexistent/crit"):
+            self.assert_skips_or_fails(self.profile.ProfileTests.setUpClass)
+
+    def test_nested_sandbox(self):
+        # crit と git はあるが、sandbox-exec がプロファイルを適用できない（Claude Code の sandbox の中）。
+        with mock.patch.multiple(self.profile, CRIT="/usr/bin/true",
+                                 GIT="/usr/bin/true", SANDBOX_EXEC="/usr/bin/false"):
+            self.assert_skips_or_fails(self.profile.ProfileTests.setUpClass)
+
+    def test_no_free_port(self):
+        self.assert_skips_or_fails(lambda: self.profile.free_port([]))
 
 
 if __name__ == "__main__":
