@@ -85,9 +85,17 @@ created: 2026-11-18
 | R8 | JS での Crit のポートへの移動を止める | 合格 | `https://example.com` で `location.href = "http://127.0.0.1:47803/"` を実行すると、`[GET] http://127.0.0.1:47803/ => [FAILED] net::ERR_BLOCKED_BY_CLIENT`（`--blocked-origins` が効いた。止まらなければ `ERR_CONNECTION_REFUSED` になる） |
 | R9 | `~/.crit` を読ませない | 合格 | 新しいセッションの `ls -la ~/.crit` が権限の設定で拒否された。このセッションの sandbox の設定にも `~/.crit` の denyRead が入った |
 | R10 | 出力が `git status` に出ない | 合格 | 前後の `git status --short` が同じ。`--ignored` でも `test.png` はない |
-| R11 | ブラウザが UNIX ソケットで公開されても、sandbox からはつなげない | 合格 | sandbox の中から `/var/run/mDNSResponder` への接続が `Operation not permitted`（Playwright のソケットそのものでは試していない） |
+| R11 | ブラウザが UNIX ソケットで公開されても、sandbox からはつなげない | 合格 | sandbox の中から `/var/run/mDNSResponder` への接続が `Operation not permitted`。`/security-review` で、Playwright が実際に公開したソケット（サーバーの一時ディレクトリの `pw-<hash>/browser/browser-*.sock`）への接続も `Operation not permitted` だった |
 
 このセッションでは、`!` のコマンドが sandbox の中で動いた（`claude mcp list` の出力に `sandbox_violations` が出て、`mktemp -d` が sandbox の外の一時ディレクトリに書けなかった）。前の調査（`!` は sandbox の外で動く）と違うので、`!` で sandbox の外の操作を頼むときは、端末で実行してもらう。
+
+<a name="security-review"></a>
+## セキュリティレビュー
+
+`/security-review`（2026-11-19、`3eee5e2` の時点）では、基準（確度 8 以上で実際に悪用できるもの）に当たる脆弱性はなかった。基準未満として除外したものへの対応は次のとおり。
+
+- `file:` の URL の検査の抜け（確度 4/10）: フックで止めた（`59d520b`。[plan のレビューで変えたこと](plan.md#review-changes)）。
+- 実行中の Chrome のプロファイルを sandbox から読める: 新しい経路ではないので、[plan の受け入れたリスク](plan.md#decision-risks)に記録した。
 
 <a name="unverified"></a>
 ## 確かめていないこと
@@ -97,4 +105,4 @@ created: 2026-11-18
 - `paths` を止める修正の、実際のセッションでの動き（単体テストだけ）。
 - 変えた後の定義での、headless の既定（ウィンドウが出ないこと）。変える前の定義では確かめた（3b）。`PLAYWRIGHT_MCP_HEADLESS` の書き方は変えていない。
 - `disabledMcpjsonServers` を外した場合との比較（R3 の推測の裏付け）。
-- Playwright が公開する UNIX ソケットそのものへの、sandbox からの接続（R11 は別のソケットで確かめた）。
+- `file://localhost:/…` のように Node が解析できない `file:` の URL を、Chrome が開くかどうか（試す前に、フックで止めるようにした）。

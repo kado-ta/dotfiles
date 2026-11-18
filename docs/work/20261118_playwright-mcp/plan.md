@@ -139,6 +139,7 @@ salesforce-help スキルの「本文を読めないとき」は、Playwright MC
 - 起動元の環境の `PLAYWRIGHT_MCP_*` の変数（`ALLOW_UNRESTRICTED_FILE_ACCESS`・`CAPS`・`INIT_PAGE` など）が、引数で固定していない設定を上書きしうる。起動元の環境（プロジェクトの settings の `env` など）を書き換えられるなら、hooks でも同じことができるので、新しい経路ではない。
 - `register-mcp.sh` は、`mise` と `claude` を引き継いだ PATH から探す。`!` で実行すると PATH はセッションのものになる。`update-skills.sh` と同じ扱いにする。
 - 出力先（`~/Library/Caches/playwright-mcp`）は sandbox の中から読める。ほかのプロジェクトのセッションが残したページの構造・コンソール・ネットワークのログ（URL のトークンを含みうる）が見える。今の用途は公開ページなので受け入れる。ログインするページを扱うようになったら、denyRead か `--redact-url-params` を考える。
+- 実行中の Chrome のプロファイル（サーバーの一時ディレクトリの `playwright_chromiumdev_profile-*`。Cookie のデータベースを含む）は sandbox の中から読める。モデルはもともとこのブラウザを操作でき、`browser_network_request` で Cookie のヘッダーも読めるので、新しい経路ではない。ログインするページを扱うようになったら、出力先と合わせて見直す。
 - ブラウザの通信がプロキシを通らない。WebFetch のドメイン許可の運用の外になる。用途 3 の localhost の確認には、この性質が要る。`--allowed-origins` は境界ではないので付けない。
 - ページが始めたダウンロードは、ページが付けた名前（`/` などを `-` に置き換えたもの）で出力先に保存され、同じ名前のファイルは上書きされる。大きさの上限もない（`--output-max-size` を付けていない）。出力先は sandbox から書けず、何かに読み込まれて動く場所でもないので受け入れる（`/review` の指摘で訂正した。前は「名前を選べない」と書いていた）。
 
@@ -162,6 +163,7 @@ salesforce-help スキルの「本文を読めないとき」は、Playwright MC
 | （2 回目）cc-crit 以外の crit（プラグインの自動プランレビュー、端末の crit）はランダムなポートで待ち受け、ポートを sandbox から読める `~/.crit/sessions` に書く | `sandbox.filesystem.denyRead` に `~/.crit`、`permissions.deny` に `Read(~/.crit/**)` を足す（ユーザーが編集）。`check-repo.py` が確かめる |
 | （2 回目）プロジェクトの `.mcp.json` や local スコープの同じ名前の `playwright` が、強化した user スコープの定義を上書きする | ユーザー設定の `disabledMcpjsonServers` に `playwright` を足す（ユーザーが編集。効くかは[試験記録](test-report.md#recheck)で確かめる）。`check-repo.py` が確かめる。local スコープは文書で禁じる |
 | （2 回目）`setup.sh` が登録の失敗で止まり、`setup.command` の後の手順も止まる | 警告を出して先に進む |
+| （`/security-review`、基準未満）Playwright MCP の `file:` の拒否は、Node が解析できる URL にしか効かない（`file://localhost:/…` などは素通りする） | フックで、`url` が `file:` で始まる呼び出しも止める |
 
 <a name="changes"></a>
 ## 変更するファイル
