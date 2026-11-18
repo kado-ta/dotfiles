@@ -264,7 +264,7 @@ class ResolveFilesTests(Base):
 
 
 COVERED = ["~/.ssh/id_*", "~/.ssh/config", "~/.aws/credentials", "~/dotfiles/aws/credentials", "~/Library/Keychains",
-           "~/.colima/_lima/_config", "~/.lima/_config"]
+           "~/.colima/_lima/_config", "~/.lima/_config", "~/.crit"]
 
 # 偽物は python の実体で動かす。/usr/bin/python3 は xcrun の中継役で、SDKROOT などを環境変数に足すため。
 PYTHON = os.path.realpath(sys.executable)
