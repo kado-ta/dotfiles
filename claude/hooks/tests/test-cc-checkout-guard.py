@@ -304,6 +304,42 @@ class SwitchTests(TreeBase):
                 self.assertEqual(result, (1, ""))
                 self.assertIn(guard.MSG_DECLINED, err)
 
+    def test_ref_swap_while_asking_stops(self):
+        # 人間が差分を読んでいる間（readline の中）に ref を差し替えると、見せていない中身が書かれる（最終レビューで実測）。
+        # y の後に同じ計算をもう一度して、違えば git を動かさずに止める（I1）。
+        self.branch("evil", "feature", {".claude/settings.json": '{"evil": 1}\n'})
+        self.branch("readme", "feature", {"README.md": "r\n"})
+        original = local_git(self.repo, "rev-parse", "feature")
+        repo = self.repo
+
+        class Swap(io.StringIO):
+            def __init__(self, target):
+                super().__init__()
+                self.target = target
+
+            def readline(self, *args):
+                local_git(repo, "update-ref", "refs/heads/feature", self.target)
+                return "y\n"
+
+        def ask(target):
+            local_git(repo, "update-ref", "refs/heads/feature", original)
+            err = io.StringIO()
+            result = guard.check(["switch", "feature"], start=repo, git_env=(), after_fetch=False, home=self.home,
+                                 stdin=Swap(target), stderr=err, tty=True)
+            return result, err.getvalue()
+
+        result, err = ask("evil")
+        self.assertEqual(result, (1, ""))
+        self.assertIn('+{"v": 2}', err)
+        self.assertNotIn('"evil"', err)
+        self.assertIn(guard.MSG_CHANGED_WHILE_ASKING, err)
+        # 対象のファイルが確認のときと同じなら（README だけが変わる）、許可する。
+        (code, state), err = ask("readme")
+        self.assertEqual(code, 0, err)
+        self.assertNotIn(guard.MSG_CHANGED_WHILE_ASKING, err)
+        self.assertEqual(json.loads(state)["expect"][".claude/settings.json"][1],
+                         ["100644", local_git(repo, "rev-parse", "readme:.claude/settings.json")])
+
     def test_checkout_forms(self):
         local_git(self.repo, "config", "alias.co", "checkout")
         self.assertEqual(self.check("co", "feature")[0], (1, ""))

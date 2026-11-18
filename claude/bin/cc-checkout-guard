@@ -154,6 +154,10 @@ MSG_UNSUPPORTED = (
 MSG_CHANGES = "cc-checkout-guard: 次のファイルは sandbox の外で自動で読み込まれたり動いたりします。この操作で変わります。"
 MSG_ASK = "続けますか？ [y/N]: "
 MSG_DECLINED = "cc-checkout-guard: 止めました。"
+MSG_CHANGED_WHILE_ASKING = (
+    "cc-checkout-guard: 確認している間にリポジトリが変わったので、git を実行せずに止めました。"
+    "動いている Claude Code のセッションが変えたおそれがあります。中身を確かめてから、もう一度実行してください。"
+)
 MSG_NO_TTY = (
     "cc-checkout-guard: ここでは確認できないので止めました。普段の端末で、差分を確かめてから次を実行してください:\n"
     "  {command}"
@@ -1704,9 +1708,21 @@ def check(argv: Sequence[str], *, start: Path, git_env: Sequence[str], after_fet
         stderr.write(render(plan) + MSG_ASK)
         stderr.flush()
         answer = stdin.readline()
+        newline = "" if answer.endswith("\n") else "\n"
         if answer.strip().lower() in ("y", "yes"):
-            return EXIT_ALLOW, state
-        stderr.write(("" if answer.endswith("\n") else "\n") + MSG_DECLINED + "\n")
+            # 人間が読んでいる間に ref などを差し替えられていないか、同じ計算をもう一度して比べる（I1）。
+            # 残る窓は、ここから git が書くまでの短い時間だけ（verify が後から見つける）。
+            try:
+                again = handler(inv, after_fetch)
+                same = (again is not None and again.changes == plan.changes and danger(again, inv) is None
+                        and state_of(again, inv) == state)
+            except GuardError:
+                same = False
+            if same:
+                return EXIT_ALLOW, state
+            stderr.write(newline + MSG_CHANGED_WHILE_ASKING + "\n")
+            return EXIT_STOP, ""
+        stderr.write(newline + MSG_DECLINED + "\n")
         return EXIT_STOP, ""
     except FetchFirst as e:
         # 関数が argv の git を動かしてから、--after-fetch で呼び直す。
