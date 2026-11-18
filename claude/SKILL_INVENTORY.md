@@ -85,7 +85,7 @@
 | `cso` | セキュリティ監査。範囲（`--infra`・`--code`・`--supply-chain`・`--owasp` など）と `--diff` を選べる | 自動 | 制限 | 規則でユーザーが指定したときだけにしている。sandbox では静的な監査だけで、`.env.example` などを追跡しているリポジトリでは失敗する（[`/cso` を sandbox で使う](#cso-sandbox)）。ソースはすべてランチャー経由で読む |
 | `qa` | サイト・API・CLI を試し、見つけたバグを直して確かめる | 自動 | 有効 | 修正ごとに commit する（作業ツリーが汚れていれば commit か stash を尋ねる）。ブラウザは Aside か gstack のヘッドレスブラウザ。後者は localhost で待ち受けるので sandbox では動かない |
 | `qa-only` | `qa` の報告だけ | 自動 | 有効 | 直さない、commit しない。ブラウザの制約は `qa` と同じ |
-| `browse` | 1 回だけのブラウザ作業（開く、操作、スクリーンショット、console） | 自動 | 有効 | ブラウザの制約は `qa` と同じ。Aside が sandbox で動くかは未確認 |
+| `browse` | 1 回だけのブラウザ作業（開く、操作、スクリーンショット、console） | 自動 | 有効 | ブラウザの制約は `qa` と同じ。Aside が sandbox で動くかは未確認。Claude が直接ブラウザを操作するときは Playwright MCP を使う（CLAUDE.md の Tools 節）ので、gstack のスキルの中で使う |
 | `benchmark` | ページの性能を測り、ベースラインと比べる | 自動 | 有効 | ブラウザが必要 |
 | `canary` | デプロイ後にページを定期的に確かめる | 自動 | 有効 | ブラウザが必要。長く待つ |
 | `office-hours` | 対話で「何を作るか」を詰め、設計文書を作る | 自動 | 有効 | 設計文書だけを書く。既定の保存先は `docs/designs/` と `~/.gstack/projects/`。DOCUMENTS.md が優先する |
@@ -294,7 +294,7 @@ sandbox の外で `/cso` を実行すると、保存先に秘密ファイルの�
 | 計画の人間レビュー | `/crit-review` | — | `/crit:crit`（sandbox で動かない） |
 | セキュリティ | `/security-review` | `/cso`（ユーザーが指定したとき） | 同じ差分に `/security-review` と `/cso` を重ねない |
 | コードの理解 | 通常の読解・Explore | `understand-chat`（グラフがあるとき）、`/pstack:how` | `/understand-anything:understand` を自分で起動しない |
-| E2E・ブラウザ | `/qa`（直す）、`/qa-only`（報告だけ） | `/browse` | `claude-in-chrome` |
+| E2E・ブラウザ | `/qa`（直す）、`/qa-only`（報告だけ） | Playwright MCP（Claude が操作して調べるとき）、`/browse`（gstack のスキルの中だけ） | `claude-in-chrome` |
 | PR・リリース | CLAUDE.md の Git 節、`/commit-staged-pr` | — | `/ship`（無効）、`/document-release`（明示だけ）、finishing の push |
 | 文脈の保存 | 自動の圧縮 | `/context-save`・`/context-restore` | pstack `recall`・`ketchup` |
 | Claude Code の改善 | `claude-automation-recommender`、直接の編集 | `writing-skills` | pstack `correct`・`automate-me`・`reflect` |

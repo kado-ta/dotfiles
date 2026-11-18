@@ -100,10 +100,13 @@ https://x.com/ai_database/status/2114184481951330365?s=12
 
 ## Tools
 
-- 対話型ブラウジング（クリック・フォーム入力・スクリーンショット・QA・ログイン後の状態確認）には gstack の `/browse` スキルを使う。
+- ブラウザの操作は次のように使い分ける。
+  - Claude が操作して調べるとき（公開ページのスクリーンショット・スタイル値、JS で描画される文書、ローカルの画面の確認）は Playwright MCP（`mcp__playwright__*`）を使う。`filename` 引数は付けない（フックが止める）。
+  - 繰り返す確認は、そのプロジェクトの `@playwright/test` にテストとして書き、実行は人間（端末・`!`）か CI に任せる（sandbox の中ではブラウザが起動しない）。プロジェクトに Playwright がなければ、導入は提案に留める。
+  - gstack のスキル（`/qa` など）の中の browse は、スキルの手順に従う。
 - 静的なドキュメント参照（公式ドキュメント・MDN・GitHub README など、読むだけ）は `WebFetch` を使ってよい。`settings.json` の allow リストにないドメインは、取得前に許可を求める。
 - `mcp__claude-in-chrome__*` ツールは使わない。
-- サイト・API・CLI の動作を通しで検証し、見つけたバグまで直す依頼には gstack の `/qa` を使う。個別のブラウザ操作は上記の `/browse` を使う。
+- サイト・API・CLI の動作を通しで検証し、見つけたバグまで直す依頼には gstack の `/qa` を使う。個別のブラウザ操作は上記の Playwright MCP を使う。
 - PR やブランチの差分のレビュー依頼には gstack の `/review` を使う。Codex レビューの方針は「Cross-model review (Codex)」のとおりで、これを置き換えない。
 - Crit での人間のレビューは `/crit-review` で開く。
   - 作業文書の design / plan を書き終えて承認を求めるときは、チャットで頼む代わりに `/crit-review <file>` で開く。`approved: true` が返ったら承認とみなす。
