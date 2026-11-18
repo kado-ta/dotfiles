@@ -11,6 +11,7 @@ Claude Code の設定を管理するディレクトリ。`setup.sh` で `~/.clau
 - `settings.json`・`CLAUDE.md`・`rules/`・`mcp.json`・`hooks/`・`scripts/statusline.sh` を `~/.claude/` にリンクする。`~/.claude/hooks/` が実ディレクトリの場合は、削除してからリンクに置き換える。
 - `skills/*/` の個人スキルを `~/.claude/skills/` にリンクする（全プロジェクトで使える）。
 - プラグイン `superpowers`・`claude-code-setup`・`ruby-lsp`・`crit`・`understand-anything`・`pstack` と、スキル集 [gstack](https://github.com/garrytan/gstack) をインストールする（インストール済みならスキップする）。`ruby-lsp` プラグインは LSP サーバーを含まないので、`ruby-lsp` gem を別途入れて PATH に通す。
+- `mcp/*.json` の MCP サーバーを、`scripts/register-mcp.sh` で user スコープに登録する（登録済みなら置き換える。[MCP サーバー](#mcp)）。
 
 `settings.json` のセキュリティ設定は、[【2026年最新版】Claude Codeで行うべきセキュリティ設定 10選 - Qiita](https://qiita.com/miruky/items/51db293a7a7d0d277a5d) を参考にしている。
 
@@ -57,6 +58,68 @@ bash claude/hooks/tests/test-guard-playwright-mcp.sh
 ```
 
 PR と main への push では、GitHub Actions が macOS の `/bin/bash` と `/usr/bin/python3` で同じテストを実行する。
+
+<a name="mcp"></a>
+
+## MCP サーバー
+
+`mcp/<name>.json` の定義を、`scripts/register-mcp.sh` が Claude Code の user スコープに `<name>` で登録する（`setup.sh` からも呼ばれる）。同じ名前の user スコープの登録を消してから足すので、何度実行してもよく、定義を変えれば置き換わる。`~/.claude.json` は状態や認証情報も持つので、直接編集・リンク・コミットしない。
+
+定義の `${HOME}` と `${NODE_BIN}`（mise のグローバル設定の Node.js の `bin`）は、登録するときに実際のパスに置き換える。公開リポジトリにユーザー名を入れないためと、端末以外から起動したときの PATH や、プロジェクトの mise の設定（信頼していないと shim が失敗する）に左右されないようにするため。ほかの `${VAR:-default}` は、Claude Code がサーバーの起動時に展開する。Node.js を更新したら、`register-mcp.sh` を再実行する。
+
+`~/.claude.json` に書くので、sandbox の外で実行する。端末で `/bin/bash ~/dotfiles/claude/scripts/register-mcp.sh` を実行するか、Claude Code のプロンプトで先頭に `!` を付けて実行する。登録したサーバーは、次に始めたセッションから使える。
+
+<a name="playwright-mcp"></a>
+
+### Playwright MCP
+
+[Playwright MCP](https://github.com/microsoft/playwright-mcp) を `playwright` で登録する。使い分けは `CLAUDE.md` の Tools 節にある。経緯と受け入れたリスクは [plan](../docs/work/20261118_playwright-mcp/plan.md#decisions) にある。
+
+| 項目 | 値 | 理由 |
+| --- | --- | --- |
+| 版 | `@playwright/mcp@0.0.85` に固定 | `@latest` では、ツールが増えたこと（ファイルを読み書きする引数など）に気づけない |
+| `--isolated` | プロファイルをメモリに置く | ログイン状態を残さない。並行したセッションでプロファイルがぶつからない |
+| `--browser chrome` | インストール済みの Google Chrome | ダウンロードが要らない。Chrome の自動更新でセキュリティ修正が入る。既定値と同じだが、版を上げて既定が変わったときに気づけるよう明示する |
+| `--output-dir` | `~/Library/Caches/playwright-mcp` | どのリポジトリにも出力しない。sandbox から書けない場所なので、symlink で出力先を向け替えられない |
+| `PLAYWRIGHT_MCP_HEADLESS` | 既定は `true` | ウィンドウを出さない。`--headless` 引数は環境変数より優先されて切り替えられなくなるので使わない |
+| `command`・`env.PATH` | mise のグローバル設定の Node.js | 上の `${NODE_BIN}` の理由 |
+
+MCP サーバーは sandbox の外で、ユーザーの権限で動く。sandbox の denyWrite・denyRead、Edit・Write の規則、ネットワークのプロキシは効かない。そのため、次を止めている。
+
+- `settings.json` の `permissions.deny`: `mcp__playwright__browser_run_code_unsafe`（Node のプロセスで任意のコードが動く。オプションでは無効にできない）と `mcp__playwright__browser_file_upload`（プロジェクトのファイルをページに送れる）。
+- フック `hooks/guard-playwright-mcp.sh`: `filename` 引数（相対パスはプロジェクトのルートから解決され、プロジェクトの中のどこにでも書ける）。
+
+<a name="playwright-mcp-install"></a>
+
+#### 導入
+
+1. Google Chrome を入れておく。
+2. `register-mcp.sh` を実行する（上記）。初回の起動で、npx が `@playwright/mcp` を取得する。
+3. `claude mcp get playwright` で、Scope が User config で、版とオプションが定義どおりかを確かめる。`claude mcp list` で接続を確かめる。
+
+<a name="playwright-mcp-headed"></a>
+
+#### ブラウザのウィンドウを表示する
+
+`PLAYWRIGHT_MCP_HEADLESS=false claude` でセッションを始める。`PLAYWRIGHT_MCP_HEADLESS=`（空）は既定値ではなく空に展開され、Playwright MCP が解釈できずに headed になる。
+
+<a name="playwright-mcp-update"></a>
+
+#### 更新
+
+1. 最新の版を調べる: `npm view @playwright/mcp version`
+2. [リリース](https://github.com/microsoft/playwright-mcp/releases)と `npx -y @playwright/mcp@<版> --help` で、オプションと既定値の変化を確かめる。
+3. [README のツールの一覧](https://github.com/microsoft/playwright-mcp#tools)で、既定で有効なツールに、ファイルのパスを受け取る引数（`filename` 以外の名前も）や、任意のコードを動かすものが増えていないかを確かめる。増えていれば、deny かフックを直す。
+4. `mcp/playwright.json` の版を書き換え、`register-mcp.sh` を実行して、Claude Code を再起動する。
+
+<a name="playwright-mcp-remove"></a>
+
+#### 削除
+
+1. `claude mcp remove playwright -s user`
+2. `mcp/playwright.json` を消す（残すと `setup.sh` が登録し直す）。
+3. `settings.json` の deny の 2 つとフックの登録、`.github/scripts/check-repo.py` のその検査を消す。
+4. 出力の `~/Library/Caches/playwright-mcp` を消す。npx のキャッシュは `~/.npm/_npx` にある。
 
 ## cc-safe-push
 

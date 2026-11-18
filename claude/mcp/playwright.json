@@ -1,0 +1,17 @@
+{
+  "type": "stdio",
+  "command": "${NODE_BIN}/npx",
+  "args": [
+    "-y",
+    "@playwright/mcp@0.0.85",
+    "--isolated",
+    "--browser",
+    "chrome",
+    "--output-dir",
+    "${HOME}/Library/Caches/playwright-mcp"
+  ],
+  "env": {
+    "PATH": "${NODE_BIN}:/usr/bin:/bin:/usr/sbin:/sbin",
+    "PLAYWRIGHT_MCP_HEADLESS": "${PLAYWRIGHT_MCP_HEADLESS:-true}"
+  }
+}

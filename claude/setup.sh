@@ -156,4 +156,7 @@ for skill_dir in "${SCRIPT_DIR}/skills"/*/; do
   link "${skill_dir}" "${CLAUDE_DIR}/skills/${skill_name}"
 done
 
+# MCP サーバー（mcp/*.json）を user スコープに登録する。登録済みなら置き換える。
+/bin/bash "${SCRIPT_DIR}/scripts/register-mcp.sh"
+
 echo "Success!"
