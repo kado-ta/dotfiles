@@ -307,7 +307,7 @@ sandbox の外で `/cso` を実行すると、保存先に秘密ファイルの�
 
 ### 共通の手順
 
-更新は、sandbox の外で `claude/scripts/update-skills.sh` を実行してまとめて行う。通常の端末で `/bin/bash ~/dotfiles/claude/scripts/update-skills.sh` を実行する（dotfiles では `mise run claude:update` でもよい）。gstack・user スコープのプラグイン・crit の CLI を更新し、gstack が `claude/settings.json` に書いた絶対パスを `~/` に戻し、cc-crit の profile テストまで実行する。Claude Code のプロンプトの `!` は、セッションによっては sandbox の中で動く（2026-11-19 に観測）。そのときは更新が失敗するうえ、cc-crit の profile テストはスキップされて終了コード 0 で終わり、「失敗した手順」に出ない。
+更新は、sandbox の外で `claude/scripts/update-skills.sh` を実行してまとめて行う。通常の端末で `/bin/bash ~/dotfiles/claude/scripts/update-skills.sh` を実行する（dotfiles では `mise run claude:update` でもよい）。gstack・user スコープのプラグイン・crit の CLI を更新し、gstack が `claude/settings.json` に書いた絶対パスを `~/` に戻し、cc-crit の profile テストまで実行する。Claude Code のプロンプトの `!` は、セッションによっては sandbox の中で動く（2026-11-19 に観測）。そのときは更新が失敗し、cc-crit の profile テストも「失敗した手順」に出る。profile テストは sandbox の中や crit がないときにスキップして終了コード 0 で終わるので、`update-skills.sh` は `CC_CRIT_PROFILE_REQUIRED=1` を付けて実行し、profile を確かめられないときは失敗させる。
 
 - Claude Code から `mise run` を使わないのは、mise が dotfiles のルートの設定ファイル（`mise.local.toml` など）を読み込み、ルートには sandbox から書けるため。paranoid で、信頼されていない設定は読み込まれないが、念のため mise を通さない。
 - 確認が要るプラグイン（マーケットプレイスが宣言したインストールコマンドが変わったもの）は、TTY がないと拒否されて失敗に数えられる。端末で `claude plugin update <id> --scope user` を実行する。
