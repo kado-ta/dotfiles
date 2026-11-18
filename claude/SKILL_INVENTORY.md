@@ -81,7 +81,7 @@
 | スキル | 機能（入力 → 出力） | 起動 | 状態 | 書き込み・依存・制約 |
 | --- | --- | --- | --- | --- |
 | `review` | ベースブランチとの差分（未 commit・未追跡も含む）をレビューし、直す | 自動 | 有効 | 専門のサブエージェント（テスト、保守性、セキュリティ、API の契約、マイグレーションなど）を並列に起動し、自動で直せるものは直す。commit・push はしない。レビュー bot のコメントがあると PR に返信を投稿する（sandbox では 403）。Codex の段は Bash から `codex exec` を呼ぶ（拒否される見込み） |
-| `codex` | Codex CLI による別モデルの意見（review・challenge・consult） | 自動 | 制限 | ファイルは変えない。Bash から `codex exec` を呼ぶので、auto モードの判定で拒否された記録がある（2026-11-11）。独立レビューは、ユーザーが `!` で `codex review` を実行する |
+| `codex` | Codex CLI による別モデルの意見（review・challenge・consult） | 自動 | 制限 | ファイルは変えない。Bash から `codex exec` を呼ぶので、auto モードの判定で拒否された記録がある（2026-11-11）。独立レビューは、ユーザーが通常の端末で `codex review` を実行する（`!` では 2026-11-18 から、app-server の初期化が `Operation not permitted` で失敗している） |
 | `cso` | セキュリティ監査。範囲（`--infra`・`--code`・`--supply-chain`・`--owasp` など）と `--diff` を選べる | 自動 | 制限 | 規則でユーザーが指定したときだけにしている。sandbox では静的な監査だけで、`.env.example` などを追跡しているリポジトリでは失敗する（[`/cso` を sandbox で使う](#cso-sandbox)）。ソースはすべてランチャー経由で読む |
 | `qa` | サイト・API・CLI を試し、見つけたバグを直して確かめる | 自動 | 有効 | 修正ごとに commit する（作業ツリーが汚れていれば commit か stash を尋ねる）。ブラウザは Aside か gstack のヘッドレスブラウザ。後者は localhost で待ち受けるので sandbox では動かない |
 | `qa-only` | `qa` の報告だけ | 自動 | 有効 | 直さない、commit しない。ブラウザの制約は `qa` と同じ |
@@ -146,17 +146,17 @@
    git ls-files -co --exclude-standard -- ':(glob)**/.env*' ':(glob)**/id_rsa*' ':(glob)**/id_ed25519*' ':(glob)**/.ssh/**' ':(glob)**/.aws/**' ':(glob)**/credentials' ':(glob)**/credentials/**' ':(glob)**/*.key' ':(glob)**/*.pem' ':(glob)**/.pgpass'
    ```
 
-2. ユーザーが `!` で消す。Claude からは書き込み拒否で消せない。次のコマンドは、未追跡のファイルか変更のあるファイルが 1 つでも混じると、何も消さない。未追跡か変更があるファイルは、ユーザーがリポジトリの外へ移して、後で戻す。
+2. ユーザーが通常の端末で消す。Claude からは書き込み拒否で消せない。Claude Code のプロンプトの `!` は、セッションによっては sandbox の中で動き、同じく消せない。次のコマンドは、未追跡のファイルか変更のあるファイルが 1 つでも混じると、何も消さない。未追跡か変更があるファイルは、ユーザーがリポジトリの外へ移して、後で戻す。
 
    ```sh
-   ! cd <repo> && git ls-files --error-unmatch -- <files> >/dev/null && git diff --quiet HEAD -- <files> && rm -- <files>
+   cd <repo> && git ls-files --error-unmatch -- <files> >/dev/null && git diff --quiet HEAD -- <files> && rm -- <files>
    ```
 
 3. `/cso` を実行する。
-4. ユーザーが `!` で戻し、`git status` で消えたままのファイルがないことを確かめる。
+4. ユーザーが通常の端末で戻し、`git status` で消えたままのファイルがないことを確かめる。
 
    ```sh
-   ! cd <repo> && git restore -- <files> && git status --short
+   cd <repo> && git restore -- <files> && git status --short
    ```
 
 sandbox の外で `/cso` を実行すると、保存先に秘密ファイルの写しが残り、7 日後に sandbox の中で動く掃除が止まる。そのときは、sandbox の外で古い実行（`~/.gstack/security/cso/<repo>/<run>`）を消す。
@@ -212,7 +212,7 @@ sandbox の外で `/cso` を実行すると、保存先に秘密ファイルの�
 | `/commit-staged-pr`（個人） | ステージ済みの変更だけを commit し、push と PR まで進める | 自動 | 有効 | cc-safe-push・cc-safe-pr を使う |
 | `code-style`（個人） | 命名・品質・スタイルの規則 | 自動 | 有効 | 全リポジトリに当たる個人の既定。リポジトリの規約・formatter・linter を優先する |
 | `salesforce-help`（個人） | help.salesforce.com の記事を読む | 自動 | 有効 | — |
-| `/sync-skill-docs`（dotfiles の project） | スキル・プラグインの更新の後、この文書・チートシート・規則を入っている状態に合わせる | 自動 | 有効 | 照合は `mise run claude:skills-check`。スナップショットの作り直しはユーザーが `!` で行う |
+| `/sync-skill-docs`（dotfiles の project） | スキル・プラグインの更新の後、この文書・チートシート・規則を入っている状態に合わせる | 自動 | 有効 | 照合は `mise run claude:skills-check`。スナップショットの作り直しはユーザーが通常の端末で行う |
 | `/claude-code-setup:claude-automation-recommender` | Claude Code の自動化（hooks・スキル・MCP など）を勧める | 自動 | 有効 | 読み取りだけ |
 
 - crit の plan-hook（PermissionRequest の ExitPlanMode）は、Plan Mode の plan を Crit で開く。そのときは `/crit-review` を使わない。
@@ -290,7 +290,7 @@ sandbox の外で `/cso` を実行すると、保存先に秘密ファイルの�
 | 機能の要件・設計 | `brainstorming` → `writing-plans` | `/pstack:architect with checkpoint`（複雑か高リスク） | `/spec`、`/autoplan`（無効） |
 | 変更の影響 | Claude 自身の読解 | `/pstack:blast-radius`（高リスク） | `understand-diff`（グラフが前提） |
 | 差分のレビュー | `/review` | `/pstack:interrogate`（高リスクで実行による証明が要るとき） | `/code-review`、`requesting-code-review` |
-| 独立したモデルのレビュー | ユーザーが `!` で実行する `codex review` | — | `/codex`（Bash から拒否される）、`interrogate`・`arena`（Claude 同士） |
+| 独立したモデルのレビュー | ユーザーが通常の端末で実行する `codex review` | — | `/codex`（Bash から拒否される）、`interrogate`・`arena`（Claude 同士） |
 | 計画の人間レビュー | `/crit-review` | — | `/crit:crit`（sandbox で動かない） |
 | セキュリティ | `/security-review` | `/cso`（ユーザーが指定したとき） | 同じ差分に `/security-review` と `/cso` を重ねない |
 | コードの理解 | 通常の読解・Explore | `understand-chat`（グラフがあるとき）、`/pstack:how` | `/understand-anything:understand` を自分で起動しない |
@@ -307,7 +307,7 @@ sandbox の外で `/cso` を実行すると、保存先に秘密ファイルの�
 
 ### 共通の手順
 
-更新は、sandbox の外で `claude/scripts/update-skills.sh` を実行してまとめて行う（Claude Code からは `! /bin/bash ~/dotfiles/claude/scripts/update-skills.sh`、端末では `mise run claude:update` でもよい）。gstack・user スコープのプラグイン・crit の CLI を更新し、gstack が `claude/settings.json` に書いた絶対パスを `~/` に戻し、cc-crit の profile テストまで実行する。
+更新は、sandbox の外で `claude/scripts/update-skills.sh` を実行してまとめて行う。通常の端末で `/bin/bash ~/dotfiles/claude/scripts/update-skills.sh` を実行する（dotfiles では `mise run claude:update` でもよい）。gstack・user スコープのプラグイン・crit の CLI を更新し、gstack が `claude/settings.json` に書いた絶対パスを `~/` に戻し、cc-crit の profile テストまで実行する。Claude Code のプロンプトの `!` は、セッションによっては sandbox の中で動く（2026-11-19 に観測）。そのときは更新が失敗するうえ、cc-crit の profile テストはスキップされて終了コード 0 で終わり、「失敗した手順」に出ない。
 
 - Claude Code から `mise run` を使わないのは、mise が dotfiles のルートの設定ファイル（`mise.local.toml` など）を読み込み、ルートには sandbox から書けるため。paranoid で、信頼されていない設定は読み込まれないが、念のため mise を通さない。
 - 確認が要るプラグイン（マーケットプレイスが宣言したインストールコマンドが変わったもの）は、TTY がないと拒否されて失敗に数えられる。端末で `claude plugin update <id> --scope user` を実行する。
@@ -324,7 +324,7 @@ sandbox の外で `/cso` を実行すると、保存先に秘密ファイルの�
      - 入っているスキルとエージェントが、すべてこの文書に載っているか
      - 「提供元」の表の版
      - gstack の状態ごとの節
-2. 終了コードが 0 なら終わり。1 なら、Claude に `/sync-skill-docs` を頼む（「gstack を更新した」と伝えるだけでもよい）。スキルが元のファイルを読んで文書を直し、差分を `/crit-review` で開く。スナップショットの作り直し（`! /usr/bin/python3 -B claude/scripts/skills-check.py snapshot`、または端末で `mise run claude:skills-snapshot`）は、ユーザーが行う。sandbox の中の Bash は `claude/` に書けないため。2 は照合できない状態（ファイルが読めない、この文書のアンカーがない）。
+2. 終了コードが 0 なら終わり。1 なら、Claude に `/sync-skill-docs` を頼む（「gstack を更新した」と伝えるだけでもよい）。スキルが元のファイルを読んで文書を直し、差分を `/crit-review` で開く。スナップショットの作り直し（通常の端末で、作業しているツリー（worktree ならそのディレクトリ）に移って `mise run claude:skills-snapshot` か `/usr/bin/python3 -B claude/scripts/skills-check.py snapshot`）は、ユーザーが行う。sandbox の中の Bash は `claude/` に書けず、Claude Code のプロンプトの `!` もセッションによっては sandbox の中で動くため。2 は照合できない状態（ファイルが読めない、この文書のアンカーがない）。
 3. `claude/settings.json` が書き換わっていないかを見る。CLI はキーの並びを変えることがあるので、`jq -S` で比べる。
 
 <a name="upgrade-source"></a>
@@ -333,7 +333,7 @@ sandbox の外で `/cso` を実行すると、保存先に秘密ファイルの�
 
 | 提供元 | 見ること |
 | --- | --- |
-| gstack（例: 1.99.4.0） | `update-skills.sh` か zsh の `gstack-upgrade` で更新する（`~/.claude/skills` に書くので sandbox の外で）。CHANGELOG で、廃止・追加されたスキルを見る。増えたスキルは `skillOverrides` が `on` のまま入るので、要るかを決める。`skillOverrides` は gstack が管理していない（dotfiles のコミット 02d0add で手で足した）。`/cso` が、読めない秘密ファイルで止まらなくなったかを確かめる（[`/cso` を sandbox で使う](#cso-sandbox)）。直っていれば、一時的に消す手順をやめ、規則で `/cso` を使う場面を決め直す。setup は、`~/.gstack/config.yaml` で on のフックを `claude/settings.json` に絶対パスで登録する（`_gstack_source` の項目）。どちらもこれを `~/` に戻す（setup は `~/` の項目も絶対パスに書き戻すので、更新のたびに要る）。`/gstack-upgrade` で更新したときは、後で `! /usr/bin/python3 -B claude/scripts/settings-home-paths.py` を実行する。timeline-stop-hook と ceo-review-gate は、`claude/setup.sh` のフラグで off にしている。項目が増えていたら、`gstack-config set <キー> off` を実行してから項目を消す（項目だけ消すと、次の setup で戻る） |
+| gstack（例: 1.99.4.0） | `update-skills.sh` か zsh の `gstack-upgrade` で更新する（`~/.claude/skills` に書くので sandbox の外で）。CHANGELOG で、廃止・追加されたスキルを見る。増えたスキルは `skillOverrides` が `on` のまま入るので、要るかを決める。`skillOverrides` は gstack が管理していない（dotfiles のコミット 02d0add で手で足した）。`/cso` が、読めない秘密ファイルで止まらなくなったかを確かめる（[`/cso` を sandbox で使う](#cso-sandbox)）。直っていれば、一時的に消す手順をやめ、規則で `/cso` を使う場面を決め直す。setup は、`~/.gstack/config.yaml` で on のフックを `claude/settings.json` に絶対パスで登録する（`_gstack_source` の項目）。どちらもこれを `~/` に戻す（setup は `~/` の項目も絶対パスに書き戻すので、更新のたびに要る）。`/gstack-upgrade` で更新したときは、後で通常の端末で `/usr/bin/python3 -B ~/dotfiles/claude/scripts/settings-home-paths.py` を実行する（`claude/settings.json` に書くので、sandbox の中で動いた `!` では失敗する）。timeline-stop-hook と ceo-review-gate は、`claude/setup.sh` のフラグで off にしている。項目が増えていたら、`gstack-config set <キー> off` を実行してから項目を消す（項目だけ消すと、次の setup で戻る） |
 | understand-anything（例: 2.9.8） | 自動更新が on なので、気づかないうちに変わる。hooks は sandbox の外で動く（2026-11-14 に承知のうえで自動更新を選んだ）。hooks が変わったら判断し直す |
 | crit（例: 1.8.15） | プラグインと CLI の版の組み合わせと、`plan-hook` の変化を見る。`update-skills.sh` は CLI の更新と cc-crit の profile テストまで実行する。個別に更新したときは、sandbox の外で `mise run crit:profile-test` を実行する |
 | pstack | [README](README.md) の手順で、hooks・スキルの一覧・依存を見直す。新しいスキルが増えても deny は広がらない |
