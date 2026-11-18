@@ -340,6 +340,10 @@ sudo install -o root -g wheel -m 0755 claude/bin/cc-checkout-guard /usr/local/li
 - 対象のパスが symlink か gitlink（submodule）になる。対象のパスの親が symlink である。新しい中身が NUL を含む
 - 対象のパスに、書くときに中身を変える属性（`filter`・`working-tree-encoding`・`ident`）が付く
 - 確かめる方法を持たない形。`rebase` などのサブコマンド、知らないオプション、`!` で始まる alias、`GIT_DIR` などの環境変数があるとき
+- ファイルに書く読み取りのコマンド。`--output` 付きの `show`・`log`・`diff` など、`config -f`、`archive`・`bundle`・`format-patch`
+- `worktree remove` で、登録のパスが実パスの実体のディレクトリでないか、その `.git` が登録を指していないとき
+
+確認して許可した `merge` が対象のファイルで衝突した後の `git merge --abort` は、確かめられないので止まる。`command git merge --abort` で戻す前に、`git diff HEAD -- <対象のパス>` で、戻した後の中身（HEAD。sandbox が動かしうる）を確かめる。
 
 sandbox の中かどうかは、OS に問い合わせて決める（環境変数は見ない）。その場所の判定は、`/usr/local/libexec/claude-guard/cc-checkout-guard status` で表示できる（`sandbox: yes` か `sandbox: no`）。
 
@@ -353,11 +357,11 @@ sandbox の中かどうかは、OS に問い合わせて決める（環境変数
 
 - 置き場所は `~/.cc-worktrees/<キー>/<name>`、ブランチは `worktree-<name>`。キーは、元のチェックアウトのディレクトリ名と `-` と、その物理パスの sha256 の先頭 12 桁。フックは `~/.cc-worktrees` と `<キー>` を自分だけが書けるディレクトリ（0700）として作る。symlink、ほかの持ち主のもの、グループかほかのユーザーが書けるものなら止まる。
 - 作成元は、ローカルの `origin/HEAD` が指すコミット。なければ元のチェックアウトの HEAD。fetch はしない。
-- 作った後に、すべてのリポジトリ向けの対象のファイルを、元のチェックアウトの同じファイルと比べる。違えば、作った worktree とブランチを消して失敗する。案内は理由ごとに出る（元のチェックアウトで `git pull` をする、既定ブランチに戻す、コミットしていない変更を片付ける、差し替えのおそれがあるので中身を確かめる）。
+- 作った後に、すべてのリポジトリ向けの対象のファイルを、元のチェックアウトの同じファイルと比べる。違えば、作った worktree とブランチを消して失敗する。案内は理由ごとに出る（元のチェックアウトで `git pull` をする、`origin/HEAD` を `git ls-remote --symref origin HEAD` で確かめる、コミットしていない変更を片付ける、差し替えのおそれがあるので中身を確かめる）。
 - `claude -w` は、元のチェックアウトの中で実行する。元のチェックアウトの外にある linked worktree から実行すると失敗する。
 - フックは 50 秒で打ち切る（`settings.json` のフックの timeout は 60 秒）。
 
-確かめ終わると、フックは印 `~/.cc-worktrees/<キー>/.verified/<name>` を書く。同じ名前でフックが呼ばれたときは、印の合う worktree だけを、確かめずに返す（開き直すときに Claude Code がフックを呼ぶかは、まだ確かめていない）。
+確かめ終わると、フックは印 `~/.cc-worktrees/<キー>/.verified/<name>` を書く。同じ名前でフックが呼ばれたときは、印の合う worktree だけを、確かめずに返す（同じ名前で開き直すと、Claude Code はフックをもう一度呼び、この worktree が開く。2026-11-19 に確かめた）。
 
 印のない worktree が登録されていると、`claude -w` は次の 2 つのコマンドを案内して失敗する。作る途中でフックが止められたなどで、確かめていない中身を持ちうる worktree である。フックは自分では消さない。使わずに、普段の端末で 2 つのコマンドを実行してから、もう一度 `claude -w` を実行する。
 
@@ -366,7 +370,7 @@ git -C <元のチェックアウト> worktree remove --force <置き場所>
 git -C <元のチェックアウト> branch -D worktree-<name>
 ```
 
-要らなくなった worktree は、普段の端末で次を実行して消す。印は、次に同じ名前で作るときに消える。Claude Code は、フックで作った worktree のブランチを消さない（公式の文書）。`WorktreeRemove` フックは登録していない。セッションを終えるときの扱いは、まだ確かめていない。
+要らなくなった worktree は、普段の端末で次を実行して消す。印は、次に同じ名前で作るときに消える。`WorktreeRemove` フックは登録していない。セッションを終えるときに Claude Code の `Remove worktree` を選ぶと、ディレクトリと登録は消えるが、ブランチ `worktree-<name>` と印は残る（2026-11-19 に確かめた。この削除は確認コマンドを通らない）。ブランチが残っていると、同じ名前の `claude -w` は失敗し続ける。中身が要らないことを確かめてから、下の 2 つ目のコマンド（`git -C <元のチェックアウト> branch -D worktree-<name>`）でブランチを消す。
 
 ```sh
 git -C <元のチェックアウト> worktree remove <置き場所>

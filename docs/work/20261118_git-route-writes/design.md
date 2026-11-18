@@ -200,6 +200,8 @@ sandbox の中で作られた git の中身（コミット・index・ref）が�
 
 - **作業ツリーに書かないもの**（`status`・`diff`・`log`・`fetch`・`add`・`commit`・`push` など）: すぐに許可する。
 - **作業ツリーに書くもの:** 書きうる中身を計算する。少なくとも、[research の 3.2](research-git-route.md#results-hooks) の 21 個を含める。ほかに、`apply`・`am`・`bisect`・`sparse-checkout`・`submodule update`・`rm`・`mv`・`clean`・`worktree add`、`merge`・`rebase`・`cherry-pick`・`revert`・`am` の `--continue`・`--skip`・`--abort` を含める。
+  - 2026-11-19 に追記（最終レビュー）: 実装は、`rebase`・`am`・`apply`・`bisect`・`sparse-checkout`・`submodule` の書き込みを計算せず、知らないサブコマンドと同じく止める（plan の Task 1・3）。`cherry-pick`・`revert` は 1 つのコミットだけを計算し、範囲と `--continue`・`--skip`・`--abort` は止める。範囲の各コミットや手順のファイルを git と同じに計算するのは、この作業に収まらなかったので、止める側に倒した（fail closed）。これらは、人間が自動で読み込まれるファイルが変わらないことを確かめてから、`command git` で実行する。
+  - 2026-11-19 に追記（最終レビュー）: 作業ツリーに書かないサブコマンドでも、`--output`（`show`・`log`・`diff`・`blame` など）と `config` の `-f`・`--file` はファイルに書くので止める。`archive`・`bundle`・`format-patch` も止める。
 - **知らないサブコマンドと、確かめられない形:** 止める（下の「止める場合」）。
 
 **書きうる中身の計算**
@@ -262,6 +264,7 @@ sandbox の中で作られた git の中身（コミット・index・ref）が�
 6. 失敗したら、作った worktree とブランチを消し、違ったファイルの一覧を出して 0 以外で終わる。Claude Code は作成を失敗にする。案内は、理由ごとに書き分ける。
    - 元のチェックアウトが既定ブランチにあり、origin より遅れている: 元のチェックアウトで `git pull` をする（関数が差分を見せる）。そのうえで、もう一度 `claude -w` を実行する。
    - 元のチェックアウトが別のブランチにある: 既定ブランチに戻すか、元のチェックアウトで作業する。
+     - 2026-11-19 に変更（最終レビュー）: `origin/HEAD` は sandbox が差し替えうるので、その先へ切り替えさせない。元のチェックアウトのブランチと `origin/HEAD` の指す先の 2 つの名前を出し、`git ls-remote --symref origin HEAD` で確かめて、違えば `git remote set-head origin --auto` で直すよう案内する。
    - 元のチェックアウトの対象のファイルに、コミットしていない変更がある: その変更を片付ける。
    - どれにも当たらない（origin の既定ブランチと、元のチェックアウトの同じブランチが一致しているのに違う）: ref か object が差し替えられたおそれがあるので、作業を止めて中身を確かめる。
 7. 成功したら、worktree のパスを標準出力の最後の行に出す。
@@ -382,9 +385,10 @@ sandbox の中で作られた git の中身（コミット・index・ref）が�
 ## 7. 受け入れるリスク
 
 - **確認を飛ばす形:** `command git`・`\git`・絶対パスの git と、zsh を通らない git。Claude が頼むのを規則で禁じるだけで、技術的には止めない。人間が頼まれて打てば通る。
-- **確認から実行までの差し替え:** 確認と git の実行のあいだに、sandbox が ref や index を差し替えると、確かめていない中身が書かれうる。`verify` が後から見つけるが、Claude Code の設定と hooks は、書かれた時点で効く。
+- **確認から実行までの差し替え:** 確認と git の実行のあいだに、sandbox が ref や index を差し替えると、確かめていない中身が書かれうる。y/N の確認の間（人間が差分を読む秒単位の時間）は、y の後に同じ計算をもう一度して比べ、違えば git を動かさずに止めるので、閉じた（2026-11-19、最終レビュー）。残るのは、確かめ直してから git が書くまでの短い時間だけである。`verify` が後から見つけるが、Claude Code の設定と hooks は、書かれた時点で効く。
 - **すでにある worktree:** `claude -w` で開き直すときと、`claude --resume` では確かめない。その worktree で動いたセッションは、自分の作業ツリーに書ける。前に `.claude/worktrees` に作った worktree は、元のチェックアウトで起動したセッションの sandbox からも書ける見込み（確かめていない）。
 - **`~/.cc-worktrees` の守り:** 持ち主と mode の確認では、人間と sandbox の中のプロセスを区別できない（同じ uid）。sandbox から書けないことに頼っているので、`~` で起動したセッション（sandbox がホームに書ける）があると崩れる。グローバルの CLAUDE.md は、`~` で起動しないよう求めている。
+- **`worktree remove` と Claude Code の Remove worktree:** git の `worktree remove` は、`<共通の gitdir>/worktrees/<id>/gitdir` の指す場所を中身ごと消す。確認コマンドは、登録のパスが実パスの実体のディレクトリで、その `.git` がこの登録を指すときだけ許可する（2026-11-19、最終レビュー）。Claude Code のセッションの終わりの `Remove worktree` は、zsh の `git` を通らないので（`WorktreeRemove` フックは登録していない）、この確認を通らない。Claude Code の sandbox の中からは gitdir のファイルを書けないことを確かめた（自分の worktree の `gitdir`・`commondir` への書き込みは拒否され、`.git/worktrees` の中に項目を作れない。2026-11-19）。`WorktreeRemove` フックで同じ確認をするのは、次の作業の候補にする。
 - **`.git/worktrees` の差し替え:** `<共通の gitdir>/worktrees` を、偽の共通の gitdir の下への symlink にすると、`worktree add` の子の git が偽の `config` と属性を読み、フィルタを sandbox の外で動かす（レビューで、一時ディレクトリで実測）。Claude Code の sandbox は `.git/worktrees` を、そのセッションの worktree のほかは読み取り専用にしていて、この中に項目を作れないことを確かめた（2026-11-19）。人間の `git worktree add` も同じ経路を通る。
 - **`git-lfs` の通信:** `worktree add` は、保護の対象でないパスに、人間の設定の `filter.lfs` を動かす。どのパスに当てるかは、sandbox が書ける属性で決まり、`git-lfs` は作成元の tree の `.lfsconfig` を読む。そのため、sandbox が選んだ先への通信が、sandbox の外で起こりうる（Claude Code の既定の `claude -w` と同じ）。書き込みの経路ではないので、この作業では扱わない。
 - **`claude -w` の変化:** Claude Code が worktree の作り方を変えると、フックとずれる。`#1234` の形（PR から作る）は、フックでは扱わない見込み（未確認）。
@@ -394,6 +398,7 @@ sandbox の中で作られた git の中身（コミット・index・ref）が�
 - **Claude の git の遅さ:** sandbox の中の git も、呼び出しごとに確認コマンドを起動する。
 - **`.worktreeinclude` の読み取りの経路:** 次の作業にする。
 - **入れ子のリポジトリの設定からコードが動く経路:** 今もすでに開いている。次の作業の最初にする（非目標）。
+- **対象の場所の中にある入れ子のリポジトリ:** 外側のチェックアウトの対象の場所の中に root がある入れ子のリポジトリ（たとえば、sandbox が `.claude/.git` に gitfile を置いたもの）で人間が git を打つと、root が `.claude` になり、外側から見た対象のファイル（`.claude/settings.json`）を対象と判定しない。入れ子のリポジトリの経路の一部として、次の作業で扱う（2026-11-19、最終レビュー）。
 
 <a name="builder"></a>
 
