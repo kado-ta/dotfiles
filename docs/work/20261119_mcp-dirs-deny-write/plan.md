@@ -215,6 +215,11 @@ done
 
 `register-mcp.sh` は sandbox の外で `cd ~` してから `npm install` するので、`~/.npmrc` を読む。`~` で起動したセッションが `registry=` を書き換えておくと、次に版を上げて登録したときに、差し替えた registry のパッケージを入れる場所に入れる。以前からある問題で、この差分で悪化していない。
 
+<a name="codex-review"></a>
+### Codex のレビュー
+
+2026-11-19 に、あなたが通常の端末で `codex review --base main` を 1 回実行した。結果は「修正必須の不具合なし」。`check-repo.py`・shellcheck・actionlint・`git diff --check` は Codex の環境で通った。`test-check-repo.py`・`test-register-mcp.py` は Codex の環境（読み取り専用）では一時ディレクトリを作れずに検証できなかったが、このセッションで実行して通った。権限の実際の動きは Codex は検証していないが、手順 7 で確かめた（[結果](#results)）。
+
 <a name="rollback"></a>
 ## ロールバック
 
