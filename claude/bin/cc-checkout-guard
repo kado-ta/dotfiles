@@ -1,0 +1,290 @@
+#!/usr/bin/env -i /Library/Developer/CommandLineTools/usr/bin/python3 -I
+# 呼び出し元の環境変数を引き継がず、xcrun の shim（/usr/bin/python3）を通さずに起動する。
+"""人間の git コマンドが、自動で読み込まれるファイルを書き換えないかを、実行の前に確かめる。
+
+/usr/local/libexec/claude-guard/cc-checkout-guard に root 所有でインストールする。
+sandbox の外で動くので、リポジトリの設定やフックを読まない git だけを使い、
+確かめられない形はすべて止める（fail closed）。
+"""
+from __future__ import annotations
+
+import os
+import pwd
+import shlex
+import subprocess
+import sys
+import unicodedata
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass
+from pathlib import Path
+from typing import TextIO
+
+# /usr/bin/git は xcrun の shim で、キャッシュや DEVELOPER_DIR で起動するプログラムが変わる。
+GIT = "/Library/Developer/CommandLineTools/usr/bin/git"
+GUARD_PATH = "/usr/local/libexec/claude-guard/cc-checkout-guard"
+EXIT_ALLOW = 0
+EXIT_STOP = 1
+EXIT_FETCH = 3
+GIT_TIMEOUT = 60
+ALIAS_DEPTH = 5
+
+PROTECTED_DIRS = (".claude", ".vscode", ".idea")  # パスのどこかの階層の名前
+PROTECTED_NAMES = (".mcp.json", "mise.lock")  # ファイル名
+PROTECTED_PREFIXES = (".env",)  # ファイル名の先頭
+DOTFILES_PROTECTED = (  # check-repo.py の PROJECT_DENY_WRITE と同じ文字列
+    "./claude", "./zsh", "./config", "./mise", "./mise.toml", "./ghostty", "./vscode", "./bin",
+    "./codex", "./biome", "./obsidian", "./aws", "./init.command", "./setup.command", "./CLAUDE.md",
+    "./.claude/rules",
+)
+DANGEROUS_ATTRS = ("filter", "working-tree-encoding", "ident")
+
+# 作業ツリーに書かないサブコマンド。
+READ_ONLY = frozenset(
+    "add archive blame branch bundle cat-file check-attr check-ignore check-mailmap check-ref-format "
+    "cherry clone commit commit-graph commit-tree config count-objects describe diff diff-files "
+    "diff-index diff-tree fetch for-each-ref format-patch fsck gc grep hash-object help init log "
+    "ls-files ls-remote ls-tree maintenance merge-base merge-tree mktag mktree name-rev notes prune "
+    "push range-diff reflog remote repack replace rev-list rev-parse shortlog show show-branch "
+    "show-ref status symbolic-ref tag update-index update-ref var verify-commit verify-pack "
+    "verify-tag version whatchanged write-tree".split()
+)
+# 人間の環境にあってよい GIT_ の名前。
+ALLOWED_GIT_ENV = frozenset(
+    "GIT_EDITOR GIT_SEQUENCE_EDITOR GIT_PAGER GIT_SSH GIT_SSH_COMMAND GIT_ASKPASS GIT_TERMINAL_PROMPT "
+    "GIT_AUTHOR_NAME GIT_AUTHOR_EMAIL GIT_AUTHOR_DATE GIT_COMMITTER_NAME GIT_COMMITTER_EMAIL "
+    "GIT_COMMITTER_DATE GIT_MERGE_AUTOEDIT GIT_PROGRESS_DELAY".split()
+)
+SKIPPED_GLOBALS = frozenset(("--no-pager", "-p", "--paginate", "--no-optional-locks"))
+HELP_GLOBALS = frozenset(("--version", "--help", "-h"))
+
+MSG_UNSUPPORTED = (
+    "cc-checkout-guard: この git の呼び出しは確かめられないので止めました（{reason}）。"
+    "自動で読み込まれるファイルが変わらないことを自分で確かめてから、command git で実行してください。"
+)
+MSG_CHANGES = "cc-checkout-guard: 次のファイルは sandbox の外で自動で読み込まれたり動いたりします。この操作で変わります。"
+MSG_ASK = "続けますか？ [y/N]: "
+MSG_DECLINED = "cc-checkout-guard: 止めました。"
+MSG_NO_TTY = (
+    "cc-checkout-guard: ここでは確認できないので止めました。普段の端末で、差分を確かめてから次を実行してください:\n"
+    "  {command}"
+)
+MSG_DANGER = "cc-checkout-guard: {path} が{kind}になるので止めました。中身を確かめてください。"
+MSG_ERROR = "cc-checkout-guard: 確かめる途中で失敗したので止めました（{reason}）。"
+MSG_VERIFY = (
+    "cc-checkout-guard: 警告: 確かめた後に、次のファイルが確認と違う中身で書かれました。"
+    "動いている Claude Code のセッションを止めて、中身を確かめてください。"
+)
+
+
+class GuardError(Exception):
+    """確かめられない、または失敗した。str(e) が理由。"""
+
+
+class FetchFirst(Exception):
+    """先に実行する git の引数を argv に持つ。"""
+
+    def __init__(self, argv: list[str]) -> None:
+        super().__init__(" ".join(argv))
+        self.argv = argv
+
+
+@dataclass(frozen=True)
+class Invocation:
+    cwd: Path  # -C を当てた後
+    root: Path | None  # 作業ツリーのルート。リポジトリの外なら None
+    globals: tuple[str, ...]  # 人間が渡した全体のオプション
+    config: tuple[str, ...]  # -c の値
+    sub: str  # alias を展開した後。なければ ""
+    args: tuple[str, ...]
+    argv: tuple[str, ...]  # 元の引数
+    start: Path  # 呼ばれたときのカレントディレクトリ
+
+
+class Plan:
+    """Task 2 以降で、サブコマンドごとの確認の内容を持たせる。"""
+
+
+# サブコマンド名 -> 確認の内容を作る関数（第 2 引数は after_fetch）。
+HANDLERS: dict[str, Callable[[Invocation, bool], Plan]] = {}
+
+
+def user_home() -> Path:
+    return Path(pwd.getpwuid(os.getuid()).pw_dir)
+
+
+def in_sandbox() -> bool:
+    # SANDBOX_RUNTIME などの環境変数は、呼び出し元が変えられるので見ない。
+    # import 時に副作用を起こさないよう、ctypes はここでだけ使う。
+    try:
+        import ctypes
+
+        lib = ctypes.CDLL("/usr/lib/libSystem.B.dylib")
+        func = lib.sandbox_check
+        func.argtypes = [ctypes.c_int, ctypes.c_char_p, ctypes.c_int]
+        func.restype = ctypes.c_int
+        return func(os.getpid(), None, 0) == 1
+    except Exception:
+        return False
+
+
+def _norm(text: str) -> str:
+    return unicodedata.normalize("NFC", text).casefold()
+
+
+def is_protected(root: Path, rel: str, home: Path) -> bool:
+    parts = [_norm(p) for p in rel.split("/") if p not in ("", ".")]
+    if not parts:
+        return False
+    name = parts[-1]
+    if any(p in PROTECTED_DIRS for p in parts):
+        return True
+    if name in PROTECTED_NAMES or name.startswith(PROTECTED_PREFIXES):
+        return True
+    if os.path.realpath(root) == os.path.realpath(home / "dotfiles"):
+        joined = "/".join(parts)
+        for item in DOTFILES_PROTECTED:
+            item = _norm(item.removeprefix("./"))
+            if joined == item or joined.startswith(item + "/"):
+                return True
+    return False
+
+
+def git_env(home: Path) -> dict[str, str]:
+    return {
+        "HOME": str(home), "PATH": "/usr/bin:/bin", "LC_ALL": "C",
+        "GIT_CONFIG_NOSYSTEM": "1", "GIT_TERMINAL_PROMPT": "0",
+        "GIT_OPTIONAL_LOCKS": "0", "GIT_NO_LAZY_FETCH": "1",
+    }
+
+
+def run_git(cwd: Path, *args: str, config: Sequence[str] = (), stdin: bytes | None = None,
+            ok: Sequence[int] = (0,)) -> bytes:
+    # 人間の -c より後に自分の値を置き、こちらを勝たせる。
+    cmd = [GIT, "-C", str(cwd)]
+    for value in config:
+        cmd += ["-c", value]
+    cmd += ["-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null", "--no-pager", *args]
+    # text=True にしない。CR を LF に変換するので、CR を含むパスを別のパスと誤認する。
+    cp = subprocess.run(
+        cmd, env=git_env(user_home()), input=stdin,
+        stdin=None if stdin is not None else subprocess.DEVNULL,
+        capture_output=True, check=False, timeout=GIT_TIMEOUT,
+    )
+    if cp.returncode not in ok:
+        # stderr はメッセージに含めない。リポジトリ内のファイルの内容が出ることがある。
+        raise GuardError(f"git {args[0]} が失敗しました")
+    return cp.stdout
+
+
+def parse(start: Path, argv: Sequence[str], git_env_names: Sequence[str], home: Path) -> Invocation:
+    for name in git_env_names:
+        if name not in ALLOWED_GIT_ENV:
+            raise GuardError(f"環境変数 {name} が設定されています")
+    cwd = start
+    config: list[str] = []
+    glob: list[str] = []
+    sub = ""
+    args: tuple[str, ...] = ()
+    i = 0
+    while i < len(argv):
+        tok = argv[i]
+        if tok in HELP_GLOBALS:
+            break
+        if tok in SKIPPED_GLOBALS:
+            glob.append(tok)
+        elif tok in ("-C", "-c"):
+            if i + 1 >= len(argv):
+                raise GuardError(f"{tok} の値がありません")
+            value = argv[i + 1]
+            glob += [tok, value]
+            if tok == "-C":
+                cwd = cwd / value
+            else:
+                if _norm(value).startswith("alias."):
+                    raise GuardError("-c alias は確かめられません")
+                config.append(value)
+            i += 1
+        elif tok.startswith("-"):
+            raise GuardError(f"全体のオプション {tok} は確かめられません")
+        else:
+            sub, args = tok, tuple(argv[i + 1:])
+            break
+        i += 1
+    if sub and sub not in READ_ONLY and sub not in HANDLERS:
+        for _ in range(ALIAS_DEPTH):
+            value = os.fsdecode(run_git(cwd, "config", "--get", f"alias.{sub}", config=config, ok=(0, 1))).strip()
+            if not value:
+                break
+            if value.startswith("!"):
+                raise GuardError(f"alias {sub} はシェルコマンドです")
+            try:
+                words = shlex.split(value)
+            except ValueError:
+                raise GuardError(f"alias {sub} を読めません") from None
+            if not words or words[0].startswith("-"):
+                raise GuardError(f"alias {sub} は展開できません")
+            sub, args = words[0], tuple(words[1:]) + args
+            if sub in READ_ONLY or sub in HANDLERS:
+                break
+        else:
+            raise GuardError("alias の展開が深すぎます")
+    try:
+        root: Path | None = Path(os.fsdecode(run_git(cwd, "rev-parse", "--show-toplevel", config=config)).removesuffix("\n"))
+    except GuardError:
+        root = None
+    return Invocation(
+        cwd=cwd, root=root, globals=tuple(glob), config=tuple(config), sub=sub,
+        args=args, argv=tuple(argv), start=start,
+    )
+
+
+def check(argv: Sequence[str], *, start: Path, git_env: Sequence[str], after_fetch: bool, home: Path,
+          stdin: TextIO, stderr: TextIO, tty: bool) -> tuple[int, str]:
+    if in_sandbox():
+        return EXIT_ALLOW, ""
+    try:
+        inv = parse(start, argv, git_env, home)
+        if inv.sub == "" or inv.sub in READ_ONLY or "-h" in inv.args or "--help" in inv.args or inv.root is None:
+            return EXIT_ALLOW, ""
+        if inv.sub not in HANDLERS:
+            raise GuardError(f"{inv.sub} は確かめられません")
+        # Task 2 で、ここに HANDLERS[inv.sub](inv, after_fetch) の Plan の処理を足す。
+        raise GuardError(f"{inv.sub} は確かめられません")
+    except GuardError as e:
+        stderr.write(MSG_UNSUPPORTED.format(reason=e) + "\n")
+        return EXIT_STOP, ""
+    except Exception as e:
+        stderr.write(MSG_ERROR.format(reason=type(e).__name__) + "\n")
+        return EXIT_STOP, ""
+
+
+def main(argv: list[str]) -> int:
+    if argv == ["status"]:
+        sys.stdout.write("sandbox: yes\n" if in_sandbox() else "sandbox: no\n")
+        return 0
+    if argv[:1] == ["check"] and "--" in argv:
+        sep = argv.index("--")
+        opts, git_args = argv[1:sep], argv[sep + 1:]
+        after_fetch = False
+        names: tuple[str, ...] = ()
+        i = 0
+        while i < len(opts):
+            if opts[i] == "--after-fetch":
+                after_fetch = True
+            elif opts[i] == "--git-env" and i + 1 < len(opts):
+                names = tuple(n for n in opts[i + 1].split(",") if n)
+                i += 1
+            else:
+                return 1
+            i += 1
+        code, out = check(
+            git_args, start=Path.cwd(), git_env=names, after_fetch=after_fetch, home=user_home(),
+            stdin=sys.stdin, stderr=sys.stderr, tty=sys.stdin.isatty() and sys.stderr.isatty(),
+        )
+        sys.stdout.write(out)
+        return code
+    return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
