@@ -47,7 +47,7 @@
 | `/pstack:arena` | 実装・文面・設定の候補を並べて比べたいとき（`architect` の中でも使われるので、重ねない） |
 | `/pstack:blast-radius` | 高リスクの差分で、差分の外への影響を確かめたいとき |
 | `/pstack:interrogate` | `/review` の後に、実行で確かめられる不変条件が残るとき |
-| `! codex review --base <base> -c 'sandbox_mode="read-only"' -c skills.include_instructions=false` | 複雑か高リスクの変更が完了する前（Bash からは実行しない） |
+| 通常ターミナルで `codex review --base <base> -c 'sandbox_mode="read-only"' -c skills.include_instructions=false` | 複雑か高リスクの変更が完了する前（Bash からは実行しない。`!` では失敗することがある） |
 | `/careful`・`/freeze <dir>` | 本番に近い環境を調べる前（危険なコマンドの警告と、編集範囲の制限） |
 
 ## Exit criteria

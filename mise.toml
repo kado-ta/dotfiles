@@ -27,15 +27,16 @@ description = "入っているスキルを、スナップショットとスキ�
 run = "/usr/bin/python3 -B claude/scripts/skills-check.py check"
 
 [tasks."claude:skills-snapshot"]
-description = "今のスキルの状態を claude/skills-snapshot.json に書く（文書を合わせた後に、端末か Claude Code の ! で実行する。sandbox の中からは claude/ に書けない）"
+description = "今のスキルの状態を claude/skills-snapshot.json に書く（文書を合わせた後に、通常の端末で実行する。sandbox の中からは claude/ に書けない）"
 run = "/usr/bin/python3 -B claude/scripts/skills-check.py snapshot"
 
 [tasks."claude:skill-usage"]
 description = "期間内のスキルの使われ方を集計する（例: mise run claude:skill-usage 2026-11-16 2026-12-07）"
 run = "/usr/bin/python3 -B claude/scripts/skill-usage.py"
 
-# スキル・プラグインをまとめて更新する。sandbox の中からは ~/.claude と Homebrew に書けないので、端末で実行する。
-# Claude Code からは mise を通さず ! /bin/bash ~/dotfiles/claude/scripts/update-skills.sh で実行する。
+# スキル・プラグインをまとめて更新する。sandbox の中からは ~/.claude と Homebrew に書けないので、通常の端末で実行する。
+# Claude Code の ! は、セッションによっては sandbox の中で動き、更新が失敗するうえ、profile のテストがスキップされて
+# 成功に数えられる。! で実行するときは、mise を通さず /bin/bash ~/dotfiles/claude/scripts/update-skills.sh で実行する。
 # mise は dotfiles のルートの設定ファイル（mise.local.toml など）を読み込み、ルートには sandbox から書けるため。
 # paranoid で、信頼されていない設定は読み込まれないが、念のため mise を通さない。
 # 終わったら、Claude Code を再起動する前に /sync-skill-docs で文書と hooks を見直す。

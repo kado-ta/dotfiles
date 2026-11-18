@@ -1,7 +1,8 @@
 """cc-crit.sb（Crit 専用の Seatbelt profile）が、必要なものだけを許可していることを確かめる。
 
 Claude Code の sandbox の中では sandbox-exec を入れ子にできないので、その場合はスキップする。
-人間が `!` で実行するか、CI（macOS）で実行する。crit か Homebrew の git がない環境でもスキップする。
+人間が通常の端末で実行するか、CI（macOS）で実行する。Claude Code の `!` は、セッションによっては
+sandbox の中で動き、スキップされる。crit か Homebrew の git がない環境でもスキップする。
 """
 import errno
 import json

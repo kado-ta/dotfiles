@@ -1,8 +1,9 @@
 #!/bin/bash
 # gstack・Claude Code のプラグイン・crit の CLI をまとめて更新する。
-# ~/.claude/skills・~/.claude/plugins・Homebrew に書くので、sandbox の外で実行する。
-#   Claude Code から: ! /bin/bash ~/dotfiles/claude/scripts/update-skills.sh
-#   端末から: 上と同じか、dotfiles で mise run claude:update
+# ~/.claude/skills・~/.claude/plugins・Homebrew に書くので、sandbox の外（通常の端末）で実行する。
+#   端末から: /bin/bash ~/dotfiles/claude/scripts/update-skills.sh か、dotfiles で mise run claude:update
+# Claude Code の ! は、セッションによっては sandbox の中で動く。そのときは更新の手順が失敗するうえ、
+# 最後の crit-profile-test はスキップされて終了コード 0 になり、成功に数えられる。
 # Claude Code から mise run を使わないのは、mise が dotfiles のルートの設定ファイル（mise.local.toml など）を
 # 読み込み、ルートには sandbox から書けるため（paranoid で、信頼されていない設定は読み込まれないが、念のため通さない）。
 # 同じ理由で、ホームに移ってから各コマンドを実行し、
