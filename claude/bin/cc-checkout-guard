@@ -45,7 +45,7 @@ DANGEROUS_ATTRS = ("filter", "working-tree-encoding", "ident")
 # 作業ツリーに書かないサブコマンド。
 READ_ONLY = frozenset(
     "add archive blame branch bundle cat-file check-attr check-ignore check-mailmap check-ref-format "
-    "cherry clone commit commit-graph commit-tree config count-objects describe diff diff-files "
+    "cherry clone commit-graph commit-tree config count-objects describe diff diff-files "
     "diff-index diff-tree fetch for-each-ref format-patch fsck gc grep hash-object help init log "
     "ls-files ls-remote ls-tree maintenance merge-base merge-tree mktag mktree name-rev notes prune "
     "push range-diff reflog remote repack replace rev-list rev-parse shortlog show show-branch "
@@ -995,6 +995,8 @@ def _pick_plan(inv: Invocation, revert: bool) -> Plan:
     if a.pathspec is not None or len(a.positional) != 1:
         raise GuardError(f"{sub} の引数を確かめられません")
     name = a.positional[0]
+    # -e は git commit を動かし、git commit は MERGE_AUTOSTASH を書く（実測）。
+    _no_autostash(inv)
     _merge_settings(inv, merge=False)
     # git は - を @{-1} として読み、rev-parse と同じく解決する（実測）。
     commit = _commit_rev(inv, "@{-1}" if name == "-" else name)
@@ -1241,8 +1243,18 @@ def plan_worktree(inv: Invocation, after_fetch: bool) -> Plan | None:
     return Plan(root=Path(root), changes=tuple(changes), sources=(tree,), fresh=True, old_root=main)
 
 
+def plan_commit(inv: Invocation, after_fetch: bool) -> Plan | None:
+    """commit（--amend を含む。MERGE_HEAD がなくても）は、コミットの後に MERGE_AUTOSTASH の中身を書く（実測）。
+
+    それ以外は作業ツリーを書かないので、オプションは読まない。
+    """
+    _no_autostash(inv)
+    return None
+
+
 # サブコマンド名 -> 確認の内容を作る関数（第 2 引数は after_fetch）。None は作業ツリーの対象を書かない。
 HANDLERS: dict[str, Callable[[Invocation, bool], Plan | None]] = {
+    "commit": plan_commit,
     "switch": plan_switch,
     "checkout": plan_checkout,
     "restore": plan_restore,

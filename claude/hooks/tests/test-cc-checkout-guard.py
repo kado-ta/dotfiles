@@ -783,6 +783,29 @@ class MergeTests(TreeBase):
         # --quit は作業ツリーを書かず、自動の stash を stash の一覧に入れる。
         self.assertEqual(self.check("merge", "--quit")[0], (0, ""))
 
+    def test_commit_with_planted_autostash_stops(self):
+        # git commit（--amend も、MERGE_HEAD がなくても）と、git commit を動かす cherry-pick -e・revert -e は、
+        # コミットの後に MERGE_AUTOSTASH の中身を書く（実測）。
+        self.settings.write_text('{"evil": 1}\n', encoding="utf-8")
+        stash = local_git(self.repo, "stash", "create")
+        local_git(self.repo, "checkout", "--", ".claude/settings.json")
+        (self.repo / ".git" / "MERGE_HEAD").write_text(local_git(self.repo, "rev-parse", "docs") + "\n",
+                                                       encoding="utf-8")
+        autostash = self.repo / ".git" / "MERGE_AUTOSTASH"
+        autostash.write_text(stash + "\n", encoding="utf-8")
+        local_git(self.repo, "config", "alias.ci", "commit")
+        for argv in (("commit", "-q", "--no-edit"), ("ci", "-m", "x"), ("commit", "--amend", "--no-edit"),
+                     ("cherry-pick", "-e", "feature"), ("revert", "-e", "HEAD")):
+            with self.subTest(argv=argv):
+                result, err = self.check(*argv)
+                self.assertEqual(result, (1, ""))
+                self.assertIn("MERGE_AUTOSTASH", err)
+                self.assertEqual(self.settings.read_text(encoding="utf-8"), '{"v": 1}\n')
+        autostash.unlink()
+        for argv in (("commit", "-q", "--no-edit"), ("ci", "-m", "x"), ("commit", "--amend", "--no-edit")):
+            with self.subTest(argv=argv, autostash=False):
+                self.assertEqual(self.check(*argv), ((0, ""), ""))
+
     def test_rerere_stops_protected_conflict(self):
         # rr-cache があると、git は記録した解決を衝突したファイルに書く（rerere.enabled がなくても。実測）。
         self.commit_settings('{"v": 3}\n')
