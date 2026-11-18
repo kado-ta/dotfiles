@@ -1183,12 +1183,24 @@ def plan_mv(inv: Invocation, after_fetch: bool) -> Plan | None:
     return None
 
 
-def _main_root(inv: Invocation) -> Path:
-    """元のチェックアウトのルート（共通の gitdir の親）。"""
+def _main_checkout(inv: Invocation) -> Path | None:
+    """元のチェックアウトのルート（共通の gitdir の親）。bare のリポジトリには無いので None。
+
+    --separate-git-dir などで共通の gitdir の名前が .git でないときは、git 自身も場所を知らないので止める（R19）。
+    """
+    if _git_line(inv, "config", "--type=bool", "--get", "core.bare", ok=(0, 1)) == "true":
+        return None
     common = Path(_git_line(inv, "rev-parse", "--path-format=absolute", "--git-common-dir"))
     if common.name != ".git":
         raise GuardError("元のチェックアウトを確かめられません")
     return common.parent
+
+
+def _main_root(inv: Invocation) -> Path:
+    main = _main_checkout(inv)
+    if main is None:
+        raise GuardError("元のチェックアウトを確かめられません")
+    return main
 
 
 def compare_with_main(main_root: Path, cwd: Path, treeish: str) -> list[Change]:
@@ -1250,22 +1262,73 @@ def _worktree_target(inv: Invocation, a: Args, path: str, rev: str | None) -> st
     return commit
 
 
+def _physical(inv: Invocation, name: str) -> str:
+    """cwd から見た name の絶対パス。
+
+    途中が symlink だと（symlink の後の .. を含む）、git が書く場所は名前の上の場所と違う（実測）。決めきれないので止める。
+    """
+    joined = os.path.join(os.path.realpath(inv.cwd), name)
+    path = os.path.normpath(joined)
+    if os.path.realpath(joined) != path:
+        raise GuardError(f"{name} の途中に symlink があります")
+    return path
+
+
+def _inside(place: str, root: Path) -> str | None:
+    """place が root の中なら、root からの相対パス。
+
+    パスの文字列ではなく、ある祖先のファイルの同一性（st_dev, st_ino）で比べる（大文字と小文字、Unicode の正規化の違いでも同じディレクトリ）。
+    """
+    target = os.stat(root)
+    path, tail = place, []
+    while True:
+        try:
+            st = os.stat(path)
+        except (FileNotFoundError, NotADirectoryError):
+            st = None
+        if st is not None and (st.st_dev, st.st_ino) == (target.st_dev, target.st_ino):
+            return "/".join(reversed(tail))
+        parent, name = os.path.split(path)
+        if parent == path:
+            return None
+        tail.append(name)
+        path = parent
+
+
 def _protected_place(inv: Invocation, place: str) -> None:
-    """place（実パス）が、今か元のチェックアウトの対象のパス（またはその下）なら止める。
+    """place（物理パス）が、今か元のチェックアウトの対象のパス（またはその下）なら止める。
 
     新しい作業ツリーの中のファイルは、そのチェックアウトから見ると対象のパスになる（.claude/skills/x/SKILL.md など）。
     """
     assert inv.root is not None
-    roots = [inv.root]
-    common = Path(_git_line(inv, "rev-parse", "--path-format=absolute", "--git-common-dir"))
-    if common.name == ".git":
-        roots.append(common.parent)
-    for root in roots:
-        rel = os.path.relpath(place, os.path.realpath(root))
-        if rel in (os.curdir, os.pardir) or rel.startswith(os.pardir + os.sep):
-            continue
-        if is_protected(root, rel, inv.home):
+    main = _main_checkout(inv)
+    for root in (inv.root, *([main] if main is not None else [])):
+        rel = _inside(place, root)
+        if rel and is_protected(root, rel, inv.home):
             raise GuardError(f"{place} は自動で読み込まれるパスの中です")
+
+
+def _worktree_name(inv: Invocation, arg: str) -> str:
+    """worktree move が動かす worktree の、登録されたパスの最後の名前。
+
+    git の find_worktree は、登録されたパスの後ろ（名前の区切りから）が arg と一致するものがちょうど 1 つならそれを、
+    なければ arg の実パスと同じものを使う。どちらの候補も集め、最後の名前が 1 つに決まらなければ止める。
+    """
+    out = run_git(inv.cwd, "worktree", "list", "--porcelain", "-z", config=inv.config)
+    paths = [os.fsdecode(rec[len(b"worktree "):]) for rec in out.split(b"\0") if rec.startswith(b"worktree ")]
+    key = _norm(arg)
+    found = [p for p in paths if key and (_norm(p) == key or _norm(p).endswith("/" + key))]
+    target = os.path.join(os.path.realpath(inv.cwd), arg)
+    for p in paths:
+        try:
+            if os.path.samefile(p, target):
+                found.append(p)
+        except OSError:
+            continue  # ない worktree（prunable）と、ない arg
+    names = {os.path.basename(p) for p in found}
+    if len(names) != 1 or "" in names:
+        raise GuardError(f"{arg} がどの worktree かを確かめられません")
+    return names.pop()
 
 
 def _worktree_move(inv: Invocation, args: Sequence[str]) -> None:
@@ -1274,13 +1337,11 @@ def _worktree_move(inv: Invocation, args: Sequence[str]) -> None:
     pos = a.positional + (a.pathspec or ())
     if len(pos) != 2:
         raise GuardError("worktree move の引数を確かめられません")
-    dest = os.path.realpath(os.path.join(os.path.realpath(inv.cwd), pos[1]))
-    places = [dest]
-    if os.path.isdir(dest):
-        # git は、行き先がディレクトリなら、その中に同じ名前で動かす。
-        places.append(os.path.join(dest, os.path.basename(pos[0].rstrip("/"))))
-    for place in places:
-        _protected_place(inv, place)
+    place = _physical(inv, pos[1])
+    if os.path.isdir(place):
+        # git は、行き先がディレクトリなら、その中に、登録された worktree のパスの最後の名前で動かす。
+        place = posixpath.join(place, _worktree_name(inv, pos[0]))
+    _protected_place(inv, place)
 
 
 def plan_worktree(inv: Invocation, after_fetch: bool) -> Plan | None:
@@ -1298,10 +1359,7 @@ def plan_worktree(inv: Invocation, after_fetch: bool) -> Plan | None:
     pos = a.positional + (a.pathspec or ())
     if not 1 <= len(pos) <= 2:
         raise GuardError("worktree add の引数を確かめられません")
-    # 行き先のパスの途中が symlink だと、確かめる場所と git が書く場所が違う。
-    root = os.path.normpath(os.path.join(os.path.realpath(inv.cwd), pos[0]))
-    if os.path.realpath(root) != root:
-        raise GuardError(f"{pos[0]} の途中に symlink があります")
+    root = _physical(inv, pos[0])
     _protected_place(inv, root)
     if a.last("--checkout", "--no-checkout") == "--no-checkout":
         return None

@@ -1090,6 +1090,64 @@ class OtherWriteTests(TreeBase):
         self.assertEqual(self.check("worktree", "move", "../wt", "../wt-moved")[0], (0, ""))
         self.assertEqual(self.check("worktree", "move", "../wt", "sub")[0], (0, ""))
 
+    def test_worktree_destinations_resolve_like_git(self):
+        # 行き先は、git と同じく物理的に決まる（再レビューで実測）。決めきれない形は止める。
+        self.branch("skill", "main", {"SKILL.md": "# evil\n"})
+        protected_place = "は自動で読み込まれるパスの中です"
+        # (a) symlink の後の ..: git は symlink の先の親に書く。
+        (self.repo / ".claude" / "skills" / "sub").mkdir(parents=True)
+        os.symlink(self.repo / ".claude" / "skills" / "sub", self.repo / "link")
+        for path in ("link/../x", "link/x"):
+            with self.subTest(path=path):
+                result, err = self.check("worktree", "add", path, "skill")
+                self.assertEqual(result, (1, ""))
+                self.assertIn("symlink", err)
+        wt = self.root / "wt"
+        local_git(self.repo, "worktree", "add", "-q", "--detach", str(wt), "docs")
+        # (b) 祖先の名前の大文字と小文字だけが違う（大文字と小文字を区別しないファイルシステム）。
+        if (self.root / "REPO").exists():
+            for argv in (("worktree", "add", "../REPO/.claude/skills/x", "skill"),
+                         ("worktree", "move", "../wt", "../REPO/.claude/skills/y")):
+                with self.subTest(argv=argv):
+                    result, err = self.check(*argv)
+                    self.assertEqual(result, (1, ""))
+                    self.assertIn(protected_place, err)
+        # (c) 行き先がディレクトリなら、git は登録された worktree のパスの最後の名前で、その中に動かす。
+        side = self.root / "side"
+        side.mkdir()
+        local_git(self.repo, "worktree", "add", "-q", str(side / ".claude"), "skill")
+        os.symlink(side / ".claude", self.root / "wtlink")
+        (self.repo / "pkg").mkdir()
+        for name in ("../wtlink", "../side/.claude/.", "../side/.claude"):
+            with self.subTest(name=name):
+                result, err = self.check("worktree", "move", name, "pkg")
+                self.assertEqual(result, (1, ""))
+                self.assertIn("pkg/.claude " + protected_place, err)
+        self.assertEqual(self.check("worktree", "move", "../side/.claude", "../moved")[0], (0, ""))
+        result, err = self.check("worktree", "move", "../none", "pkg")
+        self.assertEqual(result, (1, ""))
+        self.assertIn("どの worktree かを確かめられません", err)
+
+    def test_worktree_main_checkout_must_be_known(self):
+        # --separate-git-dir の共通の gitdir は .git という名前ではなく、元のチェックアウトの場所が決まらない（R19）。
+        sep = self.root / "sep"
+        local_git(self.root, "init", "-q", "-b", "main", "--separate-git-dir", str(self.root / "sep.gitdir"), str(sep))
+        (sep / "a.txt").write_text("a\n", encoding="utf-8")
+        local_git(sep, "add", "a.txt")
+        local_git(sep, "-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-q", "-m", "a")
+        local_git(sep, "worktree", "add", "-q", "-b", "w", str(self.root / "sepwt"))
+        for argv in (("worktree", "move", "../sepwt", "../sepwt2"), ("worktree", "add", "--no-checkout", "../sepwt3")):
+            with self.subTest(argv=argv):
+                result, err = self.check(*argv, start=sep)
+                self.assertEqual(result, (1, ""))
+                self.assertIn("元のチェックアウトを確かめられません", err)
+        # bare のリポジトリには元のチェックアウトがないので、今のチェックアウトだけを確かめる。
+        bare = self.root / "bare.git"
+        local_git(self.root, "clone", "-q", "--bare", str(self.repo), str(bare))
+        local_git(bare, "worktree", "add", "-q", str(self.root / "bw1"), "main")
+        local_git(bare, "worktree", "add", "-q", str(self.root / "bw2"), "docs")
+        self.assertEqual(self.check("worktree", "move", "../bw2", "../bw3", start=self.root / "bw1")[0], (0, ""))
+
 
 if __name__ == "__main__":
     unittest.main()
