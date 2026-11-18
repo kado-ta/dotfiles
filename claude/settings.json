@@ -154,7 +154,6 @@
       "Read(~/Dev/**/*.pem)",
       "Read(**/.pgpass)",
       "Read(~/**/.pgpass)",
-      "Edit(/etc/**)",
       "Edit(**/.env*)",
       "Edit(**/mise.lock)",
       "Edit(**/.git/config)",
