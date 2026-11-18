@@ -5,6 +5,7 @@
 /usr/local/libexec/claude-guard/cc-checkout-guard に root 所有でインストールする。
 sandbox の外で動くので、リポジトリの設定やフックを読まない git だけを使い、
 確かめられない形はすべて止める（fail closed）。
+claude -w の WorktreeCreate フック（worktree-create）として、確かめたうえで worktree を作ることもする。
 """
 from __future__ import annotations
 
@@ -13,12 +14,13 @@ import json
 import os
 import posixpath
 import pwd
+import re
 import shlex
 import stat
 import subprocess
 import sys
 import unicodedata
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import TextIO
@@ -133,6 +135,25 @@ MSG_VERIFY = (
     "cc-checkout-guard: 警告: 確かめた後に、次のファイルが確認と違う中身で書かれました。"
     "動いている Claude Code のセッションを止めて、中身を確かめてください。"
 )
+
+# claude -w のフック（worktree-create）。
+NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}\Z")
+# worktree add だけに使う PATH。グローバルの設定の filter.lfs が git-lfs を呼ぶ（R3）。
+WORKTREE_ADD_PATH = "/usr/bin:/bin:/opt/homebrew/bin"
+# フックの timeout（60 秒）より前に worktree add を止め、片付ける時間を残す。
+WORKTREE_ADD_TIMEOUT = 40
+# 違ったときの案内（design 6.6 の手順 6）。
+MSG_WT_BRANCH = "cc-checkout-guard: 元のチェックアウトが別のブランチにあります。既定ブランチに戻すか、元のチェックアウトで作業してください。"
+MSG_WT_UNCOMMITTED = "cc-checkout-guard: 元のチェックアウトの対象のファイルに、コミットしていない変更があります。その変更を片付けてください。"
+MSG_WT_BEHIND = (
+    "cc-checkout-guard: 元のチェックアウトが origin より遅れています。元のチェックアウトで git pull をして"
+    "（zsh の git 関数が差分を見せます）、もう一度 claude -w を実行してください。"
+)
+MSG_WT_REPLACED = (
+    "cc-checkout-guard: origin の既定ブランチと元のチェックアウトの同じブランチが一致しているのに、中身が違います。"
+    "ref か object が差し替えられたおそれがあるので、作業を止めて中身を確かめてください。"
+)
+MSG_WT_LEFT = "cc-checkout-guard: 作りかけの worktree を消せませんでした。中身を確かめてから消してください:"
 
 
 class GuardError(Exception):
@@ -282,8 +303,8 @@ def git_env(home: Path) -> dict[str, str]:
     }
 
 
-def _git_process(cwd: Path, *args: str, config: Sequence[str] = (),
-                 stdin: bytes | None = None) -> subprocess.CompletedProcess[bytes]:
+def _git_process(cwd: Path, *args: str, config: Sequence[str] = (), stdin: bytes | None = None,
+                 env: dict[str, str] | None = None, timeout: float = GIT_TIMEOUT) -> subprocess.CompletedProcess[bytes]:
     # 人間の -c より後に自分の値を置き、こちらを勝たせる。
     cmd = [GIT, "-C", str(cwd)]
     for value in config:
@@ -291,9 +312,9 @@ def _git_process(cwd: Path, *args: str, config: Sequence[str] = (),
     cmd += ["-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null", "--no-pager", *args]
     # text=True にしない。CR を LF に変換するので、CR を含むパスを別のパスと誤認する。
     return subprocess.run(
-        cmd, env=git_env(user_home()), input=stdin,
+        cmd, env=env if env is not None else git_env(user_home()), input=stdin,
         stdin=None if stdin is not None else subprocess.DEVNULL,
-        capture_output=True, check=False, timeout=GIT_TIMEOUT,
+        capture_output=True, check=False, timeout=timeout,
     )
 
 
@@ -1618,10 +1639,214 @@ def check(argv: Sequence[str], *, start: Path, git_env: Sequence[str], after_fet
         return EXIT_STOP, ""
 
 
+def _hook_inv(cwd: Path, root: Path | None, home: Path) -> Invocation:
+    """フックの git を cwd で動かすための Invocation。人間の -c はない。"""
+    return Invocation(cwd=cwd, root=root, globals=(), config=(), sub="worktree", args=(), argv=(), start=cwd,
+                      home=home)
+
+
+def _registered(inv: Invocation, place: str) -> bool:
+    """place が、このリポジトリの worktree として登録されているか（ディレクトリのない登録も含む）。"""
+    out = run_git(inv.cwd, "worktree", "list", "--porcelain", "-z")
+    for rec in out.split(b"\0"):
+        if not rec.startswith(b"worktree "):
+            continue
+        path = os.fsdecode(rec[len(b"worktree "):])
+        if _norm(path) == _norm(place):
+            return True
+        try:
+            if os.path.samefile(path, place):
+                return True
+        except OSError:
+            continue  # ない worktree（prunable）と、ない place
+    return False
+
+
+def _tree_danger(main: Path, tree: str) -> str | None:
+    """作成元の tree の対象が symlink か gitlink なら理由。元のチェックアウトと同じでも、新しい worktree に書かれる。"""
+    for path, entry in sorted(tree_entries(main, tree).items()):
+        if entry.mode in (SYMLINK, GITLINK) and is_repo_protected(path):
+            kind = "symlink" if entry.mode == SYMLINK else "submodule（gitlink）"
+            return MSG_DANGER.format(path=_show(path), kind=kind)
+    return None
+
+
+def _created_diff(main: Path, place: Path) -> tuple[str | None, list[Change]]:
+    """作った worktree の対象を、元のチェックアウトのディスクと比べる。
+
+    対象は、どちらかの index にある、すべてのリポジトリ向けの対象のパス。どちらかで、そのパスか親が symlink なら
+    理由を返す（lstat は親の symlink をたどるので、たどった先の中身で同じに見える）。ほかは違ったパスを返す。
+    """
+    paths = sorted(p for p in _index_paths(place) | _index_paths(main) if is_repo_protected(p))
+    for root in (place, main):
+        for path in paths:
+            parts = path.split("/")
+            for i in range(1, len(parts) + 1):
+                sub = "/".join(parts[:i])
+                if os.path.islink(os.path.join(root, sub)):
+                    return MSG_DANGER.format(path=_show(sub), kind="symlink"), []
+    new = disk_entries(place, paths)
+    old = disk_entries(main, paths)
+    return None, [Change(p, old[p], new[p]) for p in paths if old[p] != new[p]]
+
+
+def _discard(main: Path, place: Path | None, branch: str, stderr: TextIO) -> None:
+    """このフックが作った worktree とブランチを消す（R20。作る前に、どちらもないことを確かめてある）。place が None なら
+    ブランチだけを消す。
+
+    git が途中で止められると lock（initializing）が残るので、remove に --force を 2 つ付ける。
+    ほかの worktree が checkout しているブランチは、branch -D が消さない。
+    """
+    left: list[str] = []
+    if place is not None and os.path.lexists(place):
+        _git_process(main, "worktree", "remove", "--force", "--force", str(place))
+        if os.path.lexists(place):
+            left.append(str(place))
+    code = _git_process(main, "show-ref", "--verify", "--quiet", f"refs/heads/{branch}").returncode
+    if code != 1 and (code != 0 or _git_process(main, "branch", "-D", branch).returncode != 0):
+        left.append(f"ブランチ {branch}")
+    if left:
+        stderr.write(MSG_WT_LEFT + "\n" + "".join(f"  {_show(x)}\n" for x in left))
+
+
+def _uncommitted(inv: Invocation, paths: Sequence[str]) -> bool:
+    """元のチェックアウトの paths に、コミットしていない変更（index かディスク）があるか。
+
+    status は、作業ツリーと比べるときに設定の clean フィルタを動かすので使わない。中身はフィルタを通さずに比べる。
+    """
+    assert inv.root is not None
+    head = tree_entries(inv.cwd, _head_tree(inv))
+    index = index_entries(inv.root, root=inv.root, home=inv.home)
+    disk = disk_entries(inv.root, paths)
+    return any(disk[p] != index.get(p) or index.get(p) != head.get(p) for p in paths)
+
+
+def _guidance(inv: Invocation, paths: Sequence[str], base: str, from_origin: bool) -> str:
+    """違ったときの案内を 1 つ選ぶ。判断の順は plan の Task 4 の手順 7。"""
+    if from_origin:
+        prefix = "refs/remotes/origin/"
+        target = _git_line(inv, "symbolic-ref", "--quiet", "refs/remotes/origin/HEAD", ok=(0, 1))
+        default = target[len(prefix):] if target.startswith(prefix) else None
+        if default is None or _current_branch(inv) != default:
+            return MSG_WT_BRANCH
+    if _uncommitted(inv, paths):
+        return MSG_WT_UNCOMMITTED
+    if _rev(inv, "HEAD", "commit") != base:
+        return MSG_WT_BEHIND
+    return MSG_WT_REPLACED
+
+
+def _refuse(inv: Invocation, changes: Sequence[Change], base: str, from_origin: bool, stderr: TextIO) -> int:
+    assert inv.root is not None
+    stderr.write(listing(Plan(root=inv.root, changes=tuple(changes), sources=())))
+    stderr.write(_guidance(inv, [c.path for c in changes], base, from_origin) + "\n")
+    return EXIT_STOP
+
+
+def _worktree_create(payload: Mapping[str, object], stdout: TextIO, stderr: TextIO) -> int:
+    if not isinstance(payload, Mapping):
+        raise GuardError("フックの入力を読めません")
+    name, cwd = payload.get("name"), payload.get("cwd")
+    if not isinstance(name, str) or NAME.match(name) is None:
+        raise GuardError(f"worktree の名前 {name!r} は使えません" if isinstance(name, str) else "worktree の名前がありません")
+    if not isinstance(cwd, str) or not os.path.isabs(cwd):
+        raise GuardError("フックの入力に、カレントディレクトリの絶対パスがありません")
+    home = user_home()
+    main = _main_checkout(_hook_inv(Path(cwd), None, home))
+    if main is None:
+        raise GuardError("bare のリポジトリには worktree を作れません")
+    # 共通の gitdir は .git/commondir で別のリポジトリに向けられる（実測）。起動したディレクトリを含むものに限る。
+    if _inside(cwd, main) is None:
+        raise GuardError(f"{cwd} が元のチェックアウトの中にありません")
+    worktrees = main / ".claude" / "worktrees"
+    for d in (main / ".claude", worktrees):
+        if os.path.islink(d):
+            raise GuardError(f"{d} が symlink です")
+    place = worktrees / name
+    inv = _hook_inv(main, main, home)
+    if _registered(inv, str(place)):
+        # すでにある worktree は確かめない（design 7 章）。ディレクトリがなければ使えないので止める。
+        if not os.path.isdir(place) or os.path.islink(place):
+            raise GuardError(f"{place} は登録された worktree ですが、ディレクトリがありません")
+        stdout.write(f"{place}\n")
+        return EXIT_ALLOW
+    # 前からあるディレクトリとブランチは、このフックが作ったものではないので、触らずに止める（R20）。
+    if os.path.lexists(place):
+        raise GuardError(f"{place} がすでにあります")
+    branch = f"worktree-{name}"
+    if _branch_oid(inv, branch) is not None:
+        raise GuardError(f"ブランチ {branch} がすでにあります")
+    base = _rev(inv, "refs/remotes/origin/HEAD", "commit")
+    from_origin = base is not None
+    base = base or _rev(inv, "HEAD", "commit")
+    if base is None:
+        raise GuardError("作成元のコミットがありません")
+    tree = _commit_tree(inv, base)
+    changes = compare_with_main(main, main, tree)
+    if changes:
+        return _refuse(inv, changes, base, from_origin, stderr)
+    # 新しい worktree には、元のチェックアウトと同じ中身の対象もすべて書かれ、属性はそれにも効く。
+    fresh = Plan(root=place, changes=(), sources=(tree,), fresh=True, old_root=main)
+    reason = _tree_danger(main, tree) or danger(fresh, inv)
+    if reason is not None:
+        stderr.write(reason + "\n")
+        return EXIT_STOP
+    # 作成元はコミットの oid で渡す（比べた後に ref を動かされても、比べたコミットから作る）。
+    env = {**git_env(home), "PATH": WORKTREE_ADD_PATH}
+    try:
+        cp = _git_process(main, "worktree", "add", "-b", branch, str(place), base, env=env,
+                          timeout=WORKTREE_ADD_TIMEOUT)
+    except BaseException:
+        _discard(main, place, branch, stderr)
+        raise
+    if cp.returncode != 0:
+        # git は失敗すると、自分で作ったディレクトリと登録を消し、-b で作ったブランチだけを残す（実測）。
+        # 置き場所に今あるものは、このフックが作ったものではないので触らない。
+        _discard(main, None, branch, stderr)
+        raise GuardError("git worktree add が失敗しました")
+    try:
+        # 書かれた結果を比べる。比べた後の replace の ref や object の差し替えも、ここで見つかる。
+        reason, diffs = _created_diff(main, place)
+        if reason is None and not diffs:
+            stdout.write(f"{place}\n")
+            stdout.flush()
+            return EXIT_ALLOW
+    except BaseException:
+        _discard(main, place, branch, stderr)
+        raise
+    _discard(main, place, branch, stderr)
+    if reason is not None:
+        stderr.write(reason + "\n")
+        return EXIT_STOP
+    return _refuse(inv, diffs, base, from_origin, stderr)
+
+
+def worktree_create(payload: Mapping[str, object], *, stdout: TextIO, stderr: TextIO) -> int:
+    """claude -w の WorktreeCreate フック（design 6.6）。対象のファイルが元のチェックアウトと同じときだけ作る。
+
+    成功したら、置き場所の絶対パスを標準出力の最後の行に出して 0 を返す。標準出力にはほかに何も出さず、
+    文はすべて標準エラーに出す（R21）。失敗したら、作ったものを消して 1 を返す（fail closed）。
+    """
+    try:
+        return _worktree_create(payload, stdout, stderr)
+    except GuardError as e:
+        stderr.write(MSG_ERROR.format(reason=_show(str(e))) + "\n")
+    except Exception as e:
+        stderr.write(MSG_ERROR.format(reason=type(e).__name__) + "\n")
+    return EXIT_STOP
+
+
 def main(argv: list[str]) -> int:
     if argv == ["status"]:
         sys.stdout.write("sandbox: yes\n" if in_sandbox() else "sandbox: no\n")
         return 0
+    if argv == ["worktree-create"]:
+        try:
+            payload = json.loads(sys.stdin.buffer.read())
+        except Exception as e:
+            sys.stderr.write(MSG_ERROR.format(reason=type(e).__name__) + "\n")
+            return EXIT_STOP
+        return worktree_create(payload, stdout=sys.stdout, stderr=sys.stderr)
     if len(argv) == 2 and argv[0] == "verify":
         return verify(argv[1], sys.stderr)
     if argv[:1] == ["check"] and "--" in argv:
