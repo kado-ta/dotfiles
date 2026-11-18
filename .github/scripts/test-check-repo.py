@@ -552,11 +552,12 @@ class CheckRepoTests(unittest.TestCase):
         self.assert_passes()
 
     def test_without_playwright_definition_passes(self):
-        # 定義を消して登録をやめたら、deny とフックは求めない。
+        # 定義を消して登録をやめたら、deny・denyWrite とフックは求めない。
         self.git("rm", "-q", "--cached", "claude/mcp/playwright.json")
         (self.root / "claude/mcp/playwright.json").unlink()
         data = settings()
         data["permissions"]["deny"] = [r for r in data["permissions"]["deny"] if r not in PLAYWRIGHT_DENY]
+        data["sandbox"]["filesystem"]["denyWrite"] = list(MISE_DENY_WRITE)
         data["hooks"]["PreToolUse"].remove(self.playwright_group(data))
         self.write_settings(data)
         self.assert_passes()
