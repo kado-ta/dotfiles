@@ -36,3 +36,32 @@ eval "$(sheldon source)"
 # mise
 ########################################
 eval "$(mise activate zsh)"
+
+########################################
+# git を経由した書き換えの確認（cc-checkout-guard）
+########################################
+# >>> cc-checkout-guard
+git() {
+  local guard=/usr/local/libexec/claude-guard/cc-checkout-guard
+  if [[ ! -x $guard ]]; then
+    print -u2 "git: $guard がありません。~/dotfiles/claude/README.md の手順でインストールしてください。確かめずに実行するときは command git を使います。"
+    return 1
+  fi
+  local genv=${(j:,:)${(M)${(k)parameters[(R)*export*]}:#GIT_*}}
+  local state rc
+  state=$("$guard" check --git-env "$genv" -- "$@")
+  rc=$?
+  if (( rc == 3 )); then
+    command git "${(0@)state}" || return
+    state=$("$guard" check --after-fetch --git-env "$genv" -- "$@")
+    rc=$?
+  fi
+  (( rc == 0 )) || return $rc
+  command git "$@"
+  rc=$?
+  if [[ -n $state ]]; then
+    "$guard" verify "$state" || return 1
+  fi
+  return $rc
+}
+# <<< cc-checkout-guard
