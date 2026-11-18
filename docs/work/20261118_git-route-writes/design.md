@@ -249,8 +249,10 @@ sandbox の中で作られた git の中身（コミット・index・ref）が�
 **動き**
 
 1. フックの入力（JSON）から `name` とカレントディレクトリを読む。`name` は、英数字と `.`・`_`・`-` だけを許す。`.` で始まる名前は拒否する。
-2. 元のチェックアウトのルートを求める。置き場所は `<ルート>/.claude/worktrees/<name>`、ブランチは `worktree-<name>` とする（Claude Code の既定と同じ）。
-3. その場所に worktree がすでにあれば、確かめずにパスを返す（非目標。[7 章](#accepted-risks)）。
+2. 元のチェックアウトのルートを求める。置き場所は `~/.cc-worktrees/<キー>/<name>`、ブランチは `worktree-<name>` とする。キーは、元のチェックアウトの名前と、物理パスのハッシュから作る（形は plan の Task 4）。
+   - 2026-11-19 に変更（人間の判断）。初版は Claude Code の既定と同じ `<ルート>/.claude/worktrees/<name>` だった。そこは元のチェックアウトのセッションの sandbox が書けるので、フックが確かめてから `git worktree add` するまでの間に `.claude/worktrees` を symlink に替えると、git が sandbox の外の任意の場所（`~/.claude/skills/<name>/` など）に書く（レビューで実測。Claude Code の既定の `claude -w` にも同じ穴がある）。ホームの下は sandbox から書けないので、競合そのものがなくなる。
+   - フックは `~/.cc-worktrees` と `<キー>` を、自分だけが書けるディレクトリ（0o700）として作り、使う前に、実体のディレクトリで自分の持ち物で、ほかが書けないことを確かめる。
+3. その場所に worktree がすでにあれば、確かめずにパスを返す（非目標。[7 章](#accepted-risks)）。ただし、このフックが確かめ終えた worktree に限る。確かめ終えたら `~/.cc-worktrees/<キー>/.verified/<name>` に印を書き、印のない worktree（フックが途中で止められて残ったものなど）は返さずに、消すコマンドを案内して失敗する。
 4. 作成元を決める。ローカルの `origin/HEAD` が指すコミットを使い、なければ元のチェックアウトの HEAD を使う。fetch はしない（plan で変更。下の注）。
    - 作成元が sandbox に差し替えられていても、5 の比較が守る。作成元の選び方は使い勝手のためで、守りではない。
    - 注: 初版では「fetch を 5 秒程度まで試す」としていた。確認コマンドは `env -i` で動くので、fetch には cc-safe-push と同じ SSH の扱いがもう 1 つ要る。fetch は守りに関わらないので、plan で外した（2026-11-18）。元のチェックアウトで pull すれば `origin/HEAD` の先も新しくなる。
@@ -273,6 +275,9 @@ sandbox の中で作られた git の中身（コミット・index・ref）が�
 - origin で対象のファイルが変わったら（`.claude/settings.json` を変える PR をマージしたときなど）、先に元のチェックアウトで pull が要る。
 - 元のチェックアウトが別のブランチにあるときと、対象のファイルに未コミットの変更があるときも失敗する。人間の使い方では、どちらもまれである（2026-11-18、人間の回答）。
 - `.worktreeinclude` は処理されなくなる。今のリポジトリには、`.worktreeinclude` がない（[research の 3.9](research-git-route.md#results-claude-worktree)。`~/Dev` は深さ 4 まで確かめた）。
+- worktree の場所が、リポジトリの中（`.claude/worktrees`）からホームの下（`~/.cc-worktrees`）に変わる。前に作った worktree は、そのまま開ける。
+- 元のチェックアウトの外にある linked worktree から `claude -w` を実行すると失敗する。フックの入力の `cwd` が元のチェックアウトの中にあることを、ファイルの同一性で確かめるためである（`.git/commondir` で共通の gitdir を向け替えられた場合に備える。dotfiles では、sandbox から `.git/commondir` を作れないことを確かめた）。
+- フックで作った worktree のブランチを、Claude Code は消さない（公式の文書）。`WorktreeRemove` フックは登録しない。セッションを終えるときの扱いは、新しいセッションでの確認（[6.13](#design-verify-plan)）で確かめる。
 
 <a name="design-mise"></a>
 
@@ -378,7 +383,10 @@ sandbox の中で作られた git の中身（コミット・index・ref）が�
 
 - **確認を飛ばす形:** `command git`・`\git`・絶対パスの git と、zsh を通らない git。Claude が頼むのを規則で禁じるだけで、技術的には止めない。人間が頼まれて打てば通る。
 - **確認から実行までの差し替え:** 確認と git の実行のあいだに、sandbox が ref や index を差し替えると、確かめていない中身が書かれうる。`verify` が後から見つけるが、Claude Code の設定と hooks は、書かれた時点で効く。
-- **すでにある worktree:** `claude -w` で開き直すときと、`claude --resume` では確かめない。元のチェックアウトで起動したセッションの sandbox が、`.claude/worktrees/<name>/.claude/settings.json` に直接書けるかは確かめていない。
+- **すでにある worktree:** `claude -w` で開き直すときと、`claude --resume` では確かめない。その worktree で動いたセッションは、自分の作業ツリーに書ける。前に `.claude/worktrees` に作った worktree は、元のチェックアウトで起動したセッションの sandbox からも書ける見込み（確かめていない）。
+- **`~/.cc-worktrees` の守り:** 持ち主と mode の確認では、人間と sandbox の中のプロセスを区別できない（同じ uid）。sandbox から書けないことに頼っているので、`~` で起動したセッション（sandbox がホームに書ける）があると崩れる。グローバルの CLAUDE.md は、`~` で起動しないよう求めている。
+- **`.git/worktrees` の差し替え:** `<共通の gitdir>/worktrees` を、偽の共通の gitdir の下への symlink にすると、`worktree add` の子の git が偽の `config` と属性を読み、フィルタを sandbox の外で動かす（レビューで、一時ディレクトリで実測）。Claude Code の sandbox は `.git/worktrees` を、そのセッションの worktree のほかは読み取り専用にしていて、この中に項目を作れないことを確かめた（2026-11-19）。人間の `git worktree add` も同じ経路を通る。
+- **`git-lfs` の通信:** `worktree add` は、保護の対象でないパスに、人間の設定の `filter.lfs` を動かす。どのパスに当てるかは、sandbox が書ける属性で決まり、`git-lfs` は作成元の tree の `.lfsconfig` を読む。そのため、sandbox が選んだ先への通信が、sandbox の外で起こりうる（Claude Code の既定の `claude -w` と同じ）。書き込みの経路ではないので、この作業では扱わない。
 - **`claude -w` の変化:** Claude Code が worktree の作り方を変えると、フックとずれる。`#1234` の形（PR から作る）は、フックでは扱わない見込み（未確認）。
 - **dotfiles の pull のたびの確認:** dotfiles の PR の多くは `claude/` を変える。元のチェックアウトで pull するたびに、確認が出る。人間が実際の中身を見る場面として受け入れる。
 - **Claude Code の仕様:** `claude -w`、`WorktreeCreate`、信頼の扱いは、文書の要約による（C7）。新しいセッションでの確認（[6.13](#design-verify-plan)）で確かめる。

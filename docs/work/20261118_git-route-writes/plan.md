@@ -335,25 +335,30 @@ CI は、`claude/hooks/tests/test-*.py` をすべて実行するので、ワー�
 **Interfaces**
 
 - Consumes: `compare_with_main`、`disk_entry`、`danger` の symlink の判定、`run_git`。
-- Produces: `worktree_create(payload: Mapping[str, object], *, stdout: TextIO, stderr: TextIO) -> int`。`main` の `worktree-create` は、標準入力の JSON をこれに渡す。`NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}\Z")`。
+- Produces: `worktree_create(payload: Mapping[str, object], *, stdout: TextIO, stderr: TextIO, home: Path | None = None) -> int`（`home` はテストのため。既定は `user_home()`）。`main` の `worktree-create` は、標準入力の JSON をこれに渡す。`NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}\Z")`。
 
 **流れ**（design 6.6。fetch はしない）
 
-1. `name` が `NAME` に合わなければ 1。`cwd` から元のチェックアウトのルートを求める。共通の gitdir の名前が `.git` でなければ（bare）1。
-2. 置き場所は `<ルート>/.claude/worktrees/<name>`。`.claude` と `.claude/worktrees` のどちらかが symlink なら 1。
-3. 置き場所が `worktree list --porcelain` にあれば、そのパスを出して 0。ディレクトリだけがあれば 1。
-4. 作成元は、`refs/remotes/origin/HEAD^{commit}` が解決できればそれ、できなければ `HEAD^{commit}`。どちらもなければ 1。
-5. `compare_with_main` で作成元の tree を比べる。違いがあれば、作らずに 7 へ。
-6. `worktree add -b worktree-<name> <置き場所> <作成元>` で作る。
-   - このときだけ、`PATH` に `/opt/homebrew/bin` を足す。グローバルの設定の `filter.lfs` が `git-lfs` を呼ぶためである。
-   - 作った後、新しい worktree と元のチェックアウトで、すべてのリポジトリ向けの対象のファイルを `disk_entry` で比べる。対象は、どちらかの index にあるパスとする。対象のパスか、その親が symlink かどうかも調べる。
-   - 違いがあれば、`worktree remove --force <置き場所>` と `branch -D worktree-<name>` で片付けてから 7 へ。
+1. `name` が `NAME` に合わなければ 1。`cwd` から元のチェックアウトのルートを求める。bare（`core.bare`）と、共通の gitdir の名前が `.git` でないものは 1。`cwd` が元のチェックアウトの中にない（ファイルの同一性で比べる）ときも 1（`.git/commondir` で共通の gitdir を向け替えられた場合に備える）。
+2. 置き場所は `<H>/.cc-worktrees/<キー>/<name>`（R22。2026-11-19、人間の判断）。リポジトリの中には作らない。
+   - `<H>` はホームの物理パス。キーは、元のチェックアウトの物理パスの最後の名前（`[A-Za-z0-9._-]` 以外と先頭の `.` を `_` にする）、`-`、物理パスの sha256 の先頭 12 桁。
+   - `.cc-worktrees`・`<キー>`・`<キー>/.verified` は、なければ 0o700 で作る。どれも、実体のディレクトリで、自分の持ち物で、group と other が書けないことを、親から順に `lstat` で確かめる。違えば何も作らずに 1。
+   - 理由: 初版の `<ルート>/.claude/worktrees/<name>` は、元のチェックアウトのセッションの sandbox が書ける。確かめてから `worktree add` までの間に `.claude/worktrees` を symlink に替えると、git は sandbox の外に書いた（レビューの実測。30 回中 7 回）。ホームの下は sandbox から書けないので、この競合が成り立たない。
+3. 置き場所が `worktree list --porcelain` にあり、実体のディレクトリで、確かめ終わった印（`<キー>/.verified/<name>`。置き場所の `st_dev` と `st_ino`）が一致するときだけ、そのパスを出して 0。印がない・違うときは、消すコマンド（`git -C <ルート> worktree remove --force <置き場所>` と `git -C <ルート> branch -D worktree-<name>`）を案内して 1。自分では消さない。登録がなく何かがあるとき、ブランチ `worktree-<name>` だけがあるときも 1（触らない）。
+4. 作成元は、`refs/remotes/origin/HEAD^{commit}` が解決できればそれ、できなければ `HEAD^{commit}`。どちらもなければ 1。`worktree add` には oid で渡す。
+5. `compare_with_main` で作成元の tree を比べる。違いがあれば、作らずに 7 へ。作成元の tree の対象に symlink・gitlink がないかと、書くときの属性（`danger` に `fresh` の Plan を渡す）も、作る前に確かめる。
+6. `worktree add -b worktree-<name> <置き場所> <作成元の oid>` で作る。
+   - 確認コマンドの安全な呼び出し方（`core.hooksPath=/dev/null` など）で動かす。このときだけ、`PATH` に `/opt/homebrew/bin` を足す。グローバルの設定の `filter.lfs` が `git-lfs` を呼ぶためである。
+   - 自分の process group で動かし、期限か割り込みで group ごと止めてから片付ける。
+   - 作った後、新しい worktree と元のチェックアウトで、すべてのリポジトリ向けの対象のファイルを `disk_entry` で比べる。対象は、どちらかの index にあるパスとする。対象のパスか、その親が symlink かどうかも、両方のルートで調べる。
+   - 違いがあれば、`worktree remove --force --force <置き場所>` と `branch -D worktree-<name>` で片付けてから 7 へ。`worktree add` 自体が 0 以外で終わったときは、ブランチが作成元を指すときだけ消し、置き場所には触らない（git が自分で消すので、そこにあるのはこの呼び出しのものではない）。
+   - 期限: フックの開始から 50 秒。この動きの git の timeout はすべて残りの時間にする。`worktree add` の前に 10 秒残っていなければ作らない。片付けには 8 秒まで延ばす（フックの timeout 60 秒の中に収める）。
 7. 違ったファイルの一覧と、design 6.6 の手順 6 の案内のうち当てはまる 1 つを出して、1 を返す。案内の判断の順は、次のとおり。
    1. 元のチェックアウトのブランチの名前が、`origin/HEAD` の指すブランチの名前と違う。
-   2. `status --porcelain -- <違ったパス>` が空でない。
+   2. 違ったパスに、コミットしていない変更がある。`status` は clean フィルタを動かすので使わず、index と HEAD の entry、ディスク（`hash-object --no-filters`）と index の entry を比べる。
    3. 元のチェックアウトの `HEAD` が、作成元と違う。
    4. それ以外（差し替えのおそれ）。
-8. 成功したら、置き場所の絶対パスを標準出力の最後の行に出して 0 を返す。
+8. 成功したら、確かめ終わった印を書き（`.verified` の中の一時ファイルから `os.replace`）、置き場所の物理パスだけを標準出力に 1 行で出して 0 を返す。ほかの文はすべて標準エラーに出す。
 
 **テスト**（fixture: 一時ディレクトリの bare を origin として clone した元のチェックアウト。`origin/HEAD` は `main`）
 
@@ -367,9 +372,11 @@ CI は、`claude/hooks/tests/test-*.py` をすべて実行するので、ワー�
 | `test_guidance_for_other_branch` | 元のチェックアウトを feature にすると 1 で、ブランチの案内が出る |
 | `test_no_origin_uses_head` | origin のないリポジトリで 0 |
 
+実装とレビューで足したテスト（`WorktreeCreateTests` は全部で 26）: 前からあるブランチとディレクトリに触らない、フックが動かない、add の失敗で何も残らない、期限で孫のプロセスまで止まる、`PATH` を変えるのは add だけ、置き場所の親が安全でなければ止まる、印のない登録には触らずに止まる、古い置き場所の symlink が効かない、bare と `--separate-git-dir`、`cwd` が元のチェックアウトの外、作る前の属性・symlink、作った後の親の symlink、標準入力の JSON。
+
 - [ ] **Step 1:** テストを書き、失敗することを確かめる。
 - [ ] **Step 2:** 実装し、テストがすべて通ることを確かめる。
-- [ ] **Step 3:** `/verify` を実行してからコミットする。メッセージは `feat(claude): create claude -w worktrees through the checkout guard`。
+- [ ] **Step 3:** `/verify` を実行してからコミットする。メッセージは `feat(claude): create claude -w worktrees through the checkout guard`（置き場所の変更は `fix(claude): create claude -w worktrees outside the repository`）。
 
 <a name="task-5"></a>
 
@@ -512,14 +519,16 @@ MISE_ENV_FILES = ("bin/.zshrc", "bin/.zprofile", "mise/mise_config.toml")  # ほ
     - mise の `trusted_config_paths` と、シェルの設定の `MISE_TRUSTED_CONFIG_PATHS`・`MISE_PARANOID` を足さない（`mise-paranoid` が失敗する）。
   - 規約のテストの行に、次を足す。`claude/bin/cc-checkout-guard` か `bin/.zshrc` の関数を変更したら、`/usr/bin/python3 -B claude/hooks/tests/test-cc-checkout-guard.py` と `/usr/bin/python3 -B claude/hooks/tests/test-checkout-function.py` を実行する。
   - 「git push」の節の後に、短い節「git の確認（cc-checkout-guard）」を足す。何をするか、変えたら再インストールすること、README へのリンク。
+  - 「Edit・Write ツールの書き込み」の worktree の段落を、新しい置き場所に合わせる。`claude -w <name>` の worktree は `~/.cc-worktrees/<キー>/<name>` にできる（R22）。前に作った `.claude/worktrees/<name>` は、そのまま `cd` して `claude` で開ける。`claude -w` は、元のチェックアウトの外の linked worktree からは実行できない（`cwd` の確認）。
 - [ ] **Step 3: `claude/README.md`。** cc-safe-push の節と同じ形で、`<a name="cc-checkout-guard-install"></a>` の節を足す。中身は次の 3 つ。
   - インストール: `sudo install -d -o root -g wheel -m 0755 /usr/local/libexec/claude-guard` と `sudo install -o root -g wheel -m 0755 claude/bin/cc-checkout-guard /usr/local/libexec/claude-guard/cc-checkout-guard`。
   - 動き（普段の端末、`!`、sandbox、`claude -w`）。
+  - `claude -w` の worktree の置き場所（`~/.cc-worktrees/<キー>/<name>`）、確かめ終わった印（`<キー>/.verified/<name>`）、消し方（`git -C <元のチェックアウト> worktree remove <置き場所>` と `branch -D worktree-<name>`。印は次の作成で消える）、印のない worktree で止まったときの案内の意味。
   - 戻し方（design 6.14 の順）。
 - [ ] **Step 4: `.claude/rules/CLAUDE_CONFIG.md`。** `<a name="cc-checkout-guard"></a>` の節を足し、理由を短く書く。
   - root 所有に置き、一覧を中に持つ理由。
   - sandbox の中かどうかを環境変数で判断しない理由。
-  - `claude -w` で、元のチェックアウトと比べる理由。
+  - `claude -w` で、元のチェックアウトと比べる理由と、worktree をリポジトリの外（sandbox から書けないホームの下）に作る理由（R22）。
   - 入れ子のリポジトリの経路は、次の作業にしたこと。
 - [ ] **Step 5:** `python3 -B .github/scripts/check-repo.py` が PASS することを確かめる（リンクとアンカー）。
 - [ ] **Step 6:** 4 つのファイルをコミットする（文書だけなので `/verify` は不要）。メッセージは `docs: describe the checkout guard`。
@@ -537,7 +546,12 @@ MISE_ENV_FILES = ("bin/.zshrc", "bin/.zprofile", "mise/mise_config.toml")  # ほ
   - 確認が出て、N で止まり、y で切り替わる。
   - `!` に相当する形として、`! /bin/zsh -c '<読み込み>; cd <ダミー> && git switch feature'` が止まる。`SANDBOX_RUNTIME=1` を付けても止まる。
   - Bash ツールで同じ形を実行すると、確かめずに通る。
-- [ ] **Step 4: `claude -w` の試し。** ダミーのリポジトリのプロジェクト設定に、同じ `WorktreeCreate` フックを登録する。人間がそこで `claude -w probe` を実行し、worktree ができることを確かめる。続けて、`origin/HEAD` を差し替えた状態で、失敗して何も残らないことを確かめる。
+- [ ] **Step 4: `claude -w` の試し。** ダミーのリポジトリのプロジェクト設定に、同じ `WorktreeCreate` フックを登録する。人間がそこで `claude -w probe` を実行し、次を確かめる。
+  - `~/.cc-worktrees/<キー>/probe` に worktree ができ、Claude Code がそこでセッションを始める（公式の文書は、リポジトリの中の素のディレクトリを拒否するとしている。ここはリポジトリの外で、本物の worktree なので通る見込み）。`~/.cc-worktrees` と `<キー>` が 0o700 になる。
+  - フックの入力の `name` と `cwd` が、文書のとおりに来る（来なければ、いつも失敗する）。
+  - 同じ名前でもう一度 `claude -w probe` を実行すると、同じ worktree を開く（フックが呼ばれるかどうかも記録する）。
+  - セッションを終えるときの worktree の扱い（残すか消すかの問い）と、`WorktreeRemove` フックがないときに何が起きるかを記録する。公式の文書では、フックで作った worktree のブランチを Claude Code は消さない。
+  - `origin/HEAD` を差し替えた状態で、失敗して何も残らない。
 - [ ] **Step 5: 速さ。** 普段の端末で関数を読み込み、`~/dotfiles` で `time (repeat 20 git status >/dev/null)` と `time (repeat 20 command git status >/dev/null)` を比べる。1 回あたりの増分を記録する。
 - [ ] **Step 6: 記録。** `test-report.md` に次を書く。
   - 自動の検査の結果。コマンドは、`test-cc-checkout-guard.py`・`test-checkout-function.py`・ほかのフックのテスト 5 本・`test-cc-safe-push.py`・`test-cc-safe-pr.py`・`check-repo.py`・`test-check-repo.py`・shellcheck・actionlint。
