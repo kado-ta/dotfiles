@@ -152,6 +152,30 @@ for d in ~/.local/share/CLAUDE-MCP ~/Library/Caches/Playwright-MCP; do
 done
 ```
 
+<a name="results"></a>
+#### 結果
+
+2026-11-19、設定を足した後に `~` で起動したセッションで、上の 1 つ目の命令を実行した（あなたが実行し、結果を貼った）。
+
+| 対象 | 結果 |
+| --- | --- |
+| `~/Library/Caches`（対照） | writable |
+| `~/.local/share`（対照） | writable |
+| `~/.local/share/claude-mcp` | denied |
+| `~/Library/Caches/playwright-mcp` | denied |
+| `~/.local/share/mise` | writable（D5 のとおり守っていない） |
+| `~/.claude.json` | denied（Claude Code が守っている） |
+
+対照に書けたので、このセッションの `.` はホームで、2 か所はこの作業の設定で拒否されたとみなせる。変更前に書けたことは測っていない（手順 1 を実行しなかった）。
+
+同じ日に、`~` で起動したセッションで、`~/.local/share/claude-mcp/playwright/node_modules/@playwright/mcp/cli.js`（あることを確かめた）へのハードリンクを `~/.cc-probe-link` に作ろうとした。`ln: …: Operation not permitted`（終了コード 1）で拒否された。書き込みを止めた場所のファイルを、書ける場所からのハードリンクで書き換える迂回は、このファイルについては成り立たない。ほかの場所では試していない。
+
+同じ日に、`~` で起動したセッションで、大文字・小文字を変えた綴り（`~/.local/share/CLAUDE-MCP`・`~/Library/Caches/Playwright-MCP`）を試した。どちらも元のディレクトリに解決され（`ls -ld` で確認）、`touch: …: Operation not permitted`（終了コード 1）で拒否された。ディレクトリがあるあいだは、綴りを変えても迂回できない。
+
+同じ日に、`~` で起動したセッションで、Write ツールで `~/.local/share/claude-mcp/.cc-probe` と `~/Library/Caches/playwright-mcp/.cc-probe` に書こうとした。どちらも `File is in a directory that is denied by your permission settings.` で拒否され、ファイルはできなかった。作業ディレクトリ（ホーム）の中なので、`blockWritesOutsideWorkingDirectories` ではなく、足した `Edit(...)` の deny が止めた。
+
+出力先がないときの確認（[D8](#decision-case)）は行っていない。この作業をした dotfiles のセッションの `!` は、この日は sandbox の外で動いた（`~/.ssh/config` を読めた）ので、`!` は測定に使わない（`!` は人間が操作するもので、守りの穴ではない）。
+
 出力先がないときの確認は、次の順で行う。1 と 3 は通常の端末で、2 は `~` で起動したセッションの Bash ツールで実行する。
 
 1. `mv ~/Library/Caches/playwright-mcp ~/Library/Caches/playwright-mcp.bak`
@@ -201,6 +225,6 @@ PR を revert し、`claude/settings.json` から 4 項目を消す。設定は�
 
 次のリスクは受け入れた（2026-11-19 に、計画のレビューと `/review` の後に決定）。
 
-- `~` で起動したセッションでは、2 か所以外の、sandbox の外で動く場所に書ける。D5 の node、[D7](#decision-node-modules) の親の `node_modules`、[D9](#decision-npmrc) の `~/.npmrc`、`~/Library/LaunchAgents` などがある。`~/.claude.json` に書けるかは測っていない（手順 1 を実行しなかったため）。
+- `~` で起動したセッションでは、2 か所以外の、sandbox の外で動く場所に書ける。D5 の node、[D7](#decision-node-modules) の親の `node_modules`、[D9](#decision-npmrc) の `~/.npmrc`、`~/Library/LaunchAgents` などがある。MCP の登録がある `~/.claude.json` は、`~` で起動したセッションからも書けなかった（[結果](#results)）。
 - 親のディレクトリ（`~/Library/Caches`・`~/.local/share`）を別の名前に移して作り直す迂回を、sandbox が止めるかは確かめていない。移すと多くのものが壊れるので、測らない。
 - 大文字・小文字だけ違う名前の迂回は、手順 7 の結果が出るまで未確認（[D8](#decision-case)）。
