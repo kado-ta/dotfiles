@@ -134,6 +134,22 @@ check 2 'Crit port split by a line feed' "{${nav},\"tool_input\":{\"url\":\"http
 check 2 'Crit port split by a carriage return' "{${nav},\"tool_input\":{\"url\":\"http://localhost:4780\\r0/\"}}"
 check 0 'zeros before another port' "{${nav},\"tool_input\":{\"url\":\"http://localhost:0003000/\"}}"
 
+# file: URLs read local files outside the sandbox. Playwright MCP refuses them only when Node can parse the URL,
+# so forms like file://localhost:/ would reach the browser. The hook refuses every file: scheme, after the same
+# clean-up the WHATWG parser does (leading C0 controls and spaces, and TAB, LF, CR anywhere).
+check 2 'file URL' "{${nav},\"tool_input\":{\"url\":\"file:///etc/hosts\"}}"
+err=$(<"$T/err")
+case "$err" in
+  Blocked:*file:*) ok 'message starts with Blocked: and names file:' ;;
+  *) ng "message starts with Blocked: and names file: (got '$err')" ;;
+esac
+check 2 'file URL in upper case' "{${nav},\"tool_input\":{\"url\":\"FILE:///etc/hosts\"}}"
+check 2 'file URL that Node cannot parse' "{${nav},\"tool_input\":{\"url\":\"file://localhost:/etc/hosts\"}}"
+check 2 'file URL after a space and a control character' "{${nav},\"tool_input\":{\"url\":\" \\u0001file:///etc/hosts\"}}"
+check 2 'file scheme split by a tab' "{${nav},\"tool_input\":{\"url\":\"fi\\tle:///etc/hosts\"}}"
+check 2 'file URL in a new tab' '{"tool_name":"mcp__playwright__browser_tabs","tool_input":{"action":"new","url":"file:///etc/hosts"}}'
+check 0 'file: later in the URL' "{${nav},\"tool_input\":{\"url\":\"https://example.com/?u=file:///etc/hosts\"}}"
+
 # Input that cannot be checked is blocked (fail closed)
 check 2 'invalid JSON' '{"tool_name":'
 check 2 'empty input' ''

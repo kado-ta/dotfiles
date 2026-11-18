@@ -10,6 +10,9 @@
 # 届くので、開けばモデルが Finish Review を押して人間の承認を偽造できる。URL は解析せず、TAB・LF・CR を取り除いて
 # （WHATWG の URL の解析器が取り除くため）、文字列に :47800〜:47819（ポートの先頭のゼロも含む）があれば止める。
 # JS やリンクでの移動は、定義の --blocked-origins が、正規化された後の URL で止める。
+# url 引数が file: で始まる呼び出しも止める。Playwright MCP は file: を拒否するが、Node が URL を解析できる
+# ときだけなので（file://localhost:/… などは素通りする）、ブラウザ経由で sandbox の denyRead の外のファイルを
+# 読めないよう、ここでも止める。WHATWG の解析器と同じく、先頭の制御文字・空白と TAB・LF・CR を取り除いて見る。
 # 経緯は docs/work/20261118_playwright-mcp/plan.md の D1。
 # 入力を解釈できないときも止める（fail closed）。macOS の /bin/bash 3.2 と /usr/bin/python3 で動かす。
 set -u
@@ -35,7 +38,11 @@ if "paths" in tool_input:
     print("Blocked: Playwright MCP calls must not pass paths, because the server reads those local files outside the sandbox and hands them to the page. To test drag and drop, drop text with data instead.", file=sys.stderr)
     sys.exit(2)
 url = tool_input.get("url")
-if isinstance(url, str) and re.search(r":0*478[01][0-9](?![0-9])", re.sub(r"[\t\n\r]", "", url)):
+url = re.sub(r"[\t\n\r]", "", url).lstrip("".join(map(chr, range(0x21)))) if isinstance(url, str) else ""
+if re.match(r"file:", url, re.IGNORECASE):
+    print("Blocked: Playwright MCP must not open file: URLs, because the browser runs outside the sandbox and could read files the sandbox protects.", file=sys.stderr)
+    sys.exit(2)
+if re.search(r":0*478[01][0-9](?![0-9])", url):
     print("Blocked: Playwright MCP must not open ports 47800-47819, where Crit waits for the human review. Approvals in Crit must come from the human.", file=sys.stderr)
     sys.exit(2)
 '
