@@ -174,7 +174,7 @@ done
 
 同じ日に、`~` で起動したセッションで、Write ツールで `~/.local/share/claude-mcp/.cc-probe` と `~/Library/Caches/playwright-mcp/.cc-probe` に書こうとした。どちらも `File is in a directory that is denied by your permission settings.` で拒否され、ファイルはできなかった。作業ディレクトリ（ホーム）の中なので、`blockWritesOutsideWorkingDirectories` ではなく、足した `Edit(...)` の deny が止めた。
 
-出力先がないときの確認（[D8](#decision-case)）は行っていない。この作業をした dotfiles のセッションの `!` は、この日は sandbox の外で動いた（`~/.ssh/config` を読めた）ので、`!` は測定に使わない（`!` は人間が操作するもので、守りの穴ではない）。
+出力先がないときの確認（[D8](#decision-case)）は、出力先を退避したうえで `~` で起動したセッションで試そうとしたが、そのセッションの権限の判定でコマンドが実行されなかった。出力先は元に戻した（中身が 17 項目のまま戻ったことを確認）。D8 は未測定のまま、残るリスクとして扱う。この作業をした dotfiles のセッションの `!` は、この日は sandbox の外で動いた（`~/.ssh/config` を読めた）ので、`!` は測定に使わない（`!` は人間が操作するもので、守りの穴ではない）。
 
 出力先がないときの確認は、次の順で行う。1 と 3 は通常の端末で、2 は `~` で起動したセッションの Bash ツールで実行する。
 
