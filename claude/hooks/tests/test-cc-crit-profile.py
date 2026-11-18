@@ -3,6 +3,9 @@
 Claude Code の sandbox の中では sandbox-exec を入れ子にできないので、その場合はスキップする。
 人間が通常の端末で実行するか、CI（macOS）で実行する。Claude Code の `!` は、セッションによっては
 sandbox の中で動き、スキップされる。crit か Homebrew の git がない環境でもスキップする。
+CC_CRIT_PROFILE_REQUIRED=1 を付けると（update-skills.sh が付ける）、これらとポートの範囲に空きがないときは、
+profile を確かめられないので、スキップせずに失敗する。確かめる対象のファイルがないときのテストごとのスキップは、
+付けてもスキップのまま。
 """
 import errno
 import json
@@ -46,6 +49,12 @@ PROBE = textwrap.dedent("""\
 """)
 
 
+def skip_or_fail(reason):
+    if os.environ.get("CC_CRIT_PROFILE_REQUIRED") == "1":
+        raise AssertionError(f"CC_CRIT_PROFILE_REQUIRED=1, but {reason}")
+    raise unittest.SkipTest(reason)
+
+
 def free_port(ports):
     for port in ports:
         with socket.socket() as s:
@@ -54,7 +63,7 @@ def free_port(ports):
             except OSError:
                 continue
             return port
-    raise unittest.SkipTest("no free port in the range")
+    skip_or_fail("no free port in the range")
 
 
 def lan_address():
@@ -73,12 +82,12 @@ class ProfileTests(unittest.TestCase):
     def setUpClass(cls):
         for path in (CRIT, GIT, SANDBOX_EXEC):
             if not os.path.exists(path):
-                raise unittest.SkipTest(f"{path} is not installed")
+                skip_or_fail(f"{path} is not installed")
         nested = subprocess.run([SANDBOX_EXEC, "-p", "(version 1)(allow default)", "/usr/bin/true"],
                                 capture_output=True)
         if nested.returncode:
-            raise unittest.SkipTest("sandbox-exec cannot apply a profile here (inside another sandbox);"
-                                    " run this test outside Claude's sandbox")
+            skip_or_fail("sandbox-exec cannot apply a profile here (inside another sandbox);"
+                         " run this test outside Claude's sandbox")
         cls.root = Path(tempfile.mkdtemp(prefix="cc-crit-profile.")).resolve()
         cls.home_real = Path(os.path.expanduser("~")).resolve()
         cls.crit_home = cls.root / "crit-home"

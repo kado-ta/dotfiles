@@ -3,7 +3,7 @@
 # ~/.claude/skills・~/.claude/plugins・Homebrew に書くので、sandbox の外（通常の端末）で実行する。
 #   端末から: /bin/bash ~/dotfiles/claude/scripts/update-skills.sh か、dotfiles で mise run claude:update
 # Claude Code の ! は、セッションによっては sandbox の中で動く。そのときは更新の手順が失敗するうえ、
-# 最後の crit-profile-test はスキップされて終了コード 0 になり、成功に数えられる。
+# 最後の crit-profile-test も、sandbox-exec を入れ子にできず profile を確かめられないので、失敗に数えられる。
 # Claude Code から mise run を使わないのは、mise が dotfiles のルートの設定ファイル（mise.local.toml など）を
 # 読み込み、ルートには sandbox から書けるため（paranoid で、信頼されていない設定は読み込まれないが、念のため通さない）。
 # 同じ理由で、ホームに移ってから各コマンドを実行し、
@@ -56,7 +56,10 @@ fi
 
 # crit はプラグインと CLI の版の組み合わせで動くので、CLI も一緒に更新し、cc-crit の profile を確かめる。
 step crit-cli brew upgrade crit
-step crit-profile-test /usr/bin/python3 -I -B "${repo}/claude/hooks/tests/test-cc-crit-profile.py"
+# profile テストは、sandbox の中や crit がないときにスキップして終了コード 0 で終わる。
+# CC_CRIT_PROFILE_REQUIRED=1 で、profile を確かめられないときは失敗させる。
+step crit-profile-test /usr/bin/env CC_CRIT_PROFILE_REQUIRED=1 \
+  /usr/bin/python3 -I -B "${repo}/claude/hooks/tests/test-cc-crit-profile.py"
 
 if [ -n "${failed}" ]; then
   echo "失敗した手順:${failed}"
