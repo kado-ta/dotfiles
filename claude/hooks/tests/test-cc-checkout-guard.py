@@ -742,6 +742,40 @@ class MergeTests(TreeBase):
                 self.assertIn(key, err)
                 local_git(self.repo, "config", "--unset", key)
         self.assertEqual(self.check("merge", "docs")[0][0], 0)
+        # pull は pull.autoStash で git merge --autostash を動かす（レビューで実測）。
+        local_git(self.repo, "config", "pull.autoStash", "true")
+        for argv in (("pull",), ("-c", "pull.autoStash=false", "-c", "pull.autoStash=true", "pull")):
+            with self.subTest(argv=argv):
+                result, err = self.check(*argv)
+                self.assertEqual(result, (1, ""))
+                self.assertIn("pull.autoStash", err)
+        local_git(self.repo, "config", "--unset", "pull.autoStash")
+        result, err = self.check("-c", "pull.autoStash=true", "pull")
+        self.assertEqual(result, (1, ""))
+        self.assertIn("pull.autoStash", err)
+
+    def test_merge_fetch_head_reads_merge_lines(self):
+        # git merge FETCH_HEAD は、not-for-merge でない行をすべて取り込む（2 行以上なら octopus）。
+        # rev-parse FETCH_HEAD は 1 行目だけを読む（レビューで実測）。
+        docs, feature = (local_git(self.repo, "rev-parse", name) for name in ("docs", "feature"))
+        fetch_head = self.repo / ".git" / "FETCH_HEAD"
+        fetch_head.write_text(f"{docs}\t\tbranch 'docs' of x\n{feature}\t\tbranch 'feature' of x\n", encoding="utf-8")
+        result, err = self.check("merge", "FETCH_HEAD")
+        self.assertEqual(result, (1, ""))
+        self.assertIn("FETCH_HEAD", err)
+        fetch_head.write_text(f"{docs}\tnot-for-merge\tbranch 'docs' of x\n{feature}\t\tbranch 'feature' of x\n",
+                              encoding="utf-8")
+        result, err = self.check("merge", "FETCH_HEAD")
+        self.assertEqual(result, (1, ""))
+        self.assertIn("変更 .claude/settings.json", err)
+        fetch_head.write_text(f"{feature}\tnot-for-merge\tbranch 'feature' of x\n{docs}\t\tbranch 'docs' of x\n",
+                              encoding="utf-8")
+        self.assertEqual(self.check("merge", "FETCH_HEAD")[0][0], 0)
+        # 衝突の印のラベルは、取り込むコミットの oid になる（実測）。
+        self.commit_settings('{"v": 3}\n')
+        fetch_head.write_text(f"{feature}\t\tbranch 'feature' of x\n", encoding="utf-8")
+        self.assertEqual(self.approve_and_run("merge", "--no-edit", "-q", "FETCH_HEAD", codes=(1,)), (0, ""))
+        self.assertIn(f">>>>>>> {feature}", self.settings.read_text(encoding="utf-8"))
 
     def test_merge_driver_is_not_run(self):
         # merge-tree は、作業ツリーの .gitattributes と .git/info/attributes の merge 属性で、設定のドライバーを動かす（実測）。
@@ -1024,6 +1058,37 @@ class OtherWriteTests(TreeBase):
         self.assertEqual(result, (1, ""))
         self.assertIn("x がsymlink", err)
         self.assertNotIn(guard.MSG_ASK, err)
+
+    def test_worktree_add_checks_attributes_of_unchanged_files(self):
+        # 新しい作業ツリーには、元のチェックアウトと同じ中身の対象も書かれ、属性はそれにも効く（レビューで実測）。
+        info = self.repo / ".git" / "info"
+        info.mkdir(exist_ok=True)
+        (info / "attributes").write_text(".claude/settings.json working-tree-encoding=UTF-16\n", encoding="utf-8")
+        result, err = self.check("worktree", "add", "../wt", "docs", tty=True, answer="y\n")
+        self.assertEqual(result, (1, ""))
+        self.assertIn("working-tree-encoding", err)
+        self.assertNotIn(guard.MSG_ASK, err)
+
+    def test_worktree_into_protected_place_stops(self):
+        # 新しい作業ツリーの中のファイルは、今と元のチェックアウトから見ると対象のパスになりうる（レビューで実測）。
+        self.branch("skill", "main", {"SKILL.md": "# evil\n"})
+        result, err = self.check("worktree", "add", ".claude/skills/x", "skill")
+        self.assertEqual(result, (1, ""))
+        self.assertIn(".claude/skills/x", err)
+        wt = self.root / "wt"
+        local_git(self.repo, "worktree", "add", "-q", str(wt), "docs")
+        # 元のチェックアウトの対象の中も止める（今のチェックアウトは wt）。
+        result, err = self.check("worktree", "add", "../repo/.claude/skills/z", "skill", start=wt)
+        self.assertEqual(result, (1, ""))
+        self.assertIn(".claude/skills/z", err)
+        # move の行き先も同じ（R18）。行き先がディレクトリなら、git はその中に同じ名前で動かす。
+        for dest in (".claude/skills/y", ".claude"):
+            with self.subTest(dest=dest):
+                result, err = self.check("worktree", "move", "../wt", dest)
+                self.assertEqual(result, (1, ""))
+                self.assertIn(".claude", err)
+        self.assertEqual(self.check("worktree", "move", "../wt", "../wt-moved")[0], (0, ""))
+        self.assertEqual(self.check("worktree", "move", "../wt", "sub")[0], (0, ""))
 
 
 if __name__ == "__main__":

@@ -110,7 +110,8 @@ WORKTREE_ADD_FLAGS = frozenset(
     "--no-guess-remote".split()
 )
 WORKTREE_ADD_VALUES = frozenset(("-b", "-B", "--reason"))
-WORKTREE_OTHERS = frozenset("list prune lock unlock remove move repair".split())  # 作業ツリーの中身を書かない
+WORKTREE_OTHERS = frozenset("list prune lock unlock remove repair".split())  # 作業ツリーの中身を書かない
+WORKTREE_MOVE_FLAGS = frozenset(("-f", "--force"))
 # git がパスを C の形で引用するときの、\ の後の文字と、その値。
 C_ESCAPES = {ord("a"): 7, ord("b"): 8, ord("t"): 9, ord("n"): 10, ord("v"): 11, ord("f"): 12, ord("r"): 13,
              ord('"'): 34, ord("\\"): 92}
@@ -889,6 +890,31 @@ def _merge_plan(inv: Invocation, rev: str) -> Plan:
     return _merged_plan(inv, ("HEAD", rev), (_commit_tree(inv, commit),), labels=True)
 
 
+def _fetch_head(inv: Invocation) -> str:
+    """git merge FETCH_HEAD が取り込むコミットの oid（ファイルに書かれたとおりの文字列）。
+
+    git は FETCH_HEAD（sandbox が書ける）の not-for-merge でない行（oid の後が 2 つのタブ）をすべて取り込み、
+    2 行以上なら octopus で merge する。rev-parse は 1 行目だけを読むので使わない（実測）。
+    取り込む行がちょうど 1 つでなければ止める。
+    """
+    size = len(_head_commit(inv))
+    path = _git_line(inv, "rev-parse", "--path-format=absolute", "--git-path", "FETCH_HEAD")
+    with open(path, "rb") as f:
+        lines = f.read().split(b"\n")
+    if lines[-1] == b"":
+        lines.pop()
+    picked: list[str] = []
+    for line in lines:
+        oid = line[:size]
+        if len(oid) != size or any(c not in b"0123456789abcdefABCDEF" for c in oid):
+            raise GuardError("FETCH_HEAD を読めません")
+        if line[size:size + 2] == b"\t\t":
+            picked.append(os.fsdecode(oid))
+    if len(picked) != 1:
+        raise GuardError("FETCH_HEAD の取り込む行が 1 つではありません")
+    return picked[0]
+
+
 def plan_merge(inv: Invocation, after_fetch: bool) -> Plan | None:
     if inv.args == ("--quit",):
         return None  # 作業ツリーを書かない（MERGE_AUTOSTASH は stash の一覧に入る。実測）
@@ -903,7 +929,11 @@ def plan_merge(inv: Invocation, after_fetch: bool) -> Plan | None:
         raise GuardError("merge の引数を確かめられません")
     _merge_settings(inv, merge=True)
     # git は - を @{-1} として読み、印のラベルにも @{-1} を使う（実測）。
-    return _merge_plan(inv, "@{-1}" if a.positional[0] == "-" else a.positional[0])
+    rev = "@{-1}" if a.positional[0] == "-" else a.positional[0]
+    if rev == "FETCH_HEAD":
+        # 名前がちょうど FETCH_HEAD のときだけ、git は行を読み、ラベルには oid を使う（実測。fetch_head は 1 行目）。
+        rev = _fetch_head(inv)
+    return _merge_plan(inv, rev)
 
 
 def plan_pull(inv: Invocation, after_fetch: bool) -> Plan:
@@ -919,6 +949,9 @@ def plan_pull(inv: Invocation, after_fetch: bool) -> Plan:
         rebase = rebase or _git_line(inv, "config", "--type=bool", "--get", "pull.rebase", ok=(0, 1))
         if rebase == "true":
             raise GuardError("pull の rebase は確かめられません")
+    # pull.autoStash は、git merge --autostash を動かす（レビューで実測）。
+    if _git_line(inv, "config", "--type=bool", "--get", "pull.autoStash", ok=(0, 1)) == "true":
+        raise GuardError("pull.autoStash が設定されています")
     remote = _git_line(inv, "config", "--get", f"branch.{branch}.remote", ok=(0, 1))
     if not remote or remote.startswith("-"):
         raise GuardError("pull の取り込み元を確かめられません")
@@ -1217,17 +1250,51 @@ def _worktree_target(inv: Invocation, a: Args, path: str, rev: str | None) -> st
     return commit
 
 
+def _protected_place(inv: Invocation, place: str) -> None:
+    """place（実パス）が、今か元のチェックアウトの対象のパス（またはその下）なら止める。
+
+    新しい作業ツリーの中のファイルは、そのチェックアウトから見ると対象のパスになる（.claude/skills/x/SKILL.md など）。
+    """
+    assert inv.root is not None
+    roots = [inv.root]
+    common = Path(_git_line(inv, "rev-parse", "--path-format=absolute", "--git-common-dir"))
+    if common.name == ".git":
+        roots.append(common.parent)
+    for root in roots:
+        rel = os.path.relpath(place, os.path.realpath(root))
+        if rel in (os.curdir, os.pardir) or rel.startswith(os.pardir + os.sep):
+            continue
+        if is_protected(root, rel, inv.home):
+            raise GuardError(f"{place} は自動で読み込まれるパスの中です")
+
+
+def _worktree_move(inv: Invocation, args: Sequence[str]) -> None:
+    """worktree move の行き先を、git と同じく決めて確かめる（R18）。"""
+    a = split_args("worktree", args, WORKTREE_MOVE_FLAGS)
+    pos = a.positional + (a.pathspec or ())
+    if len(pos) != 2:
+        raise GuardError("worktree move の引数を確かめられません")
+    dest = os.path.realpath(os.path.join(os.path.realpath(inv.cwd), pos[1]))
+    places = [dest]
+    if os.path.isdir(dest):
+        # git は、行き先がディレクトリなら、その中に同じ名前で動かす。
+        places.append(os.path.join(dest, os.path.basename(pos[0].rstrip("/"))))
+    for place in places:
+        _protected_place(inv, place)
+
+
 def plan_worktree(inv: Invocation, after_fetch: bool) -> Plan | None:
     if not inv.args:
         raise GuardError("worktree の引数を確かめられません")
     sub = inv.args[0]
     if sub in WORKTREE_OTHERS:
         return None
+    if sub == "move":
+        _worktree_move(inv, inv.args[1:])
+        return None  # 中身は書かない
     if sub != "add":
         raise GuardError(f"worktree {sub} は確かめられません")
     a = split_args("worktree", inv.args[1:], WORKTREE_ADD_FLAGS, WORKTREE_ADD_VALUES)
-    if a.last("--checkout", "--no-checkout") == "--no-checkout":
-        return None
     pos = a.positional + (a.pathspec or ())
     if not 1 <= len(pos) <= 2:
         raise GuardError("worktree add の引数を確かめられません")
@@ -1235,6 +1302,9 @@ def plan_worktree(inv: Invocation, after_fetch: bool) -> Plan | None:
     root = os.path.normpath(os.path.join(os.path.realpath(inv.cwd), pos[0]))
     if os.path.realpath(root) != root:
         raise GuardError(f"{pos[0]} の途中に symlink があります")
+    _protected_place(inv, root)
+    if a.last("--checkout", "--no-checkout") == "--no-checkout":
+        return None
     commit = _worktree_target(inv, a, pos[0], pos[1] if len(pos) == 2 else None)
     tree = _commit_tree(inv, commit)
     main = _main_root(inv)
@@ -1301,6 +1371,9 @@ def danger(plan: Plan, inv: Invocation) -> str | None:
             if os.path.islink(os.path.join(plan.root, parent)):
                 return MSG_DANGER.format(path=_show(parent), kind="symlink")
     paths = [c.path for c in plan.changes if c.new is not None]
+    if plan.fresh:
+        # 新しい作業ツリーには、元のチェックアウトと同じ中身の対象も書かれ、属性はそれにも効く。
+        paths = sorted(set(paths) | set(_fresh_entries(plan, inv)))
     if not paths:
         return None
     # 書くときの属性は、作業ツリー・index・書く元の tree のどれからも来うる。
@@ -1379,6 +1452,17 @@ def _dec(value: object) -> Entry | None:
     raise ValueError("entry")
 
 
+def _fresh_entries(plan: Plan, inv: Invocation) -> dict[str, Entry]:
+    """新しい作業ツリーに書かれる対象（書く元の tree の対象すべて。元のチェックアウトと同じものも含む）。"""
+    assert plan.old_root is not None
+    found: dict[str, Entry] = {}
+    for tree in plan.sources:
+        for path, entry in tree_entries(plan.old_root, tree, config=inv.config).items():
+            if is_protected(plan.root, path, inv.home):
+                found[path] = entry
+    return found
+
+
 def state_of(plan: Plan, inv: Invocation) -> str:
     """verify に渡す状態。変わるファイルは [旧, 新]、index にある変わらない対象は [今, 今]。
 
@@ -1387,10 +1471,8 @@ def state_of(plan: Plan, inv: Invocation) -> str:
     expect: dict[str, list[list[str] | None]] = {}
     if plan.fresh:
         assert plan.old_root is not None
-        for tree in plan.sources:
-            for path, entry in tree_entries(plan.old_root, tree, config=inv.config).items():
-                if is_protected(plan.root, path, inv.home):
-                    expect[path] = [None, _enc(_effective_at(plan.old_root, entry, inv.config))]
+        for path, entry in _fresh_entries(plan, inv).items():
+            expect[path] = [None, _enc(_effective_at(plan.old_root, entry, inv.config))]
     else:
         entries = index_entries(plan.root, root=plan.root, home=inv.home, config=inv.config)
         targets = [p for p in entries if is_protected(plan.root, p, inv.home)]
