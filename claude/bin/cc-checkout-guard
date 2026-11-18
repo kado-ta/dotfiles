@@ -231,6 +231,10 @@ def parse(start: Path, argv: Sequence[str], git_env_names: Sequence[str], home: 
     try:
         root: Path | None = Path(os.fsdecode(run_git(cwd, "rev-parse", "--show-toplevel", config=config)).removesuffix("\n"))
     except GuardError:
+        # .git がどこにもないときだけ、リポジトリの外とみなす。
+        # .git があるのに読めないときは、外とは区別して止める。
+        if any(os.path.lexists(d / ".git") for d in (cwd, *cwd.parents)):
+            raise GuardError("リポジトリを読めません") from None
         root = None
     return Invocation(
         cwd=cwd, root=root, globals=tuple(glob), config=tuple(config), sub=sub,
@@ -244,7 +248,8 @@ def check(argv: Sequence[str], *, start: Path, git_env: Sequence[str], after_fet
         return EXIT_ALLOW, ""
     try:
         inv = parse(start, argv, git_env, home)
-        if inv.sub == "" or inv.sub in READ_ONLY or "-h" in inv.args or "--help" in inv.args or inv.root is None:
+        # -h / --help がヘルプになるのは先頭の引数のときだけ（-m の値やパスのこともある）。
+        if inv.sub == "" or inv.sub in READ_ONLY or inv.args[:1] in (("-h",), ("--help",)) or inv.root is None:
             return EXIT_ALLOW, ""
         if inv.sub not in HANDLERS:
             raise GuardError(f"{inv.sub} は確かめられません")

@@ -126,6 +126,16 @@ class CheckTests(Base):
         self.assertEqual(self.check("clone", "a", "b", start=outside)[0], (0, ""))
         self.assertEqual(self.check("switch", "x", start=outside)[0], (0, ""))
 
+    def test_help_only_as_first_argument(self):
+        for argv in (("stash", "push", "-m", "-h"), ("checkout", "feature", "--", ".claude", "-h")):
+            with self.subTest(argv=argv):
+                self.assertEqual(self.check(*argv)[0], (1, ""))
+
+    def test_unreadable_repository_stops(self):
+        local_git(self.repo, "config", "extensions.cc-probe", "1")
+        local_git(self.repo, "config", "core.repositoryformatversion", "1")
+        self.assertEqual(self.check("switch", "x")[0], (1, ""))
+
     def test_unknown_subcommand_stops(self):
         result, err = self.check("rebase", "main")
         self.assertEqual(result, (1, ""))
