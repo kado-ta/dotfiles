@@ -742,6 +742,70 @@ class SwitchTests(TreeBase):
         return os.waitstatus_to_exitcode(status), out.decode("utf-8", "replace")
 
 
+class FastPathTests(TreeBase):
+    """引数だけで許可する早道（I2）は、全体の処理が許可する形しか許可しない。"""
+
+    def fast(self, argv, git_env=""):
+        return guard.fast_allow(["check", "--git-env", git_env, "--", *argv])
+
+    def test_fast_path_agrees_with_full_path(self):
+        allowed = [("status",), ("log", "--oneline"), ("diff", "--stat"), ("-C", "sub", "status"),
+                   ("-c", "color.ui=never", "log"), ("--no-pager", "log"), ("-p", "show"), ("--version",),
+                   ("--help",), ("-h",), ("-C", "sub", "--help"), (), ("-C", "sub"), ("switch", "-h"),
+                   ("checkout", "--help"), ("worktree", "-h"), ("show", "--output-indicator-new=>"),
+                   ("config", "--get", "user.name"), ("branch", "-a"), ("rm", "-h")]
+        for argv in allowed:
+            with self.subTest(allowed=argv):
+                self.assertTrue(self.fast(argv))
+                self.assertEqual(self.check(*argv)[0], (0, ""))
+        stopped = [("show", "--output=x"), ("log", "--outp=x"), ("config", "-f", "x", "a.b", "c"),
+                   ("config", "--fil=x", "a.b", "c"), ("archive", "-o", "x", "HEAD"), ("archive", "-h"),
+                   ("format-patch", "-1"), ("bundle", "create", "x", "HEAD"), ("-c", "alias.st=status", "status"),
+                   ("-c", "ALIAS.st=status", "status"), ("--git-dir=x", "status"), ("--bare", "status"),
+                   ("-C",), ("-c",), ("rebase", "main"), ("switch", "feature"), ("rm", ".claude/settings.json"),
+                   ("show", "-h", "--output=x")]
+        for argv in stopped:
+            with self.subTest(stopped=argv):
+                self.assertFalse(self.fast(argv))
+                self.assertEqual(self.check(*argv)[0], (1, ""))
+        # 早道が決めない形は、全体の処理が決める（許可することもある）。
+        local_git(self.repo, "config", "alias.st", "status")
+        for argv in (("switch", "docs"), ("-c", "user.name=Jürgen", "status"), ("st",), ("st", "-h"),
+                     ("rm", "--cached", "README.md")):
+            with self.subTest(handed_over=argv):
+                self.assertFalse(self.fast(argv))
+                self.assertEqual(self.check(*argv)[0][0], 0)
+        # GIT_ の名前と check のオプションも、main と parse と同じく読む。
+        self.assertTrue(self.fast(("status",), "GIT_EDITOR,GIT_PAGER"))
+        self.assertEqual(self.check("status", git_env=("GIT_EDITOR", "GIT_PAGER"))[0], (0, ""))
+        self.assertFalse(self.fast(("status",), "GIT_EDITOR,GIT_DIR"))
+        self.assertEqual(self.check("status", git_env=("GIT_EDITOR", "GIT_DIR"))[0], (1, ""))
+        self.assertTrue(guard.fast_allow(["check", "--after-fetch", "--git-env", "", "--", "status"]))
+        for argv in (["check", "--bogus", "--", "status"], ["check", "--git-env"], ["check", "status"],
+                     ["verify", "{}"], ["status"], []):
+            with self.subTest(main=argv):
+                self.assertFalse(guard.fast_allow(argv))
+        self.assertEqual(guard.main(["check", "--bogus", "--", "status"]), 1)
+        # -h を許すサブコマンドの一覧は、HANDLERS と同じ。
+        self.assertEqual(set(guard.HANDLERS), guard.HANDLED)
+
+    def test_fast_path_runs_before_heavy_imports(self):
+        # インストールと同じく、スクリプトとして起動する。
+        def imported(*argv):
+            cmd = [sys.executable, "-I", "-X", "importtime", str(FILE), "check", "--git-env", "", "--", *argv]
+            cp = subprocess.run(cmd, capture_output=True, text=True, cwd=self.repo)
+            return cp, {line.rsplit("|", 1)[-1].strip() for line in cp.stderr.splitlines() if "|" in line}
+
+        cp, names = imported("status")
+        self.assertEqual((cp.returncode, cp.stdout), (0, ""))
+        for name in ("subprocess", "difflib", "dataclasses", "tempfile", "ctypes"):
+            with self.subTest(name=name):
+                self.assertNotIn(name, names)
+        # 早道で決まらない形は、全体の処理に進む。
+        _, names = imported("switch", "docs")
+        self.assertIn("subprocess", names)
+
+
 class MergeTests(TreeBase):
     def test_merge(self):
         (code, out), err = self.check("merge", "docs")

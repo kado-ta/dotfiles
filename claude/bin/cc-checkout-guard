@@ -9,44 +9,13 @@ claude -w の WorktreeCreate フック（worktree-create）として、確かめ
 """
 from __future__ import annotations
 
-import difflib
-import hashlib
-import json
 import os
-import posixpath
-import pwd
-import re
-import shlex
-import signal
-import stat
-import subprocess
 import sys
-import tempfile
-import time
-import unicodedata
-from collections.abc import Callable, Iterable, Mapping, Sequence
-from dataclasses import dataclass, replace
-from pathlib import Path
-from typing import TextIO
 
-# /usr/bin/git は xcrun の shim で、キャッシュや DEVELOPER_DIR で起動するプログラムが変わる。
-GIT = "/Library/Developer/CommandLineTools/usr/bin/git"
-GUARD_PATH = "/usr/local/libexec/claude-guard/cc-checkout-guard"
+# ここから fast_allow までは、重い import の前に読む（I2）。標準ライブラリの読み込みに 1 回あたり約 80 ms かかる。
 EXIT_ALLOW = 0
 EXIT_STOP = 1
 EXIT_FETCH = 3
-GIT_TIMEOUT = 60
-ALIAS_DEPTH = 5
-
-PROTECTED_DIRS = (".claude", ".vscode", ".idea")  # パスのどこかの階層の名前
-PROTECTED_NAMES = (".mcp.json", "mise.lock")  # ファイル名
-PROTECTED_PREFIXES = (".env",)  # ファイル名の先頭
-DOTFILES_PROTECTED = (  # check-repo.py の PROJECT_DENY_WRITE と同じ文字列
-    "./claude", "./zsh", "./config", "./mise", "./mise.toml", "./ghostty", "./vscode", "./bin",
-    "./codex", "./biome", "./obsidian", "./aws", "./init.command", "./setup.command", "./CLAUDE.md",
-    "./.claude/rules",
-)
-DANGEROUS_ATTRS = ("filter", "working-tree-encoding", "ident")
 
 # 作業ツリーに書かないサブコマンド。ファイルに書くオプション（file_writes）があれば止める。
 READ_ONLY = frozenset(
@@ -60,6 +29,19 @@ READ_ONLY = frozenset(
 )
 # 中身をファイルに書く builtin（-o・--output-directory・create <file>）。確かめずに止める（C1）。
 FILE_WRITERS = frozenset(("archive", "bundle", "format-patch"))
+# 確認の内容を計算するサブコマンド（HANDLERS のキーと同じ）。早道は、これらの -h・--help だけを許可する。
+HANDLED = frozenset(
+    "commit switch checkout restore checkout-index reset merge pull stash cherry-pick revert rm clean mv "
+    "worktree".split()
+)
+# 人間の環境にあってよい GIT_ の名前。
+ALLOWED_GIT_ENV = frozenset(
+    "GIT_EDITOR GIT_SEQUENCE_EDITOR GIT_PAGER GIT_SSH GIT_SSH_COMMAND GIT_ASKPASS GIT_TERMINAL_PROMPT "
+    "GIT_AUTHOR_NAME GIT_AUTHOR_EMAIL GIT_AUTHOR_DATE GIT_COMMITTER_NAME GIT_COMMITTER_EMAIL "
+    "GIT_COMMITTER_DATE GIT_MERGE_AUTOEDIT GIT_PROGRESS_DELAY".split()
+)
+SKIPPED_GLOBALS = frozenset(("--no-pager", "-p", "--paginate", "--no-optional-locks"))
+HELP_GLOBALS = frozenset(("--version", "--help", "-h"))
 
 
 def file_writes(sub: str, args: Sequence[str]) -> str | None:
@@ -82,14 +64,94 @@ def file_writes(sub: str, args: Sequence[str]) -> str | None:
                                 or (tok.startswith("-") and not long and "f" in tok[1:])):
             return f"config の {name} はファイルに書きます"
     return None
-# 人間の環境にあってよい GIT_ の名前。
-ALLOWED_GIT_ENV = frozenset(
-    "GIT_EDITOR GIT_SEQUENCE_EDITOR GIT_PAGER GIT_SSH GIT_SSH_COMMAND GIT_ASKPASS GIT_TERMINAL_PROMPT "
-    "GIT_AUTHOR_NAME GIT_AUTHOR_EMAIL GIT_AUTHOR_DATE GIT_COMMITTER_NAME GIT_COMMITTER_EMAIL "
-    "GIT_COMMITTER_DATE GIT_MERGE_AUTOEDIT GIT_PROGRESS_DELAY".split()
+
+
+def fast_allow(argv: Sequence[str]) -> bool:
+    """check の引数だけで許可が決まるか（I2）。偽なら何も決めず、全体の処理（main）に任せる。
+
+    許可するのは、全体の処理も許可する形だけ: READ_ONLY のサブコマンドでファイルに書かない形、
+    HANDLED のサブコマンドの -h・--help、サブコマンドのない形（--version・--help など）。
+    check のオプションと全体のオプションは main・parse と同じく読み、parse が止めるもの（-c alias.*、
+    知らないオプション、ALLOWED_GIT_ENV にない名前）と、同じと言い切れないもの（ASCII でない -c の値、alias）は任せる。
+    リポジトリは読まない。READ_ONLY は作業ツリーに書かないので、許可にリポジトリの中身は要らない。
+    """
+    if argv[:1] != ["check"] or "--" not in argv:
+        return False
+    sep = list(argv).index("--")
+    opts, args = argv[1:sep], argv[sep + 1:]
+    i = 0
+    while i < len(opts):
+        if opts[i] == "--git-env" and i + 1 < len(opts):
+            if any(name and name not in ALLOWED_GIT_ENV for name in opts[i + 1].split(",")):
+                return False
+            i += 1
+        elif opts[i] != "--after-fetch":
+            return False
+        i += 1
+    i = 0
+    while i < len(args):
+        tok = args[i]
+        if tok in HELP_GLOBALS:
+            return True
+        if tok in ("-C", "-c"):
+            if i + 1 >= len(args):
+                return False
+            # parse は、NFC と casefold の後に alias. で始まる -c を止める。ASCII なら lower と同じになる。
+            value = args[i + 1]
+            if tok == "-c" and (not value.isascii() or value.lower().startswith("alias.")):
+                return False
+            i += 2
+        elif tok in SKIPPED_GLOBALS:
+            i += 1
+        elif tok.startswith("-"):
+            return False
+        else:
+            # git は builtin を alias で置き換えないので、名前だけで決まる。
+            rest = args[i + 1:]
+            if tok in READ_ONLY:
+                return file_writes(tok, rest) is None
+            return tok in HANDLED and rest[:1] in (["-h"], ["--help"])
+    return True
+
+
+# 確認コマンドとして起動されたときだけ（check-repo.py とテストの import では動かさない）、
+# 引数だけで許可が決まれば、重い import の前に終える。標準出力には何も出さない（verify は要らない）。
+if __name__ == "__main__" and fast_allow(sys.argv[1:]):
+    sys.exit(EXIT_ALLOW)
+
+import difflib
+import hashlib
+import json
+import posixpath
+import pwd
+import re
+import shlex
+import signal
+import stat
+import subprocess
+import tempfile
+import time
+import unicodedata
+from collections.abc import Callable, Iterable, Mapping, Sequence
+from dataclasses import dataclass, replace
+from pathlib import Path
+from typing import TextIO
+
+# /usr/bin/git は xcrun の shim で、キャッシュや DEVELOPER_DIR で起動するプログラムが変わる。
+GIT = "/Library/Developer/CommandLineTools/usr/bin/git"
+GUARD_PATH = "/usr/local/libexec/claude-guard/cc-checkout-guard"
+GIT_TIMEOUT = 60
+ALIAS_DEPTH = 5
+
+PROTECTED_DIRS = (".claude", ".vscode", ".idea")  # パスのどこかの階層の名前
+PROTECTED_NAMES = (".mcp.json", "mise.lock")  # ファイル名
+PROTECTED_PREFIXES = (".env",)  # ファイル名の先頭
+DOTFILES_PROTECTED = (  # check-repo.py の PROJECT_DENY_WRITE と同じ文字列
+    "./claude", "./zsh", "./config", "./mise", "./mise.toml", "./ghostty", "./vscode", "./bin",
+    "./codex", "./biome", "./obsidian", "./aws", "./init.command", "./setup.command", "./CLAUDE.md",
+    "./.claude/rules",
 )
-SKIPPED_GLOBALS = frozenset(("--no-pager", "-p", "--paginate", "--no-optional-locks"))
-HELP_GLOBALS = frozenset(("--version", "--help", "-h"))
+DANGEROUS_ATTRS = ("filter", "working-tree-encoding", "ident")
 
 # diff は作業ツリーを読まない形（tree 同士、index と tree）だけで使う。
 # 作業ツリーと比べる diff は、設定の clean フィルタを動かし、assume-unchanged の entry を見落とすため。
