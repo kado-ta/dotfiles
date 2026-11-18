@@ -190,7 +190,13 @@ class CheckTests(Base):
                      ("archive", "-o", "x.tar", "HEAD"), ("bundle", "create", "x.bundle", "HEAD"),
                      ("config", "-f", ".claude/settings.json", "a.b", "c"), ("config", "--file=x", "a.b", "c"),
                      ("config", "--fil=x", "a.b", "c"), ("config", "-fx", "a.b", "c"), ("config", "-lfx"),
-                     ("config", "set", "--file", "x", "a.b", "c"), ("-C", "sub", "show", "--output=x")):
+                     ("config", "set", "--file", "x", "a.b", "c"), ("-C", "sub", "show", "--output=x"),
+                     # 作り直しの init は、--separate-git-dir で .git（sandbox が書ける）を丸ごと動かし、
+                     # テンプレート（--template・-c init.templateDir）から .git/hooks に書く（再レビューで実測。R24）。
+                     ("init", "--separate-git-dir=.claude/skills/evil"), ("init", "--separate-git-dir", "x"),
+                     ("init", "--sep=x"), ("init", "--separate", "x"), ("init", "--template=x"),
+                     ("init", "--templ=x"), ("init", "--template", "x"), ("-c", "init.templateDir=x", "init"),
+                     ("-c", "INIT.TEMPLATEDIR=x", "init", "-q")):
             with self.subTest(argv=argv):
                 result, err = self.check(*argv)
                 self.assertEqual(result, (1, ""))
@@ -203,9 +209,14 @@ class CheckTests(Base):
                      ("archive", f"--remote={self.repo}", "-o", f"{self.repo}/.env", "HEAD")):
             with self.subTest(argv=argv):
                 self.assertEqual(self.check(*argv, start=outside)[0], (1, ""))
+        self.assertEqual(self.check("init", "newproj", start=outside)[0], (0, ""))
         # 書かない形は今までどおり通す。
         for argv in (("show", "--output-indicator-new=>", "HEAD"), ("config", "--get", "user.name"),
-                     ("config", "--fixed-value", "--get", "a.b", "c"), ("log", "--oneline"), ("ls-files", "-o")):
+                     ("config", "--fixed-value", "--get", "a.b", "c"), ("log", "--oneline"), ("ls-files", "-o"),
+                     ("init",), ("init", "newdir"), ("init", "-q"), ("init", "-b", "main"),
+                     ("init", "--initial-branch=main"), ("init", "--bare", "x.git"), ("init", "--object-format=sha1"),
+                     ("init", "--ref-format=files"), ("init", "--shared"), ("init", "--shared=group"),
+                     ("-c", "init.defaultBranch=main", "init")):
             with self.subTest(argv=argv):
                 self.assertEqual(self.check(*argv)[0], (0, ""))
 
@@ -762,7 +773,8 @@ class FastPathTests(TreeBase):
                    ("-c", "color.ui=never", "log"), ("--no-pager", "log"), ("-p", "show"), ("--version",),
                    ("--help",), ("-h",), ("-C", "sub", "--help"), (), ("-C", "sub"), ("switch", "-h"),
                    ("checkout", "--help"), ("worktree", "-h"), ("show", "--output-indicator-new=>"),
-                   ("config", "--get", "user.name"), ("branch", "-a"), ("rm", "-h")]
+                   ("config", "--get", "user.name"), ("branch", "-a"), ("rm", "-h"), ("init",), ("init", "-q", "x"),
+                   ("init", "--bare", "--shared", "x.git")]
         for argv in allowed:
             with self.subTest(allowed=argv):
                 self.assertTrue(self.fast(argv))
@@ -772,7 +784,8 @@ class FastPathTests(TreeBase):
                    ("format-patch", "-1"), ("bundle", "create", "x", "HEAD"), ("-c", "alias.st=status", "status"),
                    ("-c", "ALIAS.st=status", "status"), ("--git-dir=x", "status"), ("--bare", "status"),
                    ("-C",), ("-c",), ("rebase", "main"), ("switch", "feature"), ("rm", ".claude/settings.json"),
-                   ("show", "-h", "--output=x")]
+                   ("show", "-h", "--output=x"), ("init", "--separate-git-dir=.claude/skills/evil"),
+                   ("init", "--templ=x"), ("-c", "init.templateDir=x", "init"), ("-c", "Init.TemplateDir=x", "init")]
         for argv in stopped:
             with self.subTest(stopped=argv):
                 self.assertFalse(self.fast(argv))
@@ -780,10 +793,17 @@ class FastPathTests(TreeBase):
         # 早道が決めない形は、全体の処理が決める（許可することもある）。
         local_git(self.repo, "config", "alias.st", "status")
         for argv in (("switch", "docs"), ("-c", "user.name=Jürgen", "status"), ("st",), ("st", "-h"),
-                     ("rm", "--cached", "README.md")):
+                     ("rm", "--cached", "README.md"), ("-c", "init.templateDir=x", "status")):
             with self.subTest(handed_over=argv):
                 self.assertFalse(self.fast(argv))
                 self.assertEqual(self.check(*argv)[0][0], 0)
+        # 受け入れた違い（ledger の判断。R24）: CLT の git が読めないリポジトリでは、早道は READ_ONLY とヘルプを
+        # 引数だけで許可し、全体の処理は rev-parse の失敗で止める（リポジトリを読めません）。どちらも作業ツリーに書かない。
+        # どちらかを変えたときに気づけるよう、今の違いをそのまま確かめる。
+        for argv in (("-C", "nonexistent", "status"), ("-c", "foo", "status"), ("-C", "nonexistent", "--help")):
+            with self.subTest(accepted_divergence=argv):
+                self.assertTrue(self.fast(argv))
+                self.assertEqual(self.check(*argv)[0], (1, ""))
         # GIT_ の名前と check のオプションも、main と parse と同じく読む。
         self.assertTrue(self.fast(("status",), "GIT_EDITOR,GIT_PAGER"))
         self.assertEqual(self.check("status", git_env=("GIT_EDITOR", "GIT_PAGER"))[0], (0, ""))

@@ -49,7 +49,9 @@ def file_writes(sub: str, args: Sequence[str]) -> str | None:
 
     --output は diff の系統（show・log・blame・range-diff など）で、引数を読む時点でファイルを作る（実測）。
     省略形（--outp）も止める。config の -f・--file は別のファイルを読み書きする。値をつないだ形（-fx）、
-    まとめ書き（-lfx）、省略形（--fil）も止める。-- の後も見る（止める側に倒す）。
+    まとめ書き（-lfx）、省略形（--fil）も止める。init の --separate-git-dir は、既存の .git（sandbox が書ける）を
+    丸ごと動かし、--template は作り直しでもテンプレートを .git/hooks などに写す（実測。R24）。省略形も止める。
+    人間の -c init.templateDir は、args に現れないので check が止める。-- の後も見る（止める側に倒す）。
     """
     if sub in FILE_WRITERS:
         return f"{sub} はファイルに書きます"
@@ -63,6 +65,8 @@ def file_writes(sub: str, args: Sequence[str]) -> str | None:
         if sub == "config" and ((long and "--file".startswith(name))
                                 or (tok.startswith("-") and not long and "f" in tok[1:])):
             return f"config の {name} はファイルに書きます"
+        if sub == "init" and long and ("--separate-git-dir".startswith(name) or "--template".startswith(name)):
+            return f"init の {name} はファイルに書きます"
     return None
 
 
@@ -96,9 +100,11 @@ def fast_allow(argv: Sequence[str]) -> bool:
         if tok in ("-C", "-c"):
             if i + 1 >= len(args):
                 return False
-            # parse は、NFC と casefold の後に alias. で始まる -c を止める。ASCII なら lower と同じになる。
+            # parse は、NFC と casefold の後に alias. で始まる -c を止め、check は init の -c init.templateDir を止める。
+            # ASCII なら lower と同じになる。
             value = args[i + 1]
-            if tok == "-c" and (not value.isascii() or value.lower().startswith("alias.")):
+            if tok == "-c" and (not value.isascii() or value.lower().startswith("alias.")
+                                or value.lower().partition("=")[0] == "init.templatedir"):
                 return False
             i += 2
         elif tok in SKIPPED_GLOBALS:
@@ -1828,6 +1834,9 @@ def check(argv: Sequence[str], *, start: Path, git_env: Sequence[str], after_fet
         writes = file_writes(inv.sub, inv.args)
         if writes is not None:
             raise GuardError(writes)
+        # 人間の -c init.templateDir も、作り直しの init でテンプレートを .git/hooks などに写す（実測。R24）。
+        if inv.sub == "init" and any(_norm(c).partition("=")[0] == "init.templatedir" for c in inv.config):
+            raise GuardError("init の -c init.templateDir はファイルに書きます")
         # -h / --help がヘルプになるのは先頭の引数のときだけ（-m の値やパスのこともある）。
         if inv.sub == "" or inv.sub in READ_ONLY or inv.args[:1] in (("-h",), ("--help",)) or inv.root is None:
             return EXIT_ALLOW, ""
