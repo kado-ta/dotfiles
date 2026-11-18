@@ -47,6 +47,10 @@ check 0 'navigate' '{"tool_name":"mcp__playwright__browser_navigate","tool_input
 check 0 'tool without arguments' '{"tool_name":"mcp__playwright__browser_close","tool_input":{}}'
 # Only the tool's own argument counts; a form field labelled "filename" is page data.
 check 0 'nested key named filename' '{"tool_name":"mcp__playwright__browser_fill_form","tool_input":{"fields":[{"name":"filename","filename":"x"}]}}'
+# Dropping text is how drag-and-drop UIs are tested; only files on disk are blocked.
+check 0 'drop with data only' '{"tool_name":"mcp__playwright__browser_drop","tool_input":{"target":"e1","data":{"text/plain":"hello"}}}'
+# A cookie path is a URL path, not a file.
+check 0 'cookie path' '{"tool_name":"mcp__playwright__browser_cookie_list","tool_input":{"path":"/"}}'
 # Claude Code writes the whole input; a hook that exits without reading it breaks the pipe once the input outgrows the buffer.
 {
   printf '%s' '{"tool_name":"mcp__playwright__browser_type","tool_input":{"text":"'
@@ -79,6 +83,21 @@ case "$err" in
   *PLANTED-TEXT*) ng "message repeats the filename (got '$err')" ;;
   *) ok 'message does not repeat the filename' ;;
 esac
+
+# paths hands local files to the page (browser_drop is in core; browser_file_upload is also denied in settings.json)
+check 2 'drop with paths' '{"tool_name":"mcp__playwright__browser_drop","tool_input":{"target":"e1","paths":["/Users/example/.env"]}}'
+err=$(<"$T/err")
+case "$err" in
+  Blocked:*paths*) ok 'message starts with Blocked: and names paths' ;;
+  *) ng "message starts with Blocked: and names paths (got '$err')" ;;
+esac
+case "$err" in
+  *.env*) ng "message repeats the paths (got '$err')" ;;
+  *) ok 'message does not repeat the paths' ;;
+esac
+check 2 'drop with paths and data' '{"tool_name":"mcp__playwright__browser_drop","tool_input":{"target":"e1","paths":["a.txt"],"data":{"text/plain":"x"}}}'
+check 2 'file upload with paths' '{"tool_name":"mcp__playwright__browser_file_upload","tool_input":{"paths":["a.txt"]}}'
+check 2 'empty paths' '{"tool_name":"mcp__playwright__browser_drop","tool_input":{"target":"e1","paths":[]}}'
 
 # Input that cannot be checked is blocked (fail closed)
 check 2 'invalid JSON' '{"tool_name":'

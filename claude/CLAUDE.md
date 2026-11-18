@@ -101,7 +101,7 @@ https://x.com/ai_database/status/2114184481951330365?s=12
 ## Tools
 
 - ブラウザの操作は次のように使い分ける。
-  - Claude が操作して調べるとき（公開ページのスクリーンショット・スタイル値、JS で描画される文書、ローカルの画面の確認）は Playwright MCP（`mcp__playwright__*`）を使う。`filename` 引数は付けない（フックが止める）。
+  - Claude が操作して調べるとき（公開ページのスクリーンショット・スタイル値、JS で描画される文書、ローカルの画面の確認）は Playwright MCP（`mcp__playwright__*`）を使う。`filename`・`paths` 引数は付けない（フックが止める）。
   - 繰り返す確認は、そのプロジェクトの `@playwright/test` にテストとして書き、実行は人間（端末・`!`）か CI に任せる（sandbox の中ではブラウザが起動しない）。プロジェクトに Playwright がなければ、導入は提案に留める。
   - gstack のスキル（`/qa` など）の中の browse は、スキルの手順に従う。
 - 静的なドキュメント参照（公式ドキュメント・MDN・GitHub README など、読むだけ）は `WebFetch` を使ってよい。`settings.json` の allow リストにないドメインは、取得前に許可を求める。

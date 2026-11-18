@@ -37,7 +37,7 @@ Playwright MCP（`@playwright/mcp`）を Claude Code の user スコープに登
 - ファイルの読み書きは、Playwright MCP 自身の検査で、ワークスペースのルートと出力先の中に限られる。OS の境界ではない。`file://` への移動は既定で拒否する。
 - `browser_run_code_unsafe` は capability が `core` で、常に有効になる。`--caps` では外せない（`filteredTools` は `core` で始まる capability を必ず含む）。説明文は "RCE-equivalent"。
 - `filename` 引数を持つ `core` のツールは、`browser_snapshot`・`browser_console_messages`・`browser_evaluate`・`browser_find`・`browser_network_requests`・`browser_network_request`・`browser_take_screenshot`・`browser_run_code_unsafe`（読み込み）。相対パスはワークスペースのルートを基準にする。`browser_evaluate` は、戻り値が JSON にできれば JSON で書く。
-- `browser_file_upload` は、ワークスペースのルートの中のファイルをページに渡せる。
+- `browser_file_upload` は、ワークスペースのルートの中のファイルをページに渡せる。`browser_drop`（`core`）も `paths` 引数で同じことができる（計画の時点では見落とし、動作確認で見つけた）。
 
 <a name="findings-sandbox"></a>
 ### sandbox との関係
@@ -71,6 +71,7 @@ Playwright MCP（`@playwright/mcp`）を Claude Code の user スコープに登
 | `browser_run_code_unsafe` | `permissions.deny` | Node のプロセスで任意のコードが動く。オプションでは外せない |
 | `browser_file_upload` | `permissions.deny` | sandbox の denyRead の外で、`.env*` などをページに送れる。今の用途で使わない |
 | `filename` 引数 | PreToolUse フックで、`filename` を含む `mcp__playwright__*` の呼び出しを拒否する | プロジェクトの中の任意のパス（`.claude/settings.json`・`.git/config` など）に書ける。`browser_evaluate` は任意の JSON を書けるので、hooks を書き込めば次のセッションで sandbox の外でコードが動く見込み |
+| `paths` 引数 | 同じフックで、`paths` を含む呼び出しも拒否する（動作確認で見つけて追加した） | `browser_drop`（`core`）は `browser_file_upload` と同じく、ローカルのファイルをページに渡せる。`data`（テキスト）のドロップは用途 3 で使うので、ツールごとは deny にしない |
 | 設定の消失 | `check-repo.py` で、定義（`claude/mcp/playwright.json`）があるあいだ、deny の 2 つとフックの登録（`onFailure: block`）を確かめる | `guard-additional-dirs.sh` と同じ扱い。定義を消したときは求めない |
 
 `filename` を拒否すると、スクリーンショットなどは出力先に自動の名前（`page-<時刻>.png` など）で保存される。スナップショットや `browser_evaluate` の結果は、ファイルではなく応答で返る。

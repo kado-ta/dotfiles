@@ -35,7 +35,7 @@ pstack はサードパーティのマーケットプレイスなので自動更�
 | `hooks/protect-main-branch.sh` | PreToolUse（Bash） | `main`・`master`・`staging` ブランチへの `git commit` をブロックする                                                                                                                                                          |
 | `hooks/ask-gh-pr-write.sh`     | PreToolUse（Bash） | `gh` の PR 書き込みと `gh api` を、表記ゆれも含めて人間の承認に回す                                                                                                                                                           |
 | `hooks/guard-additional-dirs.sh` | PreToolUse（Edit・Write・MultiEdit・NotebookEdit） | `~/.gstack/projects`（`additionalDirectories`）が symlink に差し替えられているあいだ、Edit・Write 系のツールをすべてブロックする |
-| `hooks/guard-playwright-mcp.sh` | PreToolUse（`mcp__playwright__.*`） | Playwright MCP の呼び出しのうち、`filename` 引数を含むものをブロックする。入力を検査できないときもブロックする |
+| `hooks/guard-playwright-mcp.sh` | PreToolUse（`mcp__playwright__.*`） | Playwright MCP の呼び出しのうち、ローカルのファイルを指す `filename`・`paths` 引数を含むものをブロックする。入力を検査できないときもブロックする |
 | `hooks/precompact-context.sh`  | PreCompact         | ブランチ名・未コミットの変更・直近のコミットを、コンテキスト圧縮後も残す情報として Claude に渡す                                                                                                                              |
 | `hooks/herdr-agent-state.sh`   | SessionStart       | herdr 上で起動したセッションの開始を herdr に通知する。herdr が生成・管理するため、直接編集しない                                                                                                                             |
 | `hooks/gh-read-token.sh`       | SessionStart       | sandbox 内の Bash に、作業中のリポジトリの owner 用の読み取り専用トークンを `GH_TOKEN` として渡す                                                                                                                             |
@@ -87,7 +87,7 @@ PR と main への push では、GitHub Actions が macOS の `/bin/bash` と `/
 MCP サーバーは sandbox の外で、ユーザーの権限で動く。sandbox の denyWrite・denyRead、Edit・Write の規則、ネットワークのプロキシは効かない。そのため、次を止めている。定義（`mcp/playwright.json`）があるあいだは、`check-repo.py` の `playwright-mcp` が、これらがあることを確かめる。
 
 - `settings.json` の `permissions.deny`: `mcp__playwright__browser_run_code_unsafe`（Node のプロセスで任意のコードが動く。オプションでは無効にできない）と `mcp__playwright__browser_file_upload`（プロジェクトのファイルをページに送れる）。
-- フック `hooks/guard-playwright-mcp.sh`: `filename` 引数（相対パスはプロジェクトのルートから解決され、プロジェクトの中のどこにでも書ける）。
+- フック `hooks/guard-playwright-mcp.sh`: `filename` 引数（相対パスはプロジェクトのルートから解決され、プロジェクトの中のどこにでも書ける）と、`paths` 引数（`browser_drop` などがローカルのファイルをページに渡す）。`browser_drop` は `data`（テキスト）なら使える。
 
 <a name="playwright-mcp-install"></a>
 
@@ -109,7 +109,7 @@ MCP サーバーは sandbox の外で、ユーザーの権限で動く。sandbox
 
 1. 最新の版を調べる: `npm view @playwright/mcp version`
 2. [リリース](https://github.com/microsoft/playwright-mcp/releases)と `npx -y @playwright/mcp@<版> --help` で、オプションと既定値の変化を確かめる。
-3. [README のツールの一覧](https://github.com/microsoft/playwright-mcp#tools)で、既定で有効なツールに、ファイルのパスを受け取る引数（`filename` 以外の名前も）や、任意のコードを動かすものが増えていないかを確かめる。増えていれば、deny かフックを直す。
+3. [README のツールの一覧](https://github.com/microsoft/playwright-mcp#tools)で、既定で有効なツールに、ファイルのパスを受け取る引数（`filename`・`paths` 以外の名前も）や、任意のコードを動かすものが増えていないかを確かめる。増えていれば、deny かフックを直す。
 4. `mcp/playwright.json` の版を書き換え、`register-mcp.sh` を実行して、Claude Code を再起動する。
 
 <a name="playwright-mcp-remove"></a>
