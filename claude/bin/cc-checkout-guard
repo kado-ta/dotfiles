@@ -11,6 +11,7 @@ from __future__ import annotations
 import difflib
 import json
 import os
+import posixpath
 import pwd
 import shlex
 import stat
@@ -18,7 +19,7 @@ import subprocess
 import sys
 import unicodedata
 from collections.abc import Callable, Iterable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import TextIO
 
@@ -89,6 +90,30 @@ RESET_FLAGS = frozenset(
 )
 RESET_WRITES = frozenset(("--hard", "--merge", "--keep"))
 RESET_MODES = RESET_WRITES | {"--soft", "--mixed"}
+MERGE_FLAGS = frozenset(
+    "-q --quiet --ff --no-ff --ff-only --no-edit --edit --squash --no-commit --commit --stat --no-stat --log "
+    "--no-log --no-verify --progress --no-progress".split()
+)
+MERGE_VALUES = frozenset(("-m",))
+PULL_FLAGS = frozenset("--ff-only --ff --no-ff --no-rebase -q --quiet -v --verbose --no-edit --stat --no-stat".split())
+STASH_PUSH_FLAGS = frozenset(("-q", "-u", "--include-untracked", "-k"))
+STASH_PUSH_VALUES = frozenset(("-m",))
+STASH_APPLY_FLAGS = frozenset(("-q", "--index"))
+STASH_READS = frozenset("list show drop clear create store".split())  # 作業ツリーに書かない stash
+PICK_FLAGS = frozenset(("-n", "-x", "--no-edit", "-e", "-s"))
+RM_FLAGS = frozenset(("-r", "-f", "-q", "--ignore-unmatch", "--cached", "-n"))
+CLEAN_LETTERS = "qnfidxX"  # 値を取らない短いオプション。-e は値を取る
+CLEAN_LONG = {"--quiet": "q", "--dry-run": "n", "--force": "f", "--interactive": "i"}
+MV_FLAGS = frozenset(("-f", "-k", "-v"))
+WORKTREE_ADD_FLAGS = frozenset(
+    "-f --force -d --detach --checkout --no-checkout --lock -q --quiet --track --no-track --guess-remote "
+    "--no-guess-remote".split()
+)
+WORKTREE_ADD_VALUES = frozenset(("-b", "-B", "--reason"))
+WORKTREE_OTHERS = frozenset("list prune lock unlock remove move repair".split())  # 作業ツリーの中身を書かない
+# git がパスを C の形で引用するときの、\ の後の文字と、その値。
+C_ESCAPES = {ord("a"): 7, ord("b"): 8, ord("t"): 9, ord("n"): 10, ord("v"): 11, ord("f"): 12, ord("r"): 13,
+             ord('"'): 34, ord("\\"): 92}
 
 MSG_UNSUPPORTED = (
     "cc-checkout-guard: この git の呼び出しは確かめられないので止めました（{reason}）。"
@@ -152,7 +177,8 @@ class Plan:
     root: Path  # 書かれる作業ツリー
     changes: tuple[Change, ...]
     sources: tuple[str, ...]  # 属性を確かめる tree の oid。index なら INDEX
-    fresh: bool = False  # 新しいディレクトリに書くとき（Task 3）
+    fresh: bool = False  # 新しいディレクトリに書くとき（worktree add）
+    old_root: Path | None = None  # 旧を読み、git を動かす作業ツリー（fresh のときの元のチェックアウト）。None なら root
 
 
 @dataclass(frozen=True)
@@ -196,17 +222,26 @@ def _norm(text: str) -> str:
     return unicodedata.normalize("NFC", text).casefold()
 
 
-def is_protected(root: Path, rel: str, home: Path) -> bool:
-    parts = [_norm(p) for p in rel.split("/") if p not in ("", ".")]
+def _parts(rel: str) -> list[str]:
+    return [_norm(p) for p in rel.split("/") if p not in ("", ".")]
+
+
+def is_repo_protected(rel: str) -> bool:
+    """すべてのリポジトリ向けの対象か（DOTFILES_PROTECTED を除く）。"""
+    parts = _parts(rel)
     if not parts:
         return False
     name = parts[-1]
     if any(p in PROTECTED_DIRS for p in parts):
         return True
-    if name in PROTECTED_NAMES or name.startswith(PROTECTED_PREFIXES):
+    return name in PROTECTED_NAMES or name.startswith(PROTECTED_PREFIXES)
+
+
+def is_protected(root: Path, rel: str, home: Path) -> bool:
+    if is_repo_protected(rel):
         return True
     if os.path.realpath(root) == os.path.realpath(home / "dotfiles"):
-        joined = "/".join(parts)
+        joined = "/".join(_parts(rel))
         for item in DOTFILES_PROTECTED:
             item = _norm(item.removeprefix("./"))
             if joined == item or joined.startswith(item + "/"):
@@ -588,13 +623,17 @@ def _stale(inv: Invocation, pathspec: Sequence[str]) -> set[str]:
     return stale
 
 
-def _effective(inv: Invocation, entry: Entry) -> Entry:
+def _effective_at(cwd: Path, entry: Entry, config: Sequence[str] = ()) -> Entry:
     """replace の ref を効かせた中身の oid にする。書く git と同じ中身を比べるため。"""
-    assert inv.root is not None
     if entry.mode not in (*REGULAR, SYMLINK):
         return entry
-    data = run_git(inv.root, "cat-file", "blob", entry.oid, config=inv.config)
-    return Entry(entry.mode, _hash(inv.root, data))
+    data = run_git(cwd, "cat-file", "blob", entry.oid, config=config)
+    return Entry(entry.mode, _hash(cwd, data))
+
+
+def _effective(inv: Invocation, entry: Entry) -> Entry:
+    assert inv.root is not None
+    return _effective_at(inv.root, entry, inv.config)
 
 
 def _plan(inv: Invocation, source: dict[str, Entry], paths: Iterable[str], sources: tuple[str, ...],
@@ -748,6 +787,460 @@ def plan_reset(inv: Invocation, after_fetch: bool) -> Plan | None:
     return _tree_plan(inv, tree, switch=False, force=True)
 
 
+def _current_branch(inv: Invocation) -> str | None:
+    ref = _git_line(inv, "symbolic-ref", "--quiet", "HEAD", ok=(0, 1))
+    return ref.removeprefix("refs/heads/") if ref.startswith("refs/heads/") else None
+
+
+def _head_commit(inv: Invocation) -> str:
+    commit = _rev(inv, "HEAD", "commit")
+    if commit is None:
+        raise GuardError("HEAD のコミットがありません")
+    return commit
+
+
+def _commit_rev(inv: Invocation, rev: str) -> str:
+    """merge・cherry-pick・revert・stash が読む rev。git は rev-parse と同じく解決する（同じ名前なら tag が先。実測）。"""
+    if rev.startswith("^") or ".." in rev:
+        raise GuardError(f"{rev} は確かめられません")
+    commit = _rev(inv, rev, "commit")
+    if commit is None:
+        raise GuardError(f"{rev} を解決できません")
+    return commit
+
+
+def _no_autostash(inv: Invocation) -> None:
+    """MERGE_AUTOSTASH は sandbox から置け、git は merge・merge --continue・--abort の後にその中身を書く（実測）。"""
+    path = _git_line(inv, "rev-parse", "--path-format=absolute", "--git-path", "MERGE_AUTOSTASH")
+    if os.path.lexists(path) or _git_line(inv, "rev-parse", "--verify", "--quiet", "MERGE_AUTOSTASH", ok=(0, 1)):
+        raise GuardError("MERGE_AUTOSTASH があり、git がその中身を書きます")
+
+
+def _merge_settings(inv: Invocation, *, merge: bool) -> None:
+    """merge-tree が設定のプログラムを動かすか、merge-tree の結果が git と違う設定なら止める。"""
+    # merge-tree は、作業ツリーの .gitattributes と .git/info/attributes（どちらも sandbox が書ける）の
+    # merge 属性で、設定のドライバーを動かす（実測）。
+    out = run_git(inv.cwd, "config", "--name-only", "--get-regexp", r"^merge\..+\.(driver|recursive)$",
+                  config=inv.config, ok=(0, 1))
+    if out.strip():
+        raise GuardError(f"merge のドライバーが設定されています（{os.fsdecode(out).split()[0]}）")
+    # renormalize は、merge の中でフィルタを動かす。autoStash は、merge の後に自分で作った stash を書き戻す。
+    for key in ("merge.renormalize", "merge.autoStash") if merge else ("merge.renormalize",):
+        if _git_line(inv, "config", "--type=bool", "--get", key, ok=(0, 1)) == "true":
+            raise GuardError(f"{key} が設定されています")
+    if not merge:
+        return
+    # 戦略と、ブランチごとの merge のオプション（-X theirs など）は、merge-tree の結果を変える。
+    if _git_line(inv, "config", "--get", "pull.twohead", ok=(0, 1)) not in ("", "ort"):
+        raise GuardError("pull.twohead が設定されています")
+    branch = _current_branch(inv)
+    if branch is not None and _git_line(inv, "config", "--get", f"branch.{branch}.mergeOptions", ok=(0, 1)):
+        raise GuardError(f"branch.{branch}.mergeOptions が設定されています")
+    _no_autostash(inv)
+
+
+def _rerere(inv: Invocation) -> bool:
+    """git が衝突したファイルに、記録した解決（.git/rr-cache。sandbox が書ける）を書きうるか。
+
+    rerere.enabled がなければ、rr-cache があるときに書く（実測）。
+    """
+    value = _git_line(inv, "config", "--type=bool", "--get", "rerere.enabled", ok=(0, 1))
+    if value:
+        return value == "true"
+    return os.path.isdir(_git_line(inv, "rev-parse", "--path-format=absolute", "--git-path", "rr-cache"))
+
+
+def _require_clean_index(inv: Invocation, head: str) -> None:
+    """index が HEAD と違えば止める。git は止まるか、index を tree にして merge する（stash apply・cherry-pick -n。実測）。"""
+    assert inv.root is not None
+    index = index_entries(inv.root, root=inv.root, home=inv.home, config=inv.config)
+    if changed_paths(inv, "--cached", head) or _gitlinks(tree_entries(inv.cwd, head, config=inv.config), index):
+        raise GuardError("index に HEAD と違う変更があります")
+
+
+def _merged_plan(inv: Invocation, args: Sequence[str], sources: Sequence[str], *, labels: bool) -> Plan:
+    """merge-tree --write-tree の結果の tree を、HEAD との差だけ書く操作（merge・cherry-pick・revert・stash apply）。
+
+    衝突したパスでは、tree に印の入った中身があり、git も同じ中身を書く。印のラベルが git と同じになるのは
+    merge と pull だけ（実測）。labels が偽なら、対象のパスが衝突したときに止める。
+    """
+    assert inv.root is not None
+    out = run_git(inv.cwd, "merge-tree", "--write-tree", "-z", "--name-only", *args, config=inv.config, ok=(0, 1))
+    items = out.split(b"\0")
+    conflicts: list[str] = []
+    for item in items[1:]:
+        if not item:
+            break  # 衝突したパスの後は、空の項目と、知らせの文
+        conflicts.append(os.fsdecode(item))
+    hit = sorted(p for p in conflicts if is_protected(inv.root, p, inv.home))
+    if hit and not labels:
+        raise GuardError(f"{hit[0]} が衝突します")
+    if hit and _rerere(inv):
+        raise GuardError(f"{hit[0]} が衝突し、rerere が記録した解決を書くことがあります")
+    tree = os.fsdecode(items[0])
+    plan = _tree_plan(inv, tree, switch=True, force=False)
+    return replace(plan, sources=(tree, *sources))
+
+
+def _merge_plan(inv: Invocation, rev: str) -> Plan:
+    """HEAD に rev を取り込む merge。印のラベルを git merge と同じにするため、rev をそのまま merge-tree に渡す。"""
+    commit = _commit_rev(inv, rev)
+    _head_commit(inv)
+    return _merged_plan(inv, ("HEAD", rev), (_commit_tree(inv, commit),), labels=True)
+
+
+def plan_merge(inv: Invocation, after_fetch: bool) -> Plan | None:
+    if inv.args == ("--quit",):
+        return None  # 作業ツリーを書かない（MERGE_AUTOSTASH は stash の一覧に入る。実測）
+    if inv.args in (("--abort",), ("--continue",)):
+        _no_autostash(inv)
+        if inv.args == ("--continue",):
+            return None  # コミットするだけ
+        # --abort は reset --merge で HEAD に戻す。
+        return _tree_plan(inv, _head_tree(inv), switch=False, force=True)
+    a = split_args("merge", inv.args, MERGE_FLAGS, MERGE_VALUES)
+    if a.pathspec is not None or len(a.positional) != 1:
+        raise GuardError("merge の引数を確かめられません")
+    _merge_settings(inv, merge=True)
+    # git は - を @{-1} として読み、印のラベルにも @{-1} を使う（実測）。
+    return _merge_plan(inv, "@{-1}" if a.positional[0] == "-" else a.positional[0])
+
+
+def plan_pull(inv: Invocation, after_fetch: bool) -> Plan:
+    a = split_args("pull", inv.args, PULL_FLAGS)
+    if a.positional or a.pathspec is not None:
+        raise GuardError("pull の引数を確かめられません")
+    branch = _current_branch(inv)
+    if branch is None:
+        raise GuardError("今のブランチがありません")
+    if not a.has("--no-rebase"):
+        # merges・interactive などの値は --type=bool で読めず、run_git が止める。
+        rebase = _git_line(inv, "config", "--type=bool", "--get", f"branch.{branch}.rebase", ok=(0, 1))
+        rebase = rebase or _git_line(inv, "config", "--type=bool", "--get", "pull.rebase", ok=(0, 1))
+        if rebase == "true":
+            raise GuardError("pull の rebase は確かめられません")
+    remote = _git_line(inv, "config", "--get", f"branch.{branch}.remote", ok=(0, 1))
+    if not remote or remote.startswith("-"):
+        raise GuardError("pull の取り込み元を確かめられません")
+    _merge_settings(inv, merge=True)
+    if not after_fetch:
+        raise FetchFirst([*inv.globals, "fetch", remote])
+    # git pull は FETCH_HEAD を取り込み、印のラベルにはコミットの oid を使う（実測）。
+    return _merge_plan(inv, _commit_rev(inv, "@{upstream}"))
+
+
+def _stash_push(inv: Invocation, args: Sequence[str]) -> Plan:
+    """変更を保存してから HEAD に戻す。-u は追跡していないファイルも消す。"""
+    assert inv.root is not None
+    a = split_args("stash", args, STASH_PUSH_FLAGS, STASH_PUSH_VALUES)
+    if a.positional or a.pathspec is not None:
+        raise GuardError("stash の pathspec は確かめられません")
+    head = _commit_tree(inv, _head_commit(inv))
+    source = tree_entries(inv.cwd, head, config=inv.config)
+    index = index_entries(inv.root, root=inv.root, home=inv.home, config=inv.config)
+    if a.has("-k"):
+        # -k は、HEAD に戻した後に index の中身を書く（実測）。対象のパスは、index が HEAD と同じときだけ確かめる。
+        for path in sorted(source.keys() | index.keys()):
+            if source.get(path) != index.get(path) and is_protected(inv.root, path, inv.home):
+                raise GuardError(f"stash -k が {path} に index の中身を書きます")
+    paths = set(changed_paths(inv, "--cached", head)) | _stale(inv, ()) | _gitlinks(source, index)
+    if a.has("-u", "--include-untracked"):
+        out = run_git(inv.root, "ls-files", "-z", "--others", "--exclude-standard", config=inv.config)
+        # 末尾が / のもの（中のリポジトリ）は、stash -u の clean では消えない。
+        paths |= {os.fsdecode(p) for p in out.split(b"\0") if p and not p.endswith(b"/")}
+    return _plan(inv, source, paths, (head,), delete=True)
+
+
+def _stash_apply(inv: Invocation, args: Sequence[str]) -> Plan:
+    """stash を作ったときの HEAD を元にして、HEAD と stash を merge する。"""
+    a = split_args("stash", args, STASH_APPLY_FLAGS)
+    if a.pathspec is not None or len(a.positional) > 1:
+        raise GuardError("stash の引数を確かめられません")
+    rev = a.positional[0] if a.positional else "0"
+    if rev and all(c in "0123456789" for c in rev):
+        rev = f"refs/stash@{{{rev}}}"  # git と同じく、数字だけなら refs/stash の n 番目
+    _merge_settings(inv, merge=False)
+    stash = _commit_rev(inv, rev)
+    base = _rev(inv, f"{stash}^1", "commit")
+    if base is None or _rev(inv, f"{stash}^2", "commit") is None:
+        raise GuardError(f"{rev} は stash ではありません")
+    _require_clean_index(inv, _commit_tree(inv, _head_commit(inv)))
+    plan = _merged_plan(inv, (f"--merge-base={base}", "HEAD", stash), (_commit_tree(inv, stash),), labels=False)
+    untracked = _rev(inv, f"{stash}^3", "tree")
+    if untracked is None:
+        return plan
+    # 追跡していないファイル（-u）は、merge の前に書かれる。
+    entries = tree_entries(inv.cwd, untracked, config=inv.config)
+    seen = {c.path for c in plan.changes}
+    extra = [c for c in _plan(inv, entries, entries, (), delete=False).changes if c.path not in seen]
+    return replace(plan, changes=plan.changes + tuple(extra), sources=(*plan.sources, untracked))
+
+
+def plan_stash(inv: Invocation, after_fetch: bool) -> Plan | None:
+    args = inv.args
+    if not args or args[0].startswith("-"):
+        return _stash_push(inv, args)
+    if args[0] in STASH_READS:
+        return None
+    if args[0] == "push":
+        return _stash_push(inv, args[1:])
+    if args[0] in ("apply", "pop"):
+        return _stash_apply(inv, args[1:])
+    raise GuardError(f"stash {args[0]} は確かめられません")
+
+
+def _pick_plan(inv: Invocation, revert: bool) -> Plan:
+    sub = "revert" if revert else "cherry-pick"
+    a = split_args(sub, inv.args, PICK_FLAGS)
+    if a.pathspec is not None or len(a.positional) != 1:
+        raise GuardError(f"{sub} の引数を確かめられません")
+    name = a.positional[0]
+    _merge_settings(inv, merge=False)
+    # git は - を @{-1} として読み、rev-parse と同じく解決する（実測）。
+    commit = _commit_rev(inv, "@{-1}" if name == "-" else name)
+    if _rev(inv, f"{commit}^2", "commit") is not None:
+        raise GuardError(f"{name} はマージコミットです")
+    parent = _rev(inv, f"{commit}^1", "commit")
+    if parent is None:
+        raise GuardError(f"{name} には親のコミットがありません")
+    _require_clean_index(inv, _commit_tree(inv, _head_commit(inv)))
+    base, other = (commit, parent) if revert else (parent, commit)
+    return _merged_plan(inv, (f"--merge-base={base}", "HEAD", other), (_commit_tree(inv, other),), labels=False)
+
+
+def plan_cherry_pick(inv: Invocation, after_fetch: bool) -> Plan:
+    return _pick_plan(inv, revert=False)
+
+
+def plan_revert(inv: Invocation, after_fetch: bool) -> Plan:
+    return _pick_plan(inv, revert=True)
+
+
+def plan_rm(inv: Invocation, after_fetch: bool) -> Plan | None:
+    a = split_args("rm", inv.args, RM_FLAGS)
+    if a.has("--cached", "-n"):
+        return None  # 作業ツリーを書かない
+    paths = a.positional + (a.pathspec or ())
+    if not paths:
+        raise GuardError("rm のパスがありません")
+    assert inv.root is not None
+    entries = index_entries(inv.cwd, *paths, root=inv.root, home=inv.home, config=inv.config)
+    return _plan(inv, {}, entries, (), delete=True)
+
+
+def _root_rel(inv: Invocation, root: str, name: str) -> str:
+    """inv.cwd から見たパスを、ルートからの相対パスにする（git と同じく、名前の上で .. をたどる）。"""
+    rel = os.path.relpath(os.path.normpath(os.path.join(os.path.realpath(inv.cwd), name)), root)
+    if rel in (os.curdir, os.pardir) or rel.startswith(os.pardir + os.sep):
+        raise GuardError(f"{name} はリポジトリの中のパスではありません")
+    return rel
+
+
+def _walk_error(error: OSError) -> None:
+    raise error
+
+
+def _files_under(root: str, rel: str) -> list[str]:
+    """rel がディレクトリなら、その下のファイルと symlink（たどらない）。ほかは rel だけ。"""
+    top = os.path.join(root, rel)
+    if os.path.islink(top) or not os.path.isdir(top):
+        return [rel]
+    found: list[str] = []
+    for dirpath, dirnames, filenames in os.walk(top, onerror=_walk_error):
+        names = filenames + [d for d in dirnames if os.path.islink(os.path.join(dirpath, d))]
+        prefix = os.path.relpath(dirpath, root)
+        found += [posixpath.join(prefix, n) for n in names]
+    return found
+
+
+def _unquote(name: bytes) -> bytes:
+    """git が C の形で引用したパス（"a\\tb"）を元に戻す。"""
+    if len(name) < 2 or name[:1] != b'"' or name[-1:] != b'"':
+        return name
+    body = name[1:-1]
+    out = bytearray()
+    i = 0
+    while i < len(body):
+        octal = body[i + 1:i + 4]
+        if body[i] != ord("\\"):
+            out.append(body[i])
+            i += 1
+        elif i + 1 < len(body) and body[i + 1] in C_ESCAPES:
+            out.append(C_ESCAPES[body[i + 1]])
+            i += 2
+        elif len(octal) == 3 and all(ord("0") <= b <= ord("7") for b in octal):
+            out.append(int(octal, 8))
+            i += 4
+        else:
+            raise GuardError("clean の出力を読めません")
+    return bytes(out)
+
+
+def _clean_options(args: Sequence[str]) -> tuple[set[str], int]:
+    """clean のオプションを短い名前の集合にし、-- の位置（なければ引数の数）と一緒に返す。
+
+    知らないオプションと、長いオプションの省略形（--dry）は止める。-e は値を取る（-de<pattern> の形も）。
+    """
+    letters: set[str] = set()
+    i = 0
+    while i < len(args):
+        tok = args[i]
+        if tok == "--":
+            return letters, i
+        if tok in CLEAN_LONG:
+            letters.add(CLEAN_LONG[tok])
+        elif tok == "--exclude":
+            i += 1
+        elif tok.startswith("--"):
+            if not tok.startswith("--exclude="):
+                raise GuardError(f"clean のオプション {tok} は確かめられません")
+        elif tok.startswith("-") and tok != "-":
+            for j, ch in enumerate(tok[1:], 1):
+                if ch == "e":
+                    if j == len(tok) - 1:
+                        i += 1  # 値は次の引数
+                    break  # 残りは値
+                if ch not in CLEAN_LETTERS:
+                    raise GuardError(f"clean のオプション {tok} は確かめられません")
+                letters.add(ch)
+        i += 1
+    return letters, len(args)
+
+
+def plan_clean(inv: Invocation, after_fetch: bool) -> Plan | None:
+    letters, end = _clean_options(inv.args)
+    if "n" in letters:
+        return None
+    if "i" in letters:
+        raise GuardError("clean -i は確かめられません")
+    assert inv.root is not None
+    # 同じ引数で、消すものを数える。-q は一覧も消すので打ち消す（実測）。-f は残す（-f -f で消える中のリポジトリも数える）。
+    args = ["clean", "--dry-run", *inv.args[:end], "--no-quiet", *inv.args[end:]]
+    out = run_git(inv.cwd, *args, config=inv.config)
+    root = os.path.realpath(inv.root)
+    prefix = b"Would remove "
+    paths: list[str] = []
+    for line in out.split(b"\n"):
+        if line.startswith(prefix):
+            rel = _root_rel(inv, root, os.fsdecode(_unquote(line[len(prefix):])))
+            paths += _files_under(root, rel)
+    return _plan(inv, {}, paths, (), delete=True)
+
+
+def plan_mv(inv: Invocation, after_fetch: bool) -> Plan | None:
+    """対象のファイルが動く（行き先が対象になる、対象を動かす）mv は、確かめずに止める。"""
+    a = split_args("mv", inv.args, MV_FLAGS)
+    names = a.positional + (a.pathspec or ())
+    if len(names) < 2:
+        raise GuardError("mv の引数を確かめられません")
+    assert inv.root is not None
+    root = os.path.realpath(inv.root)
+    *sources, dest = [_root_rel(inv, root, n) for n in names]
+    into = len(sources) > 1 or os.path.isdir(os.path.join(root, dest))
+    for src in sources:
+        target = posixpath.join(dest, posixpath.basename(src)) if into else dest
+        # ディレクトリを動かすときは、その下（index と、追跡していないファイル）も動く。
+        index = index_entries(inv.root, ":(literal)" + src, root=inv.root, home=inv.home, config=inv.config)
+        for path in sorted({src, *index, *_files_under(root, src)}):
+            for moved in (path, target + path[len(src):]):
+                if is_protected(inv.root, moved, inv.home):
+                    raise GuardError(f"{moved} が動きます")
+    return None
+
+
+def _main_root(inv: Invocation) -> Path:
+    """元のチェックアウトのルート（共通の gitdir の親）。"""
+    common = Path(_git_line(inv, "rev-parse", "--path-format=absolute", "--git-common-dir"))
+    if common.name != ".git":
+        raise GuardError("元のチェックアウトを確かめられません")
+    return common.parent
+
+
+def compare_with_main(main_root: Path, cwd: Path, treeish: str) -> list[Change]:
+    """treeish の tree を、元のチェックアウトのディスクと比べる。すべてのリポジトリ向けの対象だけを見る。
+
+    旧は元のチェックアウトのディスク、新は tree の entry（replace を効かせた中身）。対象のパスの親が tree で
+    symlink・gitlink になるときは、その親も比べる。
+    """
+    tree = tree_entries(cwd, treeish)
+    index = index_entries(main_root, root=main_root, home=user_home())
+    protected = {p for p in tree.keys() | index.keys() if is_repo_protected(p)}
+    parents = {
+        p for p, e in tree.items()
+        if p not in protected and e.mode in (SYMLINK, GITLINK)
+        and any(_norm(t).startswith(_norm(p) + "/") for t in protected)
+    }
+    ordered = sorted(protected | parents)
+    disk = disk_entries(main_root, ordered)
+    changes: list[Change] = []
+    for path in ordered:
+        new = tree.get(path)
+        if new is not None:
+            new = _effective_at(cwd, new)
+        if disk[path] != new:
+            changes.append(Change(path, disk[path], new))
+    return changes
+
+
+def _worktree_target(inv: Invocation, a: Args, path: str, rev: str | None) -> str:
+    """worktree add が新しい作業ツリーに書くコミット。git の解決に合わせる（実測）。"""
+    named = a.has("-b", "-B", "-d", "--detach")
+    if rev is None:
+        if not named:
+            # git は、パスの最後の名前のブランチがあればそれを、なければ（guessRemote なら）リモートのブランチを使う。
+            name = os.path.basename(path.rstrip("/"))
+            if not name or name.startswith("-") or "@{" in name:
+                raise GuardError(f"{path} から作るブランチを確かめられません")
+            oid = _branch_oid(inv, name)
+            if oid is not None:
+                return _commit_rev(inv, oid)
+            guess = a.last("--guess-remote", "--no-guess-remote")
+            if guess is None and _git_line(inv, "config", "--type=bool", "--get", "worktree.guessRemote",
+                                           ok=(0, 1)) == "true":
+                guess = "--guess-remote"
+            if guess == "--guess-remote":
+                remote = _remote_commit(inv, name)
+                if remote is not None:
+                    return remote
+        return _head_commit(inv)
+    if rev == "-":
+        rev = "@{-1}"
+    if named:
+        # -b・-B・--detach では、rev-parse と同じく tag が先（実測）。
+        return _commit_rev(inv, rev)
+    # ほかは switch と同じく、同じ名前のブランチが先。なければリモートのブランチ（実測）。
+    commit = _target(inv, rev, "commit") or _remote_commit(inv, rev)
+    if commit is None:
+        raise GuardError(f"{rev} を解決できません")
+    return commit
+
+
+def plan_worktree(inv: Invocation, after_fetch: bool) -> Plan | None:
+    if not inv.args:
+        raise GuardError("worktree の引数を確かめられません")
+    sub = inv.args[0]
+    if sub in WORKTREE_OTHERS:
+        return None
+    if sub != "add":
+        raise GuardError(f"worktree {sub} は確かめられません")
+    a = split_args("worktree", inv.args[1:], WORKTREE_ADD_FLAGS, WORKTREE_ADD_VALUES)
+    if a.last("--checkout", "--no-checkout") == "--no-checkout":
+        return None
+    pos = a.positional + (a.pathspec or ())
+    if not 1 <= len(pos) <= 2:
+        raise GuardError("worktree add の引数を確かめられません")
+    # 行き先のパスの途中が symlink だと、確かめる場所と git が書く場所が違う。
+    root = os.path.normpath(os.path.join(os.path.realpath(inv.cwd), pos[0]))
+    if os.path.realpath(root) != root:
+        raise GuardError(f"{pos[0]} の途中に symlink があります")
+    commit = _worktree_target(inv, a, pos[0], pos[1] if len(pos) == 2 else None)
+    tree = _commit_tree(inv, commit)
+    main = _main_root(inv)
+    # 新しいディレクトリはまだ読まれないので、元のチェックアウトの中身と比べる。
+    changes = compare_with_main(main, inv.cwd, tree)
+    return Plan(root=Path(root), changes=tuple(changes), sources=(tree,), fresh=True, old_root=main)
+
+
 # サブコマンド名 -> 確認の内容を作る関数（第 2 引数は after_fetch）。None は作業ツリーの対象を書かない。
 HANDLERS: dict[str, Callable[[Invocation, bool], Plan | None]] = {
     "switch": plan_switch,
@@ -755,6 +1248,15 @@ HANDLERS: dict[str, Callable[[Invocation, bool], Plan | None]] = {
     "restore": plan_restore,
     "checkout-index": plan_checkout_index,
     "reset": plan_reset,
+    "merge": plan_merge,
+    "pull": plan_pull,
+    "stash": plan_stash,
+    "cherry-pick": plan_cherry_pick,
+    "revert": plan_revert,
+    "rm": plan_rm,
+    "clean": plan_clean,
+    "mv": plan_mv,
+    "worktree": plan_worktree,
 }
 
 
@@ -778,7 +1280,7 @@ def danger(plan: Plan, inv: Invocation) -> str | None:
     # NUL を含む中身は、差分で見せても読めないので、聞かずに止める。
     for c in plan.changes:
         if c.new is not None and c.new.mode in REGULAR:
-            if b"\0" in run_git(plan.root, "cat-file", "blob", c.new.oid, config=inv.config):
+            if b"\0" in run_git(plan.old_root or plan.root, "cat-file", "blob", c.new.oid, config=inv.config):
                 return MSG_DANGER.format(path=_show(c.path), kind="バイナリの中身")
     for c in plan.changes:
         parts = c.path.split("/")
@@ -838,11 +1340,12 @@ def _lines(data: bytes) -> list[str]:
 
 def render(plan: Plan) -> str:
     out = [listing(plan)]
+    base = plan.old_root or plan.root
     for c in plan.changes:
         new_data = b""
         if c.new is not None and c.new.mode in (*REGULAR, SYMLINK):
-            new_data = run_git(plan.root, "cat-file", "blob", c.new.oid)
-        old, new = _lines(_disk_bytes(plan.root, c.path, c.old)), _lines(new_data)
+            new_data = run_git(base, "cat-file", "blob", c.new.oid)
+        old, new = _lines(_disk_bytes(base, c.path, c.old)), _lines(new_data)
         before = f"a/{c.path}" if c.old is not None else "/dev/null"
         after = f"b/{c.path}" if c.new is not None else "/dev/null"
         # 差分を取ってから表示用に変える。逆にすると、実際の ESC と「<U+001B>」という文字列が同じ行になる。
@@ -865,9 +1368,18 @@ def _dec(value: object) -> Entry | None:
 
 
 def state_of(plan: Plan, inv: Invocation) -> str:
-    """verify に渡す状態。変わるファイルは [旧, 新]、index にある変わらない対象は [今, 今]。"""
+    """verify に渡す状態。変わるファイルは [旧, 新]、index にある変わらない対象は [今, 今]。
+
+    fresh（新しい作業ツリー）では、書く元の tree の対象をすべて [null, 新] にする（変わらないものも書かれる）。
+    """
     expect: dict[str, list[list[str] | None]] = {}
-    if not plan.fresh:
+    if plan.fresh:
+        assert plan.old_root is not None
+        for tree in plan.sources:
+            for path, entry in tree_entries(plan.old_root, tree, config=inv.config).items():
+                if is_protected(plan.root, path, inv.home):
+                    expect[path] = [None, _enc(_effective_at(plan.old_root, entry, inv.config))]
+    else:
         entries = index_entries(plan.root, root=plan.root, home=inv.home, config=inv.config)
         targets = [p for p in entries if is_protected(plan.root, p, inv.home)]
         for path, entry in disk_entries(plan.root, targets).items():
@@ -943,6 +1455,9 @@ def check(argv: Sequence[str], *, start: Path, git_env: Sequence[str], after_fet
             return EXIT_ALLOW, state
         stderr.write(("" if answer.endswith("\n") else "\n") + MSG_DECLINED + "\n")
         return EXIT_STOP, ""
+    except FetchFirst as e:
+        # 関数が argv の git を動かしてから、--after-fetch で呼び直す。
+        return EXIT_FETCH, "\0".join(e.argv)
     except GuardError as e:
         stderr.write(MSG_UNSUPPORTED.format(reason=_show(str(e))) + "\n")
         return EXIT_STOP, ""

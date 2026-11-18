@@ -52,10 +52,10 @@ class Base(unittest.TestCase):
         patcher.start()
         self.addCleanup(patcher.stop)
 
-    def check(self, *argv, start=None, git_env=(), tty=False, answer=""):
+    def check(self, *argv, start=None, git_env=(), tty=False, answer="", after_fetch=False):
         err = io.StringIO()
         result = guard.check(
-            list(argv), start=start or self.repo, git_env=git_env, after_fetch=False,
+            list(argv), start=start or self.repo, git_env=git_env, after_fetch=after_fetch,
             home=self.home, stdin=io.StringIO(answer), stderr=err, tty=tty,
         )
         return result, err.getvalue()
@@ -132,9 +132,11 @@ class CheckTests(Base):
         self.assertEqual(self.check("switch", "x", start=outside)[0], (0, ""))
 
     def test_help_only_as_first_argument(self):
+        # 先頭以外の -h はヘルプではない（stash push -m -h はメッセージ -h で stash する）。
+        # ヘルプとして素通りする (0, "") にならず、確認（状態つき）か停止になる。
         for argv in (("stash", "push", "-m", "-h"), ("checkout", "feature", "--", ".claude", "-h")):
             with self.subTest(argv=argv):
-                self.assertEqual(self.check(*argv)[0], (1, ""))
+                self.assertNotEqual(self.check(*argv)[0], (0, ""))
 
     def test_unreadable_repository_stops(self):
         local_git(self.repo, "config", "extensions.cc-probe", "1")
@@ -213,6 +215,26 @@ class TreeBase(Base):
     def stage(self, text):
         """作業ツリーを変えずに、index の settings だけを変える。"""
         local_git(self.repo, "update-index", "--cacheinfo", f"100644,{self.blob(text)},.claude/settings.json")
+
+    def commit_settings(self, text):
+        self.settings.write_text(text, encoding="utf-8")
+        local_git(self.repo, "commit", "-q", "-am", "settings")
+
+    def approve_and_run(self, *argv, codes=(0,)):
+        """確認で y と答え、本物の git を同じ引数で動かし、verify の結果を返す。"""
+        (code, state), err = self.check(*argv, tty=True, answer="y\n")
+        self.assertEqual(code, 0, err)
+        cp = subprocess.run(["git", "-C", str(self.repo), *argv], capture_output=True, text=True)
+        self.assertIn(cp.returncode, codes, cp.stderr)
+        out = io.StringIO()
+        return guard.verify(state, out), out.getvalue()
+
+    def evil_branch_and_tag(self):
+        """ブランチ evil に悪い中身、同じ名前の tag に今の中身を置き、@{-1} を evil にする。"""
+        self.branch("evil", "main", {".claude/settings.json": '{"evil": 1}\n'})
+        local_git(self.repo, "switch", "-q", "evil")
+        local_git(self.repo, "switch", "-q", "main")
+        local_git(self.repo, "tag", "evil", "main")
 
 
 class SwitchTests(TreeBase):
@@ -438,7 +460,8 @@ class SwitchTests(TreeBase):
         subprocess.run(["git", "-C", str(self.repo), "status"], capture_output=True)
         self.assertTrue(canary.exists())
         canary.unlink()
-        for argv in (("switch", "feature"), ("restore", ".claude/settings.json"), ("reset", "--hard")):
+        for argv in (("switch", "feature"), ("restore", ".claude/settings.json"), ("reset", "--hard"),
+                     ("merge", "feature"), ("cherry-pick", "feature"), ("stash",)):
             with self.subTest(argv=argv):
                 result, err = self.check(*argv, tty=True, answer="n\n")
                 self.assertEqual(result, (1, ""))
@@ -460,13 +483,6 @@ class SwitchTests(TreeBase):
         self.assertNotIn("\x1b", err)
         self.assertNotIn("\r", err)
         self.assertIn("<U+001B>", err)
-
-    def evil_branch_and_tag(self):
-        """ブランチ evil に悪い中身、同じ名前の tag に今の中身を置き、@{-1} を evil にする。"""
-        self.branch("evil", "main", {".claude/settings.json": '{"evil": 1}\n'})
-        local_git(self.repo, "switch", "-q", "evil")
-        local_git(self.repo, "switch", "-q", "main")
-        local_git(self.repo, "tag", "evil", "main")
 
     def test_previous_branch_wins_over_tag(self):
         # git は - と @{-N} をブランチの名前に戻して refs/heads を読む。rev-parse は同じ名前の tag を先に使う。
@@ -524,14 +540,6 @@ class SwitchTests(TreeBase):
                 result, err = self.check(*argv)
                 self.assertEqual(result, (1, ""))
                 self.assertIn("ブランチ ghost を読めません", err)
-
-    def approve_and_run(self, *argv):
-        """確認で y と答え、本物の git を同じ引数で動かし、verify の結果を返す。"""
-        (code, state), err = self.check(*argv, tty=True, answer="y\n")
-        self.assertEqual(code, 0, err)
-        local_git(self.repo, *argv)
-        out = io.StringIO()
-        return guard.verify(state, out), out.getvalue()
 
     def test_real_git_matches_state(self):
         self.assertEqual(self.approve_and_run("switch", "-q", "feature"), (0, ""))
@@ -662,6 +670,337 @@ class SwitchTests(TreeBase):
         os.close(fd)
         _, status = os.waitpid(pid, 0)
         return os.waitstatus_to_exitcode(status), out.decode("utf-8", "replace")
+
+
+class MergeTests(TreeBase):
+    def test_merge(self):
+        (code, out), err = self.check("merge", "docs")
+        self.assertEqual(code, 0, err)
+        self.assertEqual(json.loads(out)["root"], str(self.repo))
+        result, err = self.check("merge", "feature")
+        self.assertEqual(result, (1, ""))
+        self.assertIn("変更 .claude/settings.json", err)
+
+    def test_conflicting_merge_still_checked(self):
+        self.commit_settings('{"v": 3}\n')
+        result, err = self.check("merge", "feature", tty=True, answer="n\n")
+        self.assertEqual(result, (1, ""))
+        self.assertIn("+<<<<<<< HEAD", err)
+        self.assertIn("+>>>>>>> feature", err)
+
+    def test_merge_abort(self):
+        self.settings.write_text('{"v": 5}\n', encoding="utf-8")
+        result, err = self.check("merge", "--abort")
+        self.assertEqual(result, (1, ""))
+        self.assertIn("変更 .claude/settings.json", err)
+        self.assertEqual(self.check("merge", "--quit")[0], (0, ""))
+        self.assertEqual(self.check("merge", "--continue")[0], (0, ""))
+        self.assertEqual(self.check("merge", "--abort", "-q")[0], (1, ""))
+
+    def test_pull_fetch_protocol(self):
+        origin = self.root / "origin.git"
+        local_git(self.root, "init", "-q", "--bare", "-b", "main", str(origin))
+        local_git(self.repo, "remote", "add", "origin", str(origin))
+        local_git(self.repo, "push", "-q", "-u", "origin", "main")
+        other = self.root / "other"
+        local_git(self.root, "clone", "-q", str(origin), str(other))
+        local_git(other, "config", "user.name", "Test")
+        local_git(other, "config", "user.email", "test@example.com")
+        (other / "README.md").write_text("r\n", encoding="utf-8")
+        local_git(other, "commit", "-q", "-am", "readme")
+        local_git(other, "push", "-q", "origin", "main")
+        self.assertEqual(self.check("pull")[0], (3, "fetch\0origin"))
+        local_git(self.repo, "fetch", "-q", "origin")
+        (code, out), err = self.check("pull", after_fetch=True)
+        self.assertEqual(code, 0, err)
+        self.assertEqual(json.loads(out)["root"], str(self.repo))
+        (other / ".claude" / "settings.json").write_text('{"v": 7}\n', encoding="utf-8")
+        local_git(other, "commit", "-q", "-am", "settings")
+        local_git(other, "push", "-q", "origin", "main")
+        self.assertEqual(self.check("-C", "sub", "pull", "--ff-only")[0], (3, "-C\0sub\0fetch\0origin"))
+        local_git(self.repo, "fetch", "-q", "origin")
+        result, err = self.check("pull", "--ff-only", after_fetch=True)
+        self.assertEqual(result, (1, ""))
+        self.assertIn("変更 .claude/settings.json", err)
+
+    def test_pull_unsupported_forms(self):
+        result, err = self.check("pull", "origin", "main")
+        self.assertEqual(result, (1, ""))
+        self.assertIn("pull の引数", err)
+        local_git(self.repo, "config", "pull.rebase", "true")
+        result, err = self.check("pull")
+        self.assertEqual(result, (1, ""))
+        self.assertIn("rebase", err)
+
+    def test_merge_settings_that_change_the_result_stop(self):
+        for key, value in (("merge.renormalize", "true"), ("merge.autoStash", "true"), ("pull.twohead", "resolve"),
+                           ("branch.main.mergeOptions", "-X theirs")):
+            with self.subTest(key=key):
+                local_git(self.repo, "config", key, value)
+                result, err = self.check("merge", "docs")
+                self.assertEqual(result, (1, ""))
+                self.assertIn(key, err)
+                local_git(self.repo, "config", "--unset", key)
+        self.assertEqual(self.check("merge", "docs")[0][0], 0)
+
+    def test_merge_driver_is_not_run(self):
+        # merge-tree は、作業ツリーの .gitattributes と .git/info/attributes の merge 属性で、設定のドライバーを動かす（実測）。
+        canary = self.root / "canary"
+        script = self.root / "merge-canary"
+        script.write_text(f"#!/bin/sh\ntouch '{canary}'\n", encoding="utf-8")
+        script.chmod(0o755)
+        (self.repo / "README.md").write_text("s\n", encoding="utf-8")
+        local_git(self.repo, "stash", "-q")
+        (self.repo / "README.md").write_text("m\n", encoding="utf-8")
+        local_git(self.repo, "commit", "-q", "-am", "readme")
+        local_git(self.repo, "config", "merge.x.driver", f"{script} %O %A %B")
+        info = self.repo / ".git" / "info"
+        info.mkdir(exist_ok=True)
+        (info / "attributes").write_text("* merge=x\n", encoding="utf-8")
+        # 仕掛けが効くことを、テストの git で確かめる（README は両側で変わっている）。
+        subprocess.run(["git", "-C", str(self.repo), "merge-tree", "--write-tree", "HEAD", "feature"],
+                       capture_output=True)
+        self.assertTrue(canary.exists())
+        canary.unlink()
+        for argv in (("merge", "feature"), ("cherry-pick", "feature"), ("stash", "pop")):
+            with self.subTest(argv=argv):
+                result, err = self.check(*argv, tty=True, answer="y\n")
+                self.assertEqual(result, (1, ""))
+                self.assertIn("merge.x.driver", err)
+                self.assertFalse(canary.exists())
+
+    def test_planted_autostash_stops(self):
+        # MERGE_AUTOSTASH は sandbox から置け、git は merge・--continue・--abort の後にその中身を書く（実測）。
+        self.settings.write_text('{"evil": 1}\n', encoding="utf-8")
+        stash = local_git(self.repo, "stash", "create")
+        local_git(self.repo, "checkout", "--", ".claude/settings.json")
+        (self.repo / ".git" / "MERGE_AUTOSTASH").write_text(stash + "\n", encoding="utf-8")
+        for argv in (("merge", "docs"), ("merge", "--abort"), ("merge", "--continue")):
+            with self.subTest(argv=argv):
+                result, err = self.check(*argv)
+                self.assertEqual(result, (1, ""))
+                self.assertIn("MERGE_AUTOSTASH", err)
+        # --quit は作業ツリーを書かず、自動の stash を stash の一覧に入れる。
+        self.assertEqual(self.check("merge", "--quit")[0], (0, ""))
+
+    def test_rerere_stops_protected_conflict(self):
+        # rr-cache があると、git は記録した解決を衝突したファイルに書く（rerere.enabled がなくても。実測）。
+        self.commit_settings('{"v": 3}\n')
+        (self.repo / ".git" / "rr-cache").mkdir()
+        result, err = self.check("merge", "feature", tty=True, answer="n\n")
+        self.assertEqual(result, (1, ""))
+        self.assertIn("rerere", err)
+        self.assertNotIn(guard.MSG_ASK, err)
+        local_git(self.repo, "config", "rerere.enabled", "false")
+        result, err = self.check("merge", "feature", tty=True, answer="n\n")
+        self.assertEqual(result, (1, ""))
+        self.assertIn(guard.MSG_ASK, err)
+
+    def test_real_git_merge_matches_state(self):
+        self.assertEqual(self.approve_and_run("merge", "--no-edit", "-q", "feature"), (0, ""))
+        self.assertEqual(self.settings.read_text(encoding="utf-8"), '{"v": 2}\n')
+        local_git(self.repo, "reset", "-q", "--hard", "HEAD~1")
+        self.commit_settings('{"v": 3}\n')
+        # 衝突の印のラベルも、merge-tree と git merge で同じになる（実測）。
+        self.assertEqual(self.approve_and_run("merge", "--no-edit", "-q", "feature", codes=(1,)), (0, ""))
+        self.assertIn(">>>>>>> feature", self.settings.read_text(encoding="utf-8"))
+
+
+class StashAndPickTests(TreeBase):
+    def test_stash(self):
+        self.settings.write_text('{"v": 5}\n', encoding="utf-8")
+        result, err = self.check("stash")
+        self.assertEqual(result, (1, ""))
+        self.assertIn("変更 .claude/settings.json", err)
+        local_git(self.repo, "stash", "-q")
+        result, err = self.check("stash", "pop")
+        self.assertEqual(result, (1, ""))
+        self.assertIn("変更 .claude/settings.json", err)
+        local_git(self.repo, "stash", "drop", "-q")
+        (self.repo / ".env.local").write_text("A=1\n", encoding="utf-8")
+        result, err = self.check("stash", "-u")
+        self.assertEqual(result, (1, ""))
+        self.assertIn("削除 .env.local", err)
+        local_git(self.repo, "stash", "-q", "-u")
+        result, err = self.check("stash", "pop")
+        self.assertEqual(result, (1, ""))
+        self.assertIn("追加 .env.local", err)
+        for argv in (("stash", "list"), ("stash", "show", "-p"), ("stash", "drop")):
+            with self.subTest(argv=argv):
+                self.assertEqual(self.check(*argv)[0], (0, ""))
+        self.assertEqual(self.check("stash", "branch", "x")[0], (1, ""))
+
+    def test_stash_keep_index_with_staged_protected_file_stops(self):
+        # -k は、HEAD に戻した後に index の中身を書く（実測）。
+        self.stage('{"evil": 1}\n')
+        result, err = self.check("stash", "-k")
+        self.assertEqual(result, (1, ""))
+        self.assertIn("stash -k", err)
+
+    def test_cherry_pick_and_revert(self):
+        result, err = self.check("cherry-pick", "feature")
+        self.assertEqual(result, (1, ""))
+        self.assertIn("変更 .claude/settings.json", err)
+        self.assertEqual(self.check("cherry-pick", "docs")[0][0], 0)
+        result, err = self.check("revert", "HEAD")
+        self.assertEqual(result, (1, ""))
+        self.assertIn("削除 .claude/settings.json", err)
+        for argv in (("cherry-pick", "main..feature"), ("cherry-pick", "feature^!"), ("cherry-pick", "^main"),
+                     ("cherry-pick", "--continue")):
+            with self.subTest(argv=argv):
+                self.assertEqual(self.check(*argv)[0], (1, ""))
+
+    def test_merge_commit_pick_stops(self):
+        local_git(self.repo, "merge", "-q", "--no-ff", "--no-edit", "docs")
+        result, err = self.check("cherry-pick", "HEAD")
+        self.assertEqual(result, (1, ""))
+        self.assertIn("マージコミット", err)
+
+    def test_protected_conflict_stops_pick_and_stash(self):
+        # cherry-pick・revert・stash の衝突の印は、merge-tree とラベルが違う（実測）。
+        self.settings.write_text('{"v": 4}\n', encoding="utf-8")
+        local_git(self.repo, "stash", "-q")
+        self.commit_settings('{"v": 3}\n')
+        for argv in (("cherry-pick", "feature"), ("stash", "pop")):
+            with self.subTest(argv=argv):
+                result, err = self.check(*argv, tty=True, answer="y\n")
+                self.assertEqual(result, (1, ""))
+                self.assertIn(".claude/settings.json が衝突します", err)
+                self.assertNotIn(guard.MSG_ASK, err)
+
+    def test_staged_changes_stop_stash_apply_and_pick(self):
+        # stash apply と cherry-pick -n は、HEAD ではなく index を tree にして merge する（実測）。
+        self.settings.write_text('{"v": 4}\n', encoding="utf-8")
+        local_git(self.repo, "stash", "-q")
+        notes = self.blob("staged\n")
+        local_git(self.repo, "update-index", "--add", "--cacheinfo", f"100644,{notes},notes.txt")
+        for argv in (("stash", "apply"), ("cherry-pick", "-n", "feature"), ("revert", "-n", "HEAD")):
+            with self.subTest(argv=argv):
+                result, err = self.check(*argv)
+                self.assertEqual(result, (1, ""))
+                self.assertIn("index に HEAD と違う変更があります", err)
+
+    def test_real_git_pick_and_stash_match_state(self):
+        self.assertEqual(self.approve_and_run("cherry-pick", "feature"), (0, ""))
+        self.assertEqual(self.settings.read_text(encoding="utf-8"), '{"v": 2}\n')
+        self.settings.write_text('{"v": 5}\n', encoding="utf-8")
+        self.assertEqual(self.approve_and_run("stash", "-q"), (0, ""))
+        self.assertEqual(self.settings.read_text(encoding="utf-8"), '{"v": 2}\n')
+        self.assertEqual(self.approve_and_run("stash", "pop", "-q"), (0, ""))
+        self.assertEqual(self.settings.read_text(encoding="utf-8"), '{"v": 5}\n')
+
+
+class RevisionTests(TreeBase):
+    def branch_and_tag(self):
+        """ブランチ evil に {"evil": 1}、同じ名前の tag に {"tag": 1} を置き、@{-1} を evil にする。"""
+        self.branch("evil", "main", {".claude/settings.json": '{"evil": 1}\n'})
+        self.branch("tagged", "main", {".claude/settings.json": '{"tag": 1}\n'})
+        local_git(self.repo, "tag", "evil", "tagged")
+        local_git(self.repo, "branch", "-q", "-D", "tagged")
+        local_git(self.repo, "switch", "-q", "evil")
+        local_git(self.repo, "switch", "-q", "main")
+
+    def test_revs_resolve_like_git(self):
+        # merge・cherry-pick・worktree add --detach は rev-parse と同じく tag を先に使い、
+        # worktree add（-b・--detach なし）はブランチを先に使う（実測）。
+        self.branch_and_tag()
+        cases = [(("merge", "evil"), "tag"), (("merge", "-"), "tag"), (("merge", "@{-1}"), "tag"),
+                 (("cherry-pick", "evil"), "tag"), (("cherry-pick", "-"), "tag"),
+                 (("worktree", "add", "../wt", "evil"), "evil"), (("worktree", "add", "../wt", "-"), "evil"),
+                 (("worktree", "add", "--detach", "../wt", "evil"), "tag")]
+        if (self.repo / ".git" / "refs" / "heads" / "EVIL").exists():
+            cases += [(("merge", "EVIL"), "tag"), (("cherry-pick", "EVIL"), "tag"),
+                      (("worktree", "add", "../wt", "EVIL"), "evil")]
+        for argv, shown in cases:
+            with self.subTest(argv=argv):
+                result, err = self.check(*argv, tty=True, answer="n\n")
+                self.assertEqual(result, (1, ""))
+                self.assertIn(f'+{{"{shown}": 1}}', err)
+
+    def test_real_git_resolves_tag_and_branch_like_state(self):
+        self.branch_and_tag()
+        self.assertEqual(self.approve_and_run("merge", "--no-edit", "-q", "evil"), (0, ""))
+        self.assertEqual(self.settings.read_text(encoding="utf-8"), '{"tag": 1}\n')
+        self.assertEqual(self.approve_and_run("worktree", "add", "-q", "../wt", "evil"), (0, ""))
+        wt = self.root / "wt" / ".claude" / "settings.json"
+        self.assertEqual(wt.read_text(encoding="utf-8"), '{"evil": 1}\n')
+        # 元のチェックアウトと同じ中身なら確認なしで通り、状態は新しい作業ツリーの中身を確かめる。
+        self.assertEqual(self.approve_and_run("worktree", "add", "-q", "--detach", "../wt2", "evil"), (0, ""))
+        wt2 = self.root / "wt2" / ".claude" / "settings.json"
+        self.assertEqual(wt2.read_text(encoding="utf-8"), '{"tag": 1}\n')
+
+
+class OtherWriteTests(TreeBase):
+    def test_rm_clean_mv(self):
+        result, err = self.check("rm", ".claude/settings.json")
+        self.assertEqual(result, (1, ""))
+        self.assertIn("削除 .claude/settings.json", err)
+        self.assertEqual(self.check("rm", "--cached", ".claude/settings.json")[0], (0, ""))
+        (self.repo / ".env.local").write_text("A=1\n", encoding="utf-8")
+        result, err = self.check("clean", "-fdx")
+        self.assertEqual(result, (1, ""))
+        self.assertIn("削除 .env.local", err)
+        self.assertEqual(self.check("clean", "-n")[0], (0, ""))
+        self.assertEqual(self.check("mv", "README.md", ".claude/x.md")[0], (1, ""))
+        self.assertEqual(self.check("mv", "README.md", "R.md")[0], (0, ""))
+
+    def test_clean_counts_quiet_quoted_and_directory_removals(self):
+        (self.repo / "sub" / "deep").mkdir()
+        (self.repo / "sub" / "deep" / ".env").write_text("A=1\n", encoding="utf-8")
+        (self.repo / '.env"q').write_text("A=1\n", encoding="utf-8")
+        # -q は --dry-run の一覧も消すので、打ち消して数える（実測）。
+        result, err = self.check("clean", "-fdq")
+        self.assertEqual(result, (1, ""))
+        self.assertIn("削除 sub/deep/.env", err)
+        self.assertIn('削除 .env"q', err)
+        result, err = self.check("clean", "-f", "-d", start=self.repo / "sub")
+        self.assertEqual(result, (1, ""))
+        self.assertIn("削除 sub/deep/.env", err)
+        self.assertNotIn('.env"q', err)
+        for argv in (("clean", "-i"), ("clean", "-fdi"), ("clean", "--dry")):
+            with self.subTest(argv=argv):
+                self.assertEqual(self.check(*argv)[0], (1, ""))
+        self.assertEqual(self.check("clean", "-fe", "x", "-n")[0], (0, ""))
+
+    def test_mv_into_directory_and_of_directory(self):
+        self.assertEqual(self.check("mv", "README.md", ".claude")[0], (1, ""))
+        self.assertEqual(self.check("mv", "README.md", "sub")[0], (0, ""))
+        (self.repo / "pkg").mkdir()
+        (self.repo / "pkg" / ".env.example").write_text("A=1\n", encoding="utf-8")
+        local_git(self.repo, "add", "pkg")
+        result, err = self.check("mv", "pkg", "lib")
+        self.assertEqual(result, (1, ""))
+        self.assertIn("pkg/.env.example", err)
+
+    def test_worktree_add_compares_with_main_checkout(self):
+        result, err = self.check("worktree", "add", "../wt", "feature")
+        self.assertEqual(result, (1, ""))
+        self.assertIn("変更 .claude/settings.json", err)
+        (code, out), err = self.check("worktree", "add", "../wt2", "docs")
+        self.assertEqual(code, 0, err)
+        state = json.loads(out)
+        self.assertEqual(state["root"], str(self.root / "wt2"))
+        self.assertIsNone(state["expect"][".claude/settings.json"][0])
+        self.assertEqual(self.check("worktree", "list")[0], (0, ""))
+        self.assertEqual(self.check("worktree", "add", "--orphan", "../wt3")[0], (1, ""))
+        self.assertEqual(self.check("worktree", "add", "--no-checkout", "../wt3", "feature")[0], (0, ""))
+        # 行き先の途中が symlink なら、git は別の場所に書くので止める。
+        (self.root / "elsewhere").mkdir()
+        (self.root / "link").symlink_to(self.root / "elsewhere")
+        for path in ("../link", "../link/wt"):
+            with self.subTest(path=path):
+                result, err = self.check("worktree", "add", path, "docs")
+                self.assertEqual(result, (1, ""))
+                self.assertIn("symlink", err)
+
+    def test_worktree_add_symlink_parent_stops(self):
+        self.branch("nest", "main", {"x/.claude/settings.json": '{"n": 1}\n'})
+        self.branch("nestlink", "nest", {"x/.claude/settings.json": None, "x": ("120000", "/tmp")})
+        local_git(self.repo, "switch", "-q", "nest")
+        result, err = self.check("worktree", "add", "../wt", "nestlink", tty=True, answer="y\n")
+        self.assertEqual(result, (1, ""))
+        self.assertIn("x がsymlink", err)
+        self.assertNotIn(guard.MSG_ASK, err)
 
 
 if __name__ == "__main__":
