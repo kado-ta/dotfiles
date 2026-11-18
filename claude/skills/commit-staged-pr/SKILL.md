@@ -61,7 +61,7 @@ description: Use when the user asks to commit only the currently staged git chan
          sandbox では許可されておらず、除外コマンドにも入っていません。Aside も入っていません。
        - /cso は保存先に書けるようになりましたが、.env.example など sandbox が読めないファイルを追跡している
          リポジトリでは start が失敗します（回避の手順は claude/SKILL_INVENTORY.md の cso-sandbox の節）。
-       - グローバル CLAUDE.md で使うと決めている /qa と /browse にも同じ影響があります。
+       - グローバル CLAUDE.md で使うと決めている /qa（とその中の browse）にも同じ影響があります。
      -->
 
      - `/qa`・`/design-review`・`/benchmark` は動いているアプリを使う。sandbox の中ではサーバーを起動できないので、ユーザーに起動してもらう必要があると添えて提案する。`/benchmark --diff` は、変更前の baseline がないと絶対値しか出せず、回帰を検出できないことも添える。

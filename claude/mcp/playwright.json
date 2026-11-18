@@ -1,0 +1,20 @@
+{
+  "npmPackage": "@playwright/mcp@0.0.85",
+  "type": "stdio",
+  "command": "${NODE_BIN}/node",
+  "args": [
+    "${PACKAGE_DIR}/node_modules/@playwright/mcp/cli.js",
+    "--isolated",
+    "--browser",
+    "chrome",
+    "--output-dir",
+    "${HOME}/Library/Caches/playwright-mcp",
+    "--no-webmcp",
+    "--blocked-origins",
+    "*:47800;*:47801;*:47802;*:47803;*:47804;*:47805;*:47806;*:47807;*:47808;*:47809;*:47810;*:47811;*:47812;*:47813;*:47814;*:47815;*:47816;*:47817;*:47818;*:47819"
+  ],
+  "env": {
+    "PATH": "${NODE_BIN}:/usr/bin:/bin:/usr/sbin:/sbin",
+    "PLAYWRIGHT_MCP_HEADLESS": "${PLAYWRIGHT_MCP_HEADLESS:-true}"
+  }
+}

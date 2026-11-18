@@ -1,0 +1,290 @@
+---
+status: done
+created: 2026-11-18
+---
+
+# Playwright MCP の導入
+
+<a name="goal"></a>
+## 目的
+
+Playwright MCP（`@playwright/mcp`）を Claude Code の user スコープに登録し、定義と手順を dotfiles で再現できるようにする。用途は次の 3 つ。
+
+1. Salesforce Experience Cloud サイトのログイン画面（公開ページ）の調査。複数の画面幅のスクリーンショットと、スタイル値・要素寸法の取得
+2. Salesforce Help など、JS で描画される文書の取得
+3. フロントエンド開発での画面の確認
+
+2026-11-11 の調査で Playwright MCP は不採用にした（[research-fetch-rate.md の判断](../20261111_salesforce-help-fetch-rate/research-fetch-rate.md#decision)）。この作業では、その判断を、緩和策を付けて覆す。
+
+<a name="related"></a>
+## 関連
+
+- [前の判断: Salesforce Help の WebFetch 取得成功率と、本文を読む手段の選定](../20261111_salesforce-help-fetch-rate/research-fetch-rate.md)
+- [Claude Code 設定の設計メモ](../../../.claude/rules/CLAUDE_CONFIG.md)
+- [Skill: salesforce-help](../../../claude/skills/salesforce-help/SKILL.md)
+
+<a name="findings"></a>
+## 調査結果
+
+2026-11-18 に確認した。
+
+<a name="findings-package"></a>
+### パッケージ
+
+- 最新版は `0.0.85`（2026-11-09 公開）。`playwright-core` `1.66.0-alpha-2026-11-09` を同梱する。
+- 既定のブラウザは、インストール済みの Google Chrome（`chromium` の `chrome` チャネル）。macOS では headed（ウィンドウを表示する）。`--browser chromium` は `chrome-for-testing` を使い、別にダウンロードが要る。
+- 既定の出力先は、ワークスペースのルート（MCP のクライアントが渡すルート。なければ起動時のカレントディレクトリ）の `.playwright-mcp/`。
+- ファイルの読み書きは、Playwright MCP 自身の検査で、ワークスペースのルートと出力先の中に限られる。OS の境界ではない。`file://` への移動は既定で拒否する。
+- `browser_run_code_unsafe` は capability が `core` で、常に有効になる。`--caps` では外せない（`filteredTools` は `core` で始まる capability を必ず含む）。説明文は "RCE-equivalent"。
+- `filename` 引数を持つ `core` のツールは、`browser_snapshot`・`browser_console_messages`・`browser_evaluate`・`browser_find`・`browser_network_requests`・`browser_network_request`・`browser_take_screenshot`・`browser_run_code_unsafe`（読み込み）。相対パスはワークスペースのルートを基準にする。`browser_evaluate` は、戻り値が JSON にできれば JSON で書く。
+- `browser_file_upload` は、ワークスペースのルートの中のファイルをページに渡せる。`browser_drop`（`core`）も `paths` 引数で同じことができる（計画の時点では見落とし、動作確認で見つけた）。
+
+<a name="findings-sandbox"></a>
+### sandbox との関係
+
+- MCP サーバーは Claude Code が起動し、Bash の sandbox の外でユーザーの権限で動く（前の調査の結論。今回は測り直していない）。sandbox の denyWrite・denyRead、Edit・Write の規則、ネットワークのプロキシは効かない。
+- Claude の Bash（sandbox の中）から Playwright でブラウザを起動すると、Google Chrome は crashpad の Mach ポートの登録が `Permission denied` で失敗し、同梱のヘッドレス Chromium は起動の直後に終了した。プロジェクトに入れた Playwright のテストを、Claude は sandbox の中で実行できない。
+
+<a name="findings-node"></a>
+### Node.js と npx
+
+- Node.js は mise のグローバル設定（`node = "26.13.1"`）で入れている。端末では `.zshrc` の `mise activate zsh` が、インストール先の `bin` を PATH に入れる。
+- mise の shim は、信頼していない mise の設定があるディレクトリで失敗する（`Config files in … are not trusted`）。paranoid では、設定を変えるたびに信頼が外れる。
+- 端末以外（Claude のデスクトップアプリ、Dock から起動した VS Code）から Claude Code を起動したときの PATH は確認していない。
+
+<a name="findings-cli"></a>
+### Claude Code の CLI
+
+- `claude mcp add-json -s user <name> <json>` で user スコープに登録する。`claude mcp remove -s user <name>` で消す。
+- `claude/mcp.json`（`{"mcpServers": {}}`）を `~/.claude/mcp.json` にリンクしているが、user スコープの登録は `~/.claude.json` に入る。`~/.claude/mcp.json` が読まれるかは確認していない。
+
+<a name="decisions"></a>
+## 判断
+
+<a name="decision-adopt"></a>
+### D1. 緩和策を付けて導入する
+
+前の判断の理由（sandbox の外で動く、`browser_run_code_unsafe` が RCE 相当）は今も当てはまる。用途 3 の localhost の確認と、対話的な調査は、sandbox の中ではできない（[sandbox との関係](#findings-sandbox)）。そのため、次の緩和策を付けて導入する。
+
+| 対象 | 緩和策 | 理由 |
+| --- | --- | --- |
+| `browser_run_code_unsafe` | `permissions.deny` | Node のプロセスで任意のコードが動く。オプションでは外せない |
+| `browser_file_upload` | `permissions.deny` | sandbox の denyRead の外で、`.env*` などをページに送れる。今の用途で使わない |
+| `filename` 引数 | PreToolUse フックで、`filename` を含む `mcp__playwright__*` の呼び出しを拒否する | プロジェクトの中の任意のパス（`.claude/settings.json`・`.git/config` など）に書ける。`browser_evaluate` は任意の JSON を書けるので、hooks を書き込めば次のセッションで sandbox の外でコードが動く見込み |
+| `paths` 引数 | 同じフックで、`paths` を含む呼び出しも拒否する（動作確認で見つけて追加した） | `browser_drop`（`core`）は `browser_file_upload` と同じく、ローカルのファイルをページに渡せる。`data`（テキスト）のドロップは用途 3 で使うので、ツールごとは deny にしない |
+| 設定の消失 | `check-repo.py` で、定義（`claude/mcp/playwright.json`）があるあいだ、deny の 2 つとフックの登録（`onFailure: block`）を確かめる | `guard-additional-dirs.sh` と同じ扱い。定義を消したときは求めない |
+
+`filename` を拒否すると、スクリーンショットなどは出力先に自動の名前（`page-<時刻>.png` など）で保存される。スナップショットや `browser_evaluate` の結果は、ファイルではなく応答で返る。
+
+<a name="decision-browser"></a>
+### D2. ブラウザはインストール済みの Google Chrome（`--browser chrome`）
+
+- ダウンロードが要らない。sandbox でネットワークが止められる手順がない。
+- Google Chrome の自動更新で、セキュリティ修正が MCP の更新を待たずに入る。同梱の Chromium は、MCP を更新するまで古いまま残る。
+- 用途 1 は実際の利用者の表示を見るので、Chrome のほうが近い。
+- 既定値と同じだが、版を上げて既定が変わったときに気づけるよう明示する。
+- 欠点: Chrome の版が Playwright の想定より新しくなり、動かなくなることがある。そのときは MCP を更新する。
+
+<a name="decision-headless"></a>
+### D2a. 既定は headless にし、見たいときだけウィンドウを表示する
+
+- 定義の `env` に `"PLAYWRIGHT_MCP_HEADLESS": "${PLAYWRIGHT_MCP_HEADLESS:-true}"` を書く。`--headless` 引数は付けない（引数は環境変数より優先され、切り替えられなくなる）。
+- ふだんは headless で動く。ブラウザを見たいときは、`PLAYWRIGHT_MCP_HEADLESS=false claude` でセッションを始める。
+- 根拠（事実）: Playwright MCP は `PLAYWRIGHT_MCP_HEADLESS` を `true`・`1`・`false`・`0` で解釈し、引数の設定を環境変数の後に重ねる（`coreBundle.js` の `configFromEnv`・`resolveCLIConfigForMCP`）。Claude Code は MCP の定義の `command`・`args`・`env`・`url`・`headers` で `${VAR:-default}` を展開する（[MCP のドキュメント](https://code.claude.com/docs/en/mcp)）。
+- 未確認: `claude mcp add-json --scope user` で登録した定義でも展開されるかは、ドキュメントに明記がない。[完了条件](#done)の 3b で確かめる。展開されないと、値が解釈できず headed になる（表示されるだけで、安全側の問題はない）。
+- 注意: `PLAYWRIGHT_MCP_HEADLESS=`（空）は既定値ではなく空に展開され、headed になる。
+- headless では、ビューポートの既定が 1280×720 になり、1 時間使わないとブラウザが閉じる（次の呼び出しで起動し直す。`--isolated` なので状態は残らない）。
+
+<a name="decision-output"></a>
+### D3. 出力先は `~/Library/Caches/playwright-mcp`（`--output-dir`）
+
+- どのリポジトリにも出力しないので、グローバル gitignore を変えずに済む。`~/.config/git/ignore` は dotfiles で管理していない。
+- sandbox から書けない場所なので、sandbox の中のコマンドが symlink を仕込んで出力を別の場所に向けることができない。
+- 全プロジェクトで共有する。自動の名前は時刻を含むので、並行したセッションでもぶつからない見込み。
+
+<a name="decision-node"></a>
+### D4. npx は登録するときに絶対パスで固定する
+
+> [!WARNING]
+> `/review` で、npx を実行時に使うこと自体が sandbox を抜ける経路だと分かり、固定の場所に入れて `node` で起動する形に変えた（[レビューで変えたこと](#review-changes)）。以下は元の判断。
+
+定義ファイルに `${NODE_BIN}` と `${HOME}` を書き、登録スクリプトが実際のパスに置き換える。それ以外の `${...}`（[D2a](#decision-headless) の `PLAYWRIGHT_MCP_HEADLESS`）は置き換えずに残し、Claude Code が起動時に展開する。`NODE_BIN` は、ホームで `mise where node` を実行して得たグローバルの Node.js の `bin`。
+
+- `command` は `${NODE_BIN}/npx` にする。npx と、npx が起動する `playwright-mcp` は `#!/usr/bin/env node` で始まるので、`env.PATH` も `${NODE_BIN}:/usr/bin:/bin:/usr/sbin:/sbin` に固定する。
+- 端末以外から起動したときの PATH と、プロジェクトの mise の設定（版の違いと、信頼していないときの shim の失敗）の影響を受けない。
+- 公開リポジトリにユーザー名を入れない。
+- 欠点: Node.js を更新したら、登録スクリプトを再実行する（README に書く）。
+
+<a name="decision-register"></a>
+### D5. 登録は「消してから足す」で冪等にする
+
+`claude/scripts/register-mcp.sh` は、`claude/mcp/*.json` のファイルごとに、`claude mcp remove -s user <name>`（ないときの失敗は無視）→ `claude mcp add-json -s user <name> <json>` を実行する。何度実行しても登録は 1 つで、定義を変えれば置き換わる。`~/.claude.json` は CLI だけが書き、直接は編集しない。`claude/setup.sh` からも呼ぶ。
+
+<a name="decision-routing"></a>
+### D6. 使い分け
+
+`claude/CLAUDE.md` の Tools 節を次の内容にする。
+
+> Claude がブラウザを操作して調べるとき（公開ページのスクリーンショット・スタイル値、JS で描画される文書、ローカルの画面の確認）は Playwright MCP を使う。繰り返す確認は、そのプロジェクトの `@playwright/test` にテストとして書き、実行は人間（端末・`!`）か CI に任せる（sandbox の中ではブラウザが起動しない）。プロジェクトに Playwright がなければ、導入は提案に留める。gstack のスキル（`/qa` など）の中の browse は、スキルの手順に従う。
+
+salesforce-help スキルの「本文を読めないとき」は、Playwright MCP で開いて `browser_evaluate`（`filename` なし）で `document.body.innerText` を読む手順にし、Playwright MCP が使えないときだけ、今の `!` での browse を使う。棚卸し（`SKILL_INVENTORY.md`）と早見表（`SKILL_CHEATSHEET.md`）のブラウザの行も合わせる。
+
+<a name="decision-risks"></a>
+### D7. 受け入れるリスク
+
+- ページの内容によるプロンプトインジェクション。外部のページを読む方法なら、どれでも残る。
+- cc-crit 以外の crit のポートを、ブラウザで端から試して見つける経路（`~/.crit` は読めなくした）。
+- プロジェクトの `.mcp.json` が、別の名前で Playwright を起動するサーバー。deny もフックも効かないので、プロジェクトごとの承認の画面で断ることが最後の守りになる。
+- 外部のページから Crit のポート（47800〜47819）への HTTP のリダイレクト。フックも `--blocked-origins` も止めない（route の割り込みはリダイレクトの先に掛からない）。攻撃者はポートを当て、さらにモデルに Finish Review を押させる必要がある。Crit 側でトークンを確かめる案を、別の作業で提案する。
+- 起動元の環境の `PLAYWRIGHT_MCP_*` の変数（`ALLOW_UNRESTRICTED_FILE_ACCESS`・`CAPS`・`INIT_PAGE` など）が、引数で固定していない設定を上書きしうる。起動元の環境（プロジェクトの settings の `env` など）を書き換えられるなら、hooks でも同じことができるので、新しい経路ではない。
+- `register-mcp.sh` は、`mise` と `claude` を引き継いだ PATH から探す。`!` で実行すると PATH はセッションのものになる。`update-skills.sh` と同じ扱いにする。
+- 出力先（`~/Library/Caches/playwright-mcp`）は sandbox の中から読める。ほかのプロジェクトのセッションが残したページの構造・コンソール・ネットワークのログ（URL のトークンを含みうる）が見える。今の用途は公開ページなので受け入れる。ログインするページを扱うようになったら、denyRead か `--redact-url-params` を考える。
+- 実行中の Chrome のプロファイル（サーバーの一時ディレクトリの `playwright_chromiumdev_profile-*`。Cookie のデータベースを含む）は sandbox の中から読める。モデルはもともとこのブラウザを操作でき、`browser_network_request` で Cookie のヘッダーも読めるので、新しい経路ではない。ログインするページを扱うようになったら、出力先と合わせて見直す。
+- ブラウザの通信がプロキシを通らない。WebFetch のドメイン許可の運用の外になる。用途 3 の localhost の確認には、この性質が要る。`--allowed-origins` は境界ではないので付けない。
+- ページが始めたダウンロードは、ページが付けた名前（`/` などを `-` に置き換えたもの）で出力先に保存され、同じ名前のファイルは上書きされる。大きさの上限もない（`--output-max-size` を付けていない）。出力先は sandbox から書けず、何かに読み込まれて動く場所でもないので受け入れる（`/review` の指摘で訂正した。前は「名前を選べない」と書いていた）。
+
+<a name="review-changes"></a>
+## レビューで変えたこと
+
+`/review`（専門のレビュアー 5 つと adversarial のレビュー）の指摘で、次を変えた。判断はユーザーと合意した（2026-11-18）。
+
+| 指摘 | 変えたこと |
+| --- | --- |
+| npx は、サーバーの作業ディレクトリ（プロジェクト）の `node_modules/@playwright/mcp`・`node_modules/.bin/node`・`.npmrc` を使う（`libnpmexec/lib/index.js:191-203` で確認）。sandbox の中で置かれたコードが、次のセッションの開始時に sandbox の外で動く | 定義に `npmPackage` を置き、`register-mcp.sh` が sandbox から書けない `~/.local/share/claude-mcp/playwright` に `npm install --ignore-scripts` で入れる。`command` は `${NODE_BIN}/node`、`args` の先頭は `${PACKAGE_DIR}/node_modules/@playwright/mcp/cli.js`。依存は完全に固定した版なので、lockfile は置かない |
+| ブラウザは localhost の Crit（47800〜47819）に届き、Finish Review を押して人間の承認を偽造できる | フックで、`url` に `:47800`〜`:47819` を含む呼び出しを止める。定義に `--blocked-origins`（`*:47800;…;*:47819`）を足し、JS やリンクでの移動も止める。リダイレクトは[受け入れた](#decision-risks) |
+| ページが登録した WebMCP のツールが、Claude のツールの一覧に入る | `--no-webmcp` を足す |
+| deny・フック・検査がサーバー名 `playwright` に依存している | `check-repo.py` で、`@playwright/mcp` を `playwright.json` 以外で定義すると失敗させる |
+| 定義がない（`mcp/` もない）と `register-mcp.sh` が失敗し、削除の手順の後に `setup.sh` が止まる | 通知して成功で終える |
+| 大きな入力のテストがファイルのリダイレクトで、stdin を読まないフックでも通る | パイプで渡し、書き手とフックの終了コードを確かめる。止める側の大きな入力も足した |
+| （2 回目）フックの URL の照合が、ポートの先頭のゼロや、TAB・LF・CR を挟んだ形で抜ける（WHATWG の解析器はこれらを正規化する） | TAB・LF・CR を取り除き、先頭のゼロも含めて照合する |
+| （2 回目）別名の検出が `@playwright/mcp` の部分一致だけで、`playwright` の CLI の `mcp` サブコマンドや JSON のエスケープで抜ける | JSON を読んでから、大文字・小文字を区別せずに `playwright` を含む定義を止める。読めない定義も失敗にする |
+| （2 回目）ブラウザが認証のない UNIX ソケットで公開される | sandbox が UNIX ソケットへの接続を止めることを実測し、`CLAUDE_CONFIG.md` に記録した |
+| （2 回目）文書の古い箇所（この Plan の定義の例・ロールバック、README の更新の手順） | 直した。更新の前にセッションを閉じる手順も足した |
+| （2 回目）cc-crit 以外の crit（プラグインの自動プランレビュー、端末の crit）はランダムなポートで待ち受け、ポートを sandbox から読める `~/.crit/sessions` に書く | `sandbox.filesystem.denyRead` に `~/.crit`、`permissions.deny` に `Read(~/.crit/**)` を足す（ユーザーが編集）。`check-repo.py` が確かめる |
+| （2 回目）プロジェクトの `.mcp.json` や local スコープの同じ名前の `playwright` が、強化した user スコープの定義を上書きする | ユーザー設定の `disabledMcpjsonServers` に `playwright` を足す（ユーザーが編集。効くかは[試験記録](test-report.md#recheck)で確かめる）。`check-repo.py` が確かめる。local スコープは文書で禁じる |
+| （2 回目）`setup.sh` が登録の失敗で止まり、`setup.command` の後の手順も止まる | 警告を出して先に進む |
+| （`/security-review`、基準未満）Playwright MCP の `file:` の拒否は、Node が解析できる URL にしか効かない（`file://localhost:/…` などは素通りする） | フックで、`url` が `file:` で始まる呼び出しも止める |
+
+<a name="changes"></a>
+## 変更するファイル
+
+| ファイル | 変更 |
+| --- | --- |
+| `claude/mcp/playwright.json` | 新規。定義（`npmPackage` と、`${HOME}`・`${NODE_BIN}`・`${PACKAGE_DIR}` を含む） |
+| `claude/scripts/register-mcp.sh` | 新規。登録スクリプト |
+| `claude/scripts/test-register-mcp.py` | 新規。`claude`・`mise` の偽物で、置き換え（ほかの `${...}` は残す）・呼び出しの順番・失敗を確かめる |
+| `claude/setup.sh` | `register-mcp.sh` を呼ぶ |
+| `claude/hooks/guard-playwright-mcp.sh` | 新規。`filename` を含む呼び出しを拒否する。入力を解釈できないときも拒否する |
+| `claude/hooks/tests/test-guard-playwright-mcp.sh` | 新規。回帰テスト |
+| `.github/scripts/check-repo.py`・`test-check-repo.py` | deny の 2 つとフックの登録を確かめる |
+| `.github/workflows/ci.yaml` | `test-register-mcp.py` を足す（フックのテストは glob で入る） |
+| `claude/README.md` | セットアップの一覧、Playwright MCP の導入・更新・削除の手順、ウィンドウを表示する起動の仕方、フックの表とテストの一覧 |
+| `CLAUDE.md`（ルート） | テストの一覧と、禁止事項（deny とフックを外さない） |
+| `.claude/rules/CLAUDE_CONFIG.md` | 緩和策の設計理由 |
+| `claude/CLAUDE.md` | Tools 節（[D6](#decision-routing)） |
+| `claude/skills/salesforce-help/SKILL.md` | 本文を読めないときの手順 |
+| `claude/SKILL_INVENTORY.md`・`claude/SKILL_CHEATSHEET.md` | ブラウザの行 |
+| `claude/settings.json` | deny の 2 つとフックの登録。**あなたが編集する**（下記） |
+
+`claude/settings.json` に足す内容:
+
+```json
+"deny": [
+  "mcp__playwright__browser_run_code_unsafe",
+  "mcp__playwright__browser_file_upload"
+]
+```
+
+```json
+{
+  "matcher": "mcp__playwright__.*",
+  "hooks": [
+    {
+      "type": "command",
+      "command": "/bin/bash ~/.claude/hooks/guard-playwright-mcp.sh",
+      "timeout": 10,
+      "onFailure": "block"
+    }
+  ]
+}
+```
+
+`claude/mcp/playwright.json`（[レビューで変えたこと](#review-changes)を反映した形。`--blocked-origins` の値は 47800〜47819 の 20 個を `;` でつなぐ）:
+
+```json
+{
+  "npmPackage": "@playwright/mcp@0.0.85",
+  "type": "stdio",
+  "command": "${NODE_BIN}/node",
+  "args": [
+    "${PACKAGE_DIR}/node_modules/@playwright/mcp/cli.js",
+    "--isolated",
+    "--browser",
+    "chrome",
+    "--output-dir",
+    "${HOME}/Library/Caches/playwright-mcp",
+    "--no-webmcp",
+    "--blocked-origins",
+    "*:47800;*:47801;…;*:47819"
+  ],
+  "env": {
+    "PATH": "${NODE_BIN}:/usr/bin:/bin:/usr/sbin:/sbin",
+    "PLAYWRIGHT_MCP_HEADLESS": "${PLAYWRIGHT_MCP_HEADLESS:-true}"
+  }
+}
+```
+
+<a name="steps"></a>
+## 手順
+
+ブランチ `feat/playwright-mcp` を切る。dotfiles の作業ツリーはほかのセッションと共有しているので、コミットの前に毎回ブランチを確かめる。`main` の未コミットの変更（`biome/biome.jsonc`・`claude/settings.json`）はコミットに含めない。
+
+1. フック: テストを先に書いて失敗を確かめ、`guard-playwright-mcp.sh` を書いて通す。→ `bash claude/hooks/tests/test-guard-playwright-mcp.sh`
+2. 登録スクリプト: テストを先に書き、`register-mcp.sh` と `playwright.json` を書いて通す。`setup.sh` から呼ぶ。→ `/usr/bin/python3 -B claude/scripts/test-register-mcp.py`
+3. **あなた**: `claude/settings.json` に deny とフックを足す。
+4. `check-repo.py` の検査とテストを足す。→ `python3 -B .github/scripts/check-repo.py`・`python3 -B .github/scripts/test-check-repo.py`
+5. README・ルートの CLAUDE.md・`CLAUDE_CONFIG.md`・CI を更新する。→ shellcheck・actionlint・`check-repo.py`
+6. 使い分け: `claude/CLAUDE.md`・salesforce-help・棚卸し・早見表を更新する。→ `check-repo.py`（リンク）
+7. **あなた**: 登録と動作確認（[完了条件](#done)）。新しいセッションが要る。
+8. `/review` → `/security-review` → 指摘を直す → `test-report.md` を書く → `/crit-review` で差分を開く → push・PR。Codex レビューは、あなたの端末で実行する。
+
+コミットは 1 論理変更ごとに分ける（フック、登録、settings と検査、使い分け、作業文書）。
+
+<a name="done"></a>
+## 完了条件と確かめ方
+
+| # | 条件 | 確かめ方 | 実行する人 |
+| --- | --- | --- | --- |
+| 1 | `claude mcp list` で playwright が接続済み | `! claude mcp list` | あなた |
+| 2 | user スコープ・`0.0.85`・指定したオプション | `! claude mcp get playwright` | あなた |
+| 3 | 2 回続けて登録しても、エラーも重複も出ない | `! /bin/bash ~/dotfiles/claude/scripts/register-mcp.sh` を 2 回、その後 2 | あなた |
+| 3a | 端末以外から起動したときの PATH でも起動する | 信頼していない mise の設定があるディレクトリで、`env -i` で PATH を `/usr/bin:/bin:/usr/sbin:/sbin` にして `claude mcp list` | あなた |
+| 3b | 既定は headless、`PLAYWRIGHT_MCP_HEADLESS=false` でウィンドウが出る | 4b のセッションでウィンドウが出ないこと。別に `PLAYWRIGHT_MCP_HEADLESS=false claude` で始めたセッションで、ページを開くとウィンドウが出ること | あなた（新しいセッション） |
+| 4a | Salesforce Help の本文を取得できる | 新しいセッションで、WebFetch では目次だけになる記事（`platform.automate_flow_ref_third_party_freshservice.htm`）を読ませる。salesforce-help スキルが Playwright MCP に回すことも見る。応答の大きさも記録する | あなた（新しいセッション） |
+| 4b | 1440px と 390px のスクリーンショットを撮って確認できる | 同じセッションで `browser_resize` と `browser_take_screenshot` | あなた（新しいセッション） |
+| 4c | 出力が `git status` に出ない | 4b の後に `git status`。出力が `~/Library/Caches/playwright-mcp` にあること | あなた（新しいセッション） |
+| 4d | 緩和策が効く | `filename` 付きのスクリーンショットと、`browser_run_code_unsafe` を頼んで、拒否されること | あなた（新しいセッション） |
+| 5 | README に導入・更新・削除の手順がある | 差分のレビュー | Claude・あなた |
+| — | テスト・検査が通る | フックと登録スクリプトのテスト、`check-repo.py`、`test-check-repo.py`、shellcheck、actionlint | Claude |
+
+4a〜4d の新しいセッションで使う依頼文は、手順 7 で渡す。
+
+<a name="rollback"></a>
+## ロールバック
+
+1. `claude mcp remove -s user playwright`
+2. `claude/settings.json` の deny とフックの登録を消し、`check-repo.py` の検査を戻す（ブランチのコミットを revert する）。
+3. `~/.local/share/claude-mcp/playwright` と `~/Library/Caches/playwright-mcp` を消す。
+
+<a name="out-of-scope"></a>
+## 範囲外と提案
+
+- 個別のプロジェクトへの `@playwright/test` の導入、`@playwright/cli` の導入。
+- Codex: `codex/config.base.toml` に `[mcp_servers.playwright]` を足せば同じサーバーを使える見込み。Codex に MCP のツールごとの無効化があるか、sandbox との関係はどうかを確かめてから、別の作業で提案する。
+- `claude/mcp.json` と `~/.claude/mcp.json` のリンク: 読まれていなければ、別の作業で削除を提案する。今回は触らない。
+
+<a name="open-questions"></a>
+## 確認したいこと
+
+1. `main` の `claude/settings.json` の未コミットの変更（`defaultMode` の移動と `switchModelsOnFlag` の追加）を、どう扱いますか。手順 3 の変更と同じファイルなので、混ざらないよう、先に別のコミットにするか、片付けてから手順 3 に進みたいです。
+2. 4a で Salesforce Help の応答（`browser_navigate` が返すスナップショット）が大きすぎたときは、`--snapshot-mode none` を足すかを、測った結果で相談します。

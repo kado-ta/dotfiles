@@ -43,7 +43,8 @@ https://help.salesforce.com/s/articleView?id=<id>&language=<language>&type=<type
 ## 本文を読めないとき
 
 1. WebSearch（`allowed_domains: ["help.salesforce.com"]`）で概要を探す。結果は検索の要約なので、そう明記して使う。
-2. 正確な本文が必要なら、次のコマンドを Ghostty で実行するか、Claude Code のプロンプトで先頭に `!` を付けて実行するようユーザーに依頼して待つ。`!` なら出力が会話に直接入る。Sandbox の中では Chromium が起動しない。
+2. 正確な本文が必要なら、Playwright MCP で描画して読む。`browser_navigate` で URL を開き、`browser_evaluate` の `function` に `() => document.body.innerText` を渡す（`filename` は付けない）。本文が `Loading` などのままなら、`browser_wait_for` で数秒待ってから読み直す。
+3. Playwright MCP が使えないとき（ツールがない、起動しない）は、次のコマンドを Ghostty で実行するか、Claude Code のプロンプトで先頭に `!` を付けて実行するようユーザーに依頼して待つ。`!` なら出力が会話に直接入る。Sandbox の中では Chromium が起動しない。
 
    ```sh
    B=~/.claude/skills/gstack/browse/dist/browse
@@ -54,7 +55,7 @@ https://help.salesforce.com/s/articleView?id=<id>&language=<language>&type=<type
 ## 回答に書くこと
 
 - 記事の URL
-- 読み方（WebFetch の逐語、検索の要約、ユーザーが貼った本文のいずれか）
+- 読み方（WebFetch の逐語、Playwright MCP で描画した本文、検索の要約、ユーザーが貼った本文のいずれか）
 - 確認した日付
 - 本文を読めなかった場合は、読めなかった範囲
 

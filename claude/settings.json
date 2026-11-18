@@ -168,6 +168,7 @@
       "Edit(~/Library/Logs/cc-safe-pr/**)",
       "Read(~/Library/Keychains/**)",
       "Read(~/.cc-crit/**)",
+      "Read(~/.crit/**)",
       "Edit(~/.config/cc-gh-read/**)",
       "Edit(~/.crit/**)",
       "Edit(~/.crit.config.json)",
@@ -177,7 +178,9 @@
       "Skill(pstack:setup-pstack)",
       "Agent(pstack:poteto-agent)",
       "Agent(pstack:comment-sicko)",
-      "Edit(~/.local/state/mise/**)"
+      "Edit(~/.local/state/mise/**)",
+      "mcp__playwright__browser_run_code_unsafe",
+      "mcp__playwright__browser_file_upload"
     ],
     "ask": [
       "Bash(gh pr create*)",
@@ -226,6 +229,9 @@
     ]
   },
   "model": "opus[1m]",
+  "disabledMcpjsonServers": [
+    "playwright"
+  ],
   "skillOverrides": {
     "ios-qa": "off",
     "ios-fix": "off",
@@ -303,6 +309,17 @@
           {
             "type": "command",
             "command": "/bin/bash ~/.claude/hooks/guard-additional-dirs.sh",
+            "timeout": 10,
+            "onFailure": "block"
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__playwright__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/bin/bash ~/.claude/hooks/guard-playwright-mcp.sh",
             "timeout": 10,
             "onFailure": "block"
           }
@@ -434,6 +451,7 @@
         "~/.ssh/config",
         "~/Library/Keychains",
         "~/.cc-crit",
+        "~/.crit",
         "~/.colima/_lima/_config",
         "~/.lima/_config"
       ],
