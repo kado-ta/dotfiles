@@ -44,7 +44,12 @@ MISE_EDIT_DENY = ["Edit(~/.local/state/mise/**)"]
 MISE_EDIT_ASK = ["Edit(~/dotfiles/mise/**)"]
 GUARD_TOOLS = ["Edit", "Write", "MultiEdit", "NotebookEdit"]
 GUARD_ERROR = "hooks.PreToolUse lacks hooks/guard-additional-dirs.sh"
-PLAYWRIGHT_DENY = ["mcp__playwright__browser_run_code_unsafe", "mcp__playwright__browser_file_upload"]
+PLAYWRIGHT_DENY = [
+    "mcp__playwright__browser_run_code_unsafe",
+    "mcp__playwright__browser_file_upload",
+    "Read(~/.crit/**)",
+]
+PLAYWRIGHT_DENY_READ = ["~/.crit"]
 PLAYWRIGHT_HOOK_ERROR = "hooks.PreToolUse lacks hooks/guard-playwright-mcp.sh"
 PROJECT_ASK = [
     "Edit(/claude/**)",
@@ -99,7 +104,7 @@ def settings():
             "excludedCommands": list(WRAPPER_COMMANDS),
             "filesystem": {
                 "allowWrite": ["~/.gstack/projects"],
-                "denyRead": CRIT_DENY_READ + LIMA_DENY_READ,
+                "denyRead": CRIT_DENY_READ + LIMA_DENY_READ + PLAYWRIGHT_DENY_READ,
                 "denyWrite": list(MISE_DENY_WRITE),
             },
         },
@@ -138,6 +143,7 @@ def settings():
             ],
         },
         "statusLine": {"type": "command", "command": "~/.claude/scripts/status.sh"},
+        "disabledMcpjsonServers": ["playwright"],
     }
 
 
@@ -448,6 +454,23 @@ class CheckRepoTests(unittest.TestCase):
                 self.write_settings(data)
                 self.assert_fails("FAIL playwright-mcp", f"permissions.deny lacks {rule}")
 
+    def test_missing_crit_deny_read_fails(self):
+        # ほかの crit（プラグインの自動プランレビュー、端末の crit）は、ランダムなポートを ~/.crit/sessions に書く。
+        # 読めると、モデルがポートを知って Playwright で開き、承認を偽造できる。
+        data = settings()
+        data["sandbox"]["filesystem"]["denyRead"].remove("~/.crit")
+        self.write_settings(data)
+        self.assert_fails("FAIL playwright-mcp", "sandbox.filesystem.denyRead lacks ~/.crit")
+
+    def test_missing_disabled_mcpjson_server_fails(self):
+        # プロジェクトの .mcp.json の playwright は、強化した user スコープの定義を上書きする。
+        for value in ([], ["other"]):
+            with self.subTest(value=value):
+                data = settings()
+                data["disabledMcpjsonServers"] = value
+                self.write_settings(data)
+                self.assert_fails("FAIL playwright-mcp", "disabledMcpjsonServers lacks playwright")
+
     def test_missing_playwright_hook_fails(self):
         data = settings()
         data["hooks"]["PreToolUse"].remove(self.playwright_group(data))
@@ -455,7 +478,7 @@ class CheckRepoTests(unittest.TestCase):
         self.assert_fails("FAIL playwright-mcp", PLAYWRIGHT_HOOK_ERROR)
 
     def test_playwright_hook_narrower_matcher_fails(self):
-        # 一部のツールにしか当たらない matcher では、ほかのツールの filename が通る。
+        # 一部のツールにしか当たらない matcher では、ほかのツールの filename・paths が通る。
         data = settings()
         self.playwright_group(data)["matcher"] = "mcp__playwright__browser_take_screenshot"
         self.write_settings(data)
@@ -472,6 +495,31 @@ class CheckRepoTests(unittest.TestCase):
         del self.playwright_group(data)["hooks"][0]["onFailure"]
         self.write_settings(data)
         self.assert_fails("FAIL playwright-mcp", PLAYWRIGHT_HOOK_ERROR)
+
+    def test_playwright_under_another_name_fails(self):
+        # deny・フック・この検査は、サーバー名 playwright（ツール名 mcp__playwright__*）に結び付いている。
+        self.write("claude/mcp/pw.json", json.dumps({"npmPackage": "@playwright/mcp@0.0.85"}))
+        self.assert_fails("FAIL playwright-mcp", "claude/mcp/pw.json")
+
+    def test_playwright_mcp_subcommand_under_another_name_fails(self):
+        # playwright・playwright-core の CLI にも mcp サブコマンドがある。JSON の \/ や大文字でも素通りさせない。
+        for name, text in (
+            ("pw-cli", json.dumps({"npmPackage": "playwright@1.66.0", "args": ["cli.js", "mcp"]})),
+            ("pw-escaped", '{"npmPackage": "@playwright\\/mcp@0.0.85"}'),
+            ("pw-upper", json.dumps({"command": "/opt/Playwright/bin/node"})),
+        ):
+            with self.subTest(name=name):
+                self.write(f"claude/mcp/{name}.json", text)
+                self.assert_fails("FAIL playwright-mcp", f"claude/mcp/{name}.json")
+                self.git("rm", "-q", "-f", f"claude/mcp/{name}.json")
+
+    def test_unparsable_mcp_definition_fails(self):
+        self.write("claude/mcp/broken.json", "{")
+        self.assert_fails("FAIL playwright-mcp", "claude/mcp/broken.json")
+
+    def test_other_mcp_definition_passes(self):
+        self.write("claude/mcp/other.json", json.dumps({"npmPackage": "other-mcp@1.0.0"}))
+        self.assert_passes()
 
     def test_without_playwright_definition_passes(self):
         # 定義を消して登録をやめたら、deny とフックは求めない。

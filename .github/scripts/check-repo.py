@@ -93,10 +93,15 @@ ADDITIONAL_DIRECTORIES = ("~/.gstack/projects",)
 GUARD_HOOK = "hooks/guard-additional-dirs.sh"
 GUARD_TOOLS = ("Edit", "Write", "MultiEdit", "NotebookEdit")
 # Playwright MCP は sandbox の外でユーザーの権限で動く。定義があるあいだは、任意のコードを動かすツールと
-# プロジェクトのファイルをページに渡すツールを deny にし、プロジェクトの中に書ける filename 引数をフックで止める。
-# matcher は完全一致で比べる（一部のツールにしか当たらないと、ほかのツールの filename が通る）。
+# プロジェクトのファイルをページに渡すツールを deny にし、ローカルのファイルを指す filename・paths 引数をフックで止める。
+# matcher は完全一致で比べる（一部のツールにしか当たらないと、ほかのツールの filename・paths が通る）。
+# ブラウザは localhost に届くので、cc-crit 以外の crit（プラグインの自動プランレビュー、端末の crit）がランダムなポートを
+# 書く ~/.crit も読ませない（ポートを知って開けば、承認を偽造できる）。プロジェクトの .mcp.json の playwright は、
+# 強化した user スコープの定義を上書きするので拒否する。
 PLAYWRIGHT_DEFINITION = "claude/mcp/playwright.json"
-PLAYWRIGHT_DENY = ("mcp__playwright__browser_run_code_unsafe", "mcp__playwright__browser_file_upload")
+PLAYWRIGHT_DENY = ("mcp__playwright__browser_run_code_unsafe", "mcp__playwright__browser_file_upload", "Read(~/.crit/**)")
+PLAYWRIGHT_DENY_READ = ("~/.crit",)
+PLAYWRIGHT_SERVER = "playwright"
 PLAYWRIGHT_HOOK = "hooks/guard-playwright-mcp.sh"
 PLAYWRIGHT_MATCHER = "mcp__playwright__.*"
 JSONC_FILES = {"vscode/settings.json", "vscode/keybindings.json"}
@@ -296,13 +301,42 @@ def check_edit_permissions(root):
     return errors
 
 
+def playwright_aliases(root):
+    """claude/mcp/ の playwright.json 以外で、Playwright を起動しうる定義を返す。
+
+    deny・フック・この検査はサーバー名 playwright に結び付いている。@playwright/mcp だけでなく、playwright・
+    playwright-core の CLI の mcp サブコマンドでも同じサーバーが動くので、JSON を読み、大文字・小文字を区別せずに
+    playwright を含む定義をすべて止める（JSON の \\/ のようなエスケープでも抜けないように、読んでから比べる）。
+    """
+    errors = []
+    for path in sorted((root / PLAYWRIGHT_DEFINITION).parent.glob("*.json")):
+        rel = path.relative_to(root).as_posix()
+        if rel == PLAYWRIGHT_DEFINITION:
+            continue
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            errors.append(f"{rel}: cannot be parsed as JSON")
+            continue
+        if "playwright" in json.dumps(data).lower():
+            errors.append(f"{rel}: mentions Playwright under another server name; define it only in {PLAYWRIGHT_DEFINITION}")
+    return errors
+
+
 def check_playwright_mcp(root):
+    errors = playwright_aliases(root)
     if not (root / PLAYWRIGHT_DEFINITION).exists():
-        return []
+        return errors
     settings = load_settings(root)
     deny = set(settings.get("permissions", {}).get("deny", []))
-    errors = [f"{SETTINGS}: permissions.deny lacks {rule} (required while {PLAYWRIGHT_DEFINITION} exists)"
-              for rule in PLAYWRIGHT_DENY if rule not in deny]
+    errors += [f"{SETTINGS}: permissions.deny lacks {rule} (required while {PLAYWRIGHT_DEFINITION} exists)"
+               for rule in PLAYWRIGHT_DENY if rule not in deny]
+    deny_read = settings.get("sandbox", {}).get("filesystem", {}).get("denyRead", [])
+    errors += [f"{SETTINGS}: sandbox.filesystem.denyRead lacks {path} (required while {PLAYWRIGHT_DEFINITION} exists)"
+               for path in PLAYWRIGHT_DENY_READ if path not in deny_read]
+    if PLAYWRIGHT_SERVER not in settings.get("disabledMcpjsonServers", []):
+        errors.append(f"{SETTINGS}: disabledMcpjsonServers lacks {PLAYWRIGHT_SERVER} "
+                      f"(required while {PLAYWRIGHT_DEFINITION} exists)")
     if not any(group.get("matcher") == PLAYWRIGHT_MATCHER and blocking_hook(group, PLAYWRIGHT_HOOK)
                for group in settings.get("hooks", {}).get("PreToolUse", [])):
         errors.append(f"{SETTINGS}: hooks.PreToolUse lacks {PLAYWRIGHT_HOOK} for {PLAYWRIGHT_MATCHER} "
