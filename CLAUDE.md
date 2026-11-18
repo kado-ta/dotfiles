@@ -38,13 +38,21 @@ push は、元のリポジトリの設定とフックを読まないように、
 
 ラッパーと許可リストは、Claude が書き換えられないように root 所有にする。ラッパーを変更したら、再度インストールする。インストール手順と許可リストの書き方は、[claude/README.md](claude/README.md#cc-safe-push-install) を参照する。
 
+<a name="cc-checkout-guard"></a>
+
+### git の確認（cc-checkout-guard）
+
+人間の zsh の `git`（`bin/.zshrc` の関数）と `claude -w`（`claude/settings.json` の `WorktreeCreate` フック）は、`claude/bin/cc-checkout-guard` を root 所有でインストールした確認コマンドを通る。sandbox の外で自動で読み込まれたり動いたりするファイル（`.env*`・`.claude/`・`.mcp.json` など）を git が書く前に、中身を確かめる。普段の端末では差分を見せて y/N を聞き、`!` では止める。sandbox の中（Bash ツール）の git は、確かめずに通す。
+
+確認コマンドがないと、関数はすべての git を止める（Bash ツールの git も）。確認コマンドを変更したら、再度インストールする。`.claude/settings.json` の denyWrite と、確認コマンドの `DOTFILES_PROTECTED` は、同じ項目にそろえる（`checkout-guard` が `PROJECT_DENY_WRITE` と比べる）。インストール・動き・戻し方は [claude/README.md](claude/README.md#cc-checkout-guard) を参照する。
+
 <a name="edit-write-rules"></a>
 
 ### Edit・Write ツールの書き込み
 
 ユーザー設定で `permissions.blockWritesOutsideWorkingDirectories` をオンにしている。Edit・Write ツールは作業ディレクトリの外に書けず、Claude Code の設定ファイルは作業ディレクトリの中でも編集できない。外に書く必要があるときは、人間が `/add-dir` でディレクトリを足す。設定ファイルは人間が編集する。gstack の置き場所（`~/.gstack/projects`）は、`permissions.additionalDirectories` に入れているので書ける。規則の理由は [.claude/rules/CLAUDE_CONFIG.md](.claude/rules/CLAUDE_CONFIG.md#edit-write-rules) にある。
 
-worktree は `claude -w <name>` で始める。この設定では EnterWorktree・ExitWorktree を使えない。ブランチ名は `worktree-<name>` になるので、規約の名前（`fix/…` など）には `git branch -m <新しい名前>` で変える。sandbox が `.git/config` を守っているので、`could not lock config file` と出て終了コード 128 で終わるが、名前は変わる。元のブランチに `branch.<name>.*` の設定がなければ、影響はない。終了コードが 0 でないので、`&&` で後ろにコマンドをつながない。
+worktree は `claude -w <name>` で始める。この設定では EnterWorktree・ExitWorktree を使えない。worktree は、`WorktreeCreate` フックが `~/.cc-worktrees/<キー>/<name>` に作る（[cc-checkout-guard](#cc-checkout-guard)）。前に `.claude/worktrees/<name>` に作った worktree は、そのまま `cd` して `claude` で開ける。`claude -w` は、元のチェックアウトの外にある linked worktree からは実行できない（フックが `cwd` を確かめて失敗する）。ブランチ名は `worktree-<name>` になるので、規約の名前（`fix/…` など）には `git branch -m <新しい名前>` で変える。sandbox が `.git/config` を守っているので、`could not lock config file` と出て終了コード 128 で終わるが、名前は変わる。元のブランチに `branch.<name>.*` の設定がなければ、影響はない。終了コードが 0 でないので、`&&` で後ろにコマンドをつながない。
 
 <a name="sandbox-prohibitions"></a>
 
@@ -59,10 +67,12 @@ worktree は `claude -w <name>` で始める。この設定では EnterWorktree�
 - `Edit(//**/.git/**/hooks/**)` と `Edit(//**/.git/config)` を deny にしない。Edit の deny は sandbox の denyWrite にもなり、どこでも `git init`・`git clone` が失敗する見込み（`edit-permissions` が失敗する）。
 - ユーザー設定の `sandbox.filesystem` に、接頭辞のないパスを書かない。`~/` か `/` で始める（接頭辞がないと `~/.claude` が基準になる。`edit-permissions` が失敗する）。
 - Read の deny の `*.pem` を `~/**` に広げない。
+- `bin/.zshrc` の `git` 関数、`claude/settings.json` の `WorktreeCreate` フック、`Edit(**/mise.lock)` の deny を外さない（`checkout-guard`・`edit-permissions` が失敗する）。
+- mise の `trusted_config_paths` と、シェルの設定の `MISE_TRUSTED_CONFIG_PATHS`・`MISE_PARANOID` を足さない（`mise-paranoid` が失敗する）。
 
 ## 規約
 
-- テストは `claude/hooks/tests/` のフック回帰テストと、`.github/scripts/` のリポジトリの検査。フックを変更したら `bash claude/hooks/tests/test-protect-main-branch.sh`、`bash claude/hooks/tests/test-validate-command.sh`、`bash claude/hooks/tests/test-ask-gh-pr-write.sh`、`bash claude/hooks/tests/test-gh-read-token.sh`、`bash claude/hooks/tests/test-guard-additional-dirs.sh` を実行する。`claude/bin/cc-safe-push` か `claude/bin/cc-safe-pr` を変更したら `/usr/bin/python3 -B claude/hooks/tests/test-cc-safe-push.py` と `/usr/bin/python3 -B claude/hooks/tests/test-cc-safe-pr.py` を実行する。`claude/bin/cc-crit` か `claude/bin/cc-crit.sb` を変更したら `/usr/bin/python3 -B claude/hooks/tests/test-cc-crit.py` を実行し、sandbox の外で `/usr/bin/python3 -B claude/hooks/tests/test-cc-crit-profile.py` を実行する（Claude Code の sandbox の中ではスキップされる）。`claude/scripts/skills-check.py`・`claude/scripts/skill-usage.py`・`claude/scripts/settings-home-paths.py`・`claude/scripts/update-skills.sh` を変更したら、それぞれの `python3 -B claude/scripts/test-<名前>.py`（`test-skills-check.py`・`test-skill-usage.py`・`test-settings-home-paths.py`・`test-update-skills.py`）を実行する。`jq` が mise の shim に解決される PATH では `HOME` を変えて実行するテストが失敗するので、新しいシェルで実行する。設定ファイル・シェルスクリプト・Markdown・`.github/` を変更したら、`python3 -B .github/scripts/check-repo.py`、`python3 -B .github/scripts/test-check-repo.py`、`git ls-files -z '*.sh' '*.command' ':!:claude/hooks/herdr-agent-state.sh' | xargs -0 shellcheck -S warning`、`actionlint` を実行する。これらとフック回帰テストは、PR と main への push で GitHub Actions も実行する。CI は push の後に動くので、ユーザー名を含むパスなどを公開前に防ぐには、push する前に手元で `check-repo.py` を実行する（`git add` 前のファイルも検査する）。それ以外の動作確認はセットアップスクリプトを手動実行して行う。
+- テストは `claude/hooks/tests/` のフック回帰テストと、`.github/scripts/` のリポジトリの検査。フックを変更したら `bash claude/hooks/tests/test-protect-main-branch.sh`、`bash claude/hooks/tests/test-validate-command.sh`、`bash claude/hooks/tests/test-ask-gh-pr-write.sh`、`bash claude/hooks/tests/test-gh-read-token.sh`、`bash claude/hooks/tests/test-guard-additional-dirs.sh` を実行する。`claude/bin/cc-safe-push` か `claude/bin/cc-safe-pr` を変更したら `/usr/bin/python3 -B claude/hooks/tests/test-cc-safe-push.py` と `/usr/bin/python3 -B claude/hooks/tests/test-cc-safe-pr.py` を実行する。`claude/bin/cc-crit` か `claude/bin/cc-crit.sb` を変更したら `/usr/bin/python3 -B claude/hooks/tests/test-cc-crit.py` を実行し、sandbox の外で `/usr/bin/python3 -B claude/hooks/tests/test-cc-crit-profile.py` を実行する（Claude Code の sandbox の中ではスキップされる）。`claude/bin/cc-checkout-guard` か `bin/.zshrc` の関数を変更したら、`/usr/bin/python3 -B claude/hooks/tests/test-cc-checkout-guard.py` と `/usr/bin/python3 -B claude/hooks/tests/test-checkout-function.py` を実行する。`claude/scripts/skills-check.py`・`claude/scripts/skill-usage.py`・`claude/scripts/settings-home-paths.py`・`claude/scripts/update-skills.sh` を変更したら、それぞれの `python3 -B claude/scripts/test-<名前>.py`（`test-skills-check.py`・`test-skill-usage.py`・`test-settings-home-paths.py`・`test-update-skills.py`）を実行する。`jq` が mise の shim に解決される PATH では `HOME` を変えて実行するテストが失敗するので、新しいシェルで実行する。設定ファイル・シェルスクリプト・Markdown・`.github/` を変更したら、`python3 -B .github/scripts/check-repo.py`、`python3 -B .github/scripts/test-check-repo.py`、`git ls-files -z '*.sh' '*.command' ':!:claude/hooks/herdr-agent-state.sh' | xargs -0 shellcheck -S warning`、`actionlint` を実行する。これらとフック回帰テストは、PR と main への push で GitHub Actions も実行する。CI は push の後に動くので、ユーザー名を含むパスなどを公開前に防ぐには、push する前に手元で `check-repo.py` を実行する（`git add` 前のファイルも検査する）。それ以外の動作確認はセットアップスクリプトを手動実行して行う。
 - Homebrew のパッケージリストの正規版は `bin/.Brewfile`。リポジトリルートの `Brewfile` は `mise run brew:dump` で生成し、`bin/.Brewfile` を最新化するためのベースとして使う。
 - `vscode/extensions` は `mise run vscode:ext:list` で生成するため手動編集しない。
 - `aws/config` , `aws/credentials` は gitignore 済み。公開リポジトリであるため、AWS CLI 設定も credentials もコミットしない。

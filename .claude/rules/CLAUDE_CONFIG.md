@@ -31,6 +31,18 @@ Claude から Crit の対話レビューを開くときは、`claude/bin/cc-crit
 
 `sandbox.network` の `allowUnixSockets`・`allowAllUnixSockets`・`allowLocalBinding` は設定しない（`check-repo.py` の `push-permissions` が失敗する）。Colima は既定で `$HOME` を書き込み可能でマウントするので、Docker のソケットや VM の SSH に届くと、`$HOME` のどこにでも書けて sandbox を抜けられる。同じ理由で、Colima（Lima）の VM に入る鍵（`~/.colima/_lima/_config`）を `denyRead` で読ませない。経緯は [docs/work/20261113_sandbox-escape-hardening/research-sandbox-escape.md](../../docs/work/20261113_sandbox-escape-hardening/research-sandbox-escape.md#risk-colima) を参照する。
 
+<a name="cc-checkout-guard"></a>
+
+## git の確認（cc-checkout-guard）
+
+sandbox の中で作られたコミット・index・ref は、sandbox の外で動く git（人間の端末と `!`、`claude -w` の worktree の作成）によって、自動で読み込まれたり動いたりするファイルとして書かれうる。denyWrite と Edit の deny は sandbox の中のプロセスだけを縛るので、この経路には効かない。そこで、人間の zsh の `git`（`bin/.zshrc` の関数）と `WorktreeCreate` フックが、書く前に `claude/bin/cc-checkout-guard` で中身を確かめる。設計は [docs/work/20261118_git-route-writes/design.md](../../docs/work/20261118_git-route-writes/design.md) を、使い方は [claude/README.md](../../claude/README.md#cc-checkout-guard) を参照する。
+
+- 確認コマンドは root 所有で置き、対象の一覧もその中に持つ。リポジトリの中の設定ファイルに一覧を置くと、一覧そのものを git の経路で書き換えられるため。関数は小さくし、どのサブコマンドを確かめるかなどの判断は、すべて確認コマンドで行う。関数とフックの登録は、sandbox から直接書けず、git の経路も関数が守るファイル（`bin/`・`claude/`）に置く。
+- sandbox の中かどうかは、OS に問い合わせて（`sandbox_check`）決める。`SANDBOX_RUNTIME` などの環境変数は見ない。環境変数は `! SANDBOX_RUNTIME=1 git switch x` のように `!` でも付けられ、`command git` より目立たずに確認を飛ばせるため。確認コマンドは shebang の `env -i` で起動し、人間の環境変数で動きを変えられないようにしている。問い合わせに失敗したら、sandbox の外として扱う（確認が働く側に倒す）。sandbox の中で確かめずに通すのは、書き込みは sandbox が止め、関数は `command git` で飛ばせるので、確かめても守りにならないため。
+- `claude -w` では、新しい worktree の対象のファイルを、元のチェックアウトの同じファイルと比べる。元のチェックアウトの対象のファイルは、sandbox から直接書けず、git の経路も関数が守るので、人間が確かめた中身とみなせる。書かれた結果を比べるので、ref・replace の ref・object のどれを差し替えられても見つかる。新しいディレクトリは、フックが終わるまでどのセッションからも読まれないので、書いた後に比べてよい。フックは、入力の `cwd` が元のチェックアウトの中にあることを、ファイルの同一性で確かめる。`.git/commondir` で共通の gitdir を別のリポジトリに向けられたときに、別のチェックアウトと比べないようにするため。
+- worktree は、リポジトリの中（Claude Code の既定の `.claude/worktrees`）ではなく、ホームの下の `~/.cc-worktrees/<キー>/<name>` に作る（2026-11-19、人間の判断）。リポジトリの中は、元のチェックアウトで起動したセッションの sandbox が書ける。フックが確かめてから `git worktree add` するまでの間に `.claude/worktrees` を symlink に替えると、git が sandbox の外に書いた（レビューで実測。Claude Code の既定の `claude -w` にも同じ穴がある）。ホームの下は sandbox から書けないので、この競合が成り立たない。持ち主と mode の確認では人間と sandbox を区別できない（同じ uid）ので、`~` で起動したセッション（sandbox がホームに書ける）があると、この守りは崩れる。
+- 入れ子のリポジトリ（作業ツリーの下の `.git` ファイルと `.git/modules/<名前>/config`）の設定からコードが動く経路は、次の作業にした。対象のファイルを書く経路ではなく、守り方（グローバルの git の設定、submodule の扱い）も別なため。確認を飛ばす形（`command git`・`\git`・絶対パスの git、zsh を通らない git）は、Claude が頼まないことを規則で決めているだけで、技術的には止めない。ほかに受け入れたリスクは、design の [7 章](../../docs/work/20261118_git-route-writes/design.md#accepted-risks) にある。
+
 <a name="cso-state"></a>
 
 ## gstack の `/cso`

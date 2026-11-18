@@ -294,6 +294,109 @@ mise run crit:profile-test
 
 アンインストールは、`settings.json` の `cc-crit` の行を消して `sudo rm -r /usr/local/libexec/claude-crit` を実行する。専用 HOME の `~/.cc-crit` は残るので、要らなければ消す。
 
+<a name="cc-checkout-guard"></a>
+
+## cc-checkout-guard
+
+人間の git と `claude -w` が、sandbox の外で自動で読み込まれたり動いたりするファイルを書く前に、中身を確かめる確認コマンド。sandbox の中で作られたコミット・index・ref が、sandbox の外の git で作業ツリーに書かれる経路を止める。呼ぶのは `bin/.zshrc` の `git` 関数と `settings.json` の `WorktreeCreate` フック。設計は [docs/work/20261118_git-route-writes/design.md](../docs/work/20261118_git-route-writes/design.md) を参照する。
+
+対象のファイルは次のとおり。一覧は確認コマンドの中に持つ。大文字と小文字、Unicode の正規化の違いは区別しない。
+
+- すべてのリポジトリ: 名前が `.env` で始まるファイル、`.claude/`・`.vscode/`・`.idea/` の下、`.mcp.json`、`mise.lock`
+- `~/dotfiles` の元のチェックアウトだけ: dotfiles の `.claude/settings.json` の denyWrite と同じ 16 項目（`claude`・`zsh`・`bin`・`mise`・`CLAUDE.md` など）
+
+<a name="cc-checkout-guard-install"></a>
+
+### 確認コマンドのインストール
+
+通常のターミナルで行う。Xcode Command Line Tools が前提（cc-safe-push と同じく、CLT の `python3` と `git` を直接使う）。
+
+```sh
+cd ~/dotfiles
+sudo install -d -o root -g wheel -m 0755 /usr/local/libexec/claude-guard
+sudo install -o root -g wheel -m 0755 claude/bin/cc-checkout-guard /usr/local/libexec/claude-guard/cc-checkout-guard
+```
+
+> [!IMPORTANT]
+> `git` 関数は、確認コマンドがないと、すべての git を終了コード 1 で止める（Claude の Bash ツールの git も）。フックも動かないので、`claude -w` も失敗する。`~/.zshrc` と `~/.claude/settings.json` は元のチェックアウトへのリンクなので、関数とフックは `~/dotfiles` に取り込んだ時点で効く。初めてのときは、取り込む前（マージの前）に、そのブランチのチェックアウトで上の手順を実行する。
+
+<a name="cc-checkout-guard-behavior"></a>
+
+### 確認の動き
+
+`git` 関数は、すべての git の呼び出しで、確認コマンドの `check` に引数とカレントディレクトリを渡す。許可されたら `command git` を実行する。対象のファイルを書きうる操作では、続けて `verify` で、対象のファイルが確認したとおりに書かれたかを確かめる。違えば警告を出し、git が成功していても終了コード 1 を返す。
+
+対象のファイルを変えない git（`status`・`diff`・`log`・`add`・`fetch`・`push` など）は、何も出さずに通す。変えるときは、呼ばれた場所で扱いが変わる。
+
+| 場所 | 対象のファイルが変わるとき |
+| --- | --- |
+| 普段の端末 | 変わるファイルと差分を見せて、y/N を聞く。既定は N |
+| `!` など、y/N を聞けないところ（標準入力か標準エラーが端末でない） | 変わるファイルと、普段の端末で打つ `git -C <パス> …` を表示して止める |
+| sandbox の中（Claude の Bash ツール） | 確かめずに通す。書き込みは sandbox が止める |
+| `claude -w` | [claude -w の worktree](#cc-checkout-guard-worktree) を参照する |
+
+次のときは、sandbox の外ならどこでも、理由を出して止める。確かめずに実行するときは、人間が中身を確かめてから、自分で `command git` を打つ。
+
+- 対象のパスが symlink か gitlink（submodule）になる。対象のパスの親が symlink である。新しい中身が NUL を含む
+- 対象のパスに、書くときに中身を変える属性（`filter`・`working-tree-encoding`・`ident`）が付く
+- 確かめる方法を持たない形。`rebase` などのサブコマンド、知らないオプション、`!` で始まる alias、`GIT_DIR` などの環境変数があるとき
+
+sandbox の中かどうかは、OS に問い合わせて決める（環境変数は見ない）。その場所の判定は、`/usr/local/libexec/claude-guard/cc-checkout-guard status` で表示できる（`sandbox: yes` か `sandbox: no`）。
+
+`check` の終了コードは、0 が許可、1 が停止、3 が先に fetch が要る（`pull` だけ。関数が fetch を実行してから確かめ直す）。
+
+<a name="cc-checkout-guard-worktree"></a>
+
+### claude -w の worktree
+
+`claude -w <name>` では、`WorktreeCreate` フックが Claude Code の代わりに worktree を作る。
+
+- 置き場所は `~/.cc-worktrees/<キー>/<name>`、ブランチは `worktree-<name>`。キーは、元のチェックアウトのディレクトリ名と `-` と、その物理パスの sha256 の先頭 12 桁。フックは `~/.cc-worktrees` と `<キー>` を自分だけが書けるディレクトリ（0700）として作る。symlink、ほかの持ち主のもの、グループかほかのユーザーが書けるものなら止まる。
+- 作成元は、ローカルの `origin/HEAD` が指すコミット。なければ元のチェックアウトの HEAD。fetch はしない。
+- 作った後に、すべてのリポジトリ向けの対象のファイルを、元のチェックアウトの同じファイルと比べる。違えば、作った worktree とブランチを消して失敗する。案内は理由ごとに出る（元のチェックアウトで `git pull` をする、既定ブランチに戻す、コミットしていない変更を片付ける、差し替えのおそれがあるので中身を確かめる）。
+- `claude -w` は、元のチェックアウトの中で実行する。元のチェックアウトの外にある linked worktree から実行すると失敗する。
+- フックは 50 秒で打ち切る（`settings.json` のフックの timeout は 60 秒）。
+
+確かめ終わると、フックは印 `~/.cc-worktrees/<キー>/.verified/<name>` を書く。同じ名前でフックが呼ばれたときは、印の合う worktree だけを、確かめずに返す（開き直すときに Claude Code がフックを呼ぶかは、まだ確かめていない）。
+
+印のない worktree が登録されていると、`claude -w` は次の 2 つのコマンドを案内して失敗する。作る途中でフックが止められたなどで、確かめていない中身を持ちうる worktree である。フックは自分では消さない。使わずに、普段の端末で 2 つのコマンドを実行してから、もう一度 `claude -w` を実行する。
+
+```text
+git -C <元のチェックアウト> worktree remove --force <置き場所>
+git -C <元のチェックアウト> branch -D worktree-<name>
+```
+
+要らなくなった worktree は、普段の端末で次を実行して消す。印は、次に同じ名前で作るときに消える。Claude Code は、フックで作った worktree のブランチを消さない（公式の文書）。`WorktreeRemove` フックは登録していない。セッションを終えるときの扱いは、まだ確かめていない。
+
+```sh
+git -C <元のチェックアウト> worktree remove <置き場所>
+git -C <元のチェックアウト> branch -D worktree-<name>
+```
+
+前にリポジトリの中（`.claude/worktrees/<name>`）に作った worktree は、`cd <パス> && claude` で開く。
+
+<a name="cc-checkout-guard-update"></a>
+
+### 確認コマンドの更新と戻し方
+
+確認コマンドを変更したら、テストを実行してから、再度インストールする。リポジトリのファイルを直しただけでは、動作は変わらない。
+
+```sh
+/usr/bin/python3 -B claude/hooks/tests/test-cc-checkout-guard.py
+/usr/bin/python3 -B claude/hooks/tests/test-checkout-function.py
+sudo install -o root -g wheel -m 0755 claude/bin/cc-checkout-guard /usr/local/libexec/claude-guard/cc-checkout-guard
+```
+
+戻すときは、次の順に外す。確認コマンドを先に消すと、`claude -w` が失敗し、関数がすべての git を止める。
+
+1. `settings.json` の `hooks.WorktreeCreate` を消す。
+2. `bin/.zshrc` の `# >>> cc-checkout-guard` から `# <<< cc-checkout-guard` までを消す。
+3. `sudo rm -r /usr/local/libexec/claude-guard` を実行する。
+
+1 と 2 を外すと `check-repo.py` の `checkout-guard` が失敗するので、検査も一緒に外す。`~/.cc-worktrees` の worktree は残るので、要らなければ [claude -w の worktree](#cc-checkout-guard-worktree) の手順で消す。
+
+急ぎのときは、動いているシェルで `unfunction git` を実行すると、そのシェルの git は関数を通らなくなる。`command git` も、確認を通らずに動く。
+
 <a name="gh-read-token"></a>
 
 ## sandbox 内の gh
