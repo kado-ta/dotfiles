@@ -274,7 +274,7 @@ sandbox の外で `/cso` を実行すると、保存先に秘密ファイルの�
 
 ## MCP・コネクタ
 
-- `claude/mcp.json` にサーバーはない。
+- MCP サーバーは `claude/mcp/*.json` の定義から user スコープに登録する（今は Playwright MCP だけ。[README](README.md#mcp)）。
 - claude.ai のアカウントから、Claude Docs のコネクタが入る。easel（図表）は Claude Code の組み込みのプラグイン。
 
 <a name="overlaps"></a>
