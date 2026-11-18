@@ -8,7 +8,7 @@ Claude Code の設定を管理するディレクトリ。`setup.sh` で `~/.clau
 
 `setup.sh` は次を行う。
 
-- `settings.json`・`CLAUDE.md`・`rules/`・`mcp.json`・`hooks/`・`scripts/statusline.sh` を `~/.claude/` にリンクする。`~/.claude/hooks/` が実ディレクトリの場合は、削除してからリンクに置き換える。
+- `settings.json`・`CLAUDE.md`・`rules/`・`hooks/`・`scripts/statusline.sh` を `~/.claude/` にリンクする。`~/.claude/hooks/` が実ディレクトリの場合は、削除してからリンクに置き換える。
 - `skills/*/` の個人スキルを `~/.claude/skills/` にリンクする（全プロジェクトで使える）。
 - プラグイン `superpowers`・`claude-code-setup`・`ruby-lsp`・`crit`・`understand-anything`・`pstack` と、スキル集 [gstack](https://github.com/garrytan/gstack) をインストールする（インストール済みならスキップする）。`ruby-lsp` プラグインは LSP サーバーを含まないので、`ruby-lsp` gem を別途入れて PATH に通す。
 - `mcp/*.json` の MCP サーバーを、`scripts/register-mcp.sh` で user スコープに登録する（登録済みなら置き換える。[MCP サーバー](#mcp)）。ネットワークや npm が使えずに失敗したときは、警告を出して先に進む。
