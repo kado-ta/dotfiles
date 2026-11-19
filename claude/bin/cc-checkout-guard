@@ -2063,7 +2063,7 @@ def check(argv: Sequence[str], *, start: Path, git_env: Sequence[str], home: Pat
             return EXIT_ALLOW, state
         if not tty:
             command = " ".join(shlex.quote(w) for w in ("git", "-C", str(inv.start), *inv.argv))
-            stderr.write(listing(plan) + MSG_NO_TTY.format(command=command) + "\n")
+            stderr.write(listing(plan) + MSG_NO_TTY.format(command=_show(command)) + "\n")
             return EXIT_STOP, ""
         stderr.write(render(plan, inv.config) + MSG_ASK)
         stderr.flush()

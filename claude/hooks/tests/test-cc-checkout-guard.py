@@ -576,6 +576,14 @@ class SwitchTests(TreeBase):
                 self.assertIn(guard.MSG_ASK, err)
                 self.assertFalse(canary.exists())
 
+    def test_no_tty_command_is_escaped(self):
+        # 端末でないときに見せる、普段の端末で打つコマンドも、制御文字を <U+XXXX> にする（D3）。
+        self.stage('{"v": 9}\n')
+        result, err = self.check("restore", "--", ".claude/settings.json", "x\x1b[2Ky")
+        self.assertEqual(result, (1, ""))
+        self.assertNotIn("\x1b", err)
+        self.assertIn("x<U+001B>[2Ky", err)
+
     def test_bang_message_quotes_arguments(self):
         spaced = self.root / "with space"
         local_git(self.root, "clone", "-q", str(self.repo), str(spaced))
