@@ -328,7 +328,7 @@ sudo install -o root -g wheel -m 0755 claude/bin/cc-checkout-guard /usr/local/li
 
 対象のファイルを変えない git（`status`・`diff`・`log`・`add`・`fetch`・`push` など）は、何も出さずに通す。変えるときは、呼ばれた場所で扱いが変わる。
 
-`git pull` は、どの形も止める（`-h`・`--help` は通す）。pull は確かめた後にもう一度 fetch して取り込むので、確かめた中身と取り込む中身が一致しないためである。代わりに `git fetch` を実行してから、`git merge @{u}`（fast-forward だけなら `git merge --ff-only @{u}`）を実行する。この merge は、ほかの merge と同じく確かめる。
+リポジトリの中の `git pull` は、どの形も止める（`-h`・`--help` は通す。リポジトリの外では git 自身が止まる）。pull は確かめた後にもう一度 fetch して取り込むので、確かめた中身と取り込む中身が一致しないためである。代わりに `git fetch` を実行してから、`git merge @{u}`（fast-forward だけなら `git merge --ff-only @{u}`）を実行する。この merge は、ほかの merge と同じく確かめる。
 
 | 場所 | 対象のファイルが変わるとき |
 | --- | --- |
@@ -349,7 +349,9 @@ sudo install -o root -g wheel -m 0755 claude/bin/cc-checkout-guard /usr/local/li
 
 次のときは、sandbox の外では、どのサブコマンドも（`status` なども）止める。`command git` でも同じ場所に書くので、勧めない。表示されたファイルが何を指しているかを確かめ、消してから git を実行する。
 
-- gitdir（`.git`。linked worktree では `.git/worktrees/<id>` と共通の `.git`）に、symlink か、通常のファイルとディレクトリのほかの種類がある。見るのは、最上位のすべてと、`logs`・`refs`・`sequencer`・`rebase-merge`・`rebase-apply` の下のすべて、`objects` の直下。git は `COMMIT_EDITMSG`・`FETCH_HEAD`・`logs/HEAD` などを symlink をたどって書く
+- gitdir（`.git`。linked worktree では `.git/worktrees/<id>` と共通の `.git`）の中に、symlink か、通常のファイルとディレクトリのほかの種類がある。中をすべて見る。見ないのは、`hooks` の中と、loose object と git-lfs の fan-out（`objects/<2 桁の 16 進>/`・`lfs/objects/<2 桁>/`）の中だけ（そのディレクトリ自体は見る）。git は `COMMIT_EDITMSG`・`FETCH_HEAD`・`logs/HEAD`・`objects/info/commit-graph` などを symlink をたどって書く
+
+`.git/hooks` 自体を symlink にする使い方（中のフックのファイルの symlink はよい）と、組み込みの fsmonitor（`core.fsmonitor=true`。`.git` にソケットを作る）とは、併用できない。sandbox の外の git がすべて止まる。
 
 確認して許可した `merge` が対象のファイルで衝突した後の `git merge --abort` は、確かめられないので止まる。`command git merge --abort` で戻す前に、`git diff HEAD -- <対象のパス>` で、戻した後の中身（HEAD。sandbox が動かしうる）を確かめる。
 
