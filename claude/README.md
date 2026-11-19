@@ -340,9 +340,9 @@ sudo install -o root -g wheel -m 0755 claude/bin/cc-checkout-guard /usr/local/li
 次のときは、sandbox の外ならどこでも、理由を出して止める。確かめずに実行するときは、人間が中身を確かめてから、自分で `command git` を打つ。
 
 - 対象のパスが symlink か gitlink（submodule）になる。対象のパスの親が symlink である。新しい中身が NUL を含む
-- 対象のパスに、書くときに中身を変える属性（`filter`・`working-tree-encoding`・`ident`）が付く
+- 対象のパスに、書くときに中身を変える属性（`filter`・`working-tree-encoding`・`ident`）が付く。変わるファイルだけでなく、中身が同じでも git が書き直しうる対象のファイルも確かめる（`reset --hard`・`--merge`・`--keep`、`switch -f`・`checkout -f`、`merge --abort`、`stash`、`restore`・`checkout -- <パス>`・`checkout-index`。git は index の stat が合わないファイルを書き直す）
 - 確かめる方法を持たない形。`rebase` などのサブコマンド、知らないオプション、`!` で始まる alias、`GIT_DIR` などの環境変数があるとき
-- ファイルに書く読み取りのコマンド。`--output` 付きの `show`・`log`・`diff` など、`config -f`、`archive`・`bundle`・`format-patch`、`init` の `--separate-git-dir`・`--template`・`-c init.templateDir`
+- ファイルに書く形。どのサブコマンドでも `--output`（`show`・`log`・`diff`、`stash list`・`stash show` など）、`config -f`、`archive`・`bundle`・`format-patch`、`init` の `--separate-git-dir`・`--template`・`-c init.templateDir`
 - `worktree remove` で、登録のパスが実パスの実体のディレクトリでないか、その `.git` が登録を指していないとき
 - `rm`・`mv` のパスの途中（作業ツリーのルートの下）に symlink がある（git はたどった先のファイルを消し、動かす）
 - 作業ツリーに書く操作（`commit` を除く）で、`submodule.recurse`・`core.sparseCheckout`・`core.sparseCheckoutCone`・`index.sparse` のどれかが真（`-c` も含む）。git が submodule の作業ツリーや、sparse checkout のパターンで広げたパスにも書くため
@@ -352,6 +352,8 @@ sudo install -o root -g wheel -m 0755 claude/bin/cc-checkout-guard /usr/local/li
 - gitdir（`.git`。linked worktree では `.git/worktrees/<id>` と共通の `.git`）の中に、symlink か、通常のファイルとディレクトリのほかの種類がある。中をすべて見る。見ないのは、`hooks` の中と、loose object と git-lfs の fan-out（`objects/<2 桁の 16 進>/`・`lfs/objects/<2 桁>/`）の中だけ（そのディレクトリ自体は見る。名前で見分けるので、submodule の gitdir を見ない形が残る。[design の 7 章](../docs/work/20261118_git-route-writes/design.md#accepted-risks)）。git は `COMMIT_EDITMSG`・`FETCH_HEAD`・`logs/HEAD`・`objects/info/commit-graph` などを symlink をたどって書く
 
 `.git/hooks` 自体を symlink にする使い方（中のフックのファイルの symlink はよい）と、組み込みの fsmonitor（`core.fsmonitor=true`。`.git` にソケットを作る）とは、併用できない。sandbox の外の git がすべて止まる。
+
+rerere が動くとき（`rerere.enabled` が true か、設定がなく `.git/rr-cache` がある。`-c` も含む）は、sandbox の外では、`commit`（どの形も）・`merge`（`--abort`・`--quit` を除く）・`cherry-pick`・`revert`・`stash apply`・`stash pop` を止める。rerere は、`MERGE_RR` に並んだすべてのパス（作業ツリーの外も）に、`rr-cache` に記録された解決を書き、どちらも sandbox から書けるためである。`command git` でも同じく書くので、勧めない。表示された `rr-cache` と `MERGE_RR` の中身を確かめてから消すか、`rerere.enabled` を false にしてから実行する。`bin/.gitconfig` は `rerere.enabled = false` にしている（`check-repo.py` の `checkout-guard` が確かめる）。
 
 確認して許可した `merge` が対象のファイルで衝突した後の `git merge --abort` は、確かめられないので止まる。`command git merge --abort` で戻す前に、`git diff HEAD -- <対象のパス>` で、戻した後の中身（HEAD。sandbox が動かしうる）を確かめる。
 
