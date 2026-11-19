@@ -553,6 +553,21 @@ class SwitchTests(TreeBase):
             self.assertEqual(guard.main(["verify", state]), 1)
             self.assertEqual(guard.main(["verify", "{"]), 1)
 
+    def test_verify_stops_when_the_root_is_replaced(self):
+        # 確かめた後に、作業ツリーの場所を symlink に替えられると、git は別の場所に書き、verify はその先を読んで一致と
+        # みなしうる。状態の root が、実パスと同じ実体のディレクトリでなくなっていれば止める（D3）。
+        (code, state), _ = self.check("switch", "feature", tty=True, answer="y\n")
+        self.assertEqual(code, 0)
+        self.settings.write_text('{"v": 2}\n', encoding="utf-8")
+        err = io.StringIO()
+        self.assertEqual(guard.verify(state, err), 0)
+        moved = self.root / "moved"
+        os.rename(self.repo, moved)
+        os.symlink(moved, self.repo)
+        err = io.StringIO()
+        self.assertEqual(guard.verify(state, err), 1)
+        self.assertIn(f"{self.repo} が、実体のディレクトリでなくなりました", err.getvalue())
+
     def test_does_not_run_configured_programs(self):
         canary = self.root / "canary"
         script = self.root / "touch-canary"

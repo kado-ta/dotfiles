@@ -393,6 +393,10 @@ MSG_VERIFY = (
     "cc-checkout-guard: 警告: 確かめた後に、次のファイルが確認と違う中身で書かれました。"
     "動いている Claude Code のセッションを止めて、中身を確かめてください。"
 )
+MSG_VERIFY_ROOT = (
+    "cc-checkout-guard: 警告: 確かめた作業ツリーの {root} が、実体のディレクトリでなくなりました（symlink に替えられたなど）。"
+    "git はほかの場所に書いたおそれがあります。動いている Claude Code のセッションを止めて、中身を確かめてください。"
+)
 
 # claude -w のフック（worktree-create）。
 NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}\Z")
@@ -2008,6 +2012,10 @@ def verify(state: str, stderr: TextIO) -> int:
     try:
         data = json.loads(state)
         root = Path(data["root"])
+        # 確かめた後に場所を symlink に替えられると、git は別の場所に書き、その先を読むと一致に見える（D3）。
+        if not (stat.S_ISDIR(os.lstat(root).st_mode) and os.path.realpath(root) == str(root)):
+            stderr.write(MSG_VERIFY_ROOT.format(root=_show(str(root))) + "\n")
+            return EXIT_STOP
         allowed: dict[str, tuple[Entry | None, ...]] = {}
         for rel, pair in data["expect"].items():
             if not isinstance(pair, list) or len(pair) != 2:
