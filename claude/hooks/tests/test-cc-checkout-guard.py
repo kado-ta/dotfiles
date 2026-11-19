@@ -895,13 +895,44 @@ class GitdirTests(TreeBase):
         local_git(self.repo, "switch", "-q", "docs")
         self.assertIn("checkout: moving from main to docs", self.victim.read_text(encoding="utf-8"))
 
+    def test_commit_graph_symlink_stops_gc(self):
+        # objects/info/commit-graph の symlink を通して、git gc と git commit-graph write は外のファイルを書き換えた
+        # （再レビューで実測。両方の git）。objects の下も中まで見る（R32）。
+        info = self.gitdir / "objects" / "info"
+        info.mkdir(exist_ok=True)
+        link = info / "commit-graph"
+        link.unlink(missing_ok=True)
+        os.symlink(self.victim, link)
+        for argv in (("gc", "-q"), ("commit-graph", "write", "--reachable")):
+            with self.subTest(argv=argv):
+                self.assert_stopped(argv, link)
+        # 仕掛けが効くことを、テストの git で確かめる。
+        local_git(self.repo, "commit-graph", "write", "--reachable")
+        self.assertTrue(self.victim.read_bytes().startswith(b"CGPH"))
+
     def test_entries_git_writes_through(self):
-        # 最上位のすべて、logs・refs・sequencer・rebase-merge・rebase-apply の下のすべて、objects とその直下を見る。
+        # gitdir の中をすべて見る（R32）。中を見ないのは、hooks の中と、loose object・lfs の fan-out（objects/<2 桁>）の中だけ。
         # symlink のディレクトリ（refs/heads・objects など）の中にも、git は新しいファイルを書く（実測）。
         outside = self.root / "outside"
         outside.mkdir()
         oid = local_git(self.repo, "rev-parse", "HEAD")
+
+        def link_to(target):
+            def make(p):
+                p.parent.mkdir(parents=True, exist_ok=True)
+                os.symlink(target, p)
+            return make
+
         cases = (
+            ("objects/info/commit-graphs/commit-graph-chain", link_to(self.victim)),
+            ("objects/pack/multi-pack-index", link_to(self.victim)),
+            ("info/refs", link_to(self.victim)),
+            ("rr-cache/abc/preimage", link_to(self.victim)),
+            ("worktrees/x/logs/HEAD", link_to(self.victim)),
+            ("modules/m/objects/info/commit-graph", link_to(self.victim)),
+            ("lfs/objects/ab", link_to(outside)),
+            ("lfs/tmp/x", link_to(self.victim)),
+            ("refs/heads/objects/ab/x", link_to(outside)),
             ("refs/heads/sub", lambda p: os.symlink(outside, p)),
             ("refs/tags/v", lambda p: os.symlink(self.victim, p)),
             ("logs/refs/heads/main", lambda p: (p.unlink(), os.symlink(self.victim, p))),
@@ -919,13 +950,26 @@ class GitdirTests(TreeBase):
                 make(path)
                 self.assert_stopped(("status",), path)
                 # 戻す。
-                if rel.startswith("objects/") or rel == "hooks":
+                if rel in ("objects/" + oid[:2], "hooks"):
                     path.unlink()
-                    os.rename(outside / ("o" if rel.startswith("objects/") else "h"), path)
+                    os.rename(outside / ("h" if rel == "hooks" else "o"), path)
                 else:
                     path.unlink()
                 self.assertTrue(self.fast(("status",)))
                 self.assertEqual(self.check("status")[0], (0, ""))
+        # 中を見ないのは、hooks の中（git は中に書かず、フックの symlink は正当な使い方）と、loose object と lfs の
+        # fan-out の中（git は中身のハッシュの名前で書く。数が多い）だけ（R32）。submodule の gitdir の中も同じ。
+        for rel, make in (("hooks/pre-commit", link_to(self.victim)),
+                          ("objects/" + oid[:2] + "/" + "0" * 38, link_to(self.victim)),
+                          ("lfs/objects/ab/cd", link_to(outside)),
+                          ("modules/m/hooks/post-checkout", link_to(self.victim)),
+                          ("modules/m/objects/ab/" + "0" * 38, link_to(self.victim))):
+            with self.subTest(unwalked=rel):
+                path = self.gitdir / rel
+                make(path)
+                self.assertTrue(self.fast(("status",)))
+                self.assertEqual(self.check("status")[0], (0, ""))
+                path.unlink()
         # 大文字と小文字だけが違う名前のディレクトリにも、git は書く（大文字と小文字を区別しないファイルシステム）。
         logs = self.gitdir / "logs"
         os.rename(logs, self.gitdir / "LOGS")
@@ -1057,9 +1101,11 @@ class FastPathTests(TreeBase):
         victim = self.root / "victim"
         victim.write_text("v\n", encoding="utf-8")
         gitdir = self.repo / ".git"
+        (gitdir / "objects" / "info").mkdir(exist_ok=True)
         for rel, make in (("COMMIT_EDITMSG", lambda p: os.symlink("config", p)),
                           ("FETCH_HEAD", lambda p: os.symlink(victim, p)),
-                          ("logs/HEAD", lambda p: os.symlink(victim, p)), ("MERGE_MSG", os.mkfifo)):
+                          ("logs/HEAD", lambda p: os.symlink(victim, p)), ("MERGE_MSG", os.mkfifo),
+                          ("objects/info/commit-graph", lambda p: os.symlink(victim, p))):
             path = gitdir / rel
             path.unlink(missing_ok=True)
             make(path)

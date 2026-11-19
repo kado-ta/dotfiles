@@ -18,9 +18,8 @@ import sys
 EXIT_ALLOW = 0
 EXIT_STOP = 1
 GITFILE_MAX = 4096  # 読む .git ファイル・gitdir ファイル・commondir・HEAD の大きさの上限（バイト）
-# 中のすべての entry を見る gitdir のディレクトリ（D2）。objects は直下だけを見る。
-GITDIR_WALK = frozenset(("logs", "refs", "sequencer", "rebase-merge", "rebase-apply"))
 HEX = frozenset(b"0123456789abcdefABCDEF")
+HEX2 = frozenset(f"{i:02x}" for i in range(256))  # loose object の fan-out のディレクトリの名前
 
 # 作業ツリーに書かないサブコマンド。ファイルに書くオプション（file_writes）があれば止める。
 READ_ONLY = frozenset(
@@ -80,38 +79,48 @@ def _odd(entry: os.DirEntry) -> bool:
     return entry.is_symlink() or not (entry.is_file(follow_symlinks=False) or entry.is_dir(follow_symlinks=False))
 
 
-def _odd_under(top: str, deep: bool) -> str | None:
-    """top の中で最初に見つけた _odd な entry のパス。deep なら中のディレクトリもたどる（symlink はたどらない）。"""
-    stack = [top]
-    while stack:
-        with os.scandir(stack.pop()) as it:
-            for entry in it:
-                if _odd(entry):
-                    return entry.path
-                if deep and entry.is_dir(follow_symlinks=False):
-                    stack.append(entry.path)
-    return None
+def _git_base(parts: tuple[str, ...]) -> bool:
+    """parts（gitdir からの名前）が、gitdir 自体か、modules の下の submodule の gitdir とみなせるか。
+
+    refs と logs の中は、git が ref の名前で書く場所なので、submodule の gitdir とみなさない（中まで見る側に倒す）。
+    """
+    return not parts or (parts[0] == "modules" and len(parts) > 1 and not {"refs", "logs"} & set(parts[1:]))
+
+
+def _unwalked(parts: tuple[str, ...]) -> bool:
+    """中を見ないディレクトリか（R32）。そのディレクトリ自体は、親の中の entry として見る。
+
+    - gitdir（と submodule の gitdir）の hooks: git は中に書かない。フックのファイルを symlink にするのは正当な使い方。
+    - loose object の fan-out（objects/<2 桁の 16 進>）と、git-lfs の同じ形（lfs/objects/<2 桁>）: git は中に、中身の
+      ハッシュの名前でだけ書く。数が多い（lfs の 5000 個の置き場所を歩くと、1 回 約 290 ms。実測）。
+    """
+    if parts[-1] == "hooks":
+        return _git_base(parts[:-1])
+    if len(parts) >= 2 and parts[-2] == "objects" and parts[-1] in HEX2:
+        base = parts[:-2]
+        return _git_base(base) or (base[-1:] == ("lfs",) and _git_base(base[:-1]))
+    return False
 
 
 def gitdir_problem(gitdir: str) -> str | None:
     """git が開いて書く gitdir の entry のうち、symlink か特殊なファイルの最初のパス（D2）。読めなければ OSError。
 
-    git は COMMIT_EDITMSG・FETCH_HEAD・logs/HEAD・index などを、symlink をたどって書く（index などの lockfile も、
-    symlink の先に作って置き換える）。symlink のディレクトリ（refs/heads・objects など）の中にも書く（実測）。
-    名前の一覧に頼らず、最上位のすべての entry を見る。中まで見るのは、logs・refs・sequencer・rebase-merge・
-    rebase-apply（すべて）と objects（直下だけ）。名前は大文字と小文字を区別せずに比べる（ファイルシステムが区別しない）。
+    git は COMMIT_EDITMSG・FETCH_HEAD・logs/HEAD・index・objects/info/commit-graph などを、symlink をたどって書く
+    （lockfile も、symlink の先に作って置き換える）。symlink のディレクトリ（refs/heads・objects など）の中にも書く（実測）。
+    名前の一覧に頼らず、中をすべて見る。見ないのは _unwalked の中だけ（R32）。名前は大文字と小文字を区別せずに比べる
+    （ファイルシステムが区別しない）。早道と全体の処理が、同じこの関数で確かめる。
     """
-    with os.scandir(gitdir) as it:
-        top = list(it)
-    for entry in top:
-        if _odd(entry):
-            return entry.path
-    for entry in top:
-        name = entry.name.casefold()
-        if entry.is_dir(follow_symlinks=False) and (name in GITDIR_WALK or name == "objects"):
-            found = _odd_under(entry.path, deep=name != "objects")
-            if found is not None:
-                return found
+    stack: list[tuple[str, tuple[str, ...]]] = [(gitdir, ())]
+    while stack:
+        path, parts = stack.pop()
+        with os.scandir(path) as it:
+            for entry in it:
+                if _odd(entry):
+                    return entry.path
+                if entry.is_dir(follow_symlinks=False):
+                    sub = (*parts, entry.name.casefold())
+                    if not _unwalked(sub):
+                        stack.append((entry.path, sub))
     return None
 
 
