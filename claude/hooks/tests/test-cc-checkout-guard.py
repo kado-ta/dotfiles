@@ -788,7 +788,10 @@ class SwitchTests(TreeBase):
         try:
             pid, fd = pty.fork()
         except OSError as e:
-            # Claude Code の sandbox の中では疑似端末を開けない。CI（macOS）では実際に動く。
+            # Claude Code の sandbox の中では疑似端末を開けない。CI（macOS）では実際に動くこと（R7）を前提にしているので、
+            # CI では飛ばさずに失敗にする（D3）。
+            if os.environ.get("CI"):
+                self.fail(f"CI で疑似端末を開けません: {e}")
             self.skipTest(f"疑似端末を開けません: {e}")
         if pid == 0:
             code = 99
@@ -1395,6 +1398,9 @@ class RevisionTests(TreeBase):
         if (self.repo / ".git" / "refs" / "heads" / "EVIL").exists():
             cases += [(("merge", "EVIL"), "tag"), (("cherry-pick", "EVIL"), "tag"),
                       (("worktree", "add", "../wt", "EVIL"), "evil")]
+        else:
+            with self.subTest(case="EVIL"):
+                self.skipTest("大文字と小文字を区別するファイルシステムでは、git は EVIL を evil として読まない")
         for argv, shown in cases:
             with self.subTest(argv=argv):
                 result, err = self.check(*argv, tty=True, answer="n\n")
@@ -1621,6 +1627,9 @@ class OtherWriteTests(TreeBase):
                     result, err = self.check(*argv)
                     self.assertEqual(result, (1, ""))
                     self.assertIn(protected_place, err)
+        else:
+            with self.subTest(case="REPO"):
+                self.skipTest("大文字と小文字を区別するファイルシステムでは、REPO は別のディレクトリ")
         # (c) 行き先がディレクトリなら、git は登録された worktree のパスの最後の名前で、その中に動かす。
         side = self.root / "side"
         side.mkdir()
