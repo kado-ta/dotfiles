@@ -15,7 +15,6 @@ import sys
 # ここから fast_allow までは、重い import の前に読む（I2）。標準ライブラリの読み込みに 1 回あたり約 80 ms かかる。
 EXIT_ALLOW = 0
 EXIT_STOP = 1
-EXIT_FETCH = 3
 
 # 作業ツリーに書かないサブコマンド。ファイルに書くオプション（file_writes）があれば止める。
 READ_ONLY = frozenset(
@@ -89,7 +88,7 @@ def fast_allow(argv: Sequence[str]) -> bool:
             if any(name and name not in ALLOWED_GIT_ENV for name in opts[i + 1].split(",")):
                 return False
             i += 1
-        elif opts[i] != "--after-fetch":
+        else:
             return False
         i += 1
     i = 0
@@ -193,7 +192,6 @@ MERGE_FLAGS = frozenset(
     "--no-log --no-verify --progress --no-progress".split()
 )
 MERGE_VALUES = frozenset(("-m",))
-PULL_FLAGS = frozenset("--ff-only --ff --no-ff --no-rebase -q --quiet -v --verbose --no-edit --stat --no-stat".split())
 STASH_PUSH_FLAGS = frozenset(("-q", "-u", "--include-untracked", "-k"))
 STASH_PUSH_VALUES = frozenset(("-m",))
 STASH_APPLY_FLAGS = frozenset(("-q", "--index"))
@@ -231,6 +229,10 @@ MSG_CHANGED_WHILE_ASKING = (
 MSG_NO_TTY = (
     "cc-checkout-guard: ここでは確認できないので止めました。普段の端末で、差分を確かめてから次を実行してください:\n"
     "  {command}"
+)
+MSG_PULL = (
+    "cc-checkout-guard: git pull は、確かめた後にもう一度 fetch して取り込むので止めました。"
+    "git fetch を実行してから、git merge @{u}（fast-forward だけなら git merge --ff-only @{u}）を実行してください。"
 )
 MSG_DANGER = "cc-checkout-guard: {path} が{kind}になるので止めました。中身を確かめてください。"
 MSG_ERROR = "cc-checkout-guard: 確かめる途中で失敗したので止めました（{reason}）。"
@@ -285,19 +287,14 @@ class GuardError(Exception):
     """確かめられない、または失敗した。str(e) が理由。"""
 
 
-class FetchFirst(Exception):
-    """先に実行する git の引数を argv に持つ。"""
-
-    def __init__(self, argv: list[str]) -> None:
-        super().__init__(" ".join(argv))
-        self.argv = argv
+class Refused(Exception):
+    """確かめずに止める。str(e) が出す文そのもの（MSG_UNSUPPORTED で包まない。command git を勧めない形）。"""
 
 
 @dataclass(frozen=True)
 class Invocation:
     cwd: Path  # -C を当てた後
     root: Path | None  # 作業ツリーのルート。リポジトリの外なら None
-    globals: tuple[str, ...]  # 人間が渡した全体のオプション
     config: tuple[str, ...]  # -c の値
     sub: str  # alias を展開した後。なければ ""
     args: tuple[str, ...]
@@ -480,7 +477,6 @@ def parse(start: Path, argv: Sequence[str], git_env_names: Sequence[str], home: 
             raise GuardError(f"環境変数 {name} が設定されています")
     cwd = start
     config: list[str] = []
-    glob: list[str] = []
     sub = ""
     args: tuple[str, ...] = ()
     i = 0
@@ -489,12 +485,11 @@ def parse(start: Path, argv: Sequence[str], git_env_names: Sequence[str], home: 
         if tok in HELP_GLOBALS:
             break
         if tok in SKIPPED_GLOBALS:
-            glob.append(tok)
+            pass  # 読み飛ばす
         elif tok in ("-C", "-c"):
             if i + 1 >= len(argv):
                 raise GuardError(f"{tok} の値がありません")
             value = argv[i + 1]
-            glob += [tok, value]
             if tok == "-C":
                 cwd = cwd / value
             else:
@@ -536,7 +531,7 @@ def parse(start: Path, argv: Sequence[str], git_env_names: Sequence[str], home: 
             raise GuardError("リポジトリを読めません") from None
         root = None
     return Invocation(
-        cwd=cwd, root=root, globals=tuple(glob), config=tuple(config), sub=sub,
+        cwd=cwd, root=root, config=tuple(config), sub=sub,
         args=args, argv=tuple(argv), start=start, home=home,
     )
 
@@ -869,7 +864,7 @@ def _path_plan(inv: Invocation, tree: str | None, pathspec: Sequence[str], delet
     return _plan(inv, source, paths, (tree,), delete)
 
 
-def plan_switch(inv: Invocation, after_fetch: bool) -> Plan:
+def plan_switch(inv: Invocation) -> Plan:
     a = split_args("switch", inv.args, SWITCH_FLAGS, BRANCH_VALUES)
     if a.pathspec is not None or len(a.positional) > 1:
         raise GuardError("switch の引数を確かめられません")
@@ -885,7 +880,7 @@ def plan_switch(inv: Invocation, after_fetch: bool) -> Plan:
     return _tree_plan(inv, _head_tree(inv), switch=True, force=force)
 
 
-def plan_checkout(inv: Invocation, after_fetch: bool) -> Plan:
+def plan_checkout(inv: Invocation) -> Plan:
     a = split_args("checkout", inv.args, CHECKOUT_FLAGS, BRANCH_VALUES)
     branch = a.has(*BRANCH_VALUES, "--detach", "-d")
     force = a.has("-f", "--force", "--discard-changes")
@@ -914,7 +909,7 @@ def plan_checkout(inv: Invocation, after_fetch: bool) -> Plan:
     return _path_plan(inv, None, pos, delete)
 
 
-def plan_restore(inv: Invocation, after_fetch: bool) -> Plan | None:
+def plan_restore(inv: Invocation) -> Plan | None:
     a = split_args("restore", inv.args, RESTORE_FLAGS, RESTORE_VALUES)
     worktree = a.has("-W", "--worktree")
     staged = a.has("-S", "--staged")
@@ -928,7 +923,7 @@ def plan_restore(inv: Invocation, after_fetch: bool) -> Plan | None:
     return _path_plan(inv, tree, a.positional + (a.pathspec or ()), delete)
 
 
-def plan_checkout_index(inv: Invocation, after_fetch: bool) -> Plan | None:
+def plan_checkout_index(inv: Invocation) -> Plan | None:
     a = split_args("checkout-index", inv.args, CHECKOUT_INDEX_FLAGS)
     paths = a.positional + (a.pathspec or ())
     if a.has("-a", "--all"):
@@ -941,7 +936,7 @@ def plan_checkout_index(inv: Invocation, after_fetch: bool) -> Plan | None:
     return _index_plan(inv, tuple(":(literal)" + p for p in paths))
 
 
-def plan_reset(inv: Invocation, after_fetch: bool) -> Plan | None:
+def plan_reset(inv: Invocation) -> Plan | None:
     a = split_args("reset", inv.args, RESET_FLAGS)
     if a.last(*RESET_MODES) not in RESET_WRITES:
         return None  # 作業ツリーを書かない
@@ -1086,7 +1081,7 @@ def _fetch_head(inv: Invocation) -> str:
     return picked[0]
 
 
-def plan_merge(inv: Invocation, after_fetch: bool) -> Plan | None:
+def plan_merge(inv: Invocation) -> Plan | None:
     if inv.args == ("--quit",):
         return None  # 作業ツリーを書かない（MERGE_AUTOSTASH は stash の一覧に入る。実測）
     if inv.args in (("--abort",), ("--continue",)):
@@ -1107,30 +1102,13 @@ def plan_merge(inv: Invocation, after_fetch: bool) -> Plan | None:
     return _merge_plan(inv, rev)
 
 
-def plan_pull(inv: Invocation, after_fetch: bool) -> Plan:
-    a = split_args("pull", inv.args, PULL_FLAGS)
-    if a.positional or a.pathspec is not None:
-        raise GuardError("pull の引数を確かめられません")
-    branch = _current_branch(inv)
-    if branch is None:
-        raise GuardError("今のブランチがありません")
-    if not a.has("--no-rebase"):
-        # merges・interactive などの値は --type=bool で読めず、run_git が止める。
-        rebase = _git_line(inv, "config", "--type=bool", "--get", f"branch.{branch}.rebase", ok=(0, 1))
-        rebase = rebase or _git_line(inv, "config", "--type=bool", "--get", "pull.rebase", ok=(0, 1))
-        if rebase == "true":
-            raise GuardError("pull の rebase は確かめられません")
-    # pull.autoStash は、git merge --autostash を動かす（レビューで実測）。
-    if _git_line(inv, "config", "--type=bool", "--get", "pull.autoStash", ok=(0, 1)) == "true":
-        raise GuardError("pull.autoStash が設定されています")
-    remote = _git_line(inv, "config", "--get", f"branch.{branch}.remote", ok=(0, 1))
-    if not remote or remote.startswith("-"):
-        raise GuardError("pull の取り込み元を確かめられません")
-    _merge_settings(inv, merge=True)
-    if not after_fetch:
-        raise FetchFirst([*inv.globals, "fetch", remote])
-    # git pull は FETCH_HEAD を取り込み、印のラベルにはコミットの oid を使う（実測）。
-    return _merge_plan(inv, _commit_rev(inv, "@{upstream}"))
+def plan_pull(inv: Invocation) -> Plan:
+    """git pull は、どの形も止める（D1）。
+
+    pull は、確かめた後にもう一度 fetch して、その FETCH_HEAD を取り込む。確かめた中身（@{upstream}。sandbox が書ける ref）と
+    git が取り込む中身が一致しない（レビューで実測）。fetch と merge @{u} に分ければ、merge はほかの merge と同じく確かめる。
+    """
+    raise Refused(MSG_PULL)
 
 
 def _stash_push(inv: Invocation, args: Sequence[str]) -> Plan:
@@ -1180,7 +1158,7 @@ def _stash_apply(inv: Invocation, args: Sequence[str]) -> Plan:
     return replace(plan, changes=plan.changes + tuple(extra), sources=(*plan.sources, untracked))
 
 
-def plan_stash(inv: Invocation, after_fetch: bool) -> Plan | None:
+def plan_stash(inv: Invocation) -> Plan | None:
     args = inv.args
     if not args or args[0].startswith("-"):
         return _stash_push(inv, args)
@@ -1214,11 +1192,11 @@ def _pick_plan(inv: Invocation, revert: bool) -> Plan:
     return _merged_plan(inv, (f"--merge-base={base}", "HEAD", other), (_commit_tree(inv, other),), labels=False)
 
 
-def plan_cherry_pick(inv: Invocation, after_fetch: bool) -> Plan:
+def plan_cherry_pick(inv: Invocation) -> Plan:
     return _pick_plan(inv, revert=False)
 
 
-def plan_revert(inv: Invocation, after_fetch: bool) -> Plan:
+def plan_revert(inv: Invocation) -> Plan:
     return _pick_plan(inv, revert=True)
 
 
@@ -1235,7 +1213,7 @@ def _split_letters(args: Sequence[str], letters: str) -> list[str]:
     return out
 
 
-def plan_rm(inv: Invocation, after_fetch: bool) -> Plan | None:
+def plan_rm(inv: Invocation) -> Plan | None:
     a = split_args("rm", _split_letters(inv.args, RM_LETTERS), RM_FLAGS)
     if a.has("--cached", "-n"):
         return None  # 作業ツリーを書かない
@@ -1326,7 +1304,7 @@ def _clean_options(args: Sequence[str]) -> tuple[set[str], int]:
     return letters, len(args)
 
 
-def plan_clean(inv: Invocation, after_fetch: bool) -> Plan | None:
+def plan_clean(inv: Invocation) -> Plan | None:
     letters, end = _clean_options(inv.args)
     if "n" in letters:
         return None
@@ -1346,7 +1324,7 @@ def plan_clean(inv: Invocation, after_fetch: bool) -> Plan | None:
     return _plan(inv, {}, paths, (), delete=True)
 
 
-def plan_mv(inv: Invocation, after_fetch: bool) -> Plan | None:
+def plan_mv(inv: Invocation) -> Plan | None:
     """対象のファイルが動く（行き先が対象になる、対象を動かす）mv は、確かめずに止める。"""
     a = split_args("mv", inv.args, MV_FLAGS)
     names = a.positional + (a.pathspec or ())
@@ -1590,7 +1568,7 @@ def _worktree_move(inv: Invocation, args: Sequence[str]) -> None:
     _protected_place(inv, place)
 
 
-def plan_worktree(inv: Invocation, after_fetch: bool) -> Plan | None:
+def plan_worktree(inv: Invocation) -> Plan | None:
     if not inv.args:
         raise GuardError("worktree の引数を確かめられません")
     sub = inv.args[0]
@@ -1620,7 +1598,7 @@ def plan_worktree(inv: Invocation, after_fetch: bool) -> Plan | None:
     return Plan(root=Path(root), changes=tuple(changes), sources=(tree,), fresh=True, old_root=main)
 
 
-def plan_commit(inv: Invocation, after_fetch: bool) -> Plan | None:
+def plan_commit(inv: Invocation) -> Plan | None:
     """commit（--amend を含む。MERGE_HEAD がなくても）は、コミットの後に MERGE_AUTOSTASH の中身を書く（実測）。
 
     それ以外は作業ツリーを書かないので、オプションは読まない。
@@ -1629,8 +1607,8 @@ def plan_commit(inv: Invocation, after_fetch: bool) -> Plan | None:
     return None
 
 
-# サブコマンド名 -> 確認の内容を作る関数（第 2 引数は after_fetch）。None は作業ツリーの対象を書かない。
-HANDLERS: dict[str, Callable[[Invocation, bool], Plan | None]] = {
+# サブコマンド名 -> 確認の内容を作る関数。None は作業ツリーの対象を書かない。
+HANDLERS: dict[str, Callable[[Invocation], Plan | None]] = {
     "commit": plan_commit,
     "switch": plan_switch,
     "checkout": plan_checkout,
@@ -1824,7 +1802,7 @@ def verify(state: str, stderr: TextIO) -> int:
     return EXIT_ALLOW
 
 
-def check(argv: Sequence[str], *, start: Path, git_env: Sequence[str], after_fetch: bool, home: Path,
+def check(argv: Sequence[str], *, start: Path, git_env: Sequence[str], home: Path,
           stdin: TextIO, stderr: TextIO, tty: bool) -> tuple[int, str]:
     if in_sandbox():
         return EXIT_ALLOW, ""
@@ -1843,7 +1821,7 @@ def check(argv: Sequence[str], *, start: Path, git_env: Sequence[str], after_fet
         handler = HANDLERS.get(inv.sub)
         if handler is None:
             raise GuardError(f"{inv.sub} は確かめられません")
-        plan = handler(inv, after_fetch)
+        plan = handler(inv)
         if plan is None:
             return EXIT_ALLOW, ""
         reason = danger(plan, inv)
@@ -1865,7 +1843,7 @@ def check(argv: Sequence[str], *, start: Path, git_env: Sequence[str], after_fet
             # 人間が読んでいる間に ref などを差し替えられていないか、同じ計算をもう一度して比べる（I1）。
             # 残る窓は、ここから git が書くまでの短い時間だけ（verify が後から見つける）。
             try:
-                again = handler(inv, after_fetch)
+                again = handler(inv)
                 same = (again is not None and again.changes == plan.changes and danger(again, inv) is None
                         and state_of(again, inv) == state)
             except GuardError:
@@ -1876,9 +1854,9 @@ def check(argv: Sequence[str], *, start: Path, git_env: Sequence[str], after_fet
             return EXIT_STOP, ""
         stderr.write(newline + MSG_DECLINED + "\n")
         return EXIT_STOP, ""
-    except FetchFirst as e:
-        # 関数が argv の git を動かしてから、--after-fetch で呼び直す。
-        return EXIT_FETCH, "\0".join(e.argv)
+    except Refused as e:
+        stderr.write(str(e) + "\n")
+        return EXIT_STOP, ""
     except GuardError as e:
         stderr.write(MSG_UNSUPPORTED.format(reason=_show(str(e))) + "\n")
         return EXIT_STOP, ""
@@ -1889,8 +1867,7 @@ def check(argv: Sequence[str], *, start: Path, git_env: Sequence[str], after_fet
 
 def _hook_inv(cwd: Path, root: Path | None, home: Path) -> Invocation:
     """フックの git を cwd で動かすための Invocation。人間の -c はない。"""
-    return Invocation(cwd=cwd, root=root, globals=(), config=(), sub="worktree", args=(), argv=(), start=cwd,
-                      home=home)
+    return Invocation(cwd=cwd, root=root, config=(), sub="worktree", args=(), argv=(), start=cwd, home=home)
 
 
 def _registered(inv: Invocation, place: str) -> bool:
@@ -2202,20 +2179,17 @@ def main(argv: list[str]) -> int:
     if argv[:1] == ["check"] and "--" in argv:
         sep = argv.index("--")
         opts, git_args = argv[1:sep], argv[sep + 1:]
-        after_fetch = False
         names: tuple[str, ...] = ()
         i = 0
         while i < len(opts):
-            if opts[i] == "--after-fetch":
-                after_fetch = True
-            elif opts[i] == "--git-env" and i + 1 < len(opts):
+            if opts[i] == "--git-env" and i + 1 < len(opts):
                 names = tuple(n for n in opts[i + 1].split(",") if n)
                 i += 1
             else:
                 return 1
             i += 1
         code, out = check(
-            git_args, start=Path.cwd(), git_env=names, after_fetch=after_fetch, home=user_home(),
+            git_args, start=Path.cwd(), git_env=names, home=user_home(),
             stdin=sys.stdin, stderr=sys.stderr, tty=sys.stdin.isatty() and sys.stderr.isatty(),
         )
         sys.stdout.write(out)

@@ -51,11 +51,6 @@ git() {
   local state rc
   state=$("$guard" check --git-env "$genv" -- "$@")
   rc=$?
-  if (( rc == 3 )); then
-    command git "${(0@)state}" || return
-    state=$("$guard" check --after-fetch --git-env "$genv" -- "$@")
-    rc=$?
-  fi
   (( rc == 0 )) || return $rc
   command git "$@"
   rc=$?

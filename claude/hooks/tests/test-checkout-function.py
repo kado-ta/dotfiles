@@ -22,10 +22,8 @@ FAKE_GUARD = """#!/bin/sh
 { printf 'guard'; for a in "$@"; do printf ' [%s]' "$a"; done; printf '\\n'; } >> "$FAKE_DIR/log"
 case "$1" in
   check)
-    n=1
-    for a in "$@"; do [ "$a" = "--after-fetch" ] && n=2; done
-    [ -f "$FAKE_DIR/check$n.out" ] && cat "$FAKE_DIR/check$n.out"
-    exit "$(cat "$FAKE_DIR/check$n.rc")"
+    [ -f "$FAKE_DIR/check1.out" ] && cat "$FAKE_DIR/check1.out"
+    exit "$(cat "$FAKE_DIR/check1.rc")"
     ;;
   verify)
     exit "$(cat "$FAKE_DIR/verify.rc")"
@@ -60,7 +58,6 @@ class Base(unittest.TestCase):
         self.write_exec(self.guard, FAKE_GUARD)
         self.write_exec(self.bin / "git", FAKE_GIT)
         self.set("check1.rc", "0")
-        self.set("check2.rc", "0")
         self.set("verify.rc", "0")
         self.set("git.rc", "0")
 
@@ -114,18 +111,20 @@ class CheckoutFunctionTest(Base):
         self.assertIn("git [switch] [x]", log)
         self.assertFalse([l for l in log if l.startswith("guard [verify]")])
 
-    def test_fetch_protocol(self):
+    def test_pull_stops_without_git(self):
+        # 確認コマンドは pull を止める（D1）。関数は git（先の fetch も）を動かさずに、その終了コードを返す。
+        self.set("check1.rc", "1")
+        cp, log = self.run_fn("pull")
+        self.assertEqual(cp.returncode, 1)
+        self.assertEqual(log, ["guard [check] [--git-env] [] [--] [pull]"])
+
+    def test_other_codes_are_returned(self):
+        # 終了コード 3（前の pull の手順）も、ほかの 0 以外と同じく、git を動かさずにそのまま返す（D1）。
         self.set("check1.rc", "3")
         self.set("check1.out", b"fetch\0origin")
-        self.set("check2.out", "STATE")
         cp, log = self.run_fn("pull")
-        self.assertEqual(cp.returncode, 0, cp.stderr)
-        git_lines = [l for l in log if l.startswith("git ")]
-        self.assertEqual(git_lines, ["git [fetch] [origin]", "git [pull]"])
-        after = [i for i, l in enumerate(log) if l.startswith("guard [check]") and "[--after-fetch]" in l]
-        self.assertEqual(len(after), 1)
-        self.assertLess(log.index("git [fetch] [origin]"), after[0])
-        self.assertLess(after[0], log.index("git [pull]"))
+        self.assertEqual(cp.returncode, 3)
+        self.assertEqual(log, ["guard [check] [--git-env] [] [--] [pull]"])
 
     def test_verify_failure_returns_nonzero(self):
         self.set("check1.out", "STATE")

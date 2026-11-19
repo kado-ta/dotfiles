@@ -54,10 +54,10 @@ class Base(unittest.TestCase):
         patcher.start()
         self.addCleanup(patcher.stop)
 
-    def check(self, *argv, start=None, git_env=(), tty=False, answer="", after_fetch=False):
+    def check(self, *argv, start=None, git_env=(), tty=False, answer=""):
         err = io.StringIO()
         result = guard.check(
-            list(argv), start=start or self.repo, git_env=git_env, after_fetch=after_fetch,
+            list(argv), start=start or self.repo, git_env=git_env,
             home=self.home, stdin=io.StringIO(answer), stderr=err, tty=tty,
         )
         return result, err.getvalue()
@@ -335,7 +335,7 @@ class SwitchTests(TreeBase):
         def ask(target):
             local_git(repo, "update-ref", "refs/heads/feature", original)
             err = io.StringIO()
-            result = guard.check(["switch", "feature"], start=repo, git_env=(), after_fetch=False, home=self.home,
+            result = guard.check(["switch", "feature"], start=repo, git_env=(), home=self.home,
                                  stdin=Swap(target), stderr=err, tty=True)
             return result, err.getvalue()
 
@@ -809,12 +809,13 @@ class FastPathTests(TreeBase):
         self.assertEqual(self.check("status", git_env=("GIT_EDITOR", "GIT_PAGER"))[0], (0, ""))
         self.assertFalse(self.fast(("status",), "GIT_EDITOR,GIT_DIR"))
         self.assertEqual(self.check("status", git_env=("GIT_EDITOR", "GIT_DIR"))[0], (1, ""))
-        self.assertTrue(guard.fast_allow(["check", "--after-fetch", "--git-env", "", "--", "status"]))
+        # --after-fetch（pull の手順。D1 で消した）は、ほかの知らないオプションと同じく main が止める。
         for argv in (["check", "--bogus", "--", "status"], ["check", "--git-env"], ["check", "status"],
-                     ["verify", "{}"], ["status"], []):
+                     ["check", "--after-fetch", "--git-env", "", "--", "status"], ["verify", "{}"], ["status"], []):
             with self.subTest(main=argv):
                 self.assertFalse(guard.fast_allow(argv))
         self.assertEqual(guard.main(["check", "--bogus", "--", "status"]), 1)
+        self.assertEqual(guard.main(["check", "--after-fetch", "--git-env", "", "--", "status"]), 1)
         # -h を許すサブコマンドの一覧は、HANDLERS と同じ。
         self.assertEqual(set(guard.HANDLERS), guard.HANDLED)
 
@@ -860,7 +861,9 @@ class MergeTests(TreeBase):
         self.assertEqual(self.check("merge", "--continue")[0], (0, ""))
         self.assertEqual(self.check("merge", "--abort", "-q")[0], (1, ""))
 
-    def test_pull_fetch_protocol(self):
+    def test_pull_stops(self):
+        # pull は、確かめた後にもう一度 fetch して、その FETCH_HEAD を取り込む。確かめた中身（@{u}。sandbox が書ける ref）と、
+        # git が取り込む中身が一致しない（レビューで実測）。fetch と merge @{u} に分けるよう案内して、どの形も止める（D1）。
         origin = self.root / "origin.git"
         local_git(self.root, "init", "-q", "--bare", "-b", "main", str(origin))
         local_git(self.repo, "remote", "add", "origin", str(origin))
@@ -869,31 +872,42 @@ class MergeTests(TreeBase):
         local_git(self.root, "clone", "-q", str(origin), str(other))
         local_git(other, "config", "user.name", "Test")
         local_git(other, "config", "user.email", "test@example.com")
-        (other / "README.md").write_text("r\n", encoding="utf-8")
-        local_git(other, "commit", "-q", "-am", "readme")
-        local_git(other, "push", "-q", "origin", "main")
-        self.assertEqual(self.check("pull")[0], (3, "fetch\0origin"))
-        local_git(self.repo, "fetch", "-q", "origin")
-        (code, out), err = self.check("pull", after_fetch=True)
-        self.assertEqual(code, 0, err)
-        self.assertEqual(json.loads(out)["root"], str(self.repo))
         (other / ".claude" / "settings.json").write_text('{"v": 7}\n', encoding="utf-8")
         local_git(other, "commit", "-q", "-am", "settings")
         local_git(other, "push", "-q", "origin", "main")
-        self.assertEqual(self.check("-C", "sub", "pull", "--ff-only")[0], (3, "-C\0sub\0fetch\0origin"))
+        before = local_git(self.repo, "rev-parse", "origin/main")
+        local_git(self.repo, "config", "alias.pl", "pull")
+        for argv in (("pull",), ("pull", "--ff-only"), ("-C", "sub", "pull"), ("pull", "origin", "main"),
+                     ("pull", "--rebase"), ("pl",), ("pull", "-q", "-h")):
+            with self.subTest(argv=argv):
+                result, err = self.check(*argv, tty=True, answer="y\n")
+                self.assertEqual(result, (1, ""))
+                self.assertIn("git pull は、確かめた後にもう一度 fetch して取り込むので止めました", err)
+                self.assertIn("git merge @{u}", err)
+                self.assertIn("git merge --ff-only @{u}", err)
+                self.assertNotIn("command git", err)
+                self.assertNotIn(guard.MSG_ASK, err)
+        # 確かめるための fetch もしない。
+        self.assertEqual(local_git(self.repo, "rev-parse", "origin/main"), before)
+        for argv in (("pull", "-h"), ("pull", "--help")):
+            with self.subTest(help=argv):
+                self.assertEqual(self.check(*argv)[0], (0, ""))
+        # 案内する fetch と merge @{u} は、ほかの merge と同じく確かめる（印のラベルも @{u} で、git と同じ。実測）。
         local_git(self.repo, "fetch", "-q", "origin")
-        result, err = self.check("pull", "--ff-only", after_fetch=True)
-        self.assertEqual(result, (1, ""))
-        self.assertIn("変更 .claude/settings.json", err)
-
-    def test_pull_unsupported_forms(self):
-        result, err = self.check("pull", "origin", "main")
-        self.assertEqual(result, (1, ""))
-        self.assertIn("pull の引数", err)
-        local_git(self.repo, "config", "pull.rebase", "true")
-        result, err = self.check("pull")
-        self.assertEqual(result, (1, ""))
-        self.assertIn("rebase", err)
+        for argv in (("merge", "@{u}"), ("merge", "--ff-only", "@{u}")):
+            with self.subTest(merge=argv):
+                result, err = self.check(*argv)
+                self.assertEqual(result, (1, ""))
+                self.assertIn("変更 .claude/settings.json", err)
+        self.assertEqual(self.approve_and_run("merge", "--ff-only", "-q", "@{u}"), (0, ""))
+        self.assertEqual(self.settings.read_text(encoding="utf-8"), '{"v": 7}\n')
+        (other / ".claude" / "settings.json").write_text('{"v": 8}\n', encoding="utf-8")
+        local_git(other, "commit", "-q", "-am", "settings 8")
+        local_git(other, "push", "-q", "origin", "main")
+        local_git(self.repo, "fetch", "-q", "origin")
+        self.commit_settings('{"v": 9}\n')
+        self.assertEqual(self.approve_and_run("merge", "--no-edit", "-q", "@{u}", codes=(1,)), (0, ""))
+        self.assertIn(">>>>>>> @{u}", self.settings.read_text(encoding="utf-8"))
 
     def test_merge_settings_that_change_the_result_stop(self):
         for key, value in (("merge.renormalize", "true"), ("merge.autoStash", "true"), ("pull.twohead", "resolve"),
@@ -905,17 +919,6 @@ class MergeTests(TreeBase):
                 self.assertIn(key, err)
                 local_git(self.repo, "config", "--unset", key)
         self.assertEqual(self.check("merge", "docs")[0][0], 0)
-        # pull は pull.autoStash で git merge --autostash を動かす（レビューで実測）。
-        local_git(self.repo, "config", "pull.autoStash", "true")
-        for argv in (("pull",), ("-c", "pull.autoStash=false", "-c", "pull.autoStash=true", "pull")):
-            with self.subTest(argv=argv):
-                result, err = self.check(*argv)
-                self.assertEqual(result, (1, ""))
-                self.assertIn("pull.autoStash", err)
-        local_git(self.repo, "config", "--unset", "pull.autoStash")
-        result, err = self.check("-c", "pull.autoStash=true", "pull")
-        self.assertEqual(result, (1, ""))
-        self.assertIn("pull.autoStash", err)
 
     def test_merge_fetch_head_reads_merge_lines(self):
         # git merge FETCH_HEAD は、not-for-merge でない行をすべて取り込む（2 行以上なら octopus）。
