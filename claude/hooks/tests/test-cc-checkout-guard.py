@@ -222,6 +222,23 @@ class CheckTests(Base):
             with self.subTest(argv=argv):
                 self.assertEqual(self.check(*argv)[0], (0, ""))
 
+    def test_output_of_any_subcommand_stops(self):
+        # stash list は log に、stash show は diff に引数を渡し、--output（= の形と分けた形。list は -- の後も）でファイルに
+        # 書く（両方の git で実測。/security-review の S3）。--output は、サブコマンドによらず止める。
+        for argv in (("stash", "list", "--output=.env.local"), ("stash", "list", "--outp=x"),
+                     ("stash", "list", "--format=%s", "--output", ".env"), ("stash", "list", "--", "--output=x"),
+                     ("stash", "show", "-p", "--output=.env"), ("stash", "show", f"--output={self.root}/abs"),
+                     ("stash", "show", "-p", "stash@{0}", "--output=x"), ("-C", "sub", "stash", "list", "--output=x")):
+            with self.subTest(argv=argv):
+                result, err = self.check(*argv)
+                self.assertEqual(result, (1, ""))
+                self.assertIn("stash の --outp", err)
+                self.assertIn("ファイルに書きます", err)
+        for argv in (("stash", "list"), ("stash", "show", "-p"), ("stash", "list", "--format=%s"),
+                     ("stash", "show", "--stat")):
+            with self.subTest(allowed=argv):
+                self.assertEqual(self.check(*argv)[0], (0, ""))
+
 
 class TreeBase(Base):
     """main: settings={"v": 1}・README=a。feature は両方を変え、docs は README だけを変える。"""
@@ -1065,7 +1082,10 @@ class FastPathTests(TreeBase):
                    ("-c", "ALIAS.st=status", "status"), ("--git-dir=x", "status"), ("--bare", "status"),
                    ("-C",), ("-c",), ("rebase", "main"), ("switch", "feature"), ("rm", ".claude/settings.json"),
                    ("show", "-h", "--output=x"), ("init", "--separate-git-dir=.claude/skills/evil"),
-                   ("init", "--templ=x"), ("-c", "init.templateDir=x", "init"), ("-c", "Init.TemplateDir=x", "init")]
+                   ("init", "--templ=x"), ("-c", "init.templateDir=x", "init"), ("-c", "Init.TemplateDir=x", "init"),
+                   # --output は、サブコマンドによらず、早道と全体の処理が同じ規則で止める（S3）。
+                   ("stash", "list", "--output=x"), ("stash", "-h", "--output=x"), ("switch", "-h", "--outp=x"),
+                   ("stash", "--help", "--", "--output", "x")]
         for argv in stopped:
             with self.subTest(stopped=argv):
                 self.assertFalse(self.fast(argv))

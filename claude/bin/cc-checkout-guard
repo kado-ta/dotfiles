@@ -52,6 +52,7 @@ def file_writes(sub: str, args: Sequence[str]) -> str | None:
     """sub と args がファイルに書くなら、その理由（C1）。書かないなら None。
 
     --output は diff の系統（show・log・blame・range-diff など）で、引数を読む時点でファイルを作る（実測）。
+    stash list は log に、stash show は diff に引数を渡すので、同じく書く（両方の git で実測。S3）。サブコマンドによらず止め、
     省略形（--outp）も止める。config の -f・--file は別のファイルを読み書きする。値をつないだ形（-fx）、
     まとめ書き（-lfx）、省略形（--fil）も止める。init の --separate-git-dir は、既存の .git（sandbox が書ける）を
     丸ごと動かし、--template は作り直しでもテンプレートを .git/hooks などに写す（実測。R24）。省略形も止める。
@@ -59,8 +60,6 @@ def file_writes(sub: str, args: Sequence[str]) -> str | None:
     """
     if sub in FILE_WRITERS:
         return f"{sub} はファイルに書きます"
-    if sub not in READ_ONLY:
-        return None
     for tok in args:
         name = tok.partition("=")[0]
         long = name.startswith("--") and len(name) > 2
@@ -221,8 +220,8 @@ def _gitdirs_clean(cwd: str | None, moves: Sequence[str]) -> bool:
 def fast_allow(argv: Sequence[str], cwd: str | None = None) -> bool:
     """check の引数だけで許可が決まるか（I2）。偽なら何も決めず、全体の処理（main）に任せる。
 
-    許可するのは、全体の処理も許可する形だけ: READ_ONLY のサブコマンドでファイルに書かない形、
-    HANDLED のサブコマンドの -h・--help、サブコマンドのない形（--version・--help など）。
+    許可するのは、全体の処理も許可する形だけ: READ_ONLY のサブコマンドと、HANDLED のサブコマンドの -h・--help の、
+    ファイルに書かない形（file_writes。S3）、サブコマンドのない形（--version・--help など）。
     check のオプションと全体のオプションは main・parse と同じく読み、parse が止めるもの（-c alias.*、
     知らないオプション、ALLOWED_GIT_ENV にない名前）と、同じと言い切れないもの（ASCII でない -c の値、alias）は任せる。
     リポジトリの中身は読まない。READ_ONLY は作業ツリーに書かないので、許可にリポジトリの中身は要らない。
@@ -268,10 +267,10 @@ def fast_allow(argv: Sequence[str], cwd: str | None = None) -> bool:
         else:
             # git は builtin を alias で置き換えないので、名前だけで決まる。
             rest = args[i + 1:]
-            if tok in READ_ONLY:
-                if file_writes(tok, rest) is not None:
-                    return False
-            elif not (tok in HANDLED and rest[:1] in (["-h"], ["--help"])):
+            if not (tok in READ_ONLY or (tok in HANDLED and rest[:1] in (["-h"], ["--help"]))):
+                return False
+            # ヘルプの形も、全体の処理と同じ規則で、ファイルに書く形を任せる（S3）。
+            if file_writes(tok, rest) is not None:
                 return False
             break
     # 許可する形。gitdir を確かめてから許可する（D2）。
