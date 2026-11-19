@@ -137,12 +137,14 @@ def _git_directory(path: str) -> bool:
     """path が、git が gitdir として使う .git ディレクトリと言い切れるか。git の is_git_directory より狭く判定する。
 
     git は、HEAD が正しくないか、objects・refs をたどれない .git ディレクトリを使わずに、上を探す。
+    git の validate_headref は HEAD を 255 バイトまで読み、ref: の後の ' '・\\t・\\n・\\r を飛ばす。ここでは、その一部の
+    ref: refs/ と ref:refs/ だけを受け入れる（Python の lstrip は \\v・\\f も飛ばし、git より広くなる。再レビューで実測）。
     """
     head = _small_file(os.path.join(path, "HEAD"))
     if head is None:
         return False
     if head.startswith(b"ref:"):
-        if not head[4:].lstrip().startswith(b"refs/"):
+        if not head.startswith((b"ref: refs/", b"ref:refs/")):
             return False
     elif len(head) < 40 or not HEX.issuperset(head[:40]):
         return False

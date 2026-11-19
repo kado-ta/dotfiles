@@ -965,7 +965,21 @@ class GitdirTests(TreeBase):
         (sub / ".git").mkdir()
         self.assertFalse(self.fast(("status",), sub))
         self.assertEqual(self.check("status", start=sub)[0], (1, ""))
-        (sub / ".git").rmdir()
+        # git が飛ばす HEAD（ref: の後が \v・\f か、255 バイトを超える空白）の .git ディレクトリも、gitdir とみなさない。
+        # git の validate_headref は 255 バイトまでを読み、空白は ' '・\t・\n・\r だけを飛ばす（再レビューで実測。両方の git）。
+        (sub / ".git" / "objects").mkdir()
+        (sub / ".git" / "refs").mkdir()
+        for head in (b"ref:\x0brefs/heads/main\n", b"ref:\x0crefs/heads/main\n",
+                     b"ref:" + b" " * 300 + b"refs/heads/main\n"):
+            with self.subTest(head=head[:6]):
+                (sub / ".git" / "HEAD").write_bytes(head)
+                self.assertEqual(local_git(sub, "rev-parse", "--absolute-git-dir"), str(self.gitdir))
+                for argv in (("fetch",), ("status",)):
+                    self.assertFalse(self.fast(argv, sub))
+                    self.assertEqual(self.check(*argv, start=sub)[0], (1, ""))
+        (sub / ".git" / "HEAD").unlink()
+        for name in ("objects", "refs", ""):
+            (sub / ".git" / name).rmdir()
         (self.gitdir / "FETCH_HEAD").unlink()
         # bare のリポジトリの形（HEAD がある）と、.git が symlink の形は任せる。リポジトリの外は許可する。
         (sub / "HEAD").write_text("ref: refs/heads/main\n", encoding="utf-8")
