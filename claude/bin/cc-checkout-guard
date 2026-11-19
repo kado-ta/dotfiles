@@ -821,7 +821,15 @@ def changed_paths(inv: Invocation, *diff_args: str) -> list[str]:
 
 
 def _git_line(inv: Invocation, *args: str, ok: Sequence[int] = (0,)) -> str:
-    return os.fsdecode(run_git(inv.cwd, *args, config=inv.config, ok=ok)).strip()
+    """git の出力（前後の空白を除く）。ok に入れた 0 以外の終了コードなら ""。
+
+    rev-parse --verify --quiet は、HEAD^@ などで oid を出しながら終了コード 1 で終わる（実測。D3）。
+    """
+    cp = _git_process(inv.cwd, *args, config=inv.config)
+    if cp.returncode not in ok:
+        # stderr はメッセージに含めない（run_git と同じ）。
+        raise GuardError(f"git {args[0]} が失敗しました")
+    return os.fsdecode(cp.stdout).strip() if cp.returncode == 0 else ""
 
 
 def _peel(inv: Invocation, oid: str, kind: str) -> str | None:

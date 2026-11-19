@@ -1348,6 +1348,15 @@ class RevisionTests(TreeBase):
                 self.assertEqual(result, (1, ""))
                 self.assertIn(f'+{{"{shown}": 1}}', err)
 
+    def test_output_of_failed_rev_parse_is_not_used(self):
+        # rev-parse --verify --quiet は、HEAD^@ などで oid を出しながら終了コード 1 で終わる。git の reset --hard HEAD^@ は
+        # 失敗する（レビューで実測）。0 以外の終了コードの出力は使わない（D3）。
+        inv = self.parse("reset", "--hard", "HEAD^@")
+        self.assertIsNone(guard._rev(inv, "HEAD^@", "commit"))
+        result, err = self.check("reset", "--hard", "HEAD^@")
+        self.assertEqual(result, (1, ""))
+        self.assertIn("HEAD^@ を解決できません", err)
+
     def test_real_git_resolves_tag_and_branch_like_state(self):
         self.branch_and_tag()
         self.assertEqual(self.approve_and_run("merge", "--no-edit", "-q", "evil"), (0, ""))
