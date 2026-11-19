@@ -349,7 +349,7 @@ sudo install -o root -g wheel -m 0755 claude/bin/cc-checkout-guard /usr/local/li
 
 次のときは、sandbox の外では、どのサブコマンドも（`status` なども）止める。`command git` でも同じ場所に書くので、勧めない。表示されたファイルが何を指しているかを確かめ、消してから git を実行する。
 
-- gitdir（`.git`。linked worktree では `.git/worktrees/<id>` と共通の `.git`）の中に、symlink か、通常のファイルとディレクトリのほかの種類がある。中をすべて見る。見ないのは、`hooks` の中と、loose object と git-lfs の fan-out（`objects/<2 桁の 16 進>/`・`lfs/objects/<2 桁>/`）の中だけ（そのディレクトリ自体は見る）。git は `COMMIT_EDITMSG`・`FETCH_HEAD`・`logs/HEAD`・`objects/info/commit-graph` などを symlink をたどって書く
+- gitdir（`.git`。linked worktree では `.git/worktrees/<id>` と共通の `.git`）の中に、symlink か、通常のファイルとディレクトリのほかの種類がある。中をすべて見る。見ないのは、`hooks` の中と、loose object と git-lfs の fan-out（`objects/<2 桁の 16 進>/`・`lfs/objects/<2 桁>/`）の中だけ（そのディレクトリ自体は見る。名前で見分けるので、submodule の gitdir を見ない形が残る。[design の 7 章](../docs/work/20261118_git-route-writes/design.md#accepted-risks)）。git は `COMMIT_EDITMSG`・`FETCH_HEAD`・`logs/HEAD`・`objects/info/commit-graph` などを symlink をたどって書く
 
 `.git/hooks` 自体を symlink にする使い方（中のフックのファイルの symlink はよい）と、組み込みの fsmonitor（`core.fsmonitor=true`。`.git` にソケットを作る）とは、併用できない。sandbox の外の git がすべて止まる。
 
