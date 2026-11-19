@@ -359,6 +359,7 @@ WORKTREE_ADD_VALUES = frozenset(("-b", "-B", "--reason"))
 WORKTREE_OTHERS = frozenset("list prune lock unlock repair".split())  # 作業ツリーの中身を書かない
 WORKTREE_MOVE_FLAGS = frozenset(("-f", "--force"))  # move と remove
 FETCH_HEAD_MAX = 1 << 20  # 読む FETCH_HEAD の大きさの上限（バイト）
+DISK_MAX = 16 << 20  # 差分に見せるディスクのファイルの大きさの上限（バイト）。超えたら止める
 # git がパスを C の形で引用するときの、\ の後の文字と、その値。
 C_ESCAPES = {ord("a"): 7, ord("b"): 8, ord("t"): 9, ord("n"): 10, ord("v"): 11, ord("f"): 12, ord("r"): 13,
              ord('"'): 34, ord("\\"): 92}
@@ -1915,14 +1916,13 @@ def listing(plan: Plan) -> str:
 
 
 def _disk_bytes(root: Path, rel: str, entry: Entry | None) -> bytes:
+    """差分に見せるディスクの中身。通常のファイルは、symlink をたどらず、FIFO で固まらず、DISK_MAX まで読む（D3）。"""
     path = os.path.join(root, rel)
     if entry is None or entry.mode not in (*REGULAR, SYMLINK):
         return b""
     if entry.mode == SYMLINK:
         return os.readlink(os.fsencode(path))
-    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
-    with os.fdopen(fd, "rb") as f:
-        return f.read()
+    return _read_regular(path, DISK_MAX, rel)
 
 
 def _lines(data: bytes) -> list[str]:

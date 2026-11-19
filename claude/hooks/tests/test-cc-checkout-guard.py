@@ -11,6 +11,7 @@ import signal
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import traceback
 import unittest
@@ -714,6 +715,35 @@ class SwitchTests(TreeBase):
         self.assertIn('-{"v": "<U+001B>"}', err)
         self.assertIn('+{"v": "<U+001B>"}', err)
         self.assertNotIn("\x1b", err)
+
+    def test_disk_content_is_read_as_a_bounded_regular_file(self):
+        # 差分に見せるディスクの中身は、symlink をたどらず、FIFO で固まらず、上限（16 MiB）まで読む（D3）。
+        entry = guard.Entry("100644", "0" * 40)
+        limit = 16 << 20
+        big = self.repo / "big"
+        big.write_bytes(b"x" * limit)
+        self.assertEqual(len(guard._disk_bytes(self.repo, "big", entry)), limit)
+        big.write_bytes(b"x" * (limit + 1))
+        with self.assertRaises(guard.GuardError):
+            guard._disk_bytes(self.repo, "big", entry)
+        fifo = self.repo / "fifo"
+        os.mkfifo(fifo)
+        result = []
+
+        def read():
+            try:
+                result.append(guard._disk_bytes(self.repo, "fifo", entry))
+            except Exception as e:  # noqa: BLE001 - 種類を下で確かめる
+                result.append(e)
+
+        thread = threading.Thread(target=read, daemon=True)
+        thread.start()
+        thread.join(10)
+        if thread.is_alive():
+            os.close(os.open(fifo, os.O_WRONLY | os.O_NONBLOCK))  # 固まった open を解く
+            thread.join(10)
+            self.fail("FIFO を開いて固まりました")
+        self.assertIsInstance(result[0], guard.GuardError)
 
     def test_prompt_through_pty(self):
         for answer, expected in ((b"y\n", 0), (b"n\n", 1), (None, 1)):
