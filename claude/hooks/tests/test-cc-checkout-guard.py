@@ -762,11 +762,159 @@ class SwitchTests(TreeBase):
         return os.waitstatus_to_exitcode(status), out.decode("utf-8", "replace")
 
 
+class GitdirTests(TreeBase):
+    """git は gitdir の COMMIT_EDITMSG・FETCH_HEAD・logs/HEAD などを開いて書くので、symlink の先（作業ツリーの外も）に書く
+    （レビューで実測。CLT の git 2.54 と Homebrew の git 2.56）。sandbox の外では、gitdir と共通の gitdir に symlink か
+    特殊なファイルがあれば、何も許可しない（D2）。早道は決めずに全体の処理に任せる。
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.gitdir = self.repo / ".git"
+        self.victim = self.root / "victim.json"
+        self.victim.write_text('{"keep": 1}\n', encoding="utf-8")
+
+    def fast(self, argv, start=None):
+        return guard.fast_allow(["check", "--git-env", "", "--", *argv], cwd=str(start or self.repo))
+
+    def assert_stopped(self, argv, path, start=None):
+        result, err = self.check(*argv, start=start, tty=True, answer="y\n")
+        self.assertEqual(result, (1, ""), err)
+        self.assertIn(f"{path} が、symlink か", err)
+        self.assertNotIn("command git", err)
+        self.assertNotIn(guard.MSG_ASK, err)
+        self.assertFalse(self.fast(argv, start))
+
+    def test_commit_editmsg_symlink_to_config_stops_commit(self):
+        # COMMIT_EDITMSG を .git/config への symlink にし、SQUASH_MSG に中身を置くと、人間の git commit は、
+        # エディタが失敗しても .git/config を書き換えた（レビューで実測）。
+        config = self.gitdir / "config"
+        link = self.gitdir / "COMMIT_EDITMSG"
+        link.unlink()
+        os.symlink("config", link)
+        (self.gitdir / "SQUASH_MSG").write_text(config.read_text(encoding="utf-8") + "[probe]\n\tmarker = 1\n",
+                                               encoding="utf-8")
+        (self.repo / "README.md").write_text("changed\n", encoding="utf-8")
+        local_git(self.repo, "add", "README.md")
+        for argv in (("-c", "core.editor=false", "commit"), ("commit", "-m", "x"), ("status",)):
+            with self.subTest(argv=argv):
+                self.assert_stopped(argv, link)
+        # 仕掛けが効くことを、テストの git で確かめる。
+        subprocess.run(["git", "-C", str(self.repo), "-c", "core.editor=false", "commit"], capture_output=True)
+        self.assertEqual(local_git(self.repo, "config", "--get", "probe.marker"), "1")
+
+    def test_fetch_head_symlink_stops_fetch(self):
+        # FETCH_HEAD の symlink を通して、git fetch は作業ツリーの外のファイルを書き換えた（レビューで実測）。
+        link = self.gitdir / "FETCH_HEAD"
+        os.symlink(self.victim, link)
+        for argv in (("fetch", str(self.repo)), ("fetch",), ("log", "--oneline"), ("--version",), ("switch", "-h")):
+            with self.subTest(argv=argv):
+                self.assert_stopped(argv, link)
+        local_git(self.repo, "fetch", "-q", str(self.repo))
+        self.assertNotEqual(self.victim.read_text(encoding="utf-8"), '{"keep": 1}\n')
+
+    def test_reflog_symlink_stops_switch(self):
+        # logs/HEAD の symlink を通して、git switch は作業ツリーの外のファイルに追記した（レビューで実測）。
+        link = self.gitdir / "logs" / "HEAD"
+        link.unlink()
+        os.symlink(self.victim, link)
+        self.assert_stopped(("switch", "docs"), link)
+        local_git(self.repo, "switch", "-q", "docs")
+        self.assertIn("checkout: moving from main to docs", self.victim.read_text(encoding="utf-8"))
+
+    def test_entries_git_writes_through(self):
+        # 最上位のすべて、logs・refs・sequencer・rebase-merge・rebase-apply の下のすべて、objects とその直下を見る。
+        # symlink のディレクトリ（refs/heads・objects など）の中にも、git は新しいファイルを書く（実測）。
+        outside = self.root / "outside"
+        outside.mkdir()
+        oid = local_git(self.repo, "rev-parse", "HEAD")
+        cases = (
+            ("refs/heads/sub", lambda p: os.symlink(outside, p)),
+            ("refs/tags/v", lambda p: os.symlink(self.victim, p)),
+            ("logs/refs/heads/main", lambda p: (p.unlink(), os.symlink(self.victim, p))),
+            ("objects/" + oid[:2], lambda p: (os.rename(p, outside / "o"), os.symlink(outside / "o", p))),
+            ("sequencer/todo", lambda p: (p.parent.mkdir(), os.symlink(self.victim, p))),
+            ("rebase-merge/done", lambda p: (p.parent.mkdir(), os.symlink(self.victim, p))),
+            ("rebase-apply/x/y", lambda p: (p.parent.mkdir(parents=True), os.symlink(self.victim, p))),
+            ("hooks", lambda p: (p.mkdir(exist_ok=True), os.rename(p, outside / "h"), os.symlink(outside / "h", p))),
+            ("MERGE_MSG", lambda p: os.mkfifo(p)),
+            ("description", lambda p: (p.unlink(missing_ok=True), os.symlink(self.victim, p))),
+        )
+        for rel, make in cases:
+            with self.subTest(rel=rel):
+                path = self.gitdir / rel
+                make(path)
+                self.assert_stopped(("status",), path)
+                # 戻す。
+                if rel.startswith("objects/") or rel == "hooks":
+                    path.unlink()
+                    os.rename(outside / ("o" if rel.startswith("objects/") else "h"), path)
+                else:
+                    path.unlink()
+                self.assertTrue(self.fast(("status",)))
+                self.assertEqual(self.check("status")[0], (0, ""))
+        # 大文字と小文字だけが違う名前のディレクトリにも、git は書く（大文字と小文字を区別しないファイルシステム）。
+        logs = self.gitdir / "logs"
+        os.rename(logs, self.gitdir / "LOGS")
+        if (self.gitdir / "logs").exists():
+            link = self.gitdir / "LOGS" / "HEAD"
+            link.unlink()
+            os.symlink(self.victim, link)
+            self.assert_stopped(("status",), link)
+        else:
+            with self.subTest(case="LOGS"):
+                self.skipTest("大文字と小文字を区別するファイルシステムでは、git は LOGS を読まない")
+
+    def test_linked_worktree_gitdir_and_common_dir(self):
+        # linked worktree では、その gitdir（.git/worktrees/<id>）と共通の gitdir（.git）の両方を見る。
+        wt = self.root / "wt"
+        local_git(self.repo, "worktree", "add", "-q", "--detach", str(wt), "docs")
+        self.assertTrue(self.fast(("status",), wt))
+        self.assertEqual(self.check("status", start=wt)[0], (0, ""))
+        for link in (self.gitdir / "worktrees" / "wt" / "FETCH_HEAD", self.gitdir / "FETCH_HEAD"):
+            with self.subTest(link=link):
+                os.symlink(self.victim, link)
+                self.assert_stopped(("status",), link, start=wt)
+                self.assert_stopped(("-C", str(wt), "status"), link, start=self.root)
+                link.unlink()
+
+    def test_fast_path_finds_the_gitdir_like_git(self):
+        # 早道は git を動かさずに gitdir を探す。git と同じと言い切れない形は、決めずに任せる。
+        os.symlink(self.victim, self.gitdir / "FETCH_HEAD")
+        sub = self.repo / "sub"
+        # 中のディレクトリからも、symlink を通ったカレントディレクトリからも、同じ gitdir を見つける。
+        os.symlink(sub, self.root / "sublink")
+        for start in (sub, self.root / "sublink"):
+            with self.subTest(start=start):
+                self.assertFalse(self.fast(("status",), start))
+        self.assertFalse(self.fast(("-C", "sub", "status")))
+        # git が使わない .git ディレクトリ（HEAD・objects・refs がない）を作業ツリーに置いても、その上を見落とさない。
+        (sub / ".git").mkdir()
+        self.assertFalse(self.fast(("status",), sub))
+        self.assertEqual(self.check("status", start=sub)[0], (1, ""))
+        (sub / ".git").rmdir()
+        (self.gitdir / "FETCH_HEAD").unlink()
+        # bare のリポジトリの形（HEAD がある）と、.git が symlink の形は任せる。リポジトリの外は許可する。
+        (sub / "HEAD").write_text("ref: refs/heads/main\n", encoding="utf-8")
+        self.assertFalse(self.fast(("status",), sub))
+        (sub / "HEAD").unlink()
+        self.assertTrue(self.fast(("status",), sub))
+        os.symlink(self.gitdir, self.root / "linked-dotgit")
+        other = self.root / "other"
+        other.mkdir()
+        os.symlink(self.root / "linked-dotgit", other / ".git")
+        self.assertFalse(self.fast(("status",), other))
+        outside = self.root / "outside"
+        outside.mkdir()
+        self.assertTrue(self.fast(("status",), outside))
+        self.assertEqual(self.check("status", start=outside)[0], (0, ""))
+
+
 class FastPathTests(TreeBase):
     """引数だけで許可する早道（I2）は、全体の処理が許可する形しか許可しない。"""
 
     def fast(self, argv, git_env=""):
-        return guard.fast_allow(["check", "--git-env", git_env, "--", *argv])
+        return guard.fast_allow(["check", "--git-env", git_env, "--", *argv], cwd=str(self.repo))
 
     def test_fast_path_agrees_with_full_path(self):
         allowed = [("status",), ("log", "--oneline"), ("diff", "--stat"), ("-C", "sub", "status"),
@@ -818,6 +966,21 @@ class FastPathTests(TreeBase):
         self.assertEqual(guard.main(["check", "--after-fetch", "--git-env", "", "--", "status"]), 1)
         # -h を許すサブコマンドの一覧は、HANDLERS と同じ。
         self.assertEqual(set(guard.HANDLERS), guard.HANDLED)
+        # gitdir に symlink か特殊なファイルがあれば、早道は決めずに任せ、全体の処理は止める（D2）。
+        victim = self.root / "victim"
+        victim.write_text("v\n", encoding="utf-8")
+        gitdir = self.repo / ".git"
+        for rel, make in (("COMMIT_EDITMSG", lambda p: os.symlink("config", p)),
+                          ("FETCH_HEAD", lambda p: os.symlink(victim, p)),
+                          ("logs/HEAD", lambda p: os.symlink(victim, p)), ("MERGE_MSG", os.mkfifo)):
+            path = gitdir / rel
+            path.unlink(missing_ok=True)
+            make(path)
+            for argv in (("status",), ("--version",), ("switch", "-h"), ("-C", "sub", "log"), ("init",)):
+                with self.subTest(gitdir=rel, argv=argv):
+                    self.assertFalse(self.fast(argv))
+                    self.assertEqual(self.check(*argv)[0], (1, ""))
+            path.unlink()
 
     def test_fast_path_runs_before_heavy_imports(self):
         # インストールと同じく、スクリプトとして起動する。
@@ -945,14 +1108,23 @@ class MergeTests(TreeBase):
 
     def test_fetch_head_is_read_as_a_bounded_regular_file(self):
         # FETCH_HEAD（sandbox が書ける）は、symlink をたどらずに、通常のファイルとして上限まで読む（M5）。
+        # symlink と FIFO は、先に gitdir の確かめ（D2）が止める。M5 の読み方は、それを外して確かめる。
         line = f"{local_git(self.repo, 'rev-parse', 'feature')}\t\tbranch 'feature' of x\n"
         fetch_head = self.repo / ".git" / "FETCH_HEAD"
         real = self.root / "fetch-head"
         real.write_text(line, encoding="utf-8")
+
+        def stopped(reason):
+            result, err = self.check("merge", "FETCH_HEAD")
+            self.assertEqual(result, (1, ""))
+            self.assertIn(f"{fetch_head} が、symlink か", err)
+            with mock.patch.object(guard, "_check_gitdirs"):
+                result, err = self.check("merge", "FETCH_HEAD")
+            self.assertEqual(result, (1, ""))
+            self.assertIn(reason, err)
+
         fetch_head.symlink_to(real)
-        result, err = self.check("merge", "FETCH_HEAD")
-        self.assertEqual(result, (1, ""))
-        self.assertIn("FETCH_HEAD を読めません", err)
+        stopped("FETCH_HEAD を読めません")
         fetch_head.unlink()
         fetch_head.write_text(line + "#" * (1 << 20), encoding="utf-8")
         result, err = self.check("merge", "FETCH_HEAD")
@@ -960,9 +1132,7 @@ class MergeTests(TreeBase):
         self.assertIn("FETCH_HEAD が大きすぎます", err)
         fetch_head.unlink()
         os.mkfifo(fetch_head)  # 書く側がいなくても、固まらずに止まる
-        result, err = self.check("merge", "FETCH_HEAD")
-        self.assertEqual(result, (1, ""))
-        self.assertIn("FETCH_HEAD は通常のファイルではありません", err)
+        stopped("FETCH_HEAD は通常のファイルではありません")
 
     def test_merge_driver_is_not_run(self):
         # merge-tree は、作業ツリーの .gitattributes と .git/info/attributes の merge 属性で、設定のドライバーを動かす（実測）。
@@ -1837,6 +2007,20 @@ class WorktreeCreateTests(TreeBase):
                 self.assertEqual((code, out, self.adds), (1, "", 0))
                 self.assertIn(attr.split("=")[0], err)
                 self.assert_nothing_left()
+
+    def test_gitdir_symlink_stops_before_creating(self):
+        # worktree add は、元のチェックアウトの共通の gitdir に書く（logs/refs/heads/worktree-<name> など）。
+        # その途中が symlink なら、git はその先に書くので、作る前に止める（D2）。
+        logs = self.main / ".git" / "logs" / "refs"
+        outside = self.root / "outside-logs"
+        os.rename(logs, outside)
+        os.symlink(outside, logs)
+        before = sorted(p.name for p in outside.rglob("*"))
+        code, out, err = self.create()
+        self.assertEqual((code, out, self.adds), (1, "", 0))
+        self.assertIn(f"{logs} が、symlink か", err)
+        self.assertEqual(sorted(p.name for p in outside.rglob("*")), before)
+        self.assert_nothing_left()
 
     def test_protected_symlink_stops_even_when_same_as_main(self):
         # 作る前に止める。作った後の比較も symlink で止めるが、それだけに頼らない（Task 3 の教訓）。

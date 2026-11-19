@@ -10,11 +10,17 @@ claude -w の WorktreeCreate フック（worktree-create）として、確かめ
 from __future__ import annotations
 
 import os
+import stat
 import sys
 
 # ここから fast_allow までは、重い import の前に読む（I2）。標準ライブラリの読み込みに 1 回あたり約 80 ms かかる。
+# stat は os が読み込むので、時間は増えない。
 EXIT_ALLOW = 0
 EXIT_STOP = 1
+GITFILE_MAX = 4096  # 読む .git ファイル・gitdir ファイル・commondir・HEAD の大きさの上限（バイト）
+# 中のすべての entry を見る gitdir のディレクトリ（D2）。objects は直下だけを見る。
+GITDIR_WALK = frozenset(("logs", "refs", "sequencer", "rebase-merge", "rebase-apply"))
+HEX = frozenset(b"0123456789abcdefABCDEF")
 
 # 作業ツリーに書かないサブコマンド。ファイルに書くオプション（file_writes）があれば止める。
 READ_ONLY = frozenset(
@@ -69,14 +75,149 @@ def file_writes(sub: str, args: Sequence[str]) -> str | None:
     return None
 
 
-def fast_allow(argv: Sequence[str]) -> bool:
+def _odd(entry: os.DirEntry) -> bool:
+    """symlink か、通常のファイルとディレクトリのほか（FIFO・ソケット・デバイス）か。"""
+    return entry.is_symlink() or not (entry.is_file(follow_symlinks=False) or entry.is_dir(follow_symlinks=False))
+
+
+def _odd_under(top: str, deep: bool) -> str | None:
+    """top の中で最初に見つけた _odd な entry のパス。deep なら中のディレクトリもたどる（symlink はたどらない）。"""
+    stack = [top]
+    while stack:
+        with os.scandir(stack.pop()) as it:
+            for entry in it:
+                if _odd(entry):
+                    return entry.path
+                if deep and entry.is_dir(follow_symlinks=False):
+                    stack.append(entry.path)
+    return None
+
+
+def gitdir_problem(gitdir: str) -> str | None:
+    """git が開いて書く gitdir の entry のうち、symlink か特殊なファイルの最初のパス（D2）。読めなければ OSError。
+
+    git は COMMIT_EDITMSG・FETCH_HEAD・logs/HEAD・index などを、symlink をたどって書く（index などの lockfile も、
+    symlink の先に作って置き換える）。symlink のディレクトリ（refs/heads・objects など）の中にも書く（実測）。
+    名前の一覧に頼らず、最上位のすべての entry を見る。中まで見るのは、logs・refs・sequencer・rebase-merge・
+    rebase-apply（すべて）と objects（直下だけ）。名前は大文字と小文字を区別せずに比べる（ファイルシステムが区別しない）。
+    """
+    with os.scandir(gitdir) as it:
+        top = list(it)
+    for entry in top:
+        if _odd(entry):
+            return entry.path
+    for entry in top:
+        name = entry.name.casefold()
+        if entry.is_dir(follow_symlinks=False) and (name in GITDIR_WALK or name == "objects"):
+            found = _odd_under(entry.path, deep=name != "objects")
+            if found is not None:
+                return found
+    return None
+
+
+def _small_file(path: str) -> bytes | None:
+    """path を、symlink をたどらずに、通常のファイルとして GITFILE_MAX バイトまで読む。できなければ None。
+
+    O_NONBLOCK で開くので、FIFO でも固まらない（種類を確かめてから読む）。
+    """
+    try:
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    except OSError:
+        return None
+    try:
+        if not stat.S_ISREG(os.fstat(fd).st_mode):
+            return None
+        data = os.read(fd, GITFILE_MAX + 1)
+    finally:
+        os.close(fd)
+    return data if len(data) <= GITFILE_MAX else None
+
+
+def _git_directory(path: str) -> bool:
+    """path が、git が gitdir として使う .git ディレクトリと言い切れるか。git の is_git_directory より狭く判定する。
+
+    git は、HEAD が正しくないか、objects・refs をたどれない .git ディレクトリを使わずに、上を探す。
+    """
+    head = _small_file(os.path.join(path, "HEAD"))
+    if head is None:
+        return False
+    if head.startswith(b"ref:"):
+        if not head[4:].lstrip().startswith(b"refs/"):
+            return False
+    elif len(head) < 40 or not HEX.issuperset(head[:40]):
+        return False
+    if os.path.lexists(os.path.join(path, "commondir")):
+        return False
+    return all(os.path.isdir(p) and os.access(p, os.X_OK)
+               for p in (os.path.join(path, "objects"), os.path.join(path, "refs")))
+
+
+def _path_in(base: str, data: bytes) -> str | None:
+    """git が .git ファイルと commondir を読むのと同じく、末尾の CR と LF を除き、相対パスなら base から読む。"""
+    text = os.fsdecode(data.rstrip(b"\r\n"))
+    return os.path.join(base, text) if text else None
+
+
+def find_gitdirs(cwd: str) -> list[str] | None:
+    """cwd の gitdir と共通の gitdir を、git を動かさずに、git と同じくファイルシステムから探す（D2。早道で使う）。
+
+    カレントディレクトリの物理パスから上へ .git を探す。リポジトリの外なら []。git と同じと言い切れない形
+    （.git が symlink か特殊なファイル、読めない .git ファイル、git が使うか分からない .git ディレクトリ、
+    bare のリポジトリかもしれないディレクトリ）なら None。
+    """
+    path = os.path.realpath(cwd)
+    while True:
+        dotgit = os.path.join(path, ".git")
+        try:
+            st: os.stat_result | None = os.lstat(dotgit)
+        except (FileNotFoundError, NotADirectoryError):
+            st = None
+        if st is not None:
+            gitdir: str | None = None
+            if stat.S_ISREG(st.st_mode):
+                data = _small_file(dotgit)
+                if data is not None and data.startswith(b"gitdir: "):
+                    gitdir = _path_in(path, data[len(b"gitdir: "):])
+            elif stat.S_ISDIR(st.st_mode) and _git_directory(dotgit):
+                gitdir = dotgit
+            if gitdir is None:
+                return None
+            common: str | None = gitdir
+            if os.path.lexists(os.path.join(gitdir, "commondir")):
+                data = _small_file(os.path.join(gitdir, "commondir"))
+                common = _path_in(gitdir, data) if data is not None else None
+            return None if common is None else [gitdir, common]
+        if os.path.lexists(os.path.join(path, "HEAD")):
+            return None  # bare のリポジトリかもしれない
+        parent = os.path.dirname(path)
+        if parent == path:
+            return []
+        path = parent
+
+
+def _gitdirs_clean(cwd: str | None, moves: Sequence[str]) -> bool:
+    """-C（moves）を当てたカレントディレクトリの gitdir と共通の gitdir に、gitdir_problem がないと言い切れるか（D2）。"""
+    try:
+        place = cwd if cwd is not None else os.getcwd()
+        for value in moves:
+            place = os.path.join(place, value)
+        dirs = find_gitdirs(place)
+        return dirs is not None and all(gitdir_problem(d) is None for d in dict.fromkeys(dirs))
+    except (OSError, ValueError):
+        return False
+
+
+def fast_allow(argv: Sequence[str], cwd: str | None = None) -> bool:
     """check の引数だけで許可が決まるか（I2）。偽なら何も決めず、全体の処理（main）に任せる。
 
     許可するのは、全体の処理も許可する形だけ: READ_ONLY のサブコマンドでファイルに書かない形、
     HANDLED のサブコマンドの -h・--help、サブコマンドのない形（--version・--help など）。
     check のオプションと全体のオプションは main・parse と同じく読み、parse が止めるもの（-c alias.*、
     知らないオプション、ALLOWED_GIT_ENV にない名前）と、同じと言い切れないもの（ASCII でない -c の値、alias）は任せる。
-    リポジトリは読まない。READ_ONLY は作業ツリーに書かないので、許可にリポジトリの中身は要らない。
+    リポジトリの中身は読まない。READ_ONLY は作業ツリーに書かないので、許可にリポジトリの中身は要らない。
+    許可する前に、-C を当てたカレントディレクトリの gitdir と共通の gitdir を、git を動かさずに確かめ、symlink などが
+    あるか、git と同じと言い切れなければ任せる（D2。全体の処理は、sandbox の中なら許可し、外なら止める）。
+    cwd は呼ばれたときのカレントディレクトリ（None なら os.getcwd()。テストで差し替える）。
     """
     if argv[:1] != ["check"] or "--" not in argv:
         return False
@@ -92,10 +233,11 @@ def fast_allow(argv: Sequence[str]) -> bool:
             return False
         i += 1
     i = 0
+    moves: list[str] = []  # -C の値（git と同じ順に当てる）
     while i < len(args):
         tok = args[i]
         if tok in HELP_GLOBALS:
-            return True
+            break
         if tok in ("-C", "-c"):
             if i + 1 >= len(args):
                 return False
@@ -105,6 +247,8 @@ def fast_allow(argv: Sequence[str]) -> bool:
             if tok == "-c" and (not value.isascii() or value.lower().startswith("alias.")
                                 or value.lower().partition("=")[0] == "init.templatedir"):
                 return False
+            if tok == "-C":
+                moves.append(value)
             i += 2
         elif tok in SKIPPED_GLOBALS:
             i += 1
@@ -114,9 +258,13 @@ def fast_allow(argv: Sequence[str]) -> bool:
             # git は builtin を alias で置き換えないので、名前だけで決まる。
             rest = args[i + 1:]
             if tok in READ_ONLY:
-                return file_writes(tok, rest) is None
-            return tok in HANDLED and rest[:1] in (["-h"], ["--help"])
-    return True
+                if file_writes(tok, rest) is not None:
+                    return False
+            elif not (tok in HANDLED and rest[:1] in (["-h"], ["--help"])):
+                return False
+            break
+    # 許可する形。gitdir を確かめてから許可する（D2）。
+    return _gitdirs_clean(cwd, moves)
 
 
 # 確認コマンドとして起動されたときだけ（check-repo.py とテストの import では動かさない）、
@@ -132,7 +280,6 @@ import pwd
 import re
 import shlex
 import signal
-import stat
 import subprocess
 import tempfile
 import time
@@ -209,7 +356,6 @@ WORKTREE_ADD_FLAGS = frozenset(
 WORKTREE_ADD_VALUES = frozenset(("-b", "-B", "--reason"))
 WORKTREE_OTHERS = frozenset("list prune lock unlock repair".split())  # 作業ツリーの中身を書かない
 WORKTREE_MOVE_FLAGS = frozenset(("-f", "--force"))  # move と remove
-GITFILE_MAX = 4096  # 読む .git ファイルと gitdir ファイルの大きさの上限（バイト）
 FETCH_HEAD_MAX = 1 << 20  # 読む FETCH_HEAD の大きさの上限（バイト）
 # git がパスを C の形で引用するときの、\ の後の文字と、その値。
 C_ESCAPES = {ord("a"): 7, ord("b"): 8, ord("t"): 9, ord("n"): 10, ord("v"): 11, ord("f"): 12, ord("r"): 13,
@@ -233,6 +379,10 @@ MSG_NO_TTY = (
 MSG_PULL = (
     "cc-checkout-guard: git pull は、確かめた後にもう一度 fetch して取り込むので止めました。"
     "git fetch を実行してから、git merge @{u}（fast-forward だけなら git merge --ff-only @{u}）を実行してください。"
+)
+MSG_GITDIR = (
+    "cc-checkout-guard: git のディレクトリの {path} が、symlink か、通常のファイルとディレクトリのほかの種類なので止めました。"
+    "git はここに書くときに、symlink の先（作業ツリーの外も）に書きます。何を指しているかを確かめて、消してから git を実行してください。"
 )
 MSG_DANGER = "cc-checkout-guard: {path} が{kind}になるので止めました。中身を確かめてください。"
 MSG_ERROR = "cc-checkout-guard: 確かめる途中で失敗したので止めました（{reason}）。"
@@ -534,6 +684,29 @@ def parse(start: Path, argv: Sequence[str], git_env_names: Sequence[str], home: 
         cwd=cwd, root=root, config=tuple(config), sub=sub,
         args=args, argv=tuple(argv), start=start, home=home,
     )
+
+
+def _check_gitdirs(inv: Invocation) -> None:
+    """inv.cwd の gitdir と共通の gitdir（git の見つけ方）に gitdir_problem があれば、Refused で止める（D2）。
+
+    リポジトリの外なら何もしない。早道は同じ確かめ方を、git を動かさずにファイルシステムから探して行う。
+    """
+    cp = _git_process(inv.cwd, "rev-parse", "--path-format=absolute", "--git-dir", "--git-common-dir",
+                      config=inv.config)
+    if cp.returncode != 0:
+        if inv.root is not None:
+            raise GuardError("git のディレクトリを確かめられません")
+        return
+    dirs = os.fsdecode(cp.stdout).split("\n")
+    if len(dirs) != 3 or dirs[2] or not all(dirs[:2]):
+        raise GuardError("git のディレクトリを確かめられません")
+    for gitdir in dict.fromkeys(dirs[:2]):
+        try:
+            found = gitdir_problem(gitdir)
+        except OSError:
+            raise GuardError("git のディレクトリを読めません") from None
+        if found is not None:
+            raise Refused(MSG_GITDIR.format(path=_show(found)))
 
 
 def split_args(sub: str, args: Sequence[str], flags: frozenset[str],
@@ -1808,6 +1981,8 @@ def check(argv: Sequence[str], *, start: Path, git_env: Sequence[str], home: Pat
         return EXIT_ALLOW, ""
     try:
         inv = parse(start, argv, git_env, home)
+        # git は gitdir の symlink の先に書くので、何を許可する前にも確かめる（D2）。
+        _check_gitdirs(inv)
         # ファイルに書く形は、リポジトリの外でも止める（書き先は絶対パスで対象を指せる）。
         writes = file_writes(inv.sub, inv.args)
         if writes is not None:
@@ -1841,12 +2016,13 @@ def check(argv: Sequence[str], *, start: Path, git_env: Sequence[str], home: Pat
         newline = "" if answer.endswith("\n") else "\n"
         if answer.strip().lower() in ("y", "yes"):
             # 人間が読んでいる間に ref などを差し替えられていないか、同じ計算をもう一度して比べる（I1）。
-            # 残る窓は、ここから git が書くまでの短い時間だけ（verify が後から見つける）。
+            # gitdir も確かめ直す（D2）。残る窓は、ここから git が書くまでの短い時間だけ（verify が後から見つける）。
             try:
+                _check_gitdirs(inv)
                 again = handler(inv)
                 same = (again is not None and again.changes == plan.changes and danger(again, inv) is None
                         and state_of(again, inv) == state)
-            except GuardError:
+            except (GuardError, Refused):
                 same = False
             if same:
                 return EXIT_ALLOW, state
@@ -2105,6 +2281,8 @@ def _worktree_create(payload: Mapping[str, object], stdout: TextIO, stderr: Text
     if reason is not None:
         stderr.write(reason + "\n")
         return EXIT_STOP
+    # worktree add は、元のチェックアウトの gitdir（logs/refs/heads/<ブランチ> など）に書く（D2）。
+    _check_gitdirs(inv)
     # 前に作った worktree の印が残っていれば消す。作る途中で止められたときに、古い印で確かめ済みとみなさない。
     try:
         os.unlink(_marker(place))
@@ -2154,6 +2332,8 @@ def worktree_create(payload: Mapping[str, object], *, stdout: TextIO, stderr: Te
     _deadline = time.monotonic() + WORKTREE_BUDGET
     try:
         return _worktree_create(payload, stdout, stderr, home if home is not None else user_home())
+    except Refused as e:
+        stderr.write(str(e) + "\n")
     except GuardError as e:
         stderr.write(MSG_ERROR.format(reason=_show(str(e))) + "\n")
     except Exception as e:
