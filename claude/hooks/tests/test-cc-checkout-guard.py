@@ -1454,6 +1454,63 @@ class RerereTests(TreeBase):
         self.assertNotIn(guard.MSG_ASK, err)
 
 
+class UnchangedRewriteTests(TreeBase):
+    """git は、index の stat が合わない entry を、中身が同じでも書き直し、そのときに属性で中身を変える。sandbox は
+    .git/info/attributes を書き、read-tree HEAD で index の stat を消せる（/security-review の S2。両方の git で実測）。
+    """
+
+    # 書き直した形（両方の git で実測）と、強制の形として同じに扱う形（reset --merge・--keep・merge --abort。書き直さなかった）。
+    REWRITES = (("reset", "--hard"), ("reset", "--hard", "docs"), ("reset", "--merge"), ("reset", "--keep", "HEAD"),
+                ("switch", "-f", "main"), ("switch", "-f", "docs"), ("checkout", "-f"), ("checkout", "-f", "docs"),
+                ("merge", "--abort"), ("stash",), ("stash", "-k"), ("stash", "-u"), ("restore", "."),
+                ("restore", ".claude/settings.json"), ("restore", "--source=HEAD", "."), ("restore", "--source=docs", "."),
+                ("restore", "--staged", "--worktree", "."), ("checkout", "--", "."), ("checkout", "HEAD", "--", "."),
+                ("checkout", "docs", "--", "."), ("checkout-index", "-f", "-a"),
+                ("checkout-index", "-f", ".claude/settings.json"), ("-C", "sub", "restore", ".."))
+    # 書き直さなかった形（両方の git で実測）は、今までどおり変わる対象だけを確かめる。
+    KEEPS = (("switch", "docs"), ("checkout", "docs"), ("merge", "--no-edit", "docs"), ("cherry-pick", "docs"),
+             ("restore", "README.md"), ("checkout", "docs", "--", "README.md"))
+
+    def setUp(self):
+        super().setUp()
+        (self.repo / "README.md").write_text("dirty\n", encoding="utf-8")  # stash が保存するもの
+        local_git(self.repo, "read-tree", "HEAD")  # index の stat を消す（中身は HEAD と同じ）
+
+    def plant(self, attr="working-tree-encoding=UTF-16"):
+        info = self.repo / ".git" / "info"
+        info.mkdir(exist_ok=True)
+        (info / "attributes").write_text(f".claude/settings.json {attr}\n", encoding="utf-8")
+
+    def test_attribute_on_unchanged_protected_file_stops(self):
+        for argv in self.REWRITES + self.KEEPS:
+            with self.subTest(attribute=False, argv=argv):
+                (code, _), err = self.check(*argv)
+                self.assertEqual(code, 0, err)
+        self.plant()
+        for argv in self.REWRITES:
+            with self.subTest(attribute=True, argv=argv):
+                result, err = self.check(*argv, tty=True, answer="y\n")
+                self.assertEqual(result, (1, ""))
+                self.assertIn(".claude/settings.json が書くときに中身を変える属性（working-tree-encoding）", err)
+                self.assertNotIn(guard.MSG_ASK, err)
+        for argv in self.KEEPS:
+            with self.subTest(attribute=True, kept=argv):
+                (code, _), err = self.check(*argv)
+                self.assertEqual(code, 0, err)
+        # 仕掛けが効くことを、テストの git で確かめる（reset --hard が UTF-16 で書き直す）。
+        local_git(self.repo, "reset", "-q", "--hard")
+        self.assertTrue(self.settings.read_bytes().startswith(b"\xfe\xff"))
+
+    def test_other_content_attributes_stop(self):
+        for attr in ("filter=probe", "ident", "working-tree-encoding=UTF-16LE"):
+            with self.subTest(attr=attr):
+                self.plant(attr)
+                for argv in (("reset", "--hard"), ("restore", "."), ("stash",)):
+                    result, err = self.check(*argv)
+                    self.assertEqual(result, (1, ""))
+                    self.assertIn("書くときに中身を変える属性", err)
+
+
 class StashAndPickTests(TreeBase):
     def test_stash(self):
         self.settings.write_text('{"v": 5}\n', encoding="utf-8")

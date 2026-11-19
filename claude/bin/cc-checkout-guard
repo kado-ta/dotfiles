@@ -497,6 +497,7 @@ class Plan:
     sources: tuple[str, ...]  # 属性を確かめる tree の oid。index なら INDEX
     fresh: bool = False  # 新しいディレクトリに書くとき（worktree add）
     old_root: Path | None = None  # 旧を読み、git を動かす作業ツリー（fresh のときの元のチェックアウト）。None なら root
+    rewrites: tuple[str, ...] = ()  # 中身が同じでも git が書き直しうる対象のパス（属性を確かめる。S2）
 
 
 @dataclass(frozen=True)
@@ -965,6 +966,16 @@ def _gitlinks(source: dict[str, Entry], base: dict[str, Entry]) -> set[str]:
     return found
 
 
+def _protected_index(inv: Invocation, pathspec: Sequence[str]) -> dict[str, Entry]:
+    """index の、pathspec（inv.cwd から読む。なければ全体）に当たる対象の entry（パスはルートから）。"""
+    assert inv.root is not None
+    if pathspec:
+        entries = index_entries(inv.cwd, *pathspec, root=inv.root, home=inv.home, config=inv.config)
+    else:
+        entries = index_entries(inv.root, root=inv.root, home=inv.home, config=inv.config)
+    return {p: e for p, e in entries.items() if is_protected(inv.root, p, inv.home)}
+
+
 def _stale(inv: Invocation, pathspec: Sequence[str]) -> set[str]:
     """ディスクの中身が index と違う対象のファイル。
 
@@ -972,11 +983,7 @@ def _stale(inv: Invocation, pathspec: Sequence[str]) -> set[str]:
     それを無視して書くので、中身で比べる。pathspec がなければ全体。
     """
     assert inv.root is not None
-    if pathspec:
-        entries = index_entries(inv.cwd, *pathspec, root=inv.root, home=inv.home, config=inv.config)
-    else:
-        entries = index_entries(inv.root, root=inv.root, home=inv.home, config=inv.config)
-    targets = {p: e for p, e in entries.items() if is_protected(inv.root, p, inv.home)}
+    targets = _protected_index(inv, pathspec)
     disk = disk_entries(inv.root, targets)
     stale: set[str] = set()
     for path, entry in targets.items():
@@ -1021,8 +1028,13 @@ def _plain_checkout(inv: Invocation) -> None:
 
 
 def _plan(inv: Invocation, source: dict[str, Entry], paths: Iterable[str], sources: tuple[str, ...],
-          delete: bool) -> Plan:
-    """候補のパスのうち対象のものについて、ディスクの今と、書く元の entry を比べる。"""
+          delete: bool, rewrites: Iterable[str] = ()) -> Plan:
+    """候補のパスのうち対象のものについて、ディスクの今と、書く元の entry を比べる。
+
+    rewrites は、中身が同じでも git が書き直しうるパス。そのうち書く元にある対象を Plan.rewrites に入れ、danger が属性を
+    確かめる。git は、index の stat が合わない entry（sandbox が read-tree などで stat を消せる）を、中身が同じでも書き直し、
+    そのときに属性（.git/info/attributes も sandbox が書ける）で中身を変える（/security-review の S2。両方の git で実測）。
+    """
     assert inv.root is not None
     _plain_checkout(inv)
     root, home = inv.root, inv.home
@@ -1046,7 +1058,8 @@ def _plan(inv: Invocation, source: dict[str, Entry], paths: Iterable[str], sourc
             new = _effective(inv, new)
         if disk[path] != new:
             changes.append(Change(path, disk[path], new))
-    return Plan(root=root, changes=tuple(changes), sources=sources)
+    kept = sorted(p for p in set(rewrites) if p in source and is_protected(root, p, home))
+    return Plan(root=root, changes=tuple(changes), sources=sources, rewrites=tuple(kept))
 
 
 def _index_missing(inv: Invocation) -> bool:
@@ -1055,9 +1068,15 @@ def _index_missing(inv: Invocation) -> bool:
 
 
 def _tree_plan(inv: Invocation, tree: str, *, switch: bool, force: bool) -> Plan:
-    """作業ツリーを tree にする操作。switch は HEAD との差、force は index とディスクとの差を書く。"""
+    """作業ツリーを tree にする操作。switch は HEAD との差、force は index とディスクとの差を書く。
+
+    force（reset --hard・--merge・--keep、switch -f・checkout -f、merge --abort）では、index と tree の対象すべてを、
+    中身が同じでも書き直しうるものとする（reset --hard・switch -f・checkout -f は書き直した。実測。S2）。
+    switch だけ（-f のない switch・checkout、merge・cherry-pick・revert・stash apply）は書き直さなかった。
+    """
     source = tree_entries(inv.cwd, tree, config=inv.config)
     paths: set[str] = set()
+    rewrites: set[str] = set()
     if switch:
         head = _head_tree(inv)
         paths |= set(changed_paths(inv, head, tree))
@@ -1070,17 +1089,26 @@ def _tree_plan(inv: Invocation, tree: str, *, switch: bool, force: bool) -> Plan
         assert inv.root is not None
         index = index_entries(inv.root, root=inv.root, home=inv.home, config=inv.config)
         paths |= set(changed_paths(inv, "--cached", tree)) | _stale(inv, ()) | _gitlinks(source, index)
-    return _plan(inv, source, paths, (tree,), delete=True)
+        rewrites = set(index) | set(source)
+    return _plan(inv, source, paths, (tree,), delete=True, rewrites=rewrites)
 
 
 def _index_plan(inv: Invocation, pathspec: Sequence[str]) -> Plan:
+    """pathspec に当たるパスを index から書く操作（restore・checkout -- <pathspec>・checkout-index）。
+
+    当たる対象すべてを、中身が同じでも書き直しうるものとする（restore・checkout と checkout-index -f は書き直した。実測。S2）。
+    """
     assert inv.root is not None
     source = index_entries(inv.root, root=inv.root, home=inv.home, config=inv.config)
-    return _plan(inv, source, _stale(inv, pathspec), (INDEX,), delete=False)
+    return _plan(inv, source, _stale(inv, pathspec), (INDEX,), delete=False, rewrites=_protected_index(inv, pathspec))
 
 
 def _path_plan(inv: Invocation, tree: str | None, pathspec: Sequence[str], delete: bool) -> Plan:
-    """pathspec に当たるパスを、tree（None なら index）から書く操作。"""
+    """pathspec に当たるパスを、tree（None なら index）から書く操作。
+
+    tree の、pathspec に当たる対象すべて（index と違うものと、index にあって当たるもの）を、中身が同じでも書き直しうる
+    ものとする（実測。S2）。
+    """
     if not pathspec:
         raise GuardError(f"{inv.sub} のパスがありません")
     if tree is None:
@@ -1089,8 +1117,9 @@ def _path_plan(inv: Invocation, tree: str | None, pathspec: Sequence[str], delet
     source = tree_entries(inv.cwd, tree, config=inv.config)
     index = index_entries(inv.root, root=inv.root, home=inv.home, config=inv.config)
     paths = set(changed_paths(inv, "--cached", tree, "--", *pathspec))
+    rewrites = paths | set(_protected_index(inv, pathspec))
     paths |= _stale(inv, pathspec) | _gitlinks(source, index)
-    return _plan(inv, source, paths, (tree,), delete)
+    return _plan(inv, source, paths, (tree,), delete, rewrites=rewrites)
 
 
 def plan_switch(inv: Invocation) -> Plan:
@@ -1357,7 +1386,10 @@ def plan_pull(inv: Invocation) -> Plan:
 
 
 def _stash_push(inv: Invocation, args: Sequence[str]) -> Plan:
-    """変更を保存してから HEAD に戻す。-u は追跡していないファイルも消す。"""
+    """変更を保存してから HEAD に戻す。-u は追跡していないファイルも消す。
+
+    reset --hard と同じく、index と HEAD の対象すべてを、中身が同じでも書き直しうるものとする（-k・-u も書き直した。実測。S2）。
+    """
     assert inv.root is not None
     a = split_args("stash", args, STASH_PUSH_FLAGS, STASH_PUSH_VALUES)
     if a.positional or a.pathspec is not None:
@@ -1375,7 +1407,7 @@ def _stash_push(inv: Invocation, args: Sequence[str]) -> Plan:
         out = run_git(inv.root, "ls-files", "-z", "--others", "--exclude-standard", config=inv.config)
         # 末尾が / のもの（中のリポジトリ）は、stash -u の clean では消えない。
         paths |= {os.fsdecode(p) for p in out.split(b"\0") if p and not p.endswith(b"/")}
-    return _plan(inv, source, paths, (head,), delete=True)
+    return _plan(inv, source, paths, (head,), delete=True, rewrites=set(index) | set(source))
 
 
 def _stash_apply(inv: Invocation, args: Sequence[str]) -> Plan:
@@ -1920,7 +1952,8 @@ def danger(plan: Plan, inv: Invocation) -> str | None:
             parent = "/".join(parts[:i])
             if os.path.islink(os.path.join(plan.root, parent)):
                 return MSG_DANGER.format(path=_show(parent), kind="symlink")
-    paths = [c.path for c in plan.changes if c.new is not None]
+    # 変わるものに加えて、中身が同じでも書き直しうるもの（S2）。
+    paths = sorted({c.path for c in plan.changes if c.new is not None} | set(plan.rewrites))
     if plan.fresh:
         # 新しい作業ツリーには、元のチェックアウトと同じ中身の対象も書かれ、属性はそれにも効く。
         paths = sorted(set(paths) | set(_fresh_entries(plan, inv)))
