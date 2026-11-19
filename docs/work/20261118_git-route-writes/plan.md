@@ -36,7 +36,7 @@ created: 2026-11-18
 - y/N を飛ばす環境変数やオプションは作らない。既定は N。
 - 失敗したら止める（fail closed）。例外はすべて、終了コード 1 と理由のメッセージにする。
 - `SANDBOX_RUNTIME` などの環境変数で、sandbox の中かを判断しない（design の C4）。
-- 終了コード: `0` 許可、`1` 止める、`3` 先に fetch が要る（`pull` だけ）。
+- 終了コード: `0` 許可、`1` 止める。初めは `3`（先に fetch が要る。`pull` だけ）もあったが、`/review` の修正で pull を止めることにして消した（2026-11-19。Task 3）。
 - 人間に見せる文は日本語で、下の「メッセージ」の文をそのまま使う。リポジトリのファイルの中身は、差分として見せるとき以外は出さない。
 
 **対象の一覧**（design 6.2。定数の値）
@@ -113,20 +113,20 @@ CI は、`claude/hooks/tests/test-*.py` をすべて実行するので、ワー�
 
 **Interfaces（Produces）:**
 
-- 定数: 上の「対象の一覧」、`GIT`、`GUARD_PATH = "/usr/local/libexec/claude-guard/cc-checkout-guard"`、`EXIT_ALLOW = 0`・`EXIT_STOP = 1`・`EXIT_FETCH = 3`、メッセージの定数。
+- 定数: 上の「対象の一覧」、`GIT`、`EXIT_ALLOW = 0`・`EXIT_STOP = 1`、メッセージの定数。初めにあった `GUARD_PATH`（使われていなかった）と `EXIT_FETCH = 3` は、`/review` の修正で消した。
 - `READ_ONLY: frozenset[str]`: 作業ツリーに書かないサブコマンド。`add blame branch cat-file check-attr check-ignore check-mailmap check-ref-format cherry clone commit commit-graph commit-tree config count-objects describe diff diff-files diff-index diff-tree fetch for-each-ref fsck gc grep hash-object help init log ls-files ls-remote ls-tree maintenance merge-base merge-tree mktag mktree name-rev notes prune push range-diff reflog remote repack replace rev-list rev-parse shortlog show show-branch show-ref status symbolic-ref tag update-index update-ref var verify-commit verify-pack verify-tag version whatchanged write-tree`（`commit` は Task 3 で移す。`archive`・`bundle`・`format-patch` は最終レビューで外した。下の「最終レビューで変えたもの」）。
 - `ALLOWED_GIT_ENV: frozenset[str]`: 人間の環境にあってよい `GIT_` の名前。`GIT_EDITOR GIT_SEQUENCE_EDITOR GIT_PAGER GIT_SSH GIT_SSH_COMMAND GIT_ASKPASS GIT_TERMINAL_PROMPT GIT_AUTHOR_NAME GIT_AUTHOR_EMAIL GIT_AUTHOR_DATE GIT_COMMITTER_NAME GIT_COMMITTER_EMAIL GIT_COMMITTER_DATE GIT_MERGE_AUTOEDIT GIT_PROGRESS_DELAY`。
 - `class GuardError(Exception)`: 確かめられない、または失敗した。`str(e)` が理由。
-- `class FetchFirst(Exception)`: `argv: list[str]`（先に実行する git の引数）。
-- `@dataclass(frozen=True) class Invocation`: `cwd: Path`（`-C` を当てた後）、`root: Path | None`（作業ツリーのルート。リポジトリの外なら `None`）、`globals: tuple[str, ...]`（人間が渡した全体のオプションの並び。`!` の表示と fetch に使う）、`config: tuple[str, ...]`（`-c` の値）、`sub: str`（alias を展開した後。なければ `""`）、`args: tuple[str, ...]`、`argv: tuple[str, ...]`（元の引数）、`start: Path`（呼ばれたときのカレントディレクトリ）。
-- `HANDLERS: dict[str, Callable[[Invocation, bool], Plan]]`: Task 2・3 が足す。第 2 引数は `after_fetch`。
+- `class Refused(Exception)`: 止める文そのもの。`check` は `MSG_UNSUPPORTED` で包まずにそのまま出して `(1, "")` を返す（`command git` を勧めない止め方。pull と gitdir の symlink。`/review` の修正で追加）。初めにあった `class FetchFirst(Exception)` は消した。
+- `@dataclass(frozen=True) class Invocation`: `cwd: Path`（`-C` を当てた後）、`root: Path | None`（作業ツリーのルート。リポジトリの外なら `None`）、`config: tuple[str, ...]`（`-c` の値）、`sub: str`（alias を展開した後。なければ `""`）、`args: tuple[str, ...]`、`argv: tuple[str, ...]`（元の引数）、`start: Path`（呼ばれたときのカレントディレクトリ）。初めにあった `globals`（fetch の引数に使っていた）は、`/review` の修正で消した。
+- `HANDLERS: dict[str, Callable[[Invocation], Plan | None]]`: Task 2・3 が足す。初めにあった第 2 引数の `after_fetch` は、`/review` の修正で消した。
 - `user_home() -> Path`
 - `in_sandbox() -> bool`: `/usr/lib/libSystem.B.dylib` の `sandbox_check(getpid(), NULL, 0)` が 1 なら真。例外は偽。
 - `is_protected(root: Path, rel: str, home: Path) -> bool`
 - `run_git(cwd: Path, *args: str, config: Sequence[str] = (), stdin: bytes | None = None, ok: Sequence[int] = (0,)) -> bytes`: 終了コードが `ok` になければ `GuardError("git <最初の引数> が失敗しました")`。stderr はメッセージに入れない。
 - `parse(start: Path, argv: Sequence[str], git_env: Sequence[str], home: Path) -> Invocation`
-- `check(argv, *, start: Path, git_env: Sequence[str], after_fetch: bool, home: Path, stdin: TextIO, stderr: TextIO, tty: bool) -> tuple[int, str]`: 終了コードと、標準出力に出す文字列（許可したときの状態の JSON か、fetch の引数の NUL 区切り）。
-- `main(argv: list[str]) -> int`: `check [--after-fetch] [--git-env NAMES] -- <git の引数>`・`verify <状態>`・`worktree-create`・`status`。`status` は `sandbox: yes` か `sandbox: no` を出して 0 で終わる。それ以外の形は 1。
+- `check(argv, *, start: Path, git_env: Sequence[str], home: Path, stdin: TextIO, stderr: TextIO, tty: bool) -> tuple[int, str]`: 終了コードと、標準出力に出す文字列（許可したときの状態の JSON）。初めにあった `after_fetch` と、fetch の引数の出力は、`/review` の修正で消した。
+- `main(argv: list[str]) -> int`: `check [--git-env NAMES] -- <git の引数>`・`verify <状態>`・`worktree-create`・`status`。`status` は `sandbox: yes` か `sandbox: no` を出して 0 で終わる。それ以外の形（`/review` の修正で消した `--after-fetch` を含む）は 1。
 
 **`parse` の決まり**
 
@@ -151,6 +151,14 @@ CI は、`claude/hooks/tests/test-*.py` をすべて実行するので、ワー�
 - ファイルに書く形を止める（`file_writes`。`parse` の直後、リポジトリの外の判定より前に調べる）。READ_ONLY のサブコマンドの `--output`（`--outp` などの省略形と `--output=…`。`--output-indicator-*` は除く）、`config` の `-f`・`--file`（省略形と、`-` 1 つで `f` を含むまとめ書き）。`archive`・`bundle`・`format-patch` は READ_ONLY から外して `FILE_WRITERS` にし、alias として展開せず、リポジトリの外でも止める。`init` の `--separate-git-dir`・`--template`（省略形と `=` の形）と、人間の `-c init.templateDir` も止める（修正の再レビューで追加。既存のリポジトリでは、`.git` を丸ごと動かすか、テンプレートを `.git/hooks` に写す。実測）。
 - 早道（`fast_allow`）。スクリプトの先頭で、重い import の前に、引数だけで次を許可する。READ_ONLY のサブコマンドで `file_writes` に当たらないもの、`HANDLERS` のサブコマンドの直後の `-h`・`--help`、`--version` などの全体のオプションだけの形。全体のオプションと `--git-env` は `parse` と同じく読み、確かでなければ今までの処理に任せる。モジュールとして読み込んだときは動かない（check-repo とテストは `SourceFileLoader`）。1 回あたりの時間は、sandbox の中の測定で約 135 ms から約 42 ms になった（空の `python3 -I` は約 33 ms）。CLT の git が読めないリポジトリでも READ_ONLY を許可する点だけ、今までの処理（「リポジトリを読めません」で止める）と違う。READ_ONLY は作業ツリーに書かないので、許可した。この違いは `test_fast_path_agrees_with_full_path` で、そのまま確かめる。
 - y と答えた後に、同じ計算をし直し、変わるファイル・`danger`・状態の JSON が確認のときと同じときだけ許可する。違えば（計算し直しの失敗を含む）`MSG_CHANGED_WHILE_ASKING` を出して、git を実行せずに `(1, "")`。
+
+**`/review` で変えたもの**（2026-11-19。人間の判断 D2。どれもテストがある）
+
+- gitdir の symlink を止める。git は gitdir の中のファイルを開くときに symlink をたどり、作業ツリーの外や `.git/config` に書く（`COMMIT_EDITMSG`・`FETCH_HEAD`・`logs/HEAD` などで、両方の git で実測）。sandbox の外で許可する前に、どのサブコマンド（`status`・`--version` も）でも、`-C` を当てた後のカレントディレクトリの gitdir と共通の gitdir を確かめる。
+  - 止める形: gitdir と共通の gitdir の中のどこかに、symlink か、通常のファイルとディレクトリのほかの種類（FIFO・ソケット・デバイス）がある。名前は `casefold()` で比べる。初めは最上位と `logs`・`refs`・`sequencer`・`rebase-merge`・`rebase-apply` の下と `objects` の直下だけを見ていたが、再レビューで `objects/info/commit-graph` の symlink を通して `gc` が外に書くことが分かり（実測）、全体を歩くことにした（R32）。
+  - 中を見ないのは、`hooks/` の中（git は書かない。hook のファイルを symlink にする使い方がある）と、loose object の振り分けのディレクトリ（`objects/<2 桁の 16 進>/`・`lfs/objects/<2 桁>/`。submodule の gitdir の中も）の中だけ。ディレクトリ自体は確かめる。見ない理由と残る経路は design 7 章に書く。
+  - 全体の処理は `rev-parse --path-format=absolute --git-dir --git-common-dir`（人間の `-c` つき）で gitdir を探し、問題があれば `Refused(MSG_GITDIR)`（どのファイルかを出し、確かめて消すよう案内する。`command git` は勧めない）。y の後の確かめ直しでも確かめる。
+  - 早道は git を動かさずに、物理パスから上へ `.git` を探す（`.git` ファイルの `gitdir:` と `commondir` は `O_NOFOLLOW`・4096 バイトまでで読む）。`.git` ディレクトリは、HEAD が `ref: refs/`・`ref:refs/` か 40 桁の 16 進で始まるときだけ gitdir とみなす（git が受け入れる形の一部。再レビューで、git が飛ばす `.git` を早道が使う食い違いが分かり、狭めた）。問題があるか、言い切れない形（`.git` が symlink、bare の形など）なら偽を返して全体の処理に任せる。自分では止めない。早道と全体の処理は、同じ関数（`gitdir_problem`）で判定する。`fast_allow(argv, cwd=None)` の `cwd` はテストのため。時間の増分は、sandbox の中の 20 回の中央値で 2 ms 余り（worktree）と 0.3 ms（元のチェックアウト）。
 
 **テスト**（Base は一時ディレクトリにリポジトリを作り、`guard.in_sandbox` を偽に差し替える）
 
@@ -189,7 +197,7 @@ CI は、`claude/hooks/tests/test-*.py` をすべて実行するので、ワー�
   - `@dataclass(frozen=True) class Entry`: `mode: str`（`"100644"`・`"100755"`・`"120000"`・`"160000"`・`"040000"`）、`oid: str`。
   - `@dataclass(frozen=True) class Change`: `path: str`（ルートからの相対パス）、`old: Entry | None`、`new: Entry | None`（`None` は無い・削除）。
   - `@dataclass(frozen=True) class Plan`: `root: Path`（書かれる作業ツリー）、`changes: tuple[Change, ...]`、`sources: tuple[str, ...]`（属性を確かめる tree の oid。index なら `":index"`）、`fresh: bool = False`（新しいディレクトリに書くとき。Task 3）。
-  - `disk_entry(root: Path, rel: str) -> Entry | None`: `lstat` で調べる。通常のファイルは `hash-object --no-filters`、symlink はリンク先の文字列を `hash-object --stdin` で、ディレクトリは `Entry("040000", "")`。
+  - `disk_entry(root: Path, rel: str) -> Entry | None`: `lstat` で調べる。通常のファイルは `hash-object --no-filters`、symlink はリンク先の文字列を `hash-object --stdin` で、ディレクトリは `Entry("040000", "")`。実装では使われなくなり、`/review` の修正で消した（ディスクの entry は `disk_entries(root, rels)` でまとめて求める）。
   - `tree_entries(cwd: Path, treeish: str, *, config=()) -> dict[str, Entry]`（`ls-tree -r -z --full-tree`）、`index_entries(cwd: Path, *pathspec, root=None, home=None, config=()) -> dict[str, Entry]`（`ls-files -s -z --full-name`。対象のパスに stage 1〜3 があれば `GuardError`）。
   - `changed_paths(inv: Invocation, *diff_args: str) -> list[str]`: `diff --name-only -z` を `inv.cwd` で実行し、ルートからの相対パスで返す。
   - `danger(plan: Plan, inv: Invocation) -> str | None`: 止める理由（`MSG_DANGER` の文）か `None`。
@@ -243,6 +251,15 @@ CI は、`claude/hooks/tests/test-*.py` をすべて実行するので、ワー�
 - `verify`: 各パスの今の `disk_entry` が、旧か新のどちらかと一致すればよい（git が途中で止まった場合も、旧のままなら通す）。一致しないパスがあれば、`MSG_VERIFY` とそのパスを出して 1 を返す。
   - git の後の index（`ls-files -s -z --full-name`）にあり、ディスクにもあり、`expect` にない対象のパスも、同じく報告して 1 を返す（git が新しく書いた対象のファイルを見落とさないため。実装とレビューで追加）。
 
+**`/review` で変えたもの**（2026-11-19。人間の判断 D3。どれもテストがある）
+
+- index のファイルがない（`rev-parse --git-path index` を `cwd` とつないで、symlink をたどって確かめる）ときの `switch` と、パスを取らない `checkout` は、書く元の tree のすべてのパスを候補にする。git は最初のチェックアウトとして tree 全体を書く（`info/exclude` に `*` があるとき。両方の git で実測）。`switch -c`・`checkout -b` は git が書かないのに確認が出るが、止める側なので許す。
+- `submodule.recurse`・`core.sparseCheckout`・`core.sparseCheckoutCone`・`index.sparse` のどれかが真（設定と人間の `-c` を合わせて、最後の値）なら、作業ツリーに書く形（switch・checkout・restore・checkout-index・reset・merge・stash・cherry-pick・revert・rm・clean・mv・worktree add）を止める（`_plain_checkout`）。git は submodule の中や、広げた sparse の範囲に、計算にないファイルを書く（実測）。commit と、書かない形（`restore --staged` など）は止めない。
+- `_git_line`（と `_rev`）は、git が 0 以外で終わったら出力を使わずに `""` を返す（`rev-parse --verify --quiet HEAD^@` は oid を出して 1 で終わる。実測）。
+- 差分に見せるディスクのファイルは、`O_NOFOLLOW`・`O_NONBLOCK` で開いて通常のファイルかを確かめ、16 MiB（`DISK_MAX`）を超えたら止める。
+- `MSG_NO_TTY` のコマンドの行も `_show` を通す。
+- `verify` は、状態の root が実体のディレクトリで、`realpath` と等しいことを先に確かめる。違えば `MSG_VERIFY_ROOT` を出して 1（確かめた後に、場所が symlink に替えられた形）。
+
 **テスト**（fixture: `main` に `.claude/settings.json`＝`{"v": 1}` と `README.md`＝`a`。`feature` は両方を変える（`{"v": 2}`）。`docs` は `README.md` だけを変える）
 
 | テスト | 確かめること |
@@ -285,7 +302,7 @@ CI は、`claude/hooks/tests/test-*.py` をすべて実行するので、ワー�
 | `merge --abort` | `HEAD` の tree に戻す。候補は `diff --cached HEAD` と `_stale`（reset --hard と同じ計算） |
 | `merge --continue`・`--quit` | `(0, "")`（`--continue` は MERGE_AUTOSTASH がないときだけ） |
 | `commit`（READ_ONLY から移す） | MERGE_AUTOSTASH があれば `GuardError`。ほかは `(0, "")` |
-| `pull [opts]`（位置引数なし） | `after_fetch` でなければ `FetchFirst(globals + ["fetch", <branch.<b>.remote>])` を投げ、`check` は `(3, NUL 区切りの引数)` を返す。`after_fetch` なら、`@{upstream}` を `<commit>` とする merge として計算する。`pull.rebase` か `branch.<b>.rebase` が真なら `GuardError`。許可するオプションは `--ff-only --ff --no-ff --no-rebase -q --quiet -v --verbose --no-edit --stat --no-stat` |
+| `pull`（どの形も。`pull -h`・`--help` はヘルプとして許可する） | `Refused(MSG_PULL)`。`/review` の修正で変えた（2026-11-19。人間の判断 D1）。初めは、`FetchFirst` で `(3, fetch の引数)` を返し、関数が fetch してから `--after-fetch` で `@{upstream}` との merge として計算していた。git の pull は確かめた後にもう一度 fetch するので、計算した中身と取り込む中身が違いうる（2 つのレビューで実測）。`MSG_PULL` は、`git fetch` の後に `git merge @{u}`（fast-forward だけなら `git merge --ff-only @{u}`）を案内する。この merge は、ほかの merge と同じく確かめる |
 | `stash`・`stash push [-q] [-m <msg>] [-u] [-k]`（pathspec なし） | 候補は `diff --cached HEAD` と `_stale`（`HEAD` に戻る）。`-u`・`--include-untracked` があれば、`ls-files --others --exclude-standard` の対象のファイルを削除の候補に足す |
 | `stash apply`・`stash pop [-q] [--index] [<stash>]` | s は `<stash>` か `stash@{0}`。R は `merge-tree --write-tree --merge-base=<s>^1 HEAD <s>`。候補は `diff HEAD R`。`<s>^3` があれば、その tree の対象のファイルを追加の候補に足す |
 | `stash list`・`show`・`drop`・`clear`・`create`・`store` | `(0, "")`。ほかの `stash` は `GuardError` |
@@ -304,7 +321,7 @@ CI は、`claude/hooks/tests/test-*.py` をすべて実行するので、ワー�
 - 作業ツリーと比べる `diff HEAD` は使わず、`diff --cached HEAD` と `_stale` にする（Task 2 と同じ理由）。
 - merge-tree は設定の merge ドライバーを動かす（作業ツリーの `.gitattributes` と `.git/info/attributes` の `merge=x` で実測）。`merge.<x>.driver`・`.recursive` が 1 つでも設定にあれば、merge-tree を使う確認（merge・pull・stash apply/pop・cherry-pick・revert）をすべて止める。`merge.renormalize` が真でも止める。
 - MERGE_AUTOSTASH（`rev-parse --git-path MERGE_AUTOSTASH` のファイルか `rev-parse --verify MERGE_AUTOSTASH`）があれば、merge・pull・`merge --abort`・`--continue`・commit・cherry-pick・revert を止める。git はこれらの後に置かれた stash を書く（実測）。
-- merge・pull の設定: `merge.autoStash`・`pull.autoStash`・`pull.twohead`（`ort` 以外）・`branch.<b>.mergeOptions` があれば止める。`branch.<b>.rebase` を `pull.rebase` より先に読み、bool で読めない値も止める。オプションと設定の確認は FetchFirst の前にする。
+- merge・pull の設定: `merge.autoStash`・`pull.autoStash`・`pull.twohead`（`ort` 以外）・`branch.<b>.mergeOptions` があれば止める。`branch.<b>.rebase` を `pull.rebase` より先に読み、bool で読めない値も止める。オプションと設定の確認は FetchFirst の前にする（pull の分は、`/review` の修正で pull ごと止めたので要らなくなった）。
 - `merge FETCH_HEAD` は、FETCH_HEAD のファイルを git と同じく読み、取り込む行がちょうど 1 つでなければ止める（git は octopus で取り込む）。pull は自分の fetch で FETCH_HEAD を書き直すので対象外（実測）。FETCH_HEAD は symlink をたどらずに開き、通常のファイルで 1 MiB 以下のときだけ読む（最終レビューで変更。`--path-format=absolute` の `--git-path` は symlink をたどるので、既定の形を使う）。
 - rev の解決は、merge・cherry-pick・revert・`worktree add --detach` は `_rev`（tag が先）、`worktree add` は `_target`（ブランチが先）にする（コマンドごとに実測）。cherry-pick・revert は、`..` を含むもの・`^` で始まるもの・マージコミット・親のないコミットを止める。
 - 衝突の印のラベルは、merge と pull（`@{upstream}` は oid にする）では git と一致する。cherry-pick・revert・stash apply/pop では一致しないので、対象のパスが衝突したら止める。`.git/rr-cache` があれば（`rerere.enabled` がなくても）git は記録した解決を書くので、merge・pull で対象のパスが衝突し、rerere が働きうるときも止める。
@@ -315,7 +332,13 @@ CI は、`claude/hooks/tests/test-*.py` をすべて実行するので、ワー�
 - HEAD のないブランチでは、merge・pull・stash・cherry-pick・revert と、rev のない worktree add を止める。
 
 - `compare_with_main` は、すべてのリポジトリ向けの対象（`DOTFILES_PROTECTED` を除く）について、`treeish` の tree と、元のチェックアウトの index のパスを合わせて調べる。旧は元のチェックアウトの `disk_entry`、新は tree の entry とし、違うものを返す。元のチェックアウトのルートは `rev-parse --path-format=absolute --git-common-dir` の親とする。
-- 対象のファイルが変わる取り込みでは、`check` が `(3, ...)` を返したあと、関数が fetch してから `--after-fetch` で呼び直す（Task 5）。
+- 対象のファイルが変わる取り込みでは、`check` が `(3, ...)` を返したあと、関数が fetch してから `--after-fetch` で呼び直す（Task 5）。`/review` の修正で、この手順は消した（上の pull の行）。
+
+`/review` で変えたもの（2026-11-19。人間の判断 D1・D3。どれもテストがある）:
+
+- pull は上の表のとおり止める。
+- rm と mv は、すべてのパス（rm は index の当たるパス、mv は元と、git が計算する行き先）の、ルートの下の親を `lstat` で確かめ、symlink があれば止める（`_no_symlink_parent`）。追跡していない symlink `link -> .claude` と index の `link/settings.json` で、`rm -f` は `.claude/settings.json` を消し、`mv` は `.claude` の下に書いた（実測。mv の行き先は 2.54 だけが書き、2.56 は拒否した）。checkout・restore・checkout-index・clean・`stash -u` は symlink をたどらなかったので変えていない（実測）。
+- `submodule.recurse` と sparse checkout の設定で、作業ツリーに書く形を止める（Task 2 の「`/review` で変えたもの」）。
 
 **テスト**
 
@@ -324,8 +347,7 @@ CI は、`claude/hooks/tests/test-*.py` をすべて実行するので、ワー�
 | `test_merge` | `merge docs` は `(0, state)`、`merge feature` は止まる |
 | `test_conflicting_merge_still_checked` | main で settings を `{"v": 3}` にした後の `merge feature` が止まり、答え `n` の差分に `<<<<<<<` が出る |
 | `test_merge_abort` | 作業ツリーの settings を書き換えた後の `merge --abort` が止まる |
-| `test_pull_fetch_protocol` | 一時ディレクトリの bare リポジトリを origin にする。別の clone から settings を変えて push した後、`pull` は `(3, "fetch\0origin")`。実際に fetch した後の `after_fetch` では止まる。README だけの変更なら `(0, state)` |
-| `test_pull_unsupported_forms` | `pull origin main` と、`pull.rebase=true` での `pull` が `(1, "")` |
+| `test_pull_stops`（`/review` の修正で、`test_pull_fetch_protocol` と `test_pull_unsupported_forms` を置き換えた） | `pull`・`pull --ff-only`・`-C sub pull`・`pull origin main`・`pull --rebase`・alias の `pl` が `(1, "")` で、`MSG_PULL` を出し、`command git` を勧めず、fetch もしない。`pull -h`・`--help` は `(0, "")`。fetch の後の `merge @{u}`・`merge --ff-only @{u}` は、ほかの merge と同じく差分を見せて止まり、本物の git で動かした後の verify は 0 |
 | `test_stash` | settings を書き換えた後の `stash` は止まる。settings の変更を含む stash の `stash pop` は止まる。`.env.local` を含む `stash -u` の `pop` は止まる。`stash list` は `(0, "")` |
 | `test_cherry_pick_and_revert` | `cherry-pick feature` は止まる、`cherry-pick docs` は通る、`revert <settings を変えたコミット>` は止まる、`cherry-pick main..feature` は `(1, "")` |
 | `test_rm_clean_mv` | `rm .claude/settings.json` は止まる、`rm --cached .claude/settings.json` は通る。未追跡の `.env.local` があるときの `clean -fdx` は止まり、`clean -n` は通る。`mv README.md .claude/x.md` は `(1, "")`、`mv README.md R.md` は通る |
@@ -353,7 +375,7 @@ CI は、`claude/hooks/tests/test-*.py` をすべて実行するので、ワー�
    - 理由: 初版の `<ルート>/.claude/worktrees/<name>` は、元のチェックアウトのセッションの sandbox が書ける。確かめてから `worktree add` までの間に `.claude/worktrees` を symlink に替えると、git は sandbox の外に書いた（レビューの実測。30 回中 7 回）。ホームの下は sandbox から書けないので、この競合が成り立たない。
 3. 置き場所が `worktree list --porcelain` にあり、実体のディレクトリで、確かめ終わった印（`<キー>/.verified/<name>`。置き場所の `st_dev` と `st_ino`）が一致するときだけ、そのパスを出して 0。印がない・違うときは、消すコマンド（`git -C <ルート> worktree remove --force <置き場所>` と `git -C <ルート> branch -D worktree-<name>`）を案内して 1。自分では消さない。登録がなく何かがあるとき、ブランチ `worktree-<name>` だけがあるときも 1（触らない）。ブランチだけがあるときは、中身を確かめてから `git -C <ルート> branch -D worktree-<name>` で消すよう案内する（`MSG_WT_BRANCH_EXISTS`。Claude Code の `Remove worktree` がブランチを残すため。最終レビューで変更）。
 4. 作成元は、`refs/remotes/origin/HEAD^{commit}` が解決できればそれ、できなければ `HEAD^{commit}`。どちらもなければ 1。`worktree add` には oid で渡す。
-5. `compare_with_main` で作成元の tree を比べる。違いがあれば、作らずに 7 へ。作成元の tree の対象に symlink・gitlink がないかと、書くときの属性（`danger` に `fresh` の Plan を渡す）も、作る前に確かめる。
+5. `compare_with_main` で作成元の tree を比べる。違いがあれば、作らずに 7 へ。作成元の tree の対象に symlink・gitlink がないかと、書くときの属性（`danger` に `fresh` の Plan を渡す）も、作る前に確かめる。`worktree add` の直前に、元のチェックアウトの gitdir と共通の gitdir の symlink も確かめ（Task 1 の「`/review` で変えたもの」）、あれば `MSG_GITDIR` を出して作らずに 1（`/review` の修正で追加）。
 6. `worktree add -b worktree-<name> <置き場所> <作成元の oid>` で作る。
    - 確認コマンドの安全な呼び出し方（`core.hooksPath=/dev/null` など）で動かす。このときだけ、`PATH` に `/opt/homebrew/bin` を足す。グローバルの設定の `filter.lfs` が `git-lfs` を呼ぶためである。
    - 自分の process group で動かし、期限か割り込みで group ごと止めてから片付ける。
@@ -363,7 +385,7 @@ CI は、`claude/hooks/tests/test-*.py` をすべて実行するので、ワー�
 7. 違ったファイルの一覧と、design 6.6 の手順 6 の案内のうち当てはまる 1 つを出して、1 を返す。案内の判断の順は、次のとおり。
    1. 元のチェックアウトのブランチの名前が、`origin/HEAD` の指すブランチの名前と違う。案内は両方の名前を出し、`git ls-remote --symref origin HEAD` で確かめてから `git remote set-head origin --auto` で直すよう勧める。`origin/HEAD` の先へ切り替える案内はしない（最終レビューで変更。差し替えられた先へ人間を向けないため）。
    2. 違ったパスに、コミットしていない変更がある。`status` は clean フィルタを動かすので使わず、index と HEAD の entry、ディスク（`hash-object --no-filters`）と index の entry を比べる。
-   3. 元のチェックアウトの `HEAD` が、作成元と違う。
+   3. 元のチェックアウトの `HEAD` が、作成元と違う。案内は、元のチェックアウトで `git fetch` の後に `git merge --ff-only @{u}` をしてから、もう一度 `claude -w` を実行すること（`/review` の修正で、`git pull` の案内から変えた。pull は止まるため）。
    4. それ以外（差し替えのおそれ）。
 8. 成功したら、確かめ終わった印を書き（`.verified` の中の一時ファイルから `os.replace`）、置き場所の物理パスだけを標準出力に 1 行で出して 0 を返す。ほかの文はすべて標準エラーに出す。
 
@@ -379,7 +401,7 @@ CI は、`claude/hooks/tests/test-*.py` をすべて実行するので、ワー�
 | `test_guidance_for_other_branch` | 元のチェックアウトを feature にすると 1 で、ブランチの案内が出る |
 | `test_no_origin_uses_head` | origin のないリポジトリで 0 |
 
-実装とレビューで足したテスト（`WorktreeCreateTests` は全部で 26）: 前からあるブランチとディレクトリに触らない、フックが動かない、add の失敗で何も残らない、期限で孫のプロセスまで止まる、`PATH` を変えるのは add だけ、置き場所の親が安全でなければ止まる、印のない登録には触らずに止まる、古い置き場所の symlink が効かない、bare と `--separate-git-dir`、`cwd` が元のチェックアウトの外、作る前の属性・symlink、作った後の親の symlink、標準入力の JSON。
+実装とレビューで足したテスト（`WorktreeCreateTests` は全部で 27。27 番目は `/review` の修正の `test_gitdir_symlink_stops_before_creating`）: 前からあるブランチとディレクトリに触らない、フックが動かない、add の失敗で何も残らない、期限で孫のプロセスまで止まる、`PATH` を変えるのは add だけ、置き場所の親が安全でなければ止まる、印のない登録には触らずに止まる、古い置き場所の symlink が効かない、bare と `--separate-git-dir`、`cwd` が元のチェックアウトの外、作る前の属性・symlink、作った後の親の symlink、標準入力の JSON。
 
 - [ ] **Step 1:** テストを書き、失敗することを確かめる。
 - [ ] **Step 2:** 実装し、テストがすべて通ることを確かめる。
@@ -411,11 +433,6 @@ git() {
   local state rc
   state=$("$guard" check --git-env "$genv" -- "$@")
   rc=$?
-  if (( rc == 3 )); then
-    command git "${(0@)state}" || return
-    state=$("$guard" check --after-fetch --git-env "$genv" -- "$@")
-    rc=$?
-  fi
   (( rc == 0 )) || return $rc
   command git "$@"
   rc=$?
@@ -436,7 +453,8 @@ git() {
 | `test_stops_when_check_fails` | check が 1 なら、関数は 1 を返し、偽の git は呼ばれない |
 | `test_runs_git_and_verify` | check が `STATE` を出して 0 なら、git が `switch x` で呼ばれ、続けて `verify STATE` が呼ばれる。返す値は git の終了コード（5） |
 | `test_no_verify_without_state` | check の出力が空なら、verify は呼ばれない |
-| `test_fetch_protocol` | 1 回目の check が `fetch\0origin` を出して 3 なら、`git fetch origin` が呼ばれ、続けて `check --after-fetch` と `git pull` が呼ばれる |
+| `test_pull_stops_without_git`（`/review` の修正で、`test_fetch_protocol` を置き換えた） | check が 1 なら、git を動かさずに 1 |
+| `test_other_codes_are_returned`（同上） | check が 3 を返しても、git を動かさず、check を 1 回だけ呼んで 3 を返す |
 | `test_verify_failure_returns_nonzero` | verify が 1 なら、git が 0 でも関数は 1 |
 | `test_missing_guard` | 確認コマンドがなければ 1 で、stderr に `README.md` があり、git は呼ばれない |
 | `test_git_env_names` | export した `GIT_FOO` だけが `--git-env` に渡る。export していない `GIT_BAR` は渡らない |
