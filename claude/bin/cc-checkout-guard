@@ -291,7 +291,6 @@ from typing import TextIO
 
 # /usr/bin/git は xcrun の shim で、キャッシュや DEVELOPER_DIR で起動するプログラムが変わる。
 GIT = "/Library/Developer/CommandLineTools/usr/bin/git"
-GUARD_PATH = "/usr/local/libexec/claude-guard/cc-checkout-guard"
 GIT_TIMEOUT = 60
 ALIAS_DEPTH = 5
 
@@ -778,10 +777,6 @@ def disk_entries(root: Path, rels: Iterable[str]) -> dict[str, Entry | None]:
         for (rel, mode), oid in zip(chunk, oids):
             found[rel] = Entry(mode, oid)
     return found
-
-
-def disk_entry(root: Path, rel: str) -> Entry | None:
-    return disk_entries(root, [rel])[rel]
 
 
 def tree_entries(cwd: Path, treeish: str, *, config: Sequence[str] = ()) -> dict[str, Entry]:
