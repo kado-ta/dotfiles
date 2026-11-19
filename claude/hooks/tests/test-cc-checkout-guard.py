@@ -1370,6 +1370,38 @@ class OtherWriteTests(TreeBase):
         self.assertEqual(result, (1, ""))
         self.assertIn("確かめられない", err)
 
+    def test_rm_and_mv_through_symlinked_parent_stop(self):
+        # 途中に追跡していない symlink（sandbox が作れる）を含むパスで、git rm -f は symlink の先のファイル（作業ツリーの外も）を
+        # 消し、git mv は先のファイルを動かす。行き先の途中の symlink には、CLT の git 2.54 は書き、2.56 は拒否した
+        # （レビューで実測）。rm と mv は、すべてのパスの途中（ルートの下）を lstat で確かめ、symlink があれば止める（D3）。
+        oid = local_git(self.repo, "rev-parse", "HEAD:.claude/settings.json")
+        outside = self.root / "outside"
+        outside.mkdir()
+        (outside / "keep.txt").write_text("k\n", encoding="utf-8")
+        keep = local_git(self.repo, "hash-object", "-w", str(outside / "keep.txt"))
+        (self.repo / "notes.md").write_text('{"hooks": "evil"}\n', encoding="utf-8")
+        local_git(self.repo, "add", "notes.md")
+        for path, blob in (("link/settings.json", oid), ("out/keep.txt", keep)):
+            local_git(self.repo, "update-index", "--add", "--cacheinfo", f"100644,{blob},{path}")
+        local_git(self.repo, "commit", "-q", "-m", "entries")
+        os.symlink(".claude", self.repo / "link")
+        os.symlink(outside, self.repo / "out")
+        for argv in (("rm", "-f", "link/settings.json"), ("rm", "-q", "link/settings.json"), ("rm", "-" + "rf", "link"),
+                     ("rm", "-f", "out/keep.txt"), ("-C", "sub", "rm", "-f", "../link/settings.json"),
+                     ("mv", "notes.md", "link/settings.local.json"), ("mv", "notes.md", "link"),
+                     ("mv", "-f", "link/settings.json", "moved.json"), ("mv", "notes.md", "out/n.md"),
+                     ("mv", "notes.md", "README.md", "link")):
+            with self.subTest(argv=argv):
+                result, err = self.check(*argv)
+                self.assertEqual(result, (1, ""))
+                self.assertIn("symlink", err)
+        # 途中に symlink のないパスは、今までどおり。
+        self.assertEqual(self.check("rm", "-f", "notes.md")[0][0], 0)
+        self.assertEqual(self.check("mv", "notes.md", "sub/n.md")[0], (0, ""))
+        # 仕掛けが効くことを、テストの git で確かめる（rm -f は symlink の先の作業ツリーの外のファイルを消す）。
+        subprocess.run(["git", "-C", str(self.repo), "rm", "-q", "-f", "out/keep.txt"], capture_output=True)
+        self.assertFalse((outside / "keep.txt").exists())
+
     def test_clean_counts_quiet_quoted_and_directory_removals(self):
         (self.repo / "sub" / "deep").mkdir()
         (self.repo / "sub" / "deep" / ".env").write_text("A=1\n", encoding="utf-8")
