@@ -1915,6 +1915,10 @@ class WorktreeCreateTests(TreeBase):
         self.assertEqual((code, out), (1, ""))
         self.assertIn("追加 .claude/settings.json", err)
         self.assertIn(guard.MSG_WT_BEHIND, err)
+        # git pull は止めるので（D1）、fetch と merge --ff-only @{u} を案内する。
+        self.assertIn("git fetch", err)
+        self.assertIn("git merge --ff-only @{u}", err)
+        self.assertNotIn("git pull", err)
         self.assert_nothing_left()
 
     def test_no_origin_uses_head(self):

@@ -425,8 +425,8 @@ MSG_WT_BRANCH_EXISTS = (
 )
 MSG_WT_UNCOMMITTED = "cc-checkout-guard: 元のチェックアウトの対象のファイルに、コミットしていない変更があります。その変更を片付けてください。"
 MSG_WT_BEHIND = (
-    "cc-checkout-guard: 元のチェックアウトが origin より遅れています。元のチェックアウトで git pull をして"
-    "（zsh の git 関数が差分を見せます）、もう一度 claude -w を実行してください。"
+    "cc-checkout-guard: 元のチェックアウトが origin より遅れています。元のチェックアウトで git fetch の後に"
+    " git merge --ff-only @{u} をして（zsh の git 関数が差分を見せます）、もう一度 claude -w を実行してください。"
 )
 MSG_WT_REPLACED = (
     "cc-checkout-guard: origin の既定ブランチと元のチェックアウトの同じブランチが一致しているのに、中身が違います。"
