@@ -1419,6 +1419,35 @@ class OtherWriteTests(TreeBase):
         subprocess.run(["git", "-C", str(self.repo), "rm", "-q", "-f", "out/keep.txt"], capture_output=True)
         self.assertFalse((outside / "keep.txt").exists())
 
+    def test_submodule_recurse_and_sparse_checkout_stop(self):
+        # submodule.recurse では、switch などが submodule の作業ツリーにも（.git/modules から）書く。sparse checkout では、
+        # sandbox が .git/info/sparse-checkout を広げると、確認に出ないパスも書く（どちらも両方の git で実測）。
+        # 作業ツリーに書く形は止める。設定は人間の -c も読む（D3）。
+        writes = (("switch", "docs"), ("checkout", "docs"), ("restore", "README.md"), ("checkout-index", "-a"),
+                  ("reset", "--hard"), ("merge", "docs"), ("merge", "--abort"), ("stash",), ("cherry-pick", "docs"),
+                  ("revert", "HEAD"), ("rm", "README.md"), ("clean", "-f"), ("mv", "README.md", "R.md"),
+                  ("worktree", "add", "../wt", "docs"))
+        others = (("commit", "-m", "x"), ("restore", "--staged", "README.md"), ("reset", "--soft", "HEAD"),
+                  ("rm", "--cached", "README.md"), ("status",), ("worktree", "add", "--no-checkout", "../wt", "docs"))
+        for key in ("submodule.recurse", "core.sparseCheckout", "core.sparseCheckoutCone", "index.sparse"):
+            for how in ("config", "-c"):
+                pre = ("-c", f"{key}=true") if how == "-c" else ()
+                if how == "config":
+                    local_git(self.repo, "config", key, "true")
+                for argv in writes:
+                    with self.subTest(key=key, how=how, argv=argv):
+                        result, err = self.check(*pre, *argv)
+                        self.assertEqual(result, (1, ""))
+                        self.assertIn(f"{key.lower()} が設定されています", err)
+                for argv in others:
+                    with self.subTest(key=key, how=how, allowed=argv):
+                        self.assertEqual(self.check(*pre, *argv)[0][0], 0)
+                if how == "config":
+                    local_git(self.repo, "config", "--unset", key)
+        # 人間の -c で false にすれば、今までどおり確かめる。
+        local_git(self.repo, "config", "submodule.recurse", "true")
+        self.assertEqual(self.check("-c", "submodule.recurse=false", "switch", "docs")[0][0], 0)
+
     def test_clean_counts_quiet_quoted_and_directory_removals(self):
         (self.repo / "sub" / "deep").mkdir()
         (self.repo / "sub" / "deep" / ".env").write_text("A=1\n", encoding="utf-8")

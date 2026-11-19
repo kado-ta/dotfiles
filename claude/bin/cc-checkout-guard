@@ -304,6 +304,8 @@ DOTFILES_PROTECTED = (  # check-repo.py の PROJECT_DENY_WRITE と同じ文字�
     "./.claude/rules",
 )
 DANGEROUS_ATTRS = ("filter", "working-tree-encoding", "ident")
+# 書く git が、確認の計算の外（submodule の作業ツリー、sparse checkout のパターン）にも書く設定（D3）。git の正規の名前。
+CHECKOUT_SETTINGS = ("submodule.recurse", "core.sparsecheckout", "core.sparsecheckoutcone", "index.sparse")
 
 # diff は作業ツリーを読まない形（tree 同士、index と tree）だけで使う。
 # 作業ツリーと比べる diff は、設定の clean フィルタを動かし、assume-unchanged の entry を見落とすため。
@@ -974,10 +976,29 @@ def _effective(inv: Invocation, entry: Entry) -> Entry:
     return _effective_at(inv.root, entry, inv.config)
 
 
+def _plain_checkout(inv: Invocation) -> None:
+    """submodule.recurse か sparse checkout の設定（人間の -c も）が真なら止める（D3）。
+
+    submodule.recurse では、switch などが submodule の作業ツリーにも（.git/modules から）書く。sparse checkout では、
+    sandbox が .git/info/sparse-checkout を広げると、HEAD と同じで確認に出ないパスも書く（どちらも両方の git で実測）。
+    作業ツリーに書く handler が、書く形と決まった後に呼ぶ。値が bool として読めなければ run_git が止める。
+    """
+    pattern = "^(" + "|".join(re.escape(key) for key in CHECKOUT_SETTINGS) + ")$"
+    out = run_git(inv.cwd, "config", "--type=bool", "--get-regexp", pattern, config=inv.config, ok=(0, 1))
+    values: dict[str, str] = {}
+    for line in os.fsdecode(out).splitlines():
+        key, _, value = line.partition(" ")
+        values[key] = value  # 後のもの（人間の -c）が勝つ
+    for key in CHECKOUT_SETTINGS:
+        if values.get(key) == "true":
+            raise GuardError(f"{key} が設定されています")
+
+
 def _plan(inv: Invocation, source: dict[str, Entry], paths: Iterable[str], sources: tuple[str, ...],
           delete: bool) -> Plan:
     """候補のパスのうち対象のものについて、ディスクの今と、書く元の entry を比べる。"""
     assert inv.root is not None
+    _plain_checkout(inv)
     root, home = inv.root, inv.home
     candidates = set(paths)
     targets = {p for p in candidates if is_protected(root, p, home)}
@@ -1539,6 +1560,7 @@ def plan_mv(inv: Invocation) -> Plan | None:
                 _no_symlink_parent(root, moved)
                 if is_protected(inv.root, moved, inv.home):
                     raise GuardError(f"{moved} が動きます")
+    _plain_checkout(inv)
     return None
 
 
@@ -1787,6 +1809,7 @@ def plan_worktree(inv: Invocation) -> Plan | None:
     _protected_place(inv, root)
     if a.last("--checkout", "--no-checkout") == "--no-checkout":
         return None
+    _plain_checkout(inv)
     commit = _worktree_target(inv, a, pos[0], pos[1] if len(pos) == 2 else None)
     tree = _commit_tree(inv, commit)
     main = _main_root(inv)
