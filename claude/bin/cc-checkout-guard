@@ -393,6 +393,13 @@ MSG_PULL = (
     "cc-checkout-guard: git pull は、確かめた後にもう一度 fetch して取り込むので止めました。"
     "git fetch を実行してから、git merge @{u}（fast-forward だけなら git merge --ff-only @{u}）を実行してください。"
 )
+MSG_RERERE = (
+    "cc-checkout-guard: git の rerere（記録した衝突の解決を当て直す機能）が有効なので止めました"
+    "（rerere.enabled が true か、設定がなく rr-cache があります）。この git は、MERGE_RR（{merge_rr}）に並んだ"
+    "すべてのパス（作業ツリーの外も）に、rr-cache（{rr_cache}）に記録された解決を書きます。どちらも sandbox から書けます。"
+    "中身を確かめてから両方を消し、rerere を使わないなら rerere.enabled を false にしてから"
+    "（dotfiles の bin/.gitconfig は false にしています）、もう一度実行してください。"
+)
 MSG_GITDIR = (
     "cc-checkout-guard: git のディレクトリの {path} が、symlink か、通常のファイルとディレクトリのほかの種類なので止めました。"
     "git はここに書くときに、symlink の先（作業ツリーの外も）に書きます。何を指しているかを確かめて、消してから git を実行してください。"
@@ -1227,14 +1234,30 @@ def _merge_settings(inv: Invocation, *, merge: bool) -> None:
 
 
 def _rerere(inv: Invocation) -> bool:
-    """git が衝突したファイルに、記録した解決（.git/rr-cache。sandbox が書ける）を書きうるか。
+    """git が rerere を動かすか（人間の -c も読む）。rerere.enabled がなければ、rr-cache があるときに動かす（実測）。
 
-    rerere.enabled がなければ、rr-cache があるときに書く（実測）。
+    rerere は、衝突したファイルだけでなく、MERGE_RR（worktree ごとの gitdir）に並んだすべてのパス（ルートからの相対パスか
+    絶対パス。作業ツリーの外も）に、rr-cache（共通の gitdir）に記録された解決を当て、symlink もたどって書く。どちらも
+    sandbox が書ける通常のファイルなので、gitdir の確かめ（D2）には出ない（/security-review の S1。両方の git で実測）。
     """
     value = _git_line(inv, "config", "--type=bool", "--get", "rerere.enabled", ok=(0, 1))
     if value:
         return value == "true"
     return os.path.isdir(_git_line(inv, "rev-parse", "--path-format=absolute", "--git-path", "rr-cache"))
+
+
+def _no_rerere(inv: Invocation) -> None:
+    """rerere が動くなら、Refused で止める（S1）。
+
+    当て直したのは（両方の git で実測）、git commit のどの形（コミットした後に動かす）、merge --continue、衝突した
+    merge・cherry-pick（-n も）・revert・stash apply と pop、cherry-pick -e・revert -e（中で git commit を動かす）。
+    衝突するかは確かめずに、merge・cherry-pick・revert・stash apply と pop は、どの形も止める。
+    merge --abort・--quit・stash（push）・reset・switch などは当て直さなかった。
+    """
+    if _rerere(inv):
+        rr_cache, merge_rr = (_git_line(inv, "rev-parse", "--path-format=absolute", "--git-path", name)
+                              for name in ("rr-cache", "MERGE_RR"))
+        raise Refused(MSG_RERERE.format(rr_cache=_show(rr_cache), merge_rr=_show(merge_rr)))
 
 
 def _require_clean_index(inv: Invocation, head: str) -> None:
@@ -1262,8 +1285,6 @@ def _merged_plan(inv: Invocation, args: Sequence[str], sources: Sequence[str], *
     hit = sorted(p for p in conflicts if is_protected(inv.root, p, inv.home))
     if hit and not labels:
         raise GuardError(f"{hit[0]} が衝突します")
-    if hit and _rerere(inv):
-        raise GuardError(f"{hit[0]} が衝突し、rerere が記録した解決を書くことがあります")
     tree = os.fsdecode(items[0])
     plan = _tree_plan(inv, tree, switch=True, force=False)
     return replace(plan, sources=(tree, *sources))
@@ -1309,6 +1330,7 @@ def plan_merge(inv: Invocation) -> Plan | None:
     if inv.args in (("--abort",), ("--continue",)):
         _no_autostash(inv)
         if inv.args == ("--continue",):
+            _no_rerere(inv)  # git commit を動かす
             return None  # コミットするだけ
         # --abort は reset --merge で HEAD に戻す。
         return _tree_plan(inv, _head_tree(inv), switch=False, force=True)
@@ -1316,6 +1338,7 @@ def plan_merge(inv: Invocation) -> Plan | None:
     if a.pathspec is not None or len(a.positional) != 1:
         raise GuardError("merge の引数を確かめられません")
     _merge_settings(inv, merge=True)
+    _no_rerere(inv)
     # git は - を @{-1} として読み、印のラベルにも @{-1} を使う（実測）。
     rev = "@{-1}" if a.positional[0] == "-" else a.positional[0]
     if rev == "FETCH_HEAD":
@@ -1360,6 +1383,7 @@ def _stash_apply(inv: Invocation, args: Sequence[str]) -> Plan:
     a = split_args("stash", args, STASH_APPLY_FLAGS)
     if a.pathspec is not None or len(a.positional) > 1:
         raise GuardError("stash の引数を確かめられません")
+    _no_rerere(inv)
     rev = a.positional[0] if a.positional else "0"
     if rev and all(c in "0123456789" for c in rev):
         rev = f"refs/stash@{{{rev}}}"  # git と同じく、数字だけなら refs/stash の n 番目
@@ -1401,6 +1425,7 @@ def _pick_plan(inv: Invocation, revert: bool) -> Plan:
     name = a.positional[0]
     # -e は git commit を動かし、git commit は MERGE_AUTOSTASH を書く（実測）。
     _no_autostash(inv)
+    _no_rerere(inv)
     _merge_settings(inv, merge=False)
     # git は - を @{-1} として読み、rev-parse と同じく解決する（実測）。
     commit = _commit_rev(inv, "@{-1}" if name == "-" else name)
@@ -1838,11 +1863,12 @@ def plan_worktree(inv: Invocation) -> Plan | None:
 
 
 def plan_commit(inv: Invocation) -> Plan | None:
-    """commit（--amend を含む。MERGE_HEAD がなくても）は、コミットの後に MERGE_AUTOSTASH の中身を書く（実測）。
+    """commit（--amend を含む。MERGE_HEAD がなくても）は、コミットの後に MERGE_AUTOSTASH の中身を書き、rerere を動かす（実測）。
 
-    それ以外は作業ツリーを書かないので、オプションは読まない。
+    それ以外は作業ツリーを書かないので、オプションは読まない（rerere が動くなら --dry-run も止める）。
     """
     _no_autostash(inv)
+    _no_rerere(inv)
     return None
 
 

