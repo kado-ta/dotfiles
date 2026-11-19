@@ -504,6 +504,23 @@ class SwitchTests(TreeBase):
         self.assertEqual(result, (1, ""))
         self.assertIn("変更 .claude/settings.json", err)
 
+    def test_missing_index_writes_the_whole_tree(self):
+        # index がないと、git switch・checkout は initial checkout として、書く元の tree 全体（HEAD と同じパスも）を書き出す。
+        # info/exclude に * があると、追跡していないファイルを上書きしないための確かめも効かない（レビューで実測。両方の git）。
+        # sandbox は、作業ツリーに触れずに HEAD のブランチを進め、index を消せる（D3）。
+        local_git(self.repo, "update-ref", "refs/heads/main", "feature")
+        (self.repo / ".git" / "index").unlink()
+        (self.repo / ".git" / "info").mkdir(exist_ok=True)
+        with open(self.repo / ".git" / "info" / "exclude", "a", encoding="utf-8") as f:
+            f.write("*\n")
+        for argv in (("switch", "main"), ("checkout",), ("checkout", "main")):
+            with self.subTest(argv=argv):
+                result, err = self.check(*argv)
+                self.assertEqual(result, (1, ""))
+                self.assertIn("変更 .claude/settings.json", err)
+        self.assertEqual(self.approve_and_run("switch", "-q", "main"), (0, ""))
+        self.assertEqual(self.settings.read_text(encoding="utf-8"), '{"v": 2}\n')
+
     def test_verify(self):
         tasks = self.repo / ".vscode" / "tasks.json"
         tasks.parent.mkdir()
