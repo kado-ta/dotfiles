@@ -176,6 +176,7 @@ sandbox の中で作られた git の中身（コミット・index・ref）が�
 - **動き:**
   1. どこで動いていても（sandbox の中も）、確認コマンドの `check` に、引数とカレントディレクトリを渡す。環境変数を見て飛ばすことはしない。
   2. 確認コマンドが見つからない、または 0 以外で終わったら、git を実行せずにその終了コードを返す（fail closed）。見つからないときは、インストールの手順の場所を表示する。
+     - 2026-11-19 に追記（/review。D1）: plan で足した終了コード 3（関数が先に `fetch` を実行してから確かめ直す、`pull` のための手順）は、`pull` を止めた（[6.4](#design-check)）ので消した。関数は、0 以外の終了コードをすべて、git を実行せずにそのまま返す。
   3. 許可されたら `command git "$@"` を実行し、`check` が求めたときだけ、続けて確認コマンドの `verify` を呼ぶ。返すのは git の終了コードとする。ただし、`verify` が食い違いを見つけたときは 0 以外にする。
 - **関数は小さく保つ。** どのサブコマンドを確かめるかなど、判断はすべて確認コマンドで行う。関数に判断を書くと、root 所有でない場所に判断が分かれるためである。
 - **速さ:** まず、すべての呼び出しを確認コマンドに通して測る。`git status` や補完が目に見えて遅くなるなら、plan で対処を決める。
@@ -211,12 +212,17 @@ sandbox の中で作られた git の中身（コミット・index・ref）が�
 - `.git` の中の、sandbox が書ける状態は、すべて信用しない。ref、index、stash、`ORIG_HEAD`・`MERGE_HEAD`・`FETCH_HEAD`、rebase と cherry-pick の手順のファイル、`info/` などである。`--continue` などでは、手順のファイルにある残りのコミットも候補にする。
 - 中身は、書く git と同じ見え方で読む。replace の ref（`refs/replace`）と alternates を、git と同じく効かせたまま読む。git と違う見え方で読むと、確認で見せた中身と書かれる中身がずれる。
 - `pull` は、fetch と merge（`pull.ff = only` なら fast-forward）に分けて考える。対応する形と、fetch をいつ行うかは、plan で決める。
+  - 2026-11-19 に変更（/review。D1）: `pull` は、どの形も止める（`-h`・`--help` はヘルプとして通す）。plan の手順（確認コマンドが先に `fetch` を実行させ、その後の `@{upstream}` で計算する）では、確かめた後に `pull` がもう一度 fetch して、その FETCH_HEAD を取り込むので、確かめた中身（sandbox が書ける `@{upstream}`）と git が取り込む中身が一致しなかった（レビューで実測）。止めるときは、`command git` を勧めずに、`git fetch` の後に `git merge @{u}`（fast-forward だけなら `git merge --ff-only @{u}`）を実行するよう案内する。この merge は、ほかの merge と同じく確かめる（衝突の印のラベルも `@{u}` で、git と同じ。両方の git で実測）。
+- 2026-11-19 に追記（/review。D3）: index のファイルがないと、`switch`・`checkout` は initial checkout として、書く元の tree 全体（HEAD と同じパスも）を書き出す。`info/exclude` に `*` があると、追跡していないファイルを上書きしないための確かめも効かない（両方の git で実測。sandbox は、作業ツリーに触れずに HEAD のブランチを進め、index を消せる）。git が読む index（`rev-parse --git-path index`）がないときは、書く元の tree のすべてのパスを候補にして差分を見せる。`switch -c`・`checkout -b` と merge は、このとき git が書かないか止まる（実測）が、同じく候補に入れる（見せすぎの側）。
 - `worktree add` は、新しいディレクトリに書く。まだどこからも読まれないので、書いた後に [6.6](#design-worktree-hook) と同じ比べ方で確かめてよい。違ったら差分を見せて、残すかを y/N で聞く。N なら worktree を消す。
 
 **止める場合**（対応する形でも止める）
 
 - 対象のパス、またはその親が、symlink か gitlink（submodule）になる。symlink の先は、後から sandbox が書ける場所かもしれないからである。
 - 対象のパスに、書くときに中身を変える属性がつく（`filter`・`working-tree-encoding`・`ident`）。属性は `.gitattributes` と `.git/info/attributes` から来て、どちらも sandbox が書ける。`filter=lfs` なら、書かれる中身は blob ではなく、LFS のサーバーから来る。
+- 2026-11-19 に追記（/review。D2）: gitdir（linked worktree では、その gitdir と共通の gitdir）に、symlink か、通常のファイルとディレクトリのほかの種類がある。git は `COMMIT_EDITMSG`・`FETCH_HEAD`・`MERGE_MSG`・`SQUASH_MSG`・`logs/HEAD`・`index`（lockfile も symlink の先に作る）を symlink をたどって書き、symlink のディレクトリ（`refs/heads`・`objects`）の中にも書く（両方の git で実測。レビューでは、人間の `git commit` が `.git/config` を書き換え、`fetch`・`switch` が作業ツリーの外のファイルを書いた）。名前の一覧に頼らず、最上位のすべての entry、`logs`・`refs`・`sequencer`・`rebase-merge`・`rebase-apply` の下のすべて、`objects` とその直下を見る（名前の大文字と小文字は区別しない）。読み取りのサブコマンドも含めて、何を許可する前にも確かめ、y の後の確かめ直しでも確かめる。早道は git を動かさずにファイルシステムから gitdir を探し、言い切れない形は全体の処理に任せる（全体の処理は `rev-parse --git-dir --git-common-dir` で探す）。この停止は `command git` を勧めず、何を指しているかを確かめて消してから git を実行するよう案内する。
+- 2026-11-19 に追記（/review。D3）: `rm`・`mv` のパスの途中（作業ツリーのルートの下）に symlink がある。git はたどった先（作業ツリーの外も）のファイルを消し、動かす（両方の git で実測。行き先の途中の symlink には、2.54 は書き、2.56 は拒否した）。`checkout`・`restore`・`checkout-index`・`clean`・`stash -u` は、symlink の親をたどらなかった（実測）。
+- 2026-11-19 に追記（/review。D3）: 作業ツリーに書く操作（`commit` を除く）で、`submodule.recurse`・`core.sparseCheckout`・`core.sparseCheckoutCone`・`index.sparse` が真（人間の `-c` も読む）。git は submodule の作業ツリー（`.git/modules` から）や、sparse checkout のパターン（`.git/info/sparse-checkout`。sandbox が書ける）を広げたパスにも書き、確認の計算に入らない（両方の git で実測）。
 
 **確かめるときに動かさないもの**
 
@@ -240,6 +246,7 @@ sandbox の中で作られた git の中身（コミット・index・ref）が�
 
 - git が終わった後に、対象のファイルの中身を、`check` で許可した中身と比べる。変わらないはずのファイルは、変わっていないことを確かめる。
 - 違っていたら、目立つ警告を出す。内容は、食い違ったファイルの一覧と、「動いている Claude Code のセッションを止めて、中身を確かめる」という案内である。終了コードは 0 以外にする。
+- 2026-11-19 に追記（/review。D3）: 確かめた作業ツリーの場所が、実パスと同じ実体のディレクトリでなくなっていれば（symlink に替えられたなど）、警告を出して 0 以外で終わる。git はほかの場所に書き、その先を読むと一致に見えるためである。
 - `check` から `verify` に渡す状態は、sandbox から書けない場所に置く。`cc-safe-push` と同じく、macOS のユーザー専用の一時ディレクトリを使う。あるいは、関数の変数で渡す。方法は plan で決める。
 
 <a name="design-worktree-hook"></a>
@@ -261,8 +268,10 @@ sandbox の中で作られた git の中身（コミット・index・ref）が�
 5. `git worktree add -b worktree-<name> <置き場所> <作成元>` で作る。そのうえで、すべてのリポジトリ向けの対象（[6.2](#design-target-list)）について、新しい worktree のファイルと、元のチェックアウトの同じパスのファイルを、実際の中身で比べる。比べるのは、どちらかで追跡されているパスである。
    - ファイルの有無と中身が一致しなければ、失敗とする。対象のパスやその親が symlink のときも失敗とする。
    - dotfiles だけの対象（`claude/` など）は比べない。worktree の中のものは使われないからである。
+   - 2026-11-19 に追記（/review。D2）: `worktree add` は、元のチェックアウトの gitdir（`logs/refs/heads/worktree-<name>` など）に書くので、その前に、元のチェックアウトの gitdir と共通の gitdir に symlink などがないことを確かめる（[6.4](#design-check) の止める場合）。
 6. 失敗したら、作った worktree とブランチを消し、違ったファイルの一覧を出して 0 以外で終わる。Claude Code は作成を失敗にする。案内は、理由ごとに書き分ける。
    - 元のチェックアウトが既定ブランチにあり、origin より遅れている: 元のチェックアウトで `git pull` をする（関数が差分を見せる）。そのうえで、もう一度 `claude -w` を実行する。
+     - 2026-11-19 に変更（/review。D1）: `pull` は止まるので、`git fetch` の後に `git merge --ff-only @{u}` をするよう案内する。
    - 元のチェックアウトが別のブランチにある: 既定ブランチに戻すか、元のチェックアウトで作業する。
      - 2026-11-19 に変更（最終レビュー）: `origin/HEAD` は sandbox が差し替えうるので、その先へ切り替えさせない。元のチェックアウトのブランチと `origin/HEAD` の指す先の 2 つの名前を出し、`git ls-remote --symref origin HEAD` で確かめて、違えば `git remote set-head origin --auto` で直すよう案内する。
    - 元のチェックアウトの対象のファイルに、コミットしていない変更がある: その変更を片付ける。
@@ -275,7 +284,7 @@ sandbox の中で作られた git の中身（コミット・index・ref）が�
 
 **変わること:**
 
-- origin で対象のファイルが変わったら（`.claude/settings.json` を変える PR をマージしたときなど）、先に元のチェックアウトで pull が要る。
+- origin で対象のファイルが変わったら（`.claude/settings.json` を変える PR をマージしたときなど）、先に元のチェックアウトで pull が要る（2026-11-19 から、`pull` は止まるので、`git fetch` と `git merge --ff-only @{u}`。/review の D1）。
 - 元のチェックアウトが別のブランチにあるときと、対象のファイルに未コミットの変更があるときも失敗する。人間の使い方では、どちらもまれである（2026-11-18、人間の回答）。
 - `.worktreeinclude` は処理されなくなる。今のリポジトリには、`.worktreeinclude` がない（[research の 3.9](research-git-route.md#results-claude-worktree)。`~/Dev` は深さ 4 まで確かめた）。
 - worktree の場所が、リポジトリの中（`.claude/worktrees`）からホームの下（`~/.cc-worktrees`）に変わる。前に作った worktree は、そのまま開ける。
@@ -385,20 +394,24 @@ sandbox の中で作られた git の中身（コミット・index・ref）が�
 ## 7. 受け入れるリスク
 
 - **確認を飛ばす形:** `command git`・`\git`・絶対パスの git と、zsh を通らない git。Claude が頼むのを規則で禁じるだけで、技術的には止めない。人間が頼まれて打てば通る。
-- **確認から実行までの差し替え:** 確認と git の実行のあいだに、sandbox が ref や index を差し替えると、確かめていない中身が書かれうる。y/N の確認の間（人間が差分を読む秒単位の時間）は、y の後に同じ計算をもう一度して比べ、違えば git を動かさずに止めるので、閉じた（2026-11-19、最終レビュー）。残るのは、確かめ直してから git が書くまでの短い時間だけである。`verify` が後から見つけるが、Claude Code の設定と hooks は、書かれた時点で効く。
+- **確認から実行までの差し替え:** 確認と git の実行のあいだに、sandbox が ref や index を差し替えると、確かめていない中身が書かれうる。y/N の確認の間（人間が差分を読む秒単位の時間）は、y の後に同じ計算をもう一度して比べ、違えば git を動かさずに止めるので、閉じた（2026-11-19、最終レビュー）。残るのは、確かめ直してから git が書くまでの短い時間だけである。`verify` が後から見つけるが、Claude Code の設定と hooks は、書かれた時点で効く。`pull` はこの窓に収まらない（確かめた後にもう一度 fetch して、確かめていない中身を取り込む）ので、止める（2026-11-19、/review の D1）。gitdir の symlink（D2）も、y の後にもう一度確かめるが、確かめてから git が書くまでの間に置かれたものは見つけられない（`verify` も見ない）。
 - **すでにある worktree:** `claude -w` で開き直すときと、`claude --resume` では確かめない。その worktree で動いたセッションは、自分の作業ツリーに書ける。前に `.claude/worktrees` に作った worktree は、元のチェックアウトで起動したセッションの sandbox からも書ける見込み（確かめていない）。
 - **`~/.cc-worktrees` の守り:** 持ち主と mode の確認では、人間と sandbox の中のプロセスを区別できない（同じ uid）。sandbox から書けないことに頼っているので、`~` で起動したセッション（sandbox がホームに書ける）があると崩れる。グローバルの CLAUDE.md は、`~` で起動しないよう求めている。
 - **`worktree remove` と Claude Code の Remove worktree:** git の `worktree remove` は、`<共通の gitdir>/worktrees/<id>/gitdir` の指す場所を中身ごと消す。確認コマンドは、登録のパスが実パスの実体のディレクトリで、その `.git` がこの登録を指すときだけ許可する（2026-11-19、最終レビュー）。Claude Code のセッションの終わりの `Remove worktree` は、zsh の `git` を通らないので（`WorktreeRemove` フックは登録していない）、この確認を通らない。Claude Code の sandbox の中からは gitdir のファイルを書けないことを確かめた（自分の worktree の `gitdir`・`commondir` への書き込みは拒否され、`.git/worktrees` の中に項目を作れない。2026-11-19）。`WorktreeRemove` フックで同じ確認をするのは、次の作業の候補にする。
 - **`.git/worktrees` の差し替え:** `<共通の gitdir>/worktrees` を、偽の共通の gitdir の下への symlink にすると、`worktree add` の子の git が偽の `config` と属性を読み、フィルタを sandbox の外で動かす（レビューで、一時ディレクトリで実測）。Claude Code の sandbox は `.git/worktrees` を、そのセッションの worktree のほかは読み取り専用にしていて、この中に項目を作れないことを確かめた（2026-11-19）。人間の `git worktree add` も同じ経路を通る。
 - **`git-lfs` の通信:** `worktree add` は、保護の対象でないパスに、人間の設定の `filter.lfs` を動かす。どのパスに当てるかは、sandbox が書ける属性で決まり、`git-lfs` は作成元の tree の `.lfsconfig` を読む。そのため、sandbox が選んだ先への通信が、sandbox の外で起こりうる（Claude Code の既定の `claude -w` と同じ）。書き込みの経路ではないので、この作業では扱わない。
 - **`claude -w` の変化:** Claude Code が worktree の作り方を変えると、フックとずれる。`#1234` の形（PR から作る）は、フックでは扱わない見込み（未確認）。
-- **dotfiles の pull のたびの確認:** dotfiles の PR の多くは `claude/` を変える。元のチェックアウトで pull するたびに、確認が出る。人間が実際の中身を見る場面として受け入れる。
+- **dotfiles の pull のたびの確認:** dotfiles の PR の多くは `claude/` を変える。元のチェックアウトで pull するたびに、確認が出る。人間が実際の中身を見る場面として受け入れる。2026-11-19 から、`pull` は止まるので、確認は `git fetch` の後の `git merge --ff-only @{u}` で出る（/review の D1）。
 - **Claude Code の仕様:** `claude -w`、`WorktreeCreate`、信頼の扱いは、文書の要約による（C7）。新しいセッションでの確認（[6.13](#design-verify-plan)）で確かめる。
 - **`claude -w` の失敗:** 元のチェックアウトが別のブランチにあるときと、対象のファイルに未コミットの変更があるときは、`claude -w` が失敗する（[6.6](#design-worktree-hook)）。まれなので受け入れる。
 - **Claude の git の遅さ:** sandbox の中の git も、呼び出しごとに確認コマンドを起動する。
 - **`.worktreeinclude` の読み取りの経路:** 次の作業にする。
 - **入れ子のリポジトリの設定からコードが動く経路:** 今もすでに開いている。次の作業の最初にする（非目標）。
 - **対象の場所の中にある入れ子のリポジトリ:** 外側のチェックアウトの対象の場所の中に root がある入れ子のリポジトリ（たとえば、sandbox が `.claude/.git` に gitfile を置いたもの）で人間が git を打つと、root が `.claude` になり、外側から見た対象のファイル（`.claude/settings.json`）を対象と判定しない。入れ子のリポジトリの経路の一部として、次の作業で扱う（2026-11-19、最終レビュー）。
+- **`git clone` の書き込み（2026-11-19、/review。R25）:** `clone --template=<ディレクトリ>`・`-c init.templateDir=<ディレクトリ> clone`・`-c core.hooksPath=<ディレクトリ> clone` は、そのディレクトリのフック（`post-checkout`）を clone の途中で動かす（両方の git で実測）。対象の場所の中への clone（`git clone <url> .claude/skills/x`）も止めない。確認コマンドは `clone` を、作業ツリーに書かない読み取りとして通している。clone は非目標（新しいリポジトリを信頼するかは人間が決める）で、行き先・テンプレート・設定をまとめて扱う必要があるので、次の作業にする。
+- **リポジトリの外の、自動で読み込まれる場所への worktree（2026-11-19、/review）:** `worktree add`・`move` の行き先が、リポジトリの外の自動で読み込まれる場所（`~/.claude/skills` など）でも、確認コマンドは止めない。対象の一覧はリポジトリの中の相対パスで、ホームの下の場所を持たないためである。一覧をホームの下に広げるのは、次の作業にする。
+- **計算する git と書く git の違い（2026-11-19、/review）:** 確認コマンドは CLT の git（2.54。`GIT_CONFIG_NOSYSTEM` でシステムの設定を読まない）で計算し、関数は人間の git（Homebrew の 2.56。`/opt/homebrew/etc/gitconfig` を読む）を動かす。動きが違うところがある（symlink の途中を通る `git mv` の行き先には、2.54 は書き、2.56 は拒否した。実測）。違いは `verify` が後から見つける。確認コマンドの git は、cc-safe-push と同じく xcrun の shim と人間の環境を避けるために CLT のパスに固定していて、人間の git に合わせると、その前提を作り直すことになるので、この作業では変えない。
+- **mise の新しい lock ファイル（2026-11-19、/review）:** `mise.local.lock` と、lock の sidecar のディレクトリは、対象の一覧に入っていない。今の一覧は `mise.lock` だけで、新しい形がいつ読まれ、paranoid の信頼とどう関わるかを確かめていないので、確かめてから一覧に足す（次の作業）。
 
 <a name="builder"></a>
 

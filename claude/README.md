@@ -324,9 +324,11 @@ sudo install -o root -g wheel -m 0755 claude/bin/cc-checkout-guard /usr/local/li
 
 ### 確認の動き
 
-`git` 関数は、すべての git の呼び出しで、確認コマンドの `check` に引数とカレントディレクトリを渡す。許可されたら `command git` を実行する。対象のファイルを書きうる操作では、続けて `verify` で、対象のファイルが確認したとおりに書かれたかを確かめる。違えば警告を出し、git が成功していても終了コード 1 を返す。
+`git` 関数は、すべての git の呼び出しで、確認コマンドの `check` に引数とカレントディレクトリを渡す。許可されたら `command git` を実行する。対象のファイルを書きうる操作では、続けて `verify` で、対象のファイルが確認したとおりに書かれたかを確かめる。違えば（確かめた作業ツリーの場所が symlink に替えられたときも）警告を出し、git が成功していても終了コード 1 を返す。
 
 対象のファイルを変えない git（`status`・`diff`・`log`・`add`・`fetch`・`push` など）は、何も出さずに通す。変えるときは、呼ばれた場所で扱いが変わる。
+
+`git pull` は、どの形も止める（`-h`・`--help` は通す）。pull は確かめた後にもう一度 fetch して取り込むので、確かめた中身と取り込む中身が一致しないためである。代わりに `git fetch` を実行してから、`git merge @{u}`（fast-forward だけなら `git merge --ff-only @{u}`）を実行する。この merge は、ほかの merge と同じく確かめる。
 
 | 場所 | 対象のファイルが変わるとき |
 | --- | --- |
@@ -342,12 +344,18 @@ sudo install -o root -g wheel -m 0755 claude/bin/cc-checkout-guard /usr/local/li
 - 確かめる方法を持たない形。`rebase` などのサブコマンド、知らないオプション、`!` で始まる alias、`GIT_DIR` などの環境変数があるとき
 - ファイルに書く読み取りのコマンド。`--output` 付きの `show`・`log`・`diff` など、`config -f`、`archive`・`bundle`・`format-patch`、`init` の `--separate-git-dir`・`--template`・`-c init.templateDir`
 - `worktree remove` で、登録のパスが実パスの実体のディレクトリでないか、その `.git` が登録を指していないとき
+- `rm`・`mv` のパスの途中（作業ツリーのルートの下）に symlink がある（git はたどった先のファイルを消し、動かす）
+- 作業ツリーに書く操作（`commit` を除く）で、`submodule.recurse`・`core.sparseCheckout`・`core.sparseCheckoutCone`・`index.sparse` のどれかが真（`-c` も含む）。git が submodule の作業ツリーや、sparse checkout のパターンで広げたパスにも書くため
+
+次のときは、sandbox の外では、どのサブコマンドも（`status` なども）止める。`command git` でも同じ場所に書くので、勧めない。表示されたファイルが何を指しているかを確かめ、消してから git を実行する。
+
+- gitdir（`.git`。linked worktree では `.git/worktrees/<id>` と共通の `.git`）に、symlink か、通常のファイルとディレクトリのほかの種類がある。見るのは、最上位のすべてと、`logs`・`refs`・`sequencer`・`rebase-merge`・`rebase-apply` の下のすべて、`objects` の直下。git は `COMMIT_EDITMSG`・`FETCH_HEAD`・`logs/HEAD` などを symlink をたどって書く
 
 確認して許可した `merge` が対象のファイルで衝突した後の `git merge --abort` は、確かめられないので止まる。`command git merge --abort` で戻す前に、`git diff HEAD -- <対象のパス>` で、戻した後の中身（HEAD。sandbox が動かしうる）を確かめる。
 
 sandbox の中かどうかは、OS に問い合わせて決める（環境変数は見ない）。その場所の判定は、`/usr/local/libexec/claude-guard/cc-checkout-guard status` で表示できる（`sandbox: yes` か `sandbox: no`）。
 
-`check` の終了コードは、0 が許可、1 が停止、3 が先に fetch が要る（`pull` だけ。関数が fetch を実行してから確かめ直す）。
+`check` の終了コードは、0 が許可、1 が停止。
 
 <a name="cc-checkout-guard-worktree"></a>
 
@@ -357,7 +365,8 @@ sandbox の中かどうかは、OS に問い合わせて決める（環境変数
 
 - 置き場所は `~/.cc-worktrees/<キー>/<name>`、ブランチは `worktree-<name>`。キーは、元のチェックアウトのディレクトリ名と `-` と、その物理パスの sha256 の先頭 12 桁。フックは `~/.cc-worktrees` と `<キー>` を自分だけが書けるディレクトリ（0700）として作る。symlink、ほかの持ち主のもの、グループかほかのユーザーが書けるものなら止まる。
 - 作成元は、ローカルの `origin/HEAD` が指すコミット。なければ元のチェックアウトの HEAD。fetch はしない。
-- 作った後に、すべてのリポジトリ向けの対象のファイルを、元のチェックアウトの同じファイルと比べる。違えば、作った worktree とブランチを消して失敗する。案内は理由ごとに出る（元のチェックアウトで `git pull` をする、`origin/HEAD` を `git ls-remote --symref origin HEAD` で確かめる、コミットしていない変更を片付ける、差し替えのおそれがあるので中身を確かめる）。
+- 作る前に、元のチェックアウトの gitdir に symlink などがないことを、上の gitdir の停止と同じく確かめる。あれば作らずに失敗する。
+- 作った後に、すべてのリポジトリ向けの対象のファイルを、元のチェックアウトの同じファイルと比べる。違えば、作った worktree とブランチを消して失敗する。案内は理由ごとに出る（元のチェックアウトで `git fetch` の後に `git merge --ff-only @{u}` をする、`origin/HEAD` を `git ls-remote --symref origin HEAD` で確かめる、コミットしていない変更を片付ける、差し替えのおそれがあるので中身を確かめる）。
 - `claude -w` は、元のチェックアウトの中で実行する。元のチェックアウトの外にある linked worktree から実行すると失敗する。
 - フックは 50 秒で打ち切る（`settings.json` のフックの timeout は 60 秒）。
 
