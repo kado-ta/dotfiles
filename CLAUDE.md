@@ -68,6 +68,7 @@ worktree は `claude -w <name>` で始める。この設定では EnterWorktree�
 - ユーザー設定の `sandbox.filesystem` に、接頭辞のないパスを書かない。`~/` か `/` で始める（接頭辞がないと `~/.claude` が基準になる。`edit-permissions` が失敗する）。
 - Read の deny の `*.pem` を `~/**` に広げない。
 - `bin/.zshrc` の `git` 関数、`claude/settings.json` の `WorktreeCreate` フック、`Edit(**/mise.lock)` の deny を外さない（`checkout-guard`・`edit-permissions` が失敗する）。
+- `bin/.gitconfig` の `rerere.enabled = false` を外さない（`checkout-guard` が失敗する）。
 - mise の `trusted_config_paths` と、シェルの設定の `MISE_TRUSTED_CONFIG_PATHS`・`MISE_PARANOID` を足さない（`mise-paranoid` が失敗する）。
 
 ## 規約

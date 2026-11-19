@@ -9,6 +9,10 @@
 	re = remote -v
 [merge]
 	ff = false
+[rerere]
+# sandbox が .git/rr-cache と MERGE_RR に置いた解決を、sandbox の外の git が任意のパスに書かないようにする。
+# 設定がなくても rr-cache があれば動くので、false にする（cc-checkout-guard も止める。check-repo.py が確かめる）。
+	enabled = false
 [pull]
 	ff = only
 [push]

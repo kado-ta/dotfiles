@@ -155,6 +155,9 @@ ZSHRC_BLOCK = (
     "# <<< cc-checkout-guard",
 )
 ZSHRC_AFTER = 'eval "$(mise activate zsh)"'
+# グローバルの git の設定。rerere が動くと、sandbox の外の git が、.git/rr-cache と MERGE_RR（どちらも sandbox が書ける）の
+# 解決を任意のパス（作業ツリーの外も）に書く。rerere.enabled がなくても、rr-cache があれば動くので false にする。
+GITCONFIG = "bin/.gitconfig"
 # ガードの対象に必ず含める一般パターン（ガード側の定数の部分集合であること）。
 GUARD_REQUIRED_DIRS = (".claude", ".vscode", ".idea")
 GUARD_REQUIRED_NAMES = (".mcp.json", "mise.lock")
@@ -392,6 +395,11 @@ def check_checkout_guard(root):
             break
         if expected == ZSHRC_BLOCK[0] and (after is None or position < after):
             errors.append(f"{ZSHRC}: the checkout guard block must come after {ZSHRC_AFTER}")
+    # git と同じく読む（最後の値が勝つ。no・0 も false）。ファイルやキーがなければ終了コード 1、bool でなければ 128。
+    cp = subprocess.run(["git", "config", "--file", str(root / GITCONFIG), "--type=bool", "--get", "rerere.enabled"],
+                        capture_output=True, text=True)
+    if cp.returncode != 0 or cp.stdout.strip() != "false":
+        errors.append(f"{GITCONFIG}: rerere.enabled must be false")
     return errors
 
 

@@ -90,6 +90,7 @@ ZSHRC = (
     "}\n"
     "# <<< cc-checkout-guard\n"
 )
+GITCONFIG = "[merge]\n\tff = false\n[rerere]\n\tenabled = false\n"
 
 
 def guard_source(dirs=(".claude", ".vscode", ".idea"), names=(".mcp.json", "mise.lock"), prefixes=(".env",),
@@ -173,6 +174,7 @@ class CheckRepoTests(unittest.TestCase):
         self.write("mise/mise_config.toml", PARANOID_CONFIG)
         self.write("claude/bin/cc-checkout-guard", guard_source())
         self.write("bin/.zshrc", ZSHRC)
+        self.write("bin/.gitconfig", GITCONFIG)
 
     def git(self, *args):
         subprocess.run(["git", "-C", str(self.root), *args], check=True, capture_output=True)
@@ -500,6 +502,24 @@ class CheckRepoTests(unittest.TestCase):
             with self.subTest(case=name):
                 self.write("bin/.zshrc", text)
                 self.assert_fails("FAIL checkout-guard", "bin/.zshrc")
+
+    def test_gitconfig_rerere_not_false_fails(self):
+        # rerere が動くと、sandbox の外の git が .git/rr-cache と MERGE_RR（sandbox が書ける）の解決を任意のパスに書く。
+        for name, text in (("missing section", "[merge]\n\tff = false\n"), ("true", "[rerere]\n\tenabled = true\n"),
+                           ("bare key", "[rerere]\n\tenabled\n"), ("invalid", "[rerere]\n\tenabled = maybe\n"),
+                           ("last wins", GITCONFIG + "[rerere]\n\tenabled = true\n")):
+            with self.subTest(case=name):
+                self.write("bin/.gitconfig", text)
+                self.assert_fails("FAIL checkout-guard", "bin/.gitconfig: rerere.enabled must be false")
+        self.git("rm", "-q", "-f", "bin/.gitconfig")
+        self.assert_fails("FAIL checkout-guard", "bin/.gitconfig: rerere.enabled must be false")
+
+    def test_gitconfig_rerere_false_forms_pass(self):
+        for text in ("[ReReRe]\n\tEnabled = no\n", "[rerere]\n\tenabled = 0\n",
+                     "[rerere]\n\tenabled = true\n[rerere]\n\tenabled = false\n"):
+            with self.subTest(text=text):
+                self.write("bin/.gitconfig", text)
+                self.assert_passes()
 
     def test_missing_mise_lock_deny_fails(self):
         data = settings()
