@@ -337,6 +337,8 @@ sudo install -o root -g wheel -m 0755 claude/bin/cc-checkout-guard /usr/local/li
 | sandbox の中（Claude の Bash ツール） | 確かめずに通す。書き込みは sandbox が止める |
 | `claude -w` | [claude -w の worktree](#cc-checkout-guard-worktree) を参照する |
 
+変わるかは、git が書く中身（replace の ref と、差し替えられた object も、git と同じく効かせて読む）とディスクを比べて決める。中身が同じでも git が書き直しうる対象（下の属性の項目の形）も、同じく比べる。生の blob がディスクと同じでも、git は replace の ref などの中身を書くため。
+
 次のときは、sandbox の外ならどこでも、理由を出して止める。確かめずに実行するときは、人間が中身を確かめてから、自分で `command git` を打つ（rerere が動く間は勧めない。下の rerere の段落）。
 
 - 対象のパスが symlink か gitlink（submodule）になる。対象のパスの親が symlink である。新しい中身が NUL を含む
