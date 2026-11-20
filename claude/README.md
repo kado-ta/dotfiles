@@ -340,7 +340,7 @@ sudo install -o root -g wheel -m 0755 claude/bin/cc-checkout-guard /usr/local/li
 次のときは、sandbox の外ならどこでも、理由を出して止める。確かめずに実行するときは、人間が中身を確かめてから、自分で `command git` を打つ（rerere が動く間は勧めない。下の rerere の段落）。
 
 - 対象のパスが symlink か gitlink（submodule）になる。対象のパスの親が symlink である。新しい中身が NUL を含む
-- 対象のパスに、書くときに中身を変える属性（`filter`・`working-tree-encoding`・`ident`）が付く。変わるファイルだけでなく、中身が同じでも git が書き直しうる対象のファイルも確かめる（`reset --hard`・`--merge`・`--keep`、`switch -f`・`checkout -f`、`merge --abort`、`stash`、`restore`・`checkout -- <パス>`・`checkout-index`、index がないか stage 0 の entry がないときの `switch`・`checkout`。git は index の stat が合わないファイルと、initial checkout ではすべての対象を書き直す）
+- 対象のパスに、書くときに中身を変える属性（`filter`・`working-tree-encoding`・`ident`）が付く。変わるファイルだけでなく、中身が同じでも git が書き直しうる対象のファイルも確かめる（`reset --hard`・`--merge`・`--keep`、`switch -f`・`checkout -f`、`merge --abort`、`stash`、`restore`・`checkout -- <パス>`・`checkout-index`、index がないか stage 0 の entry がないときの `switch`・`checkout`。git は index の stat が合わないファイルと、initial checkout ではすべての対象を書き直す）。`-f` のない `switch`・`checkout` と `merge`・`cherry-pick`・`revert`・`stash apply`・`stash pop` では、HEAD と書く元で違う対象を、ディスクがすでに書く元と同じ中身でも確かめる（index の stat がディスクに合っていると、git は書く元の中身を属性で変えて書く）
 - 確かめる方法を持たない形。`rebase` などのサブコマンド、知らないオプション、`!` で始まる alias、`GIT_DIR` などの環境変数があるとき
 - ファイルに書く形。どのサブコマンドでも `--output`（`show`・`log`・`diff`、`stash list`・`stash show` など）、`config -f`、`archive`・`bundle`・`format-patch`、`init` の `--separate-git-dir`・`--template`・`-c init.templateDir`
 - `worktree remove` で、登録のパスが実パスの実体のディレクトリでないか、その `.git` が登録を指していないとき
@@ -356,7 +356,9 @@ sudo install -o root -g wheel -m 0755 claude/bin/cc-checkout-guard /usr/local/li
 rerere が動くとき（`rerere.enabled` が true か、設定がなく `.git/rr-cache` がある。`-c` も含む）は、sandbox の外では、`commit`（どの形も）・`merge`（`--abort`・`--quit` を除く）・`cherry-pick`・`revert`・`stash apply`・`stash pop` を、ほかのどの理由よりも先に止める。rerere は、`MERGE_RR` に並んだすべてのパス（作業ツリーの外も）に、`rr-cache` に記録された解決を書き、どちらも sandbox から書けるためである。`command git` でも同じく書くので、勧めない。ほかの理由で止める形（`rebase`・`am`・`apply` などの確かめられない形、ファイルに書く形）も、rerere が動く間は `command git` を勧めない。止めた文は、場合を分けて案内する。
 
 - `rerere.enabled` の設定がなく、`rr-cache` があるとき: 表示された `rr-cache` と `MERGE_RR` の中身を確かめてから消すか、`rerere.enabled` を設定で false にしてから、もう一度実行する。
-- `rerere.enabled` が設定か `-c` で true のとき: `rr-cache` と `MERGE_RR` を消しても止まる。rerere を使わないなら、設定で false にする。確かめられる形（上の `commit` など）をこの 1 回だけ実行するなら、`git -c rerere.enabled=false …` で実行する（関数が確かめ直す）。
+- `rerere.enabled` が設定か `-c` で true のとき: `rr-cache` と `MERGE_RR` を消しても止まる。rerere を使わないなら、設定で false にする。
+
+どちらの場合も、確かめられる形（上の `commit` など）をこの 1 回だけ実行するなら、`git -c rerere.enabled=false …` で実行する（関数が確かめ直す）。確かめられない形を `git -c rerere.enabled=false …` で打つと、`-c` を付けたまま `command git -c rerere.enabled=false …` で実行するよう案内する（`-c` を外すと rerere が動くため）。
 
 `bin/.gitconfig` は `rerere.enabled = false` にしている（`check-repo.py` の `checkout-guard` が確かめる）。
 
