@@ -1617,6 +1617,36 @@ class UnchangedRewriteTests(TreeBase):
         local_git(self.repo, "reset", "-q", "--hard")
         self.assertTrue(self.settings.read_bytes().startswith(b"\xfe\xff"))
 
+    def test_attribute_on_unchanged_file_with_unborn_index_stops(self):
+        # index がない（か stage 0 の entry がない）と、-f のない switch・checkout も initial checkout として、中身が同じ対象も
+        # 書き直す（再レビューで実測。両方の git）。
+        with open(self.repo / ".git" / "info" / "exclude", "a", encoding="utf-8") as f:
+            f.write("*\n")
+        index = self.repo / ".git" / "index"
+        attributes = self.repo / ".git" / "info" / "attributes"
+        forms = (("switch", "docs"), ("checkout", "docs"), ("checkout",), ("switch", "main"))
+        for name in ("missing", "unborn"):
+            attributes.unlink(missing_ok=True)
+            if name == "missing":
+                index.unlink(missing_ok=True)
+            else:
+                local_git(self.repo, "read-tree", "--empty")
+                os.utime(index, (0, 0))
+            for argv in forms:
+                with self.subTest(index=name, attribute=False, argv=argv):
+                    (code, _), err = self.check(*argv)
+                    self.assertEqual(code, 0, err)
+            self.plant()
+            for argv in forms:
+                with self.subTest(index=name, attribute=True, argv=argv):
+                    result, err = self.check(*argv, tty=True, answer="y\n")
+                    self.assertEqual(result, (1, ""))
+                    self.assertIn(".claude/settings.json が書くときに中身を変える属性（working-tree-encoding）", err)
+                    self.assertNotIn(guard.MSG_ASK, err)
+        # 仕掛けが効くことを、テストの git で確かめる（-f のない switch が UTF-16 で書き直す）。
+        local_git(self.repo, "switch", "-q", "docs")
+        self.assertTrue(self.settings.read_bytes().startswith(b"\xfe\xff"))
+
     def test_other_content_attributes_stop(self):
         for attr in ("filter=probe", "ident", "working-tree-encoding=UTF-16LE"):
             with self.subTest(attr=attr):

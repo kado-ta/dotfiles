@@ -1096,7 +1096,9 @@ def _tree_plan(inv: Invocation, tree: str, *, switch: bool, force: bool) -> Plan
 
     force（reset --hard・--merge・--keep、switch -f・checkout -f、merge --abort）では、index と tree の対象すべてを、
     中身が同じでも書き直しうるものとする（reset --hard・switch -f・checkout -f は書き直した。実測。S2）。
-    switch だけ（-f のない switch・checkout、merge・cherry-pick・revert・stash apply）は書き直さなかった。
+    switch だけ（-f のない switch・checkout、merge・cherry-pick・revert・stash apply）は、index に stage 0 の entry が
+    あれば書き直さなかった。index がない（か unborn の）ときは、initial checkout として tree の対象すべてを書き直した
+    （再レビューで実測。両方の git）ので、そのときは tree の対象すべてを入れる。
     """
     source = tree_entries(inv.cwd, tree, config=inv.config)
     paths: set[str] = set()
@@ -1108,7 +1110,9 @@ def _tree_plan(inv: Invocation, tree: str, *, switch: bool, force: bool) -> Plan
         if _index_unborn(inv):
             # index がない（か unborn の）と、switch・checkout は initial checkout として、tree 全体（HEAD と同じパスも）を
             # 書き出す（sandbox は index を消せる。両方の git で実測。D3・R37）。merge はこのとき止まる（実測）が、同じく候補に入れる。
+            # 中身が同じ対象も書き直すので、属性も確かめる（S2）。
             paths |= set(source)
+            rewrites |= set(source)
     if force:
         assert inv.root is not None
         index = index_entries(inv.root, root=inv.root, home=inv.home, config=inv.config)
