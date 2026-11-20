@@ -1404,8 +1404,8 @@ class RerereTests(TreeBase):
                ("merge", "--no-edit", "docs"), ("cherry-pick", "docs"), ("revert", "-e", "HEAD"), ("stash", "pop"),
                ("stash", "apply"))
 
-    def assert_stops(self, *pre):
-        for argv in self.REPLAYS:
+    def assert_stops(self, *pre, forms=REPLAYS):
+        for argv in forms:
             with self.subTest(pre=pre, argv=argv):
                 result, err = self.check(*pre, *argv, tty=True, answer="y\n")
                 self.assertEqual(result, (1, ""))
@@ -1450,6 +1450,24 @@ class RerereTests(TreeBase):
         local_git(self.repo, "config", "rerere.enabled", "true")
         self.assert_stops()
         self.assert_allows("-c", "rerere.enabled=false")
+
+    def test_rerere_stop_comes_before_other_stops(self):
+        # MERGE_AUTOSTASH（sandbox が置ける）の停止と、確かめられない形の停止は、command git を勧める。rerere の文より先に出ると、
+        # 勧めに従った git commit が当て直した（再レビューで実測。両方の git）。rerere の停止は、ほかのどの停止よりも先にする。
+        (self.repo / "README.md").write_text("z\n", encoding="utf-8")
+        stash = local_git(self.repo, "stash", "create")
+        local_git(self.repo, "checkout", "--", "README.md")
+        (self.gitdir / "MERGE_AUTOSTASH").write_text(stash + "\n", encoding="utf-8")
+        self.plant()
+        self.assert_stops(forms=self.REPLAYS + (("cherry-pick", "--continue"), ("revert", "--skip"),
+                                                ("merge", "-X", "theirs", "docs"), ("stash", "apply", "--quiet")))
+        for argv in (("commit", "-m", "x"), ("merge", "docs")):
+            with self.subTest(argv=argv):
+                self.assertNotIn("MERGE_AUTOSTASH", self.check(*argv)[1])
+        # rerere が動かなければ、今までどおり MERGE_AUTOSTASH で止まる。
+        result, err = self.check("-c", "rerere.enabled=false", "commit", "-m", "x")
+        self.assertEqual(result, (1, ""))
+        self.assertIn("MERGE_AUTOSTASH", err)
 
     def test_forms_that_do_not_replay_still_allow(self):
         # merge --abort（reset --merge）・--quit・stash（push）・reset・switch は、当て直さなかった（両方の git で実測）。

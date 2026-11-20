@@ -1281,6 +1281,8 @@ def _no_rerere(inv: Invocation) -> None:
     merge・cherry-pick（-n も）・revert・stash apply と pop、cherry-pick -e・revert -e（中で git commit を動かす）。
     衝突するかは確かめずに、merge・cherry-pick・revert・stash apply と pop は、どの形も止める。
     merge --abort・--quit・stash（push）・reset・switch などは当て直さなかった。
+    呼ぶ側は、ほかのどの停止（MERGE_AUTOSTASH、確かめられないオプションなど）よりも先に呼ぶ。それらは command git を勧め、
+    勧めに従った git が当て直すため（再レビューで実測）。
     """
     if _rerere(inv):
         rr_cache, merge_rr = (_git_line(inv, "rev-parse", "--path-format=absolute", "--git-path", name)
@@ -1355,10 +1357,12 @@ def _fetch_head(inv: Invocation) -> str:
 def plan_merge(inv: Invocation) -> Plan | None:
     if inv.args == ("--quit",):
         return None  # 作業ツリーを書かない（MERGE_AUTOSTASH は stash の一覧に入る。実測）
+    if inv.args != ("--abort",):
+        # --abort・--quit のほかは rerere を動かしうる（--continue は git commit を動かす）。ほかのどの停止よりも先に確かめる。
+        _no_rerere(inv)
     if inv.args in (("--abort",), ("--continue",)):
         _no_autostash(inv)
         if inv.args == ("--continue",):
-            _no_rerere(inv)  # git commit を動かす
             return None  # コミットするだけ
         # --abort は reset --merge で HEAD に戻す。
         return _tree_plan(inv, _head_tree(inv), switch=False, force=True)
@@ -1366,7 +1370,6 @@ def plan_merge(inv: Invocation) -> Plan | None:
     if a.pathspec is not None or len(a.positional) != 1:
         raise GuardError("merge の引数を確かめられません")
     _merge_settings(inv, merge=True)
-    _no_rerere(inv)
     # git は - を @{-1} として読み、印のラベルにも @{-1} を使う（実測）。
     rev = "@{-1}" if a.positional[0] == "-" else a.positional[0]
     if rev == "FETCH_HEAD":
@@ -1411,10 +1414,10 @@ def _stash_push(inv: Invocation, args: Sequence[str]) -> Plan:
 
 def _stash_apply(inv: Invocation, args: Sequence[str]) -> Plan:
     """stash を作ったときの HEAD を元にして、HEAD と stash を merge する。"""
+    _no_rerere(inv)  # ほかのどの停止よりも先
     a = split_args("stash", args, STASH_APPLY_FLAGS)
     if a.pathspec is not None or len(a.positional) > 1:
         raise GuardError("stash の引数を確かめられません")
-    _no_rerere(inv)
     rev = a.positional[0] if a.positional else "0"
     if rev and all(c in "0123456789" for c in rev):
         rev = f"refs/stash@{{{rev}}}"  # git と同じく、数字だけなら refs/stash の n 番目
@@ -1450,13 +1453,13 @@ def plan_stash(inv: Invocation) -> Plan | None:
 
 def _pick_plan(inv: Invocation, revert: bool) -> Plan:
     sub = "revert" if revert else "cherry-pick"
+    _no_rerere(inv)  # ほかのどの停止よりも先（--continue・--skip なども）
     a = split_args(sub, inv.args, PICK_FLAGS)
     if a.pathspec is not None or len(a.positional) != 1:
         raise GuardError(f"{sub} の引数を確かめられません")
     name = a.positional[0]
     # -e は git commit を動かし、git commit は MERGE_AUTOSTASH を書く（実測）。
     _no_autostash(inv)
-    _no_rerere(inv)
     _merge_settings(inv, merge=False)
     # git は - を @{-1} として読み、rev-parse と同じく解決する（実測）。
     commit = _commit_rev(inv, "@{-1}" if name == "-" else name)
@@ -1897,9 +1900,10 @@ def plan_commit(inv: Invocation) -> Plan | None:
     """commit（--amend を含む。MERGE_HEAD がなくても）は、コミットの後に MERGE_AUTOSTASH の中身を書き、rerere を動かす（実測）。
 
     それ以外は作業ツリーを書かないので、オプションは読まない（rerere が動くなら --dry-run も止める）。
+    rerere の停止は、command git を勧める MERGE_AUTOSTASH の停止よりも先にする。
     """
-    _no_autostash(inv)
     _no_rerere(inv)
+    _no_autostash(inv)
     return None
 
 
