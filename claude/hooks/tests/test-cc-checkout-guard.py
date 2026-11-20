@@ -540,6 +540,38 @@ class SwitchTests(TreeBase):
         self.assertEqual(self.approve_and_run("switch", "-q", "main"), (0, ""))
         self.assertEqual(self.settings.read_text(encoding="utf-8"), '{"v": 2}\n')
 
+    def test_index_without_stage_zero_entries_writes_the_whole_tree(self):
+        # git は、entry がなく更新時刻の秒が 0 の index も、ないときと同じく initial checkout をする（is_index_unborn。
+        # 両方の git で実測。R37）。更新時刻は sandbox が変えられるので、stage 0 の entry が 1 つもない index は、時刻によらず
+        # 同じく扱う（見せすぎの側。時刻が 0 でない空の index では、git は書かなかった）。
+        local_git(self.repo, "update-ref", "refs/heads/main", "feature")
+        (self.repo / ".git" / "info").mkdir(exist_ok=True)
+        with open(self.repo / ".git" / "info" / "exclude", "a", encoding="utf-8") as f:
+            f.write("*\n")
+        index = self.repo / ".git" / "index"
+        readme = local_git(self.repo, "rev-parse", "HEAD:README.md")
+        unmerged = "".join(f"100644 {readme} {n}\tREADME.md\n" for n in (1, 2, 3))
+        for name, make in (("empty, mtime 0", lambda: os.utime(index, (0, 0))), ("empty, mtime now", lambda: None),
+                           ("unmerged only", lambda: local_git(self.repo, "update-index", "--index-info",
+                                                               input=unmerged))):
+            local_git(self.repo, "read-tree", "--empty")
+            make()
+            for argv in (("switch", "main"), ("checkout",), ("checkout", "main")):
+                with self.subTest(index=name, argv=argv):
+                    result, err = self.check(*argv)
+                    self.assertEqual(result, (1, ""))
+                    self.assertIn("変更 .claude/settings.json", err)
+        # stage 0 の entry が 1 つでもあれば、時刻が 0 でも initial checkout にならない（実測）。今までどおり。
+        local_git(self.repo, "read-tree", "--empty")
+        local_git(self.repo, "update-index", "--add", "--cacheinfo", f"100644,{readme},README.md")
+        os.utime(index, (0, 0))
+        self.assertEqual(self.check("switch", "main")[0][0], 0)
+        # 仕掛けが効くことを、テストの git で確かめる（時刻が 0 の空の index で、git switch main が中身を書く）。
+        local_git(self.repo, "read-tree", "--empty")
+        os.utime(index, (0, 0))
+        local_git(self.repo, "switch", "-q", "main")
+        self.assertEqual(self.settings.read_text(encoding="utf-8"), '{"v": 2}\n')
+
     def test_verify(self):
         tasks = self.repo / ".vscode" / "tasks.json"
         tasks.parent.mkdir()

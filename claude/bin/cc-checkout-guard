@@ -1078,9 +1078,17 @@ def _plan(inv: Invocation, source: dict[str, Entry], paths: Iterable[str], sourc
     return Plan(root=root, changes=tuple(changes), sources=sources, rewrites=tuple(kept))
 
 
-def _index_missing(inv: Invocation) -> bool:
-    """git が読む index のファイルがないか（git と同じく、symlink をたどって確かめる）。"""
-    return not os.path.exists(os.path.join(inv.cwd, _git_line(inv, "rev-parse", "--git-path", "index")))
+def _index_unborn(inv: Invocation) -> bool:
+    """switch・checkout が initial checkout をしうる index か。index に stage 0 の entry が 1 つもないとき（ないときも）。
+
+    git は、index のファイルがないときと、entry がなく更新時刻の秒が 0 のとき（is_index_unborn）に、initial checkout
+    として書く元の tree 全体を書き出す（両方の git で実測。R37）。更新時刻は sandbox が変えられるので見ずに、stage 0 の
+    entry がないとき（時刻が 0 でない空の index と、衝突の entry だけの index も。git はこれらでは書かなかった）を含める
+    （見せすぎの側）。stage 0 の entry が 1 つでもあれば（intent-to-add だけでも）、git は initial checkout をしなかった。
+    """
+    assert inv.root is not None
+    out = run_git(inv.root, "ls-files", "-s", "-z", config=inv.config)
+    return not any(rec.partition(b"\t")[0].endswith(b" 0") for rec in out.split(b"\0") if rec)
 
 
 def _tree_plan(inv: Invocation, tree: str, *, switch: bool, force: bool) -> Plan:
@@ -1097,9 +1105,9 @@ def _tree_plan(inv: Invocation, tree: str, *, switch: bool, force: bool) -> Plan
         head = _head_tree(inv)
         paths |= set(changed_paths(inv, head, tree))
         paths |= _gitlinks(source, tree_entries(inv.cwd, head, config=inv.config))
-        if _index_missing(inv):
-            # index がないと、switch・checkout は initial checkout として、tree 全体（HEAD と同じパスも）を書き出す
-            # （sandbox は index を消せる。両方の git で実測。D3）。merge はこのとき止まる（実測）が、同じく候補に入れる。
+        if _index_unborn(inv):
+            # index がない（か unborn の）と、switch・checkout は initial checkout として、tree 全体（HEAD と同じパスも）を
+            # 書き出す（sandbox は index を消せる。両方の git で実測。D3・R37）。merge はこのとき止まる（実測）が、同じく候補に入れる。
             paths |= set(source)
     if force:
         assert inv.root is not None
