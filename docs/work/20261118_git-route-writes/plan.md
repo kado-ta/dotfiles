@@ -90,6 +90,7 @@ DANGEROUS_ATTRS = ("filter", "working-tree-encoding", "ident")
 | `claude/bin/cc-checkout-guard` | 新規 | 確認コマンド（Task 1〜4） |
 | `claude/hooks/tests/test-cc-checkout-guard.py` | 新規 | 確認コマンドのテスト（Task 1〜4） |
 | `bin/.zshrc` | 変更 | `git` 関数（Task 5） |
+| `bin/.gitconfig` | 変更 | `rerere.enabled = false`（`/security-review` の修正。Task 7 が確かめる） |
 | `claude/hooks/tests/test-checkout-function.py` | 新規 | 関数のテスト（Task 5） |
 | `claude/settings.json` | 変更（人間が当てる） | `WorktreeCreate` フック、`Edit(**/mise.lock)` の追加、`Edit(/etc/**)` の削除（Task 6） |
 | `.github/scripts/check-repo.py`・`test-check-repo.py` | 変更 | 検査（Task 7） |
@@ -159,6 +160,11 @@ CI は、`claude/hooks/tests/test-*.py` をすべて実行するので、ワー�
   - 中を見ないのは、`hooks/` の中（git は書かない。hook のファイルを symlink にする使い方がある）と、loose object の振り分けのディレクトリ（`objects/<2 桁の 16 進>/`・`lfs/objects/<2 桁>/`。submodule の gitdir の中も）の中だけ。ディレクトリ自体は確かめる。見ない理由と残る経路は design 7 章に書く。
   - 全体の処理は `rev-parse --path-format=absolute --git-dir --git-common-dir`（人間の `-c` つき）で gitdir を探し、問題があれば `Refused(MSG_GITDIR)`（どのファイルかを出し、確かめて消すよう案内する。`command git` は勧めない）。y の後の確かめ直しでも確かめる。
   - 早道は git を動かさずに、物理パスから上へ `.git` を探す（`.git` ファイルの `gitdir:` と `commondir` は `O_NOFOLLOW`・4096 バイトまでで読む）。`.git` ディレクトリは、HEAD が `ref: refs/`・`ref:refs/` か 40 桁の 16 進で始まるときだけ gitdir とみなす（git が受け入れる形の一部。再レビューで、git が飛ばす `.git` を早道が使う食い違いが分かり、狭めた）。問題があるか、言い切れない形（`.git` が symlink、bare の形など）なら偽を返して全体の処理に任せる。自分では止めない。早道と全体の処理は、同じ関数（`gitdir_problem`）で判定する。`fast_allow(argv, cwd=None)` の `cwd` はテストのため。時間の増分は、sandbox の中の 20 回の中央値で 2 ms 余り（worktree）と 0.3 ms（元のチェックアウト）。
+
+**`/security-review` で変えたもの**（2026-11-20。人間の判断で、この PR で直す。どれもテストがある）
+
+- `file_writes` の `--output`（省略形、`=` の形と分けた形、`--` の前と後）は、READ_ONLY に限らず、どのサブコマンドでも止める。`stash list --format=… --output=<パス>` と `stash show -p --output=<パス>` が、選んだ中身をどこにでも書いた（両方の git で実測）。値やパスの位置にある `--output` で始まる語（`commit -m --output` など）と、`commit --o`（`--only` の省略形）も止まるが、止める側なので許す（R35）。テストは `test_output_of_any_subcommand_stops`。
+- 早道は、`HANDLERS` のサブコマンドの `-h`・`--help` の形にも `file_writes` を当て、書く形は全体の処理に任せる（全体の処理と同じ規則にするため。`test_fast_path_agrees_with_full_path` に足した）。
 
 **テスト**（Base は一時ディレクトリにリポジトリを作り、`guard.in_sandbox` を偽に差し替える）
 
@@ -260,6 +266,16 @@ CI は、`claude/hooks/tests/test-*.py` をすべて実行するので、ワー�
 - `MSG_NO_TTY` のコマンドの行も `_show` を通す。
 - `verify` は、状態の root が実体のディレクトリで、`realpath` と等しいことを先に確かめる。違えば `MSG_VERIFY_ROOT` を出して 1（確かめた後に、場所が symlink に替えられた形）。
 
+**`/security-review` で変えたもの**（2026-11-20。人間の判断で、この PR で直す。どれもテストがある）
+
+- 中身が変わらない対象のファイルも、git が書き直しうるなら属性を確かめる。`.git/info/attributes` の `working-tree-encoding` と `read-tree HEAD`（index の stat を消す）の後で、`reset --hard`・`switch -f`・`checkout -f`・`restore .`・`checkout -- .`・`checkout-index -f`（`UTF-16LE` では `stash` も）が、確認なしに `.claude/settings.json` を書き直した（両方の git で実測）。
+  - `Plan` に `rewrites: tuple[str, ...] = ()`（中身が同じでも git が書き直しうる対象のパス）を足した。`danger` は、`changes` の書かれるパスと `rewrites` を合わせて属性を確かめる。
+  - 強制の形（`reset --hard`・`--merge`・`--keep`、`switch -f`・`checkout -f`、`merge --abort`）は index と tree の対象すべて、`stash` は index と HEAD の対象すべて、パスを取る形（`restore`・`checkout [<tree>] -- <pathspec>`・`checkout-index`）は pathspec に当たる対象を `rewrites` にする（`_protected_index`）。
+  - index の stat では絞らない（stat を消さなくても、同じ秒に書いた index で書き直した。実測）。
+  - `-f` のない switch・checkout と、merge・cherry-pick・revert・stash apply/pop（`_tree_plan` の switch の枝を通る `_merged_plan`）は、書かれうる対象（HEAD との差、gitlink、index がないときは tree 全体）をすべて `rewrites` にする。ディスクがすでに書く元と同じ対象は `changes` に入らないが、sandbox が HEAD を進め、index の entry の stat をディスクに合わせ、属性を付けると、git は属性で変えた中身を確認なしで書いた（修正 1 回目の再レビューで分かった。両方の git で実測。R40）。index がないとき（下の項目）は、git が initial checkout で tree 全体を書き直す（再レビューで分かった。実測）。
+- stage 0 の entry がない index も、index がないものとして扱う（`_index_missing` を `_index_unborn` に置き換えた。R37）。git は entry がなく時刻が 0 の index で initial checkout をし、sandbox が選んだ中身を確認なしで `.claude/settings.json` に書いた（実測）。時刻は sandbox が変えられるので、時刻を見ずに広く取る。git が initial checkout をしない状態（時刻が 0 でない空の index、衝突の entry だけの index）でも tree 全体を見せて聞くが、止める側なので許す（R39）。
+  - 対象に filter などの属性を付けたリポジトリでは、対象が変わらなくても上の形が止まる（R35）。テストは `UnchangedRewriteTests`。
+
 **テスト**（fixture: `main` に `.claude/settings.json`＝`{"v": 1}` と `README.md`＝`a`。`feature` は両方を変える（`{"v": 2}`）。`docs` は `README.md` だけを変える）
 
 | テスト | 確かめること |
@@ -300,12 +316,12 @@ CI は、`claude/hooks/tests/test-*.py` をすべて実行するので、ワー�
 | --- | --- |
 | `merge [opts] <commit>`（位置引数はちょうど 1 つ） | `merge-tree --write-tree HEAD <commit>` の 1 行目を結果の tree R とする（終了コード 0 と 1 を受け入れる）。候補は `diff HEAD R`。`sources` は R と `<commit>`。許可するオプションは `-q --quiet --ff --no-ff --ff-only --no-edit --edit -m --squash --no-commit --commit --stat --no-stat --log --no-log --no-verify --progress --no-progress` |
 | `merge --abort` | `HEAD` の tree に戻す。候補は `diff --cached HEAD` と `_stale`（reset --hard と同じ計算） |
-| `merge --continue`・`--quit` | `(0, "")`（`--continue` は MERGE_AUTOSTASH がないときだけ） |
-| `commit`（READ_ONLY から移す） | MERGE_AUTOSTASH があれば `GuardError`。ほかは `(0, "")` |
+| `merge --continue`・`--quit` | `(0, "")`（`--continue` は MERGE_AUTOSTASH がなく、rerere が動かないときだけ。rerere は `/security-review` で追加） |
+| `commit`（READ_ONLY から移す） | MERGE_AUTOSTASH があれば `GuardError`。rerere が動きうるなら `Refused(MSG_RERERE)`（`/security-review` で追加）。ほかは `(0, "")` |
 | `pull`（どの形も。`pull -h`・`--help` はヘルプとして許可する） | `Refused(MSG_PULL)`。`/review` の修正で変えた（2026-11-19。人間の判断 D1）。初めは、`FetchFirst` で `(3, fetch の引数)` を返し、関数が fetch してから `--after-fetch` で `@{upstream}` との merge として計算していた。git の pull は確かめた後にもう一度 fetch するので、計算した中身と取り込む中身が違いうる（2 つのレビューで実測）。`MSG_PULL` は、`git fetch` の後に `git merge @{u}`（fast-forward だけなら `git merge --ff-only @{u}`）を案内する。この merge は、ほかの merge と同じく確かめる |
 | `stash`・`stash push [-q] [-m <msg>] [-u] [-k]`（pathspec なし） | 候補は `diff --cached HEAD` と `_stale`（`HEAD` に戻る）。`-u`・`--include-untracked` があれば、`ls-files --others --exclude-standard` の対象のファイルを削除の候補に足す |
 | `stash apply`・`stash pop [-q] [--index] [<stash>]` | s は `<stash>` か `stash@{0}`。R は `merge-tree --write-tree --merge-base=<s>^1 HEAD <s>`。候補は `diff HEAD R`。`<s>^3` があれば、その tree の対象のファイルを追加の候補に足す |
-| `stash list`・`show`・`drop`・`clear`・`create`・`store` | `(0, "")`。ほかの `stash` は `GuardError` |
+| `stash list`・`show`・`drop`・`clear`・`create`・`store` | `(0, "")`（`--output` は Task 1 の `file_writes` で止める。`/security-review` で変更）。ほかの `stash` は `GuardError` |
 | `cherry-pick [-n] [-x] [--no-edit] [-e] [-s] <commit>` | `merge-tree --write-tree --merge-base=<c>^ HEAD <c>`。範囲（`..` を含む）、マージコミット、`--continue`・`--skip`・`--abort`・`--quit` は `GuardError` |
 | `revert`（同じオプション） | `merge-tree --write-tree --merge-base=<c> HEAD <c>^` |
 | `rm [-r] [-f] [-q] [--ignore-unmatch] [--] <pathspec>` | `ls-files -z -- <pathspec>` の対象のファイルを削除の候補にする。`--cached` か `-n` があれば `(0, "")`。`--` より前の `r`・`f`・`q`・`n` のまとめ書き（`-rf` など）は 1 文字ずつに分けて読む（最終レビューで変更） |
@@ -339,6 +355,16 @@ CI は、`claude/hooks/tests/test-*.py` をすべて実行するので、ワー�
 - pull は上の表のとおり止める。
 - rm と mv は、すべてのパス（rm は index の当たるパス、mv は元と、git が計算する行き先）の、ルートの下の親を `lstat` で確かめ、symlink があれば止める（`_no_symlink_parent`）。追跡していない symlink `link -> .claude` と index の `link/settings.json` で、`rm -f` は `.claude/settings.json` を消し、`mv` は `.claude` の下に書いた（実測。mv の行き先は 2.54 だけが書き、2.56 は拒否した）。checkout・restore・checkout-index・clean・`stash -u` は symlink をたどらなかったので変えていない（実測）。
 - `submodule.recurse` と sparse checkout の設定で、作業ツリーに書く形を止める（Task 2 の「`/review` で変えたもの」）。
+
+`/security-review` で変えたもの（2026-11-20。人間の判断で、rerere を設定で切り、確認でも止める。どれもテストがある）:
+
+- rerere が動きうるとき（`rerere.enabled` が真か、設定がなく `rr-cache` がある。人間の `-c` も読む）は、`commit`（どの形も）、`merge <rev>`・`merge --continue`、`cherry-pick`・`revert`、`stash apply`・`pop` を、衝突するかによらず `Refused(MSG_RERERE)` で止める（`_no_rerere`）。git は `MERGE_RR` に並んだすべてのパス（作業ツリーの外の絶対パスも。symlink をたどる）に、`rr-cache` の解決を書いた（`commit`・`merge --continue`・README だけが衝突する merge などで、両方の git で実測）。`MSG_RERERE` は `rr-cache` と `MERGE_RR` の場所を出し、確かめてから消すか `rerere.enabled` を false にするよう案内する。`command git` は勧めない。
+- rerere の確認は、それぞれの handler で MERGE_AUTOSTASH などのほかの確認より先にする。後にあると、sandbox が置いた MERGE_AUTOSTASH で `command git` を勧める文が先に出て、それに従うと当て直した（再レビューで分かった。実測）。
+- rerere が動きうる間は、ほかの理由で止めるとき（`GuardError`）も `command git` を勧めず、`MSG_UNSUPPORTED_RERERE` を出す（`_unsupported`）。rebase・`am --3way`・`apply --3way` などで勧めに従うと、当て直した（実測。R38）。`MSG_RERERE` は、設定で `rerere.enabled` が true のときは消しても止まることも書く（R36）。
+- 人間が `-c rerere.enabled=false` を付けて確かめられない形を打ったときも、`-c` を外した形で rerere を確かめる。外すと動くなら、`-c` を付けたまま `command git -c rerere.enabled=false …` で実行するよう案内する（`MSG_UNSUPPORTED_KEEP_C`。R42）。
+- 上の「衝突の印のラベル」の項目の、対象のパスが衝突して rerere が働きうるときに止める規則は、この停止に置き換えた。
+- `merge --abort`・`--quit`、`stash`（push）、reset・switch・restore などは当て直さなかったので止めない（実測）。
+- `bin/.gitconfig` に `rerere.enabled = false` を足し、Task 7 の検査で確かめる。この設定がない環境では、確かめた後に `rr-cache` を置かれる窓が残る（design 7 章）。テストは `RerereTests`。
 
 **テスト**
 
@@ -501,6 +527,7 @@ GUARD_REQUIRED_PREFIXES = (".env",)
 MISE_LOCK_DENY = ("Edit(**/mise.lock)",)
 MISE_ENV_FORBIDDEN = ("MISE_TRUSTED_CONFIG_PATHS", "MISE_PARANOID")
 MISE_ENV_FILES = ("bin/.zshrc", "bin/.zprofile", "mise/mise_config.toml")  # ほかに zsh/*.zsh
+GITCONFIG = "bin/.gitconfig"  # /security-review で追加
 ```
 
 **検査**
@@ -509,6 +536,7 @@ MISE_ENV_FILES = ("bin/.zshrc", "bin/.zprofile", "mise/mise_config.toml")  # ほ
   - `CHECKOUT_GUARD` を `SourceFileLoader` で読み込む（読み込めなければ失敗）。`PROJECT_DENY_WRITE` のすべてが `DOTFILES_PROTECTED` にあることと、3 つの `GUARD_REQUIRED_*` が対応する定数に含まれることを確かめる。
   - `claude/settings.json` の `hooks.WorktreeCreate` にあるコマンドの並びが、`[CHECKOUT_GUARD_COMMAND]` とちょうど一致する。
   - `ZSHRC` に `ZSHRC_BLOCK` の 4 行がこの順にあり、最初の行が `ZSHRC_AFTER` より後にある。
+  - `git config --file <root>/bin/.gitconfig --type=bool --get rerere.enabled` が終了コード 0 で `false` を出す（`/security-review` で追加。Task 3）。違えば `bin/.gitconfig: rerere.enabled must be false`。
 - `edit-permissions`: `MISE_LOCK_DENY` が `permissions.deny` にあることを足す。
 - `mise-paranoid`:
   - グローバルの設定の `[settings]` に `trusted_config_paths` があれば、値によらず失敗にする。
@@ -525,6 +553,8 @@ MISE_ENV_FILES = ("bin/.zshrc", "bin/.zprofile", "mise/mise_config.toml")  # ほ
 | `test_missing_mise_lock_deny_fails` | `Edit(**/mise.lock)` を除くと `FAIL edit-permissions` |
 | `test_trusted_config_paths_fails` | `trusted_config_paths = []` と `["~/Dev"]` のどちらも `FAIL mise-paranoid` |
 | `test_mise_env_override_fails` | `bin/.zshrc` の `export MISE_PARANOID=0` と、`zsh/x.zsh` の `MISE_TRUSTED_CONFIG_PATHS` が失敗する |
+| `test_gitconfig_rerere_not_false_fails`（`/security-review` で追加） | `[rerere]` がない、`true`、値のない `enabled`、`maybe`、`false` の後の `true`、ファイルがないのどれも `FAIL checkout-guard` |
+| `test_gitconfig_rerere_false_forms_pass`（同） | `[ReReRe] Enabled = no`・`enabled = 0`・`true` の後の `false` は通る |
 
 - [ ] **Step 1:** テストを書き、`python3 -B .github/scripts/test-check-repo.py` で失敗することを確かめる。
 - [ ] **Step 2:** 実装し、`test-check-repo.py` と `check-repo.py`（実物のリポジトリ）がどちらも通ることを確かめる。
