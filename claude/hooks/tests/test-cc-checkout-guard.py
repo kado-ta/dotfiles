@@ -1647,6 +1647,42 @@ class UnchangedRewriteTests(TreeBase):
         local_git(self.repo, "switch", "-q", "docs")
         self.assertTrue(self.settings.read_bytes().startswith(b"\xfe\xff"))
 
+    def test_attribute_on_changed_file_already_on_disk_stops(self):
+        # HEAD と書く元で違う対象のディスクが、すでに書く元と同じ生の中身でも、index の entry（HEAD の oid）の stat がディスクの
+        # ファイルに合っていれば、git は書く元の中身を属性で変えて書いた（sandbox は HEAD を進め、index の stat を合わせられる。
+        # 再レビューと修正 2 回目で実測。両方の git。R40）。-f のない switch・checkout と、merge・cherry-pick・revert・
+        # stash apply と pop（_merged_plan）が同じ形を持つ。
+        old = time.time() - 3600
+        self.settings.write_text('{"v": 9}\n', encoding="utf-8")
+        os.utime(self.settings, (old, old))
+        local_git(self.repo, "commit", "-q", "-am", "v9")  # HEAD と index は {"v": 9}（docs は {"v": 1}）
+        self.branch("back", "main", {".claude/settings.json": '{"v": 1}\n'})
+        head, head_tree, back_tree = (local_git(self.repo, "rev-parse", rev)
+                                      for rev in ("HEAD", "HEAD^{tree}", "back^{tree}"))
+        index_commit = local_git(self.repo, "commit-tree", head_tree, "-p", head, "-m", "index on main")
+        stash = local_git(self.repo, "commit-tree", back_tree, "-p", head, "-p", index_commit, "-m", "WIP on main")
+        local_git(self.repo, "stash", "store", "-m", "WIP on main", stash)
+        # ディスクを書く元と同じ中身にする（同じ大きさで、時刻も index に合わせる）。
+        self.settings.write_text('{"v": 1}\n', encoding="utf-8")
+        os.utime(self.settings, (old, old))
+        forms = (("switch", "docs"), ("checkout", "docs"), ("checkout", "-b", "new", "docs"), ("merge", "back"),
+                 ("merge", "--no-ff", "--no-edit", "back"), ("cherry-pick", "back"), ("revert", "--no-edit", "HEAD"),
+                 ("stash", "apply"), ("stash", "pop"))
+        for argv in forms:
+            with self.subTest(attribute=False, argv=argv):
+                (code, _), err = self.check(*argv)
+                self.assertEqual(code, 0, err)
+        self.plant()
+        for argv in forms:
+            with self.subTest(attribute=True, argv=argv):
+                result, err = self.check(*argv, tty=True, answer="y\n")
+                self.assertEqual(result, (1, ""))
+                self.assertIn(".claude/settings.json が書くときに中身を変える属性（working-tree-encoding）", err)
+                self.assertNotIn(guard.MSG_ASK, err)
+        # 仕掛けが効くことを、テストの git で確かめる。ctime を見ない設定で、index の stat がディスクに合ったとみなされる。
+        local_git(self.repo, "-c", "core.trustctime=false", "switch", "-q", "docs")
+        self.assertTrue(self.settings.read_bytes().startswith(b"\xfe\xff"))
+
     def test_other_content_attributes_stop(self):
         for attr in ("filter=probe", "ident", "working-tree-encoding=UTF-16LE"):
             with self.subTest(attr=attr):
