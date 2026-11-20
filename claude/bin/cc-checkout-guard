@@ -512,6 +512,9 @@ class Change:
     path: str  # ルートからの相対パス
     old: Entry | None  # 今のディスク。None は無い
     new: Entry | None  # 書かれるもの。None は削除
+    # 書かれる中身を読む blob（書く git と同じく、replace の ref を効かせて読む）。空なら new.oid。
+    # 書く元の blob を読む。new.oid（中身の hash）の object は、差し替えた loose object の中身ではないことがある。
+    blob: str = ""
 
 
 @dataclass(frozen=True)
@@ -1028,9 +1031,37 @@ def _effective_at(cwd: Path, entry: Entry, config: Sequence[str] = ()) -> Entry:
     return Entry(entry.mode, _hash(cwd, data))
 
 
-def _effective(inv: Invocation, entry: Entry) -> Entry:
-    assert inv.root is not None
-    return _effective_at(inv.root, entry, inv.config)
+def _effective_entries(cwd: Path, entries: Mapping[str, Entry], config: Sequence[str] = ()) -> dict[str, Entry]:
+    """entries の blob（通常のファイルと symlink）を、書く git と同じく読み、中身の oid にする（_effective_at と同じ）。
+
+    cat-file --batch は、cat-file blob と同じく、replace の ref（連なりも）と人間の -c core.useReplaceRefs を効かせ、
+    差し替えた loose object の中身を返す（両方の git で実測）。数が多くても git を 1 回だけ動かす。
+    oid は、git と同じく "blob <大きさ>\\0" と中身の hash（oid の長さで SHA-1 か SHA-256）。ディスクの側は disk_entries が
+    git で hash するので、SHA-1 の衝突を仕込んだ中身は、そちらで git が止める（両方の git は SHA1_DC）。
+    """
+    found = dict(entries)
+    oids = sorted({e.oid for e in entries.values() if e.mode in (*REGULAR, SYMLINK)})
+    if not oids:
+        return found
+    out = run_git(cwd, "cat-file", "--batch", config=config, stdin=b"".join(o.encode() + b"\n" for o in oids))
+    contents: dict[str, bytes] = {}
+    pos = 0
+    for oid in oids:
+        end = out.find(b"\n", pos)
+        header = out[pos:end].split(b" ") if end >= 0 else []
+        if len(header) != 3 or header[1] != b"blob" or not header[2].isdigit():
+            raise GuardError(f"{oid} を blob として読めません")
+        size = int(header[2])
+        contents[oid] = out[end + 1:end + 1 + size]
+        if len(contents[oid]) != size or out[end + 1 + size:end + 2 + size] != b"\n":
+            raise GuardError("cat-file の出力を読めません")
+        pos = end + 2 + size
+    for path, entry in entries.items():
+        if entry.oid in contents:
+            data = contents[entry.oid]
+            digest = hashlib.new("sha256" if len(entry.oid) == 64 else "sha1", b"blob %d\0" % len(data) + data)
+            found[path] = Entry(entry.mode, digest.hexdigest())
+    return found
 
 
 def _plain_checkout(inv: Invocation) -> None:
@@ -1058,6 +1089,8 @@ def _plan(inv: Invocation, source: dict[str, Entry], paths: Iterable[str], sourc
     rewrites は、中身が同じでも git が書き直しうるパス。そのうち書く元にある対象を Plan.rewrites に入れ、danger が属性を
     確かめる。git は、index の stat が合わない entry（sandbox が read-tree などで stat を消せる）を、中身が同じでも書き直し、
     そのときに属性（.git/info/attributes も sandbox が書ける）で中身を変える（/security-review の S2。両方の git で実測）。
+    rewrites の対象も、候補と同じく、書く git が読む中身（replace の ref、差し替えた loose object）でディスクと比べる。
+    生の oid がディスクと同じでも、git はその中身を書いた（Codex の指摘。両方の git で実測）。
     """
     assert inv.root is not None
     _plain_checkout(inv)
@@ -1071,18 +1104,18 @@ def _plan(inv: Invocation, source: dict[str, Entry], paths: Iterable[str], sourc
             prefix = _norm(path) + "/"
             if any(_norm(t).startswith(prefix) for t in targets):
                 targets.add(path)
+    kept = sorted(p for p in set(rewrites) if p in source and is_protected(root, p, home))
+    targets.update(kept)
     ordered = sorted(targets)
     disk = disk_entries(root, ordered)
+    effective = _effective_entries(root, {p: source[p] for p in ordered if p in source}, inv.config)
     changes: list[Change] = []
     for path in ordered:
-        new = source.get(path)
+        new = effective.get(path)
         if new is None and not delete:
             continue
-        if new is not None:
-            new = _effective(inv, new)
         if disk[path] != new:
-            changes.append(Change(path, disk[path], new))
-    kept = sorted(p for p in set(rewrites) if p in source and is_protected(root, p, home))
+            changes.append(Change(path, disk[path], new, source[path].oid if new is not None else ""))
     return Plan(root=root, changes=tuple(changes), sources=sources, rewrites=tuple(kept))
 
 
@@ -2019,7 +2052,7 @@ def danger(plan: Plan, inv: Invocation) -> str | None:
     # NUL を含む中身は、差分で見せても読めないので、聞かずに止める。
     for c in plan.changes:
         if c.new is not None and c.new.mode in REGULAR:
-            if b"\0" in run_git(plan.old_root or plan.root, "cat-file", "blob", c.new.oid, config=inv.config):
+            if b"\0" in run_git(plan.old_root or plan.root, "cat-file", "blob", c.blob or c.new.oid, config=inv.config):
                 return MSG_DANGER.format(path=_show(c.path), kind="バイナリの中身")
     for c in plan.changes:
         parts = c.path.split("/")
@@ -2087,7 +2120,7 @@ def render(plan: Plan, config: Sequence[str] = ()) -> str:
     for c in plan.changes:
         new_data = b""
         if c.new is not None and c.new.mode in (*REGULAR, SYMLINK):
-            new_data = run_git(base, "cat-file", "blob", c.new.oid, config=config)
+            new_data = run_git(base, "cat-file", "blob", c.blob or c.new.oid, config=config)
         old, new = _lines(_disk_bytes(base, c.path, c.old)), _lines(new_data)
         before = f"a/{c.path}" if c.old is not None else "/dev/null"
         after = f"b/{c.path}" if c.new is not None else "/dev/null"

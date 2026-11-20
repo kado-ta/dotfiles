@@ -16,6 +16,7 @@ import threading
 import time
 import traceback
 import unittest
+import zlib
 from pathlib import Path
 from unittest import mock
 
@@ -1623,6 +1624,57 @@ class UnchangedRewriteTests(TreeBase):
         info = self.repo / ".git" / "info"
         info.mkdir(exist_ok=True)
         (info / "attributes").write_text(f".claude/settings.json {attr}\n", encoding="utf-8")
+
+    # ディスクが index の生の blob と同じでも、git が replace の ref（か差し替えた loose object）の中身で書き直した形
+    # （Codex の指摘。両方の git で実測）。
+    REPLACED = (("restore", ".claude/settings.json"), ("restore", "."), ("checkout", "--", ".claude/settings.json"),
+                ("checkout", "HEAD", "--", ".claude/settings.json"), ("restore", "--source=HEAD", ".claude/settings.json"),
+                ("checkout-index", "-f", ".claude/settings.json"), ("reset", "--hard"), ("switch", "-f", "main"),
+                ("checkout", "-f"), ("checkout", "-f", "main"))
+
+    def assert_replacement_shown(self, text):
+        for argv in self.REPLACED:
+            with self.subTest(argv=argv, tty=False):
+                result, err = self.check(*argv)
+                self.assertEqual(result, (1, ""))
+                self.assertIn("変更 .claude/settings.json", err)
+            with self.subTest(argv=argv, tty=True):
+                result, err = self.check(*argv, tty=True, answer="n\n")
+                self.assertEqual(result, (1, ""))
+                self.assertIn("-" + '{"v": 1}', err)
+                self.assertIn("+" + text.rstrip("\n"), err)
+                self.assertIn(guard.MSG_ASK, err)
+
+    def test_replaced_content_of_unchanged_file_is_shown(self):
+        # refs/replace（sandbox が書ける）を、中身が同じ対象の blob に置く。git は replace を効かせた中身を書くので、
+        # 中身が同じでも書き直しうる対象は、書く git の中身（人間の -c も効かせる）でディスクと比べる。
+        for argv in self.REPLACED:
+            with self.subTest(replace=False, argv=argv):
+                self.assertEqual(self.check(*argv)[0][0], 0)
+                self.assertEqual(self.check(*argv, tty=True, answer="n\n")[1], "")  # 何も見せない
+        original = local_git(self.repo, "rev-parse", "HEAD:.claude/settings.json")
+        local_git(self.repo, "replace", original, self.blob('{"evil": 1}\n'))  # 大きさも違う中身
+        self.assert_replacement_shown('{"evil": 1}\n')
+        # 人間の -c core.useReplaceRefs=false では、git は replace を効かせずに書くので、見せない。
+        for argv in self.REPLACED:
+            with self.subTest(argv=argv, use_replace=False):
+                (code, _), err = self.check("-c", "core.useReplaceRefs=false", *argv, tty=True, answer="n\n")
+                self.assertEqual(code, 0, err)
+                self.assertNotIn('"evil"', err)
+        # 仕掛けが効くことを、テストの git で確かめる。
+        local_git(self.repo, "restore", ".claude/settings.json")
+        self.assertEqual(self.settings.read_text(encoding="utf-8"), '{"evil": 1}\n')
+
+    def test_tampered_loose_object_of_unchanged_file_is_shown(self):
+        # 元の blob の loose object を、同じ名前のまま別の中身にする（sandbox は objects の中に書ける）。git は中身の hash を
+        # 確かめずに書いた（両方の git で実測）。書く git が読む中身で比べ、その中身を見せる。
+        original = local_git(self.repo, "rev-parse", "HEAD:.claude/settings.json")
+        obj = self.repo / ".git" / "objects" / original[:2] / original[2:]
+        obj.chmod(0o644)
+        obj.write_bytes(zlib.compress(b'blob 12\0{"evil": 1}\n'))
+        self.assert_replacement_shown('{"evil": 1}\n')
+        local_git(self.repo, "checkout-index", "-f", ".claude/settings.json")
+        self.assertEqual(self.settings.read_text(encoding="utf-8"), '{"evil": 1}\n')
 
     def test_attribute_on_unchanged_protected_file_stops(self):
         for argv in self.REWRITES + self.KEEPS:
