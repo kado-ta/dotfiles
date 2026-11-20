@@ -404,6 +404,14 @@ MSG_UNSUPPORTED_RERERE = (
     "MERGE_RR（{merge_rr}）に並んだすべてのパス（作業ツリーの外も）に、rr-cache（{rr_cache}）に記録された解決を書きえます。"
     "どちらも sandbox から書けます。{how}rerere を止めてからもう一度実行すると、今までどおりの案内が出ます。"
 )
+# 確かめられない形の停止で、人間の -c が rerere を止めているが、-c を外すと rerere が動くとき（R42）。
+MSG_UNSUPPORTED_KEEP_C = (
+    "cc-checkout-guard: この git の呼び出しは確かめられないので止めました（{reason}）。"
+    "自動で読み込まれるファイルが変わらないことを自分で確かめてから、-c rerere.enabled=false を付けたまま、"
+    "command git -c rerere.enabled=false … の形で実行してください。-c を外すと git の rerere が動き（{why}）、"
+    "MERGE_RR（{merge_rr}）に並んだすべてのパス（作業ツリーの外も）に、rr-cache（{rr_cache}）に記録された解決を書きます。"
+    "どちらも sandbox から書けます。"
+)
 # rerere が動く理由（_rerere の値）ごとの、文の部分（R36）。
 RERERE_WHY = {
     "config": "rerere.enabled が true です（設定か -c）",
@@ -1335,6 +1343,7 @@ def _unsupported(reason: str, inv: Invocation | None, start: Path, home: Path) -
     command git で実行すると、rebase・am・apply --3way・rerere、--git-dir の付いた commit、ファイルに書く形として止めた
     commit -m --output（両方の git）と、switch -m・checkout -m（git 2.56）が、記録した解決を当て直した（修正 1 回目で実測）。
     呼び出しを読めなかったとき（全体のオプションなど）は、呼ばれた場所で、人間の -c なしに確かめる。
+    人間の -c が rerere を止めていても、-c を外すと動くなら、-c を付けたままにするよう案内する（R42）。
     rerere が動くかを確かめられなければ、今までの文にする（git も rerere の設定や場所を読めない見込み）。
     """
     target = inv or Invocation(cwd=start, root=None, config=(), sub="", args=(), argv=(), start=start, home=home)
@@ -1343,6 +1352,11 @@ def _unsupported(reason: str, inv: Invocation | None, start: Path, home: Path) -
         if kind is not None:
             return MSG_UNSUPPORTED_RERERE.format(reason=_show(reason), how=RERERE_HOW[kind],
                                                  **_rerere_parts(target, kind))
+        if target.config:
+            bare = replace(target, config=())
+            kind = _rerere(bare)
+            if kind is not None:
+                return MSG_UNSUPPORTED_KEEP_C.format(reason=_show(reason), **_rerere_parts(bare, kind))
     except Exception:
         pass
     return MSG_UNSUPPORTED.format(reason=_show(reason))
