@@ -337,10 +337,10 @@ sudo install -o root -g wheel -m 0755 claude/bin/cc-checkout-guard /usr/local/li
 | sandbox の中（Claude の Bash ツール） | 確かめずに通す。書き込みは sandbox が止める |
 | `claude -w` | [claude -w の worktree](#cc-checkout-guard-worktree) を参照する |
 
-次のときは、sandbox の外ならどこでも、理由を出して止める。確かめずに実行するときは、人間が中身を確かめてから、自分で `command git` を打つ。
+次のときは、sandbox の外ならどこでも、理由を出して止める。確かめずに実行するときは、人間が中身を確かめてから、自分で `command git` を打つ（rerere が動く間は勧めない。下の rerere の段落）。
 
 - 対象のパスが symlink か gitlink（submodule）になる。対象のパスの親が symlink である。新しい中身が NUL を含む
-- 対象のパスに、書くときに中身を変える属性（`filter`・`working-tree-encoding`・`ident`）が付く。変わるファイルだけでなく、中身が同じでも git が書き直しうる対象のファイルも確かめる（`reset --hard`・`--merge`・`--keep`、`switch -f`・`checkout -f`、`merge --abort`、`stash`、`restore`・`checkout -- <パス>`・`checkout-index`。git は index の stat が合わないファイルを書き直す）
+- 対象のパスに、書くときに中身を変える属性（`filter`・`working-tree-encoding`・`ident`）が付く。変わるファイルだけでなく、中身が同じでも git が書き直しうる対象のファイルも確かめる（`reset --hard`・`--merge`・`--keep`、`switch -f`・`checkout -f`、`merge --abort`、`stash`、`restore`・`checkout -- <パス>`・`checkout-index`、index がないか stage 0 の entry がないときの `switch`・`checkout`。git は index の stat が合わないファイルと、initial checkout ではすべての対象を書き直す）
 - 確かめる方法を持たない形。`rebase` などのサブコマンド、知らないオプション、`!` で始まる alias、`GIT_DIR` などの環境変数があるとき
 - ファイルに書く形。どのサブコマンドでも `--output`（`show`・`log`・`diff`、`stash list`・`stash show` など）、`config -f`、`archive`・`bundle`・`format-patch`、`init` の `--separate-git-dir`・`--template`・`-c init.templateDir`
 - `worktree remove` で、登録のパスが実パスの実体のディレクトリでないか、その `.git` が登録を指していないとき
