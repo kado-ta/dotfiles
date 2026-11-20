@@ -1665,6 +1665,44 @@ class UnchangedRewriteTests(TreeBase):
         local_git(self.repo, "restore", ".claude/settings.json")
         self.assertEqual(self.settings.read_text(encoding="utf-8"), '{"evil": 1}\n')
 
+    def test_gitlink_on_protected_path_without_changes_allows(self):
+        # 対象のパスにある gitlink（submodule）は、git が中身を書き直さない。ディレクトリがあれば（中身があっても空でも）、
+        # 変わるものがなければ今までどおり許可する（Codex の修正の再レビュー。cfc9811 は gitlink として止めていた）。
+        # ディレクトリがなければ git が作るので、今までどおり gitlink として止める。
+        head = local_git(self.repo, "rev-parse", "HEAD")
+        local_git(self.repo, "update-index", "--add", "--cacheinfo", f"160000,{head},.claude/skills/foo")
+        local_git(self.repo, "commit", "-q", "-m", "gitlink")
+        local_git(self.repo, "read-tree", "HEAD")
+        foo = self.repo / ".claude" / "skills" / "foo"
+        forms = (("reset", "--hard"), ("restore", "."), ("checkout", "--", "."), ("checkout-index", "-f", "-a"),
+                 ("switch", "-f", "main"), ("checkout", "-f"), ("stash",))
+        foo.mkdir(parents=True)
+        (foo / "SKILL.md").write_text("# foo\n", encoding="utf-8")
+        for state in ("populated", "empty"):
+            if state == "empty":
+                (foo / "SKILL.md").unlink()
+            for argv in forms:
+                with self.subTest(state=state, argv=argv):
+                    (code, _), err = self.check(*argv, tty=True, answer="n\n")
+                    self.assertEqual(code, 0, err)
+                    self.assertEqual(err, "")
+        foo.rmdir()
+        for argv in forms:
+            with self.subTest(state="missing", argv=argv):
+                result, err = self.check(*argv, tty=True, answer="y\n")
+                self.assertEqual(result, (1, ""))
+                self.assertIn("submodule（gitlink）", err)
+        # 書き直しうる blob は、今までどおり書く git の中身で比べる。
+        foo.mkdir()
+        original = local_git(self.repo, "rev-parse", "HEAD:.claude/settings.json")
+        local_git(self.repo, "replace", original, self.blob('{"evil": 1}\n'))
+        for argv in forms[:6]:
+            with self.subTest(replaced=True, argv=argv):
+                result, err = self.check(*argv)
+                self.assertEqual(result, (1, ""))
+                self.assertIn("変更 .claude/settings.json", err)
+                self.assertNotIn("gitlink", err)
+
     def test_tampered_loose_object_of_unchanged_file_is_shown(self):
         # 元の blob の loose object を、同じ名前のまま別の中身にする（sandbox は objects の中に書ける）。git は中身の hash を
         # 確かめずに書いた（両方の git で実測）。書く git が読む中身で比べ、その中身を見せる。

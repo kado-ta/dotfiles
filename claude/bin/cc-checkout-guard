@@ -1105,7 +1105,9 @@ def _plan(inv: Invocation, source: dict[str, Entry], paths: Iterable[str], sourc
             if any(_norm(t).startswith(prefix) for t in targets):
                 targets.add(path)
     kept = sorted(p for p in set(rewrites) if p in source and is_protected(root, p, home))
-    targets.update(kept)
+    # 中身を書き直すのは blob（通常のファイルと symlink）だけ。gitlink は、中身のある（か空の）ディレクトリを git が
+    # 書き直さないので比べない（ディレクトリと gitlink の entry は一致せず、止めてしまう）。ないときは _stale が候補にする。
+    targets.update(p for p in kept if source[p].mode in (*REGULAR, SYMLINK))
     ordered = sorted(targets)
     disk = disk_entries(root, ordered)
     effective = _effective_entries(root, {p: source[p] for p in ordered if p in source}, inv.config)
