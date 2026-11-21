@@ -48,9 +48,20 @@
 | `/pstack:blast-radius` | 高リスクの差分で、差分の外への影響を確かめたいとき |
 | `/pstack:interrogate` | `/review` の後に、実行で確かめられる不変条件が残るとき |
 | 通常ターミナルで `cd <repo> && codex review --base <base> -c 'sandbox_mode="read-only"' -c skills.include_instructions=false` | 複雑か高リスクの変更が完了する前（Bash からは実行しない。`!` では失敗することがある） |
+| 通常ターミナルで `cd <repo> && codex exec - -s read-only -c skills.include_instructions=false < <プロンプトのファイル>`（challenge） | セキュリティの境界か設計判断を含む変更で、上の `codex review` に加えて 1 回（5 回の上限に数える）。プロンプトは Claude が `~/.claude/skills/gstack/codex/sections/challenge-mode.md` の既定の文を下敷きに書き、scratchpad に置いて絶対パスで渡す。全文をチャットにも示す |
 | `/careful`・`/freeze <dir>` | 本番に近い環境を調べる前（危険なコマンドの警告と、編集範囲の制限） |
 
 ## Exit criteria
 
 - 調査: 根拠（ファイルと行）を付けて問いに答えたら終える。
 - レビュー: 指摘への対応が決まったら終える。別のレビューを重ねるのは、ユーザーが指定したときと、高リスクのときだけ。
+- Codex のレビュー: 結果は貼り付けに頼らず、次のコマンドで、そのブランチで実行した全回の最終メッセージ（`last_agent_message`）を読む。1 回ずつ test-report に記録してから、採否を整理する。記録のほかの部分は読まない。Codex は sandbox の外で動くので、コマンドの出力に denyRead のファイルの中身が入りうる。
+
+```sh
+top=$(git rev-parse --show-toplevel) b=$(git branch --show-current)
+for f in ~/.codex/sessions/*/*/*/rollout-*.jsonl*; do
+  zstd -dcfq "$f" | jq -rn --arg cwd "$top" --arg b "$b" '[inputs] | (map(select(.type=="session_meta"))[0].payload) as $m
+    | select($m.cwd==$cwd and $m.git.branch==$b) | .[] | select(.type=="event_msg" and .payload.type=="task_complete" and .payload.last_agent_message!=null)
+    | "== \($m.timestamp) \($m.git.commit_hash[0:7])\n\(.payload.last_agent_message)"'
+done
+```
