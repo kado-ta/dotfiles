@@ -98,7 +98,7 @@ input_for() {
 
 # invoke <hook-input>: runs the hook under test and sets OUT and CODE
 invoke() {
-  OUT=$(CLAUDE_CONFIG_DIR="${HOOK_CFG:-$CFG}" CLAUDE_PROJECT_DIR='' TZ=Asia/Tokyo HOME="${HOOK_HOME:-$HOME}" \
+  OUT=$(CLAUDE_CONFIG_DIR="${HOOK_CFG:-$CFG}" CLAUDE_PROJECT_DIR="${HOOK_PROJECT_DIR:-}" TZ=Asia/Tokyo HOME="${HOOK_HOME:-$HOME}" \
     PATH="${HOOK_PATH:-$PATH}" /bin/bash "${HOOK_FILE:-$T/hook.sh}" <<<"$1" 2>/dev/null)
   CODE=$?
 }
@@ -161,16 +161,34 @@ for cmd in 'git switch main' 'git switch -c feat/x' 'git checkout main' 'git che
   'git bisect start' 'git stash' 'git stash push -m x' 'git stash pop' 'git restore f' 'git clean -fd' \
   'git add -A' 'git add --all' 'git add -u' 'git add --update' 'git add .' 'git add :/' \
   'git commit -a -m x' 'git commit -am x' 'git commit --all -m x' 'gh pr checkout 12' \
-  'git -C sub -c core.x=y switch main' '"git" switch main' $'git \\\nswitch main' 'cd sub && git switch main'; do
+  'git -C sub -c core.x=y switch main' '"git" switch main' $'git \\\nswitch main' 'cd sub && git switch main' \
+  'git stash 2>&1' 'git stash >/dev/null' 'git stash -u' 'git stash --include-untracked' \
+  'git commit -m x .' 'git commit -m x -- :/'; do
   check ask "$cmd"
 done
 
 # Not targets
 for cmd in 'git commit -m x' 'git add f' 'git add src/' 'git stash list' 'git stash show' 'git status' \
   'git log' 'git diff' 'git fetch' 'git branch -a' 'git cherry-pick abc' 'git revert abc' 'git push' \
-  'git worktree list' 'git rm f' 'git mv a b' 'gh pr view 1' 'echo hi' ''; do
+  'git worktree list' 'git rm f' 'git mv a b' 'gh pr view 1' 'echo hi' '' \
+  'git commit --amend --no-edit' 'git commit -m x f'; do
   check none "$cmd"
 done
+
+# Known false positives (design 6): quotes are removed before matching, so words inside them count
+check ask 'git commit -m "docs: explain git reset usage"' '' 'known false positive: commit message'
+check ask "grep -rn 'git checkout' claude/" '' 'known false positive: grep pattern'
+
+# A long command with many quotes stays far below the 10 s hook timeout (a quadratic gsub took about 7 s here)
+long=$(printf 'echo "a" %.0s' $(seq 1 15000))
+TIMEFORMAT=%R
+{ time check none "$long" '' 'long command with many quotes'; } 2>"$T/long-command.time"
+elapsed=$(<"$T/long-command.time")
+if awk -v e="$elapsed" 'BEGIN { exit !(e < 3) }'; then
+  ok "long command took ${elapsed}s"
+else
+  ng "long command took ${elapsed}s"
+fi
 
 # The tree of the hook's cwd
 check ask 'git switch main' "$T/repo/sub" 'subdirectory of the same tree'
@@ -178,6 +196,9 @@ check ask 'git switch main' "$T/link" 'symlinked cwd'
 check none 'git switch main' "$T/other" 'another tree'
 check none 'git switch main' "$T/repo/.claude/worktrees/wt" 'worktree inside the tree'
 check none 'git switch main' "$T" 'outside any repository'
+no_cwd=$(jq -nc '{session_id: "self-id", tool_input: {command: "git switch main"}}')
+HOOK_PROJECT_DIR="$T/repo" verdict ask "$no_cwd" 'no cwd falls back to CLAUDE_PROJECT_DIR'
+verdict none "$no_cwd" 'no cwd and no CLAUDE_PROJECT_DIR'
 
 # The records decide
 reset
@@ -262,6 +283,11 @@ record 5001 "$T/repo" idle cli other-5001 'Sun Nov 1 00:00:00 2026'
 alive 5001 "$EPOCH1"
 check ask 'git switch main' '' 'single-digit day'
 
+reset
+record 5001 "$T/repo" idle cli other-5001 "$(proc "$EPOCH")"
+alive 5001
+check none 'git switch main' '' 'ps fails for a live pid'
+
 # Self: the calling session is not another session
 reset
 record 5001 "$T/repo" idle cli self-id
@@ -323,10 +349,11 @@ reset
 for pid in $(seq 6000 6059); do record "$pid" "$T/repo"; done
 record 5001 "$T/repo"
 alive 5001
-start=$SECONDS
-check ask 'git switch main' '' 'many records'
-elapsed=$((SECONDS - start))
-if [ "$elapsed" -lt 2 ]; then
+# time measures the check in this shell to the millisecond; SECONDS has 1 s steps and could read 2 s for 1.01 s
+TIMEFORMAT=%R
+{ time check ask 'git switch main' '' 'many records'; } 2>"$T/many-records.time"
+elapsed=$(<"$T/many-records.time")
+if awk -v e="$elapsed" 'BEGIN { exit !(e < 2) }'; then
   ok "many records took ${elapsed}s"
 else
   ng "many records took ${elapsed}s"

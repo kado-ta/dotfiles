@@ -310,7 +310,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/bin/bash ~/.claude/hooks/ask-shared-tree-git.sh",
+            "command": "/bin/bash ~/.claude/hooks/ask-shared-tree-git.sh || true",
             "timeout": 10
           }
         ]
