@@ -22,8 +22,9 @@ TARGET="${GIT}(switch|checkout|rebase|merge|pull|reset|bisect|restore|clean)${EN
 TARGET+="|${GIT}stash([[:space:]]*([;&|)\`]|[0-9]*[<>]|\$)|[[:space:]]+(-|(push|pop|apply|drop|clear|save|branch|create|store)${END}))"
 # add は -A・--all・-u・--update・.・:/（-vA のようにまとめた形も）。
 TARGET+="|${GIT}add${ARGS}[[:space:]]+(--all|--update|\\.|:/|-[[:alnum:]]*[Au][[:alnum:]]*)${END}"
-# commit は -a・--all（-am のようにまとめた形も）と、add と同じパス指定の .・:/。
-TARGET+="|${GIT}commit${ARGS}[[:space:]]+(--all|-[[:alnum:]]*a[[:alnum:]]*|\\.|:/)${END}"
+# commit は -a・--all と、add と同じパス指定の .・:/。短いオプションのまとまりは、値を取るもの（c・C・F・m・t・S・u）
+# より前に a があるときだけ対象にする（-am"msg" は対象、-mall はメッセージ all なので対象外）。
+TARGET+="|${GIT}commit${ARGS}[[:space:]]+(--all|-[abd-ln-sv-zABDEG-RT-Z0-9]*a[^[:space:];&|)\`<>]*|\\.|:/)${END}"
 TARGET+="|${SEP}gh${OPT}[[:space:]]+pr${OPT}[[:space:]]+checkout${END}"
 
 # 記録の procStart の形（Sat Nov 21 04:58:51 2026）。

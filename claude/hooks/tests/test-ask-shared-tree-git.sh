@@ -163,7 +163,7 @@ for cmd in 'git switch main' 'git switch -c feat/x' 'git checkout main' 'git che
   'git commit -a -m x' 'git commit -am x' 'git commit --all -m x' 'gh pr checkout 12' \
   'git -C sub -c core.x=y switch main' '"git" switch main' $'git \\\nswitch main' 'cd sub && git switch main' \
   'git stash 2>&1' 'git stash >/dev/null' 'git stash -u' 'git stash --include-untracked' \
-  'git commit -m x .' 'git commit -m x -- :/'; do
+  'git commit -m x .' 'git commit -m x -- :/' 'git commit -am"fix: update"' 'git commit -qam x'; do
   check ask "$cmd"
 done
 
@@ -171,13 +171,15 @@ done
 for cmd in 'git commit -m x' 'git add f' 'git add src/' 'git stash list' 'git stash show' 'git status' \
   'git log' 'git diff' 'git fetch' 'git branch -a' 'git cherry-pick abc' 'git revert abc' 'git push' \
   'git worktree list' 'git rm f' 'git mv a b' 'gh pr view 1' 'echo hi' '' \
-  'git commit --amend --no-edit' 'git commit -m x f'; do
+  'git commit --amend --no-edit' 'git commit -m x f' 'git commit -mall' 'git commit -uall -m x'; do
   check none "$cmd"
 done
 
 # Known false positives (design 6): quotes are removed before matching, so words inside them count
 check ask 'git commit -m "docs: explain git reset usage"' '' 'known false positive: commit message'
 check ask "grep -rn 'git checkout' claude/" '' 'known false positive: grep pattern'
+# Known miss (design 6): removing quotes splits a quoted option value, so the subcommand after it is not found
+check none 'git -c user.name="Example User" switch main' '' 'known miss: quoted option value with a space'
 
 # A long command with many quotes stays far below the 10 s hook timeout (a quadratic gsub took about 7 s here)
 long=$(printf 'echo "a" %.0s' $(seq 1 15000))

@@ -11,7 +11,7 @@ created: 2026-11-21
 
 ## 1. 自動のテストと検査
 
-Claude Code の sandbox の中で、worktree（`feat/shared-tree-git-hook`）で実行した。フックのテストは、書き込める cwd（`$TMPDIR`）から絶対パスで実行した。表は `/review` の修正の後の結果。
+Claude Code の sandbox の中で、worktree（`feat/shared-tree-git-hook`）で実行した。フックのテストは、書き込める cwd（`$TMPDIR`）から絶対パスで実行した。表は `/review` と Codex のレビューの修正の後の結果。
 
 | コマンド | 結果 |
 | --- | --- |
@@ -22,7 +22,7 @@ Claude Code の sandbox の中で、worktree（`feat/shared-tree-git-hook`）で
 | `bash claude/hooks/tests/test-protect-main-branch.sh` | pass=94 fail=0 |
 | `bash claude/hooks/tests/test-validate-command.sh` | pass=29 fail=0 |
 | `bash claude/hooks/tests/test-ask-gh-pr-write.sh` | pass=66 fail=0 |
-| `bash claude/hooks/tests/test-ask-shared-tree-git.sh` | pass=106 fail=0（`SKIP real ps`） |
+| `bash claude/hooks/tests/test-ask-shared-tree-git.sh` | pass=111 fail=0（`SKIP real ps`） |
 | `bash claude/hooks/tests/test-gh-read-token.sh` | pass=24 fail=0 |
 | `bash claude/hooks/tests/test-guard-additional-dirs.sh` | pass=17 fail=0 |
 | `bash claude/hooks/tests/test-guard-playwright-mcp.sh` | pass=49 fail=0 |
@@ -102,9 +102,29 @@ gstack の `/review` で、ブランチの差分をレビューした。専門�
 
 QA の probe（成功の経路、`git stash 2>&1`、300 KB の入力で書き手が SIGPIPE を受けないこと、plan の検査コマンド）は、修正の後に取り直して合格した。修正の前に取った対照の probe（素の `git stash`）は取り直していないので、QA の判定は「inconclusive」のまま。同じ内容は回帰テストの `git stash` の行で確かめている。
 
+<a name="codex"></a>
+
+## 6. Codex のレビュー
+
+人間が普段の端末で `codex review --base main -c 'sandbox_mode="read-only"' -c skills.include_instructions=false` を実行した。結果は Codex の記録（`last_agent_message`）から読んだ。
+
+**1 回目（2026-11-21T08:36Z、`45468c5`）:** 総評は「patch is incorrect」（確度 0.98）。指摘は次の 2 件。
+
+| 指摘 | 内容 |
+| --- | --- |
+| [P2] `-am` に直結したメッセージ（確度 0.99） | `git commit -am"fix: update"` は引用符を除くと `-amfix: update` になり、短いオプションのまとまりを英数字だけと見る正規表現が `:` で外れて、確認が出ない |
+| [P2] 空白を含むグローバルオプションの値（確度 0.99） | `git -c user.name="Example User" switch feature` は引用符を除くと値が 2 語に割れ、`OPT` が値を 1 語しか許さないので、後ろの `switch` を見つけられない |
+
+2 件とも、QA の fixture で再現した（対照の `-am "fix: update"` と、空白のない `-c` の値では確認が出た）。対応は人間が選んだ。
+
+| 指摘 | 採否 | 理由と対応 |
+| --- | --- | --- |
+| `-am` に直結したメッセージ | 採用 | 短いオプションのまとまりを、値を取るオプション（`c`・`C`・`F`・`m`・`t`・`S`・`u`）より前に `a` があるときだけ対象にし、値がくっついていても当たるようにした。`git commit -mall`（メッセージが all）と `-uall` の誤検知もなくなった。テストを先に書き、3 件の失敗を確かめてから直した |
+| 空白を含むオプションの値 | 不採用（記録） | 直すには、引用符を 1 文字ずつ読んで語の切れ目を保つ処理への書き直しが要る。正規表現や split では、二重引用符の中のアポストロフィが別の引用符と組になって本物の操作を隠しうる。jq で 1 文字ずつ読むと遅さが戻るおそれがある。起きるのはまれな形で、原因は受け入れた誤検知と同じなので、design 6 に見逃しとして書き、テストに「known miss」の行を足した |
+
 <a name="plan-changes"></a>
 
-## 6. plan からの変更
+## 7. plan からの変更
 
 | plan の記述 | 実装 | 理由 |
 | --- | --- | --- |
