@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: done
 created: 2026-11-21
 ---
 
@@ -40,7 +40,9 @@ plan の jq のフィルタを、一時ファイルに対して、ファイル�
 
 - Claude が Bash（sandbox の中）で `/usr/bin/python3 -B claude/scripts/trust-audit.py` を実行した。終了コード 1。18 件が `missing` 2・`home` 1・`not-repo` 1（信頼 `false`）・`repo` 14 に分かれ、plan の[出力の例](plan.md#output)と一致した。
 - レビューの後の版でも、同じ 18 件の区分と終了コード 1 を確かめた。出力するコマンドは、バックアップの `cp` と、`missing` の 2 件を消す jq の 1 行になった（[plan との違い](#deviations)の 6）。
-- 人間が通常のターミナルで `mise trust` してから `mise run claude:trust-audit` を実行する確認: 未実施。
+- 人間が通常のターミナルで `mise trust` してから `mise run claude:trust-audit` を実行した（2026-11-21、PR #53 のマージ後）。19 件が出た。18 件は上と同じ区分で、増えた 1 件は `~/dotfiles/.claude/worktrees/shared-tree-git-hook`（`repo`、信頼 `true`）。上の確認の後に、別のセッションが作った worktree である。出力したコマンドも、上と同じ（バックアップの `cp` と、`missing` の 2 件を消す jq の 1 行）。
+  - 終了コード 1（候補あり）なので、mise は最後に `ERROR task failed` と表示した。mise は 0 以外を失敗として表示する。`claude:skills-check` で違いがあるときも同じ。
+  - 観察: 公式ドキュメントでは、worktree の信頼のキーは main checkout のルートになる（[出典の確認](#sources)）。しかし、この worktree のパスそのものが、信頼 `true` の項目になっていた。この worktree（`trust-audit`）のパスは項目になっていない。違いの原因は確かめていない。
 
 <a name="sources"></a>
 
