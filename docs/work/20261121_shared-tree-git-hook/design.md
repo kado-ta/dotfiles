@@ -102,14 +102,14 @@ Claude が作業ツリーの状態を動かす git 操作（ブランチの切�
     "hooks": [
       {
         "type": "command",
-        "command": "/bin/bash ~/.claude/hooks/ask-shared-tree-git.sh",
+        "command": "/bin/bash ~/.claude/hooks/ask-shared-tree-git.sh || true",
         "timeout": 10
       }
     ]
   }
   ```
 
-  `onFailure` は付けない（fail open。[5.6](#design-failure)）。
+  `onFailure` は付けない（fail open。[5.6](#design-failure)）。`|| true` は `/review` で足した（[5.6](#design-failure)）。
 - 確認には `permissionDecision: "ask"` を使う。`ask-gh-pr-write.sh` は、`permissions.allow` の `Bash(gh *)` に当たるコマンドも、この仕組みで auto mode でも人間の確認に回している。`Bash(git checkout *)` も allow にあるが、同じに働く見込み（[5.9](#design-manual) で確かめる）。
 
 <a name="design-targets"></a>
@@ -124,7 +124,7 @@ Claude が作業ツリーの状態を動かす git 操作（ブランチの切�
 | --- | --- |
 | ブランチと HEAD を動かす | `git switch`、`git checkout`（すべての形）、`git rebase`、`git merge`、`git pull`、`git reset`、`git bisect` |
 | 未コミットの変更を消す・動かす | `git stash`（`list`・`show` を除く）、`git restore`、`git clean` |
-| 他人の変更を混ぜる | `git add` の `-A`・`--all`・`-u`・`--update`・`.`・`:/`、`git commit` の `-a`・`--all`（`-am` のようにまとめた形も） |
+| 他人の変更を混ぜる | `git add` の `-A`・`--all`・`-u`・`--update`・`.`・`:/`、`git commit` の `-a`・`--all`（`-am` のようにまとめた形も）とパス指定の `.`・`:/`（`/review` で追加） |
 | ブランチを動かす gh | `gh pr checkout` |
 
 対象外の例: 単独の `git commit`、ファイルやディレクトリを指定した `git add`、`git rm`・`git mv`・`git apply`・`git am`、`fetch`・`status`・`log`・`diff`・`branch`・`cherry-pick`・`revert`・`worktree`・`push`。
@@ -179,6 +179,7 @@ Claude が作業ツリーの状態を動かす git 操作（ブランチの切�
 
 - 本体をサブシェルで実行し、どんな失敗でも何も出さずに終了コード 0 で終える。終了コード 2（ブロック）は使わない。
 - jq がない・壊れている、記録のディレクトリがない、`ps` が失敗する、などの場合も同じ。
+- フックのファイル自体に構文エラーがあると、bash は本体を動かす前に終了コード 2 で終わり、Claude Code はそれをブロックとして扱う（実装中に、編集の途中のフックで、このセッションの Bash がすべて止まった）。登録のコマンドに `|| true` を付け、この場合も 0 で終える。
 
 <a name="design-speed"></a>
 
@@ -235,7 +236,12 @@ Claude が作業ツリーの状態を動かす git 操作（ブランチの切�
 - **非目標の経路。** 人間の git、Codex、`git -C` の先、エイリアスやスクリプトの中の git は見ない。
 - **ディレクトリを指定した `git add`。** 別のセッションの変更を混ぜうるが、対象にしない（[5.2](#design-targets)）。
 - **人が見ていないセッション。** `claude -p`・スケジュールタスク・バックグラウンドのセッションには承認する人がいないので、確認は拒否として扱われる見込み。同じ作業ツリーに別のセッションがあると、その中の対象の操作は止まる。2026-11-21 の時点で、人が見ていない Claude に git 操作を自動でさせる仕組みはない（人間に確認した）ので、特別な扱いは設けない。そうした仕組みを作るときに見直す。
-- **PATH の jq。** 既存のフックと同じく、jq は PATH から使う。
+- **PATH の jq と grep。** 既存のフックと同じく、jq と grep は PATH から使う。jq が先に動くので、grep だけを絶対パスにしても守りは増えない。
+- 次の 4 つは `/review` で見つかり、人間が受け入れた（2026-11-21）。どれも、同じ作業ツリーに別のセッションがいるときだけの話である。
+  - **worktree をまたいで共有される stash。** stash のスタック（`refs/stash`）はリポジトリ全体で共有されるが、このフックは作業ツリーのルートで比べる。そのため、worktree のセッションの `git stash pop`・`drop`・`clear` が、本体のツリーのセッションが積んだ stash を取り出したり消したりしても、確認は出ない。本体での `git clean -ffdx` が入れ子の worktree を消す場合も同じ。直すなら、stash の操作だけ、`.git` ファイルの `gitdir:` と `commondir` をファイルとして読み、共通の git ディレクトリで比べる（git は実行しない）。
+  - **引用符と heredoc の中の語による誤検知。** 引用符を除いてから照合するので、コミットメッセージ・grep のパターン・heredoc の本文に対象の語があっても確認が出る。テストに「known false positive」として書いた。
+  - **同じ会話の同時の再開。** 記録の `sessionId` が自分と同じものを除くので、生きているセッションの会話を別の端末やアプリで同時に `--resume` すると、互いに見えない。
+  - **相手のセッションの `/add-dir` と `cd` の先。** 相手の側は記録の `cwd`（起動した場所）だけで判断する。相手が `/add-dir` で足したディレクトリや `cd` の先で編集していても見えない。
 
 <a name="rollout"></a>
 
