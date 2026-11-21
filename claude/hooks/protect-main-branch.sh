@@ -48,6 +48,23 @@ is_builtin() {
   return 1
 }
 
+# `git branch` の引数（TOKENS の $1 番目から区切りまで）が、一覧と現在のブランチの表示だけか。
+# HEAD のブランチを変えるのは -m・-M（現在のブランチの改名）だが、まとめた短いオプションや今後のオプションを
+# 見落とさないよう、許す引数を並べる。一覧にない引数（ブランチ名・リダイレクト・`)` や `` ` `` の付いた語も）があれば、
+# 変えうるとみなす。`&` は区切りとみなさない。`&>` のリダイレクトも `&` のトークンに分かれ、後ろの引数が git に渡るため。
+is_read_only_branch() {
+  local j="$1"
+  while [ "$j" -lt "${#TOKENS[@]}" ]; do
+    case "${TOKENS[$j]}" in
+      '&&' | '||' | ';' | '|') return 0 ;;
+      --show-current | --list | --all | -a | --remotes | -r | --verbose | -v | -vv) ;;
+      *) return 1 ;;
+    esac
+    j=$((j + 1))
+  done
+  return 0
+}
+
 # エイリアス（$1）の値を ALIAS_VALUE に入れる。`-c alias.<name>=...` を優先し、なければ対象のリポジトリ（$2）
 # から見える設定を見る。エイリアス名は大文字と小文字を区別しない。
 # 長いコマンドで遅くならないよう、設定は対象のリポジトリが変わったときだけ読む。
@@ -135,6 +152,19 @@ main() {
   # shellcheck disable=SC2207,SC2001 # 単語分割が目的。SC2001 が勧める置換は上記のとおり遅い
   TOKENS=($(sed -E 's/(&&|\|\||[;|&])/ \1 /g; s/$/ ;/' <<<"$COMMAND"))
   set +f
+  # 引用符・置換・ヒアドキュメント・配列の中の `;` や改行も、区切りのトークンになる。こうした記号が最初に現れる
+  # トークンより後ろでは、git がコマンドの先頭にあるとは限らない
+  FIRST_SPECIAL=${#TOKENS[@]}
+  k=0
+  while [ "$k" -lt "${#TOKENS[@]}" ]; do
+    case "${TOKENS[$k]}" in
+      *[\'\"\\\$\`\(\)\<]*)
+        FIRST_SPECIAL=$k
+        break
+        ;;
+    esac
+    k=$((k + 1))
+  done
   CD_PATHS=()
   C_PATHS=()
   TARGETS=()
@@ -159,6 +189,12 @@ main() {
       CD_PATHS+=("$path")
       i=$((i + 2))
       continue
+    fi
+    # git branch の引数を一覧で判定するのは、git が記号より前で、裸の語としてコマンドの先頭にあるときだけ。
+    # `$(echo git branch -v) -m main` や `(git branch -v)` では、引数がその外に続きうる
+    PLAIN_START=0
+    if [ "$COMMAND_START" -eq 1 ] && [ "${TOKENS[$i]}" = "git" ] && [ "$i" -lt "$FIRST_SPECIAL" ]; then
+      PLAIN_START=1
     fi
     COMMAND_START=0
     i=$((i + 1))
@@ -195,7 +231,11 @@ main() {
     subcommand="${TOKENS[$i]:-}"
     subcommand="${subcommand%)}"
     subcommand="${subcommand%\`}"
-    case "$subcommand" in checkout | switch | branch | symbolic-ref | rebase) BRANCH_CHANGE=1 ;; esac
+    case "$subcommand" in
+      checkout | switch | symbolic-ref | rebase) BRANCH_CHANGE=1 ;;
+      # git と branch のあいだのオプション（-c・-C の値）に記号があると、フックの読み方がシェルとずれうる
+      branch) { [ "$PLAIN_START" -eq 1 ] && [ "$i" -lt "$FIRST_SPECIAL" ] && is_read_only_branch "$((i + 1))"; } || BRANCH_CHANGE=1 ;;
+    esac
     # commit 以外の組み込みコマンドは、エイリアスでもないので検査しない
     if [ "$subcommand" != "commit" ] && is_builtin "$subcommand"; then
       continue
