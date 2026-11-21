@@ -71,6 +71,14 @@ check 2 "$FEAT" "IFS=' ;'; a='command;git branch -v;-m main'; \${=a} && git comm
 check 2 "$FEAT" 'git -c "a.b=x \" branch -v ; " branch -m main && git commit -m x' 'escaped quote in a -c value before branch'
 check 2 "$FEAT" "git -c 'a.b=x'y branch -m main ; z' branch -v ; ' ; git commit -m x" 'quoted -c value that hides the real branch call'
 check 2 "$FEAT" 'git -C "d branch -v ; " branch -m main && git commit -m x' 'quoted -C path before branch'
+check 2 "$FEAT" 'function git { command git {branch,-M,main}; }; git branch; unfunction git; git commit -m x' 'brace expansion in a function that replaces git'
+check 2 "$FEAT" 'git -C {.,branch,-m} branch && git commit -m x' 'brace expansion in a -C value before branch'
+check 2 "$FEAT" 'git -c {x.y=z,branch,-m} branch && git commit -m x' 'brace expansion in a -c value before branch'
+check 2 "$FEAT" 'touch -- -m zz && mkdir a && git -C * branch && git commit -m x' 'glob in a -C value before branch'
+check 2 "$FEAT" 'git -C [a] branch && git commit -m x' 'bracket glob in a -C value before branch'
+check 2 "$FEAT" 'git -C ^x branch && git commit -m x' 'extended glob negation in a -C value before branch'
+check 2 "$FEAT" 'git -C a# branch && git commit -m x' 'extended glob repetition in a -C value before branch'
+check 0 "$FEAT" "cd ~ && cd $FEAT && git branch --show-current && git commit -m x" 'tilde before a read-only branch call'
 check 2 "$MAIN" 'git branch --show-current && git commit -m x' 'showing the current branch before a commit on main'
 
 # 同名のタグがあると symbolic-ref --short は heads/main を返す
