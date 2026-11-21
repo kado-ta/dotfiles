@@ -63,8 +63,8 @@ class TrustAuditTest(unittest.TestCase):
         for line in lines[1:]:
             if not line:
                 break
-            category, trust, path = line.split(None, 2)
-            rows.append((category, trust, path))
+            category, trust, action, path = line.split(None, 3)
+            rows.append((category, trust, action, path))
         return rows
 
     @staticmethod
@@ -100,15 +100,41 @@ class TrustAuditTest(unittest.TestCase):
         self.write_typical_config()
         rows = self.run_script().stdout
         self.assertEqual(sorted(self.rows(rows)), sorted([
-            ("home", "true", "~"),
-            ("missing", "true", "~/gone"),
-            ("missing", "false", "~/gone-untrusted"),
-            ("not-repo", "true", "~/plain-trusted"),
-            ("not-repo", "false", "~/plain-untrusted"),
-            ("repo", "true", "~/repo"),
-            ("repo", "true", "~/worktree"),
-            ("repo", "true", "~/mono/sub"),
+            ("home", "true", "-", "~"),
+            ("missing", "true", "消す", "~/gone"),
+            ("missing", "false", "消す", "~/gone-untrusted"),
+            ("not-repo", "true", "消す", "~/plain-trusted"),
+            ("not-repo", "false", "-", "~/plain-untrusted"),
+            ("repo", "true", "-", "~/repo"),
+            ("repo", "true", "-", "~/worktree"),
+            ("repo", "true", "-", "~/mono/sub"),
         ]))
+
+    def test_summarizes_the_result_and_the_impact_of_leaving_it(self):
+        self.write_typical_config()
+        lines = self.run_script().stdout.splitlines()
+        self.assertIn("結果: 消す候補が 3 件ある（フォルダがない 2 件、リポジトリの外で信頼している 1 件）。"
+                      "ほかの 5 件は対応不要。", lines)
+        self.assertIn("残しておくと: フォルダがない項目は、同じパスにフォルダを作り直したとき、確認なしで信頼される。"
+                      "急ぎではない。", lines)
+        self.assertIn("残しておくと: リポジトリの外の項目は、その下の、リポジトリでないフォルダも信頼されたままになる。",
+                      lines)
+
+    def test_summary_leaves_out_kinds_without_candidates(self):
+        self.write_config({str(self.home / "gone"): self.entry(True), self.folder("repo", git="dir"): self.entry(True)})
+        out = self.run_script().stdout
+        self.assertIn("結果: 消す候補が 1 件ある（フォルダがない 1 件）。ほかの 1 件は対応不要。", out.splitlines())
+        self.assertNotIn("リポジトリの外", out)
+
+    def test_lists_numbered_next_steps_before_the_commands(self):
+        self.write_typical_config()
+        lines = self.run_script().stdout.splitlines()
+        start = lines.index("次の手順:")
+        self.assertTrue(lines[start + 1].startswith("1. Claude Code をすべて閉じる"), lines)
+        self.assertTrue(lines[start + 2].startswith("2. 通常のターミナルで"), lines)
+        self.assertTrue(lines[start + 3].startswith("3. もう一度 mise run claude:trust-audit を実行し"), lines)
+        backup = next(i for i, line in enumerate(lines) if line.startswith("cp -p "))
+        self.assertLess(start + 3, backup)
 
     def test_lists_rows_in_display_order(self):
         self.write_typical_config()
@@ -171,7 +197,8 @@ class TrustAuditTest(unittest.TestCase):
         result = self.run_script()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(len(self.rows(result.stdout)), 3)
-        for word in ("claude purge", "jq ", "cp -p"):
+        self.assertIn("結果: 消す候補はない。やることはない。", result.stdout.splitlines())
+        for word in ("claude purge", "jq ", "cp -p", "次の手順", "残しておくと"):
             self.assertNotIn(word, result.stdout)
 
     def test_does_not_print_other_values(self):
