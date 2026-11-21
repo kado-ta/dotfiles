@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: done
 created: 2026-11-21
 ---
 
@@ -46,7 +46,7 @@ sandbox の中では、`mise.toml` を変えた後の mise は信頼し直すま
 ## 実物での確認（手順 4）
 
 - Claude が Bash（sandbox の中）で、mise タスクと同じ式（`sh -c -o errexit '/usr/bin/python3 -B claude/scripts/trust-audit.py || [ $? -eq 1 ]'`）を実行した。終了コード 0。出力は plan の[出力の形](plan.md#output)と同じだった。19 件のうち、フォルダがない 2 件が `消す`、ほかの 17 件が `-` で、結果・残しておくと・次の手順・コマンド・jq の注意が出た。
-- 人間が通常のターミナルで `mise trust` してから `mise run claude:trust-audit` を実行し、`ERROR task failed` が出ないことを確かめる: 未実施。
+- 人間が通常のターミナルで `mise trust` してから `mise run claude:trust-audit` を実行し、最後に `ERROR task failed` が出なくなったことを確かめた（2026-11-21、PR #56 のマージ後）。
 
 <a name="deviations"></a>
 
