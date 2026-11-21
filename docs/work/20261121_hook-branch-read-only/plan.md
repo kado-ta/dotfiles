@@ -38,14 +38,15 @@ created: 2026-11-21
 1. `claude/hooks/protect-main-branch.sh`: サブコマンドが `branch` のときは、区切り（`&&`・`||`・`;`・`|`）までの引数を見る。引数がないか、すべてが次の一覧に入っていれば、ブランチの切り替えとみなさない。それ以外（`-m`・`-c`、ブランチ名、リダイレクト、`)` や `` ` `` の付いた語、一覧にないオプション）は、今までどおり切り替えとみなす。
    - 一覧: `--show-current`、`--list`、`--all`・`-a`、`--remotes`・`-r`、`--verbose`・`-v`・`-vv`
    - `&` は区切りとみなさない（[D5](#decision-ampersand)）。
-   - 一覧で判定するのは、`git` が記号より前で、裸の語としてコマンドの先頭にあるときだけ（[D6](#decision-command-start)）。
+   - 一覧で判定するのは、裸の `git` が記号より前にあり、呼び出し全体の先頭か、記号のない `cd <path> &&` の直後にあるときだけ（[D6](#decision-command-start)、[D10](#decision-first-command)）。
 2. `claude/hooks/tests/test-protect-main-branch.sh`: テストを足す。
    - 通る（0）: feature ブランチで `git branch --show-current && git commit`、`git branch; git commit`、`git branch -vv && git commit`、`cd <dir> && git branch --show-current && git commit -m "a b"`
    - 止める（2）: feature ブランチで `git branch -m main && git commit`、`git branch -M main && git commit`、`git branch --show-current -m main && git commit`、`git branch new && git commit`、`git branch --show-current 2>/dev/null && git commit`
    - 止める（2）: main ブランチで `git branch --show-current && git commit`（cwd の検査で止まる）
    - 止める（2）: `branch` に展開されるエイリアスの後の commit（今までどおり）
    - 止める（2、`/review` で追加）: `git branch &>/dev/null -m main`、`git branch -a&>>/dev/null -m main`、`$(echo git branch -v) -m main`、`a=( git branch -v); "${a[@]}" -m main`、`` git branch -v` echo m main` ``、文字列やヒアドキュメントの中の行に置いた `git branch -v`、引用符の中の `;`、`(git branch --show-current)`、`-c`・`-C` の値に引用符・ブレース・グロブがある `git ... branch`、ブレース展開を使う関数で git を上書きした後の commit
-   - 通る（0、Codex のレビューで追加）: `cd ~ && cd <dir> && git branch --show-current && git commit`
+   - 通る（0、Codex のレビューで追加）: `cd ~ && git branch --show-current && git commit`
+   - 止める（2、Codex のレビューで追加）: zsh の短い関数定義や `alias -g` の後、ほかのコマンドの後（`true &&`・`git status &&`・`cd <dir>;`）の、表示だけの `git branch` と commit
 
 文書は変えない。`claude/README.md` のフックの表と CLAUDE.md は、ブランチの切り替えの判定の細部を書いていない。グローバルの CLAUDE.md の「`git switch -c` と `git commit` は別の Bash 呼び出しにする」は、変更後もそのまま正しい。
 
@@ -150,6 +151,16 @@ Codex のレビュー（[試験記録](test-report.md#codex-review-3)）が、D6
 - `git -C {.,branch,-m} branch && git commit`（`-c` でも同じ）: フックは値を 1 つのトークンとして読み飛ばすが、zsh は `git -C . branch -m branch` に展開する。
 
 1 つのトークンを複数の引数にする展開は、グロブも同じなので、`*`・`?`・`[` も足した。前のコマンドで `-m` などの名前のファイルを作れば、`git -C * branch` で引数を組み立てられる。`zsh/setpot.zsh` で `extended_glob` が有効なので、`^`（否定）と `#`（繰り返し）も足した。`~` は足さない。語の先頭ではホームのパス、途中では除外で、どちらも語を複数に増やさない。足すと `cd ~/dotfiles && git branch --show-current && ...` も止まる。
+
+<a name="decision-first-command"></a>
+### D10. 表示だけとみなすのは、呼び出しの先頭のコマンドだけにする
+
+Codex の 4 回目のレビュー（[試験記録](test-report.md#codex-review-4)）が、記号を使わずに、前のコマンドで git や引数の意味を変える形を 2 つ挙げた。zsh の短い関数定義 `function git; /usr/bin/git branch -M main; git branch; ...` と、`alias -g -- -v=-m ...` の後の `git branch -v ...` である。記号の判定に語を足しても、`autoload` や `eval` など別の形が残る見込みなので、許す位置を絞った（2026-11-21、あなたの判断）。
+
+- `git` が呼び出し全体の最初のトークンであるか、`cd <path> &&` の直後（4 つ目のトークン）にある。`<path>` にも D6・D9 の記号がない。
+- これより前には何も置けないので、同じ呼び出しの中で git・cd・引数を定義し直す形は、まとめて止まる。
+
+`cd <dir> && git branch --show-current && git add ... && git commit -m "..."` は通る。`true && git branch ...`、`git status && git branch ...`、`cd <dir>; git branch ...`、2 つ目以降の `git branch` は、変更前と同じくブロックされる。シェルの設定ファイルやリポジトリの設定など、呼び出しの外で定義されたものは、変更前と同じく見ていない。
 
 <a name="rollback"></a>
 ## ロールバック

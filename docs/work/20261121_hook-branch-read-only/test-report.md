@@ -13,11 +13,11 @@ created: 2026-11-21
 <a name="verification"></a>
 ## 検証
 
-2026-11-21、コミット `f9c1da5` の内容で実行した。フックのテストは、`$TMPDIR` を cwd にして macOS の `/bin/bash` 3.2 で実行した。
+2026-11-21、[D10](plan.md#decision-first-command) の修正の後に実行した。フックのテストは、`$TMPDIR` を cwd にして macOS の `/bin/bash` 3.2 で実行した。
 
 | コマンド | 結果 |
 | --- | --- |
-| `bash claude/hooks/tests/test-protect-main-branch.sh` | 126 件成功。修正の各段で、足したテストが修正の前に失敗することを確かめた（4 件・4 件・5 件・3 件・5 件・2 件） |
+| `bash claude/hooks/tests/test-protect-main-branch.sh` | 131 件成功。修正の各段で、足したテストが修正の前に失敗することを確かめた（4 件・4 件・5 件・3 件・5 件・2 件・5 件） |
 | ほかのフックのテスト 5 本（validate-command、ask-gh-pr-write、gh-read-token、guard-additional-dirs、guard-playwright-mcp） | すべて成功（29・66・24・17・49 件） |
 | `python3 -B .github/scripts/test-check-repo.py` | OK（83 件） |
 | shellcheck（`-S warning`）、actionlint、`git diff --check`、`/bin/bash -n` | 指摘なし |
@@ -67,3 +67,14 @@ created: 2026-11-21
   1. ブレース展開を使う関数で git を上書きする形（High、Blocks: yes）
   2. `-C`・`-c` の値のブレース展開（Medium、Blocks: yes）
 - 対応: どちらも採用した。手元でも、変更前は 2、変更後は 0 になることを確かめた。同じ理由でグロブと extended_glob の記号も足した（[plan の D9](plan.md#decision-expansion)、`f9c1da5`）。
+
+<a name="codex-review-4"></a>
+### 4 回目（challenge、書き直したプロンプト）
+
+2026-11-21 に、あなたが通常の端末で、3 回目と同じプロンプト（D9 のことを書き足したもの）で実行した（`8ec4de2`）。結果は Codex の記録から読んだ。
+
+- 結果: 後退が 2 種類（`VERDICT: FINDINGS`）。3 回目と同じく、ヒアストリングをプロセス置換に置き換えた写しで確かめたとのこと。
+  1. zsh の短い関数定義 `function git; /usr/bin/git branch -M main; git branch; unfunction git; git commit -m x`（High、Blocks: yes）。括弧・波括弧・引用符を使わないので、D6・D9 の記号に当たらない。
+  2. 同じコマンドの中で `alias -g -- -v=-m --show-current=main` を定義し、次の行で `git branch -v --show-current` とする形（Medium、Blocks: no）。zsh が行ごとに読む場合だけ効き、`zsh -c` で一度に渡すと効かない（Codex の実測。`/review` のサブエージェントも、Bash ツールの実行方法では効かないと測った）。
+- 手元でも、どちらもフックの判定では変更前は 2、変更後は 0 になることを確かめた。
+- 対応: どちらも採用した。記号の判定に語を足すのではなく、表示だけとみなす位置を、呼び出しの先頭か `cd <path> &&` の直後に絞った（[plan の D10](plan.md#decision-first-command)）。2 つ目は Bash ツールの実行方法では効かない見込みだが、同じ変更で止まる。
