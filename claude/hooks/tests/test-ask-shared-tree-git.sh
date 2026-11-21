@@ -12,10 +12,21 @@ T=$(mktemp -d "${TMPDIR:-/tmp}/test-ask-shared-tree-git.XXXXXX") || {
   exit 1
 }
 trap 'rm -rf "$T"' EXIT
+# The physical path, as the hook reports it
+TP=$(cd "$T" && pwd -P)
 
 pass=0
 fail=0
 CFG="$T/cfg"
+
+ok() {
+  pass=$((pass + 1))
+  echo "PASS $1"
+}
+ng() {
+  fail=$((fail + 1))
+  echo "FAIL $1"
+}
 
 # Trees: a repository, a worktree inside it, another repository, and a symlink to the first
 mkdir -p "$T/repo/.git" "$T/repo/sub" "$T/repo/.claude/worktrees/wt" "$T/other/.git" "$T/bin"
@@ -45,15 +56,16 @@ esac
 EOF
 chmod +x "$T/bin/kill" "$T/bin/ps"
 
-# The hook under test, with /bin/kill swapped for the fake
+# The hook under test, with /bin/kill and /bin/ps swapped for the fakes
 src=$(cat "$HOOK" 2>/dev/null)
 KILL_REAL=/bin/kill
 KILL_FAKE="$T/bin/kill"
-substituted=${src//$KILL_REAL/$KILL_FAKE}
-if [ "$substituted" = "$src" ]; then
-  fail=$((fail + 1))
-  echo "FAIL /bin/kill in the hook could not be replaced"
-fi
+PS_REAL=/bin/ps
+PS_FAKE="$T/bin/ps"
+step=${src//$KILL_REAL/$KILL_FAKE}
+[ "$step" != "$src" ] || ng "/bin/kill in the hook could not be replaced"
+substituted=${step//$PS_REAL/$PS_FAKE}
+[ "$substituted" != "$step" ] || ng "/bin/ps in the hook could not be replaced"
 printf '%s\n' "$substituted" >"$T/hook.sh"
 
 # reset: forget every session record and every fake process
@@ -78,34 +90,64 @@ alive() {
   if [ $# -ge 2 ]; then echo "$2" >"$T/start/$1"; fi
 }
 
+# input_for <command> [cwd]
+input_for() {
+  jq -n --arg cmd "$1" --arg cwd "${2:-$T/repo}" \
+    '{session_id: "self-id", cwd: $cwd, tool_input: {command: $cmd}}'
+}
+
+# invoke <hook-input>: runs the hook under test and sets OUT and CODE
+invoke() {
+  OUT=$(CLAUDE_CONFIG_DIR="${HOOK_CFG:-$CFG}" CLAUDE_PROJECT_DIR='' TZ=Asia/Tokyo HOME="${HOOK_HOME:-$HOME}" \
+    PATH="${HOOK_PATH:-$PATH}" /bin/bash "${HOOK_FILE:-$T/hook.sh}" <<<"$1" 2>/dev/null)
+  CODE=$?
+}
+
 # verdict <ask|none> <hook-input> <description>
 verdict() {
-  local expected="$1" input="$2" desc="$3"
-  local output code actual
-  output=$(CLAUDE_CONFIG_DIR="${HOOK_CFG:-$CFG}" CLAUDE_PROJECT_DIR='' TZ=Asia/Tokyo HOME="${HOOK_HOME:-$HOME}" \
-    PATH="${HOOK_PATH:-$PATH}" /bin/bash "${HOOK_FILE:-$T/hook.sh}" <<<"$input" 2>/dev/null)
-  code=$?
-  case "$code:$output" in
+  local actual
+  invoke "$2"
+  case "$CODE:$OUT" in
     0:) actual=none ;;
     0:*'"permissionDecision": "ask"'*) actual=ask ;;
     0:*) actual=other-output ;;
-    *) actual="exit-$code" ;;
+    *) actual="exit-$CODE" ;;
   esac
-  if [ "$actual" = "$expected" ]; then
-    pass=$((pass + 1))
-    echo "PASS [$expected] $desc"
+  if [ "$actual" = "$1" ]; then
+    ok "[$1] $3"
   else
-    fail=$((fail + 1))
-    echo "FAIL [want $expected, got $actual] $desc"
+    ng "[want $1, got $actual] $3"
   fi
 }
 
 # check <ask|none> <command> [cwd] [description]
 check() {
-  local input
-  input=$(jq -n --arg cmd "$2" --arg cwd "${3:-$T/repo}" \
-    '{session_id: "self-id", cwd: $cwd, tool_input: {command: $cmd}}')
-  verdict "$1" "$input" "${4:-$2}"
+  verdict "$1" "$(input_for "$2" "${3:-}")" "${4:-$2}"
+}
+
+# reason [cwd]: the permissionDecisionReason for 'git switch main' (empty when the hook does not ask)
+reason() {
+  invoke "$(input_for 'git switch main' "${1:-}")"
+  printf '%s' "$OUT" | jq -r '.hookSpecificOutput.permissionDecisionReason // empty' 2>/dev/null
+}
+
+# expect_in <description> <text> <substring>
+expect_in() {
+  case "$2" in
+    *"$3"*) ok "$1" ;;
+    *) ng "$1: '$3' not in '$2'" ;;
+  esac
+}
+
+# expect_count <description> <text> <substring> <count>
+expect_count() {
+  local rest=${2//"$3"/}
+  local n=$(((${#2} - ${#rest}) / ${#3}))
+  if [ "$n" -eq "$4" ]; then
+    ok "$1"
+  else
+    ng "$1: '$3' appears $n times, want $4, in '$2'"
+  fi
 }
 
 # Another live session shares the tree
@@ -201,6 +243,113 @@ verdict none '' 'empty input'
 verdict none "$(jq -nc --arg cwd "$T/repo" '{cwd: $cwd, tool_input: {command: null}}')" 'null command'
 verdict none "$(jq -nc --arg cwd "$T/repo" '{cwd: $cwd, tool_input: {command: 1}}')" 'non-string command'
 verdict none "$(jq -nc --arg cwd "$T/repo" '{cwd: $cwd, tool_input: {}}')" 'missing command'
+
+# Liveness: procStart (UTC) is compared with ps, so a pid reused by another process is not counted
+EPOCH=1795237131  # 2026-11-21 04:58:51 UTC
+EPOCH1=1793491200 # 2026-11-01 00:00:00 UTC, a Sunday
+# proc <epoch>: procStart as Claude Code writes it
+proc() { TZ=UTC LC_ALL=C /bin/date -r "$1" '+%a %b %e %H:%M:%S %Y'; }
+
+reset
+record 5001 "$T/repo" idle cli other-5001 "$(proc "$EPOCH")"
+alive 5001 "$EPOCH"
+check ask 'git switch main' '' 'procStart matches in UTC'
+alive 5001 $((EPOCH + 60))
+check none 'git switch main' '' 'pid reused'
+record 5001 "$T/repo" idle cli other-5001 garbage
+check ask 'git switch main' '' 'unknown procStart format falls back to kill -0'
+record 5001 "$T/repo" idle cli other-5001 'Sun Nov 1 00:00:00 2026'
+alive 5001 "$EPOCH1"
+check ask 'git switch main' '' 'single-digit day'
+
+# Self: the calling session is not another session
+reset
+record 5001 "$T/repo" idle cli self-id
+alive 5001
+check none 'git switch main' '' 'same sessionId'
+
+reset
+echo 4242 >"$T/ppid/default"
+echo 1 >"$T/ppid/4242"
+record 4242 "$T/repo"
+alive 4242
+check none 'git switch main' '' 'ancestor pid'
+record 5001 "$T/repo"
+alive 5001
+check ask 'git switch main' '' 'ancestor pid plus another live session'
+expect_count 'the reason lists only the other session' "$(reason)" '開始）' 1
+
+# Reason text
+reset
+record 5001 "$T/repo" busy cli
+record 5002 "$T/repo" idle claude-vscode
+record 5003 "$T/repo" waiting claude-desktop
+record 5004 "$T/repo" idle cursor
+alive 5001
+alive 5002
+alive 5003
+alive 5004
+text=$(HOOK_HOME=/nonexistent-home reason)
+expect_in 'CLI label' "$text" 'CLI（busy、'
+expect_in 'VS Code label' "$text" 'VS Code（idle、'
+expect_in 'desktop app label' "$text" 'desktop app（waiting、'
+expect_in 'unknown entrypoint as is' "$text" 'cursor（idle、'
+expect_in 'start time in the local time zone' "$text" '11/21 13:58 開始'
+expect_in 'physical path outside home' "$text" "同じ作業ツリー（$TP/repo）"
+expect_in 'home as ~' "$(HOOK_HOME="$TP" reason)" '同じ作業ツリー（~/repo）'
+
+reset
+for pid in 5001 5002 5003 5004 5005 5006 5007; do
+  record "$pid" "$T/repo"
+  alive "$pid"
+done
+text=$(reason)
+expect_count 'at most five sessions listed' "$text" '開始）' 5
+expect_in 'the rest counted' "$text" '、ほか 2 件'
+
+reset
+mkdir -p "$T/a\"b/.git"
+record 5001 "$T/a\"b"
+alive 5001
+invoke "$(input_for 'git switch main' "$T/a\"b")"
+if printf '%s' "$OUT" | jq -e '.hookSpecificOutput.permissionDecisionReason | contains("a\"b")' >/dev/null 2>&1; then
+  ok 'a quote in the path keeps the output valid JSON'
+else
+  ng "a quote in the path keeps the output valid JSON: $OUT"
+fi
+
+# Many records: dead sessions left behind do not slow the hook down
+reset
+for pid in $(seq 6000 6059); do record "$pid" "$T/repo"; done
+record 5001 "$T/repo"
+alive 5001
+start=$SECONDS
+check ask 'git switch main' '' 'many records'
+elapsed=$((SECONDS - start))
+if [ "$elapsed" -lt 2 ]; then
+  ok "many records took ${elapsed}s"
+else
+  ng "many records took ${elapsed}s"
+fi
+
+# Real ps and kill, with the hook itself (ps is not permitted inside the Claude Code sandbox)
+if ! /bin/ps -p $$ >/dev/null 2>&1; then
+  echo "SKIP real ps"
+else
+  sleep 60 &
+  spid=$!
+  reset
+  record "$spid" "$T/repo" idle cli x "$(TZ=UTC LC_ALL=C /bin/ps -o lstart= -p "$spid")"
+  HOOK_FILE="$HOOK" check ask 'git switch main' '' 'real ps: a live session'
+  reset
+  record $$ "$T/repo" idle cli x "$(TZ=UTC LC_ALL=C /bin/ps -o lstart= -p $$)"
+  HOOK_FILE="$HOOK" check none 'git switch main' '' 'real ps: the test shell, an ancestor of the hook'
+  reset
+  record "$spid" "$T/repo" idle cli x "$(TZ=UTC LC_ALL=C /bin/ps -o lstart= -p "$spid")"
+  kill "$spid"
+  wait "$spid" 2>/dev/null
+  HOOK_FILE="$HOOK" check none 'git switch main' '' 'real ps: the session ended'
+fi
 
 echo "---"
 echo "pass=$pass fail=$fail"
