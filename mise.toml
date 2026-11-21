@@ -34,6 +34,12 @@ run = "/usr/bin/python3 -B claude/scripts/skills-check.py snapshot"
 description = "期間内のスキルの使われ方を集計する（例: mise run claude:skill-usage 2026-11-16 2026-12-07）"
 run = "/usr/bin/python3 -B claude/scripts/skill-usage.py"
 
+# 読み取りだけで、消すためのコマンドは出力するだけ。実行は人間が、Claude Code をすべて閉じてから通常の端末で行う。
+# スクリプトは候補があると終了コード 1 を返す。mise が失敗と表示しないよう 1 は成功として扱い、点検できないとき（2）だけ失敗にする。
+[tasks."claude:trust-audit"]
+description = "Claude Code が信頼したフォルダを点検し、消す候補があれば次の手順とコマンドを出す（点検できないときだけ失敗する）"
+run = "/usr/bin/python3 -B claude/scripts/trust-audit.py || [ $? -eq 1 ]"
+
 # スキル・プラグインをまとめて更新する。sandbox の中からは ~/.claude と Homebrew に書けないので、通常の端末で実行する。
 # Claude Code の ! は、セッションによっては sandbox の中で動き、更新も profile のテストも失敗する。
 # ! で実行するときは、mise を通さず /bin/bash ~/dotfiles/claude/scripts/update-skills.sh で実行する。

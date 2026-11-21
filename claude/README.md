@@ -2,6 +2,33 @@
 
 Claude Code の設定を管理するディレクトリ。`setup.sh` で `~/.claude/` にシンボリックリンクする。
 
+<a name="toc"></a>
+
+## 目次
+
+- [セットアップ（`setup.sh`）](#setup)
+- [フック](#hooks)
+- [MCP サーバー](#mcp)
+  - [Playwright MCP](#playwright-mcp)
+- [cc-safe-push](#cc-safe-push)
+  - [動作](#cc-safe-push-policy)
+  - [インストール](#cc-safe-push-install)
+  - [許可リストの書き方](#cc-safe-push-allowlist)
+  - [更新するとき](#cc-safe-push-update)
+- [cc-safe-pr](#cc-safe-pr)
+  - [使い方](#cc-safe-pr-usage)
+  - [拒否する条件](#cc-safe-pr-policy)
+  - [インストール](#cc-safe-pr-install)
+  - [監査ログ](#cc-safe-pr-audit)
+- [cc-crit](#cc-crit)
+  - [使い方](#cc-crit-usage)
+  - [インストール](#cc-crit-install)
+  - [更新するとき](#cc-crit-update)
+- [sandbox 内の gh](#gh-read-token)
+  - [トークンの作成と配置](#gh-read-token-setup)
+- [信頼したフォルダの点検](#trust-audit)
+  - [信頼の仕様の要点](#trust-audit-spec)
+
 <a name="setup"></a>
 
 ## セットアップ（`setup.sh`）
@@ -24,6 +51,8 @@ pstack はサードパーティのマーケットプレイスなので自動更�
 - [rules/SKILL_ROUTING.md](rules/SKILL_ROUTING.md): Claude がスキルを選ぶときの規則。全プロジェクトの全セッションで読み込まれる。
 - [SKILL_INVENTORY.md](SKILL_INVENTORY.md): 全スキルの棚卸し（状態・制約・重複の裁定・更新したときの見直し・規則の効果の確認）。
 - [SKILL_CHEATSHEET.md](SKILL_CHEATSHEET.md): タスク別の早見表（人間向け）。
+
+[目次に戻る](#toc)
 
 <a name="hooks"></a>
 
@@ -60,6 +89,8 @@ bash claude/hooks/tests/test-guard-playwright-mcp.sh
 ```
 
 PR と main への push では、GitHub Actions が macOS の `/bin/bash` と `/usr/bin/python3` で同じテストを実行する。
+
+[目次に戻る](#toc)
 
 <a name="mcp"></a>
 
@@ -140,6 +171,10 @@ headless のブラウザを止めるサイトもある（login.salesforce.com �
 2. `mcp/playwright.json` を消す（残すと `setup.sh` が登録し直す）。
 3. `settings.json` の deny（`mcp__playwright__*` の 2 つ、`Read(~/.crit/**)`、`Edit(~/.local/share/claude-mcp/**)`、`Edit(~/Library/Caches/playwright-mcp/**)`）、denyRead の `~/.crit`、denyWrite の `~/.local/share/claude-mcp` と `~/Library/Caches/playwright-mcp`、`disabledMcpjsonServers` の `playwright`、フックの登録を消す。定義がなければ、`check-repo.py` はこれらを求めない。
 4. 入れた `~/.local/share/claude-mcp/playwright` と、出力の `~/Library/Caches/playwright-mcp` を消す。
+
+[目次に戻る](#toc)
+
+<a name="cc-safe-push"></a>
 
 ## cc-safe-push
 
@@ -254,6 +289,8 @@ Claude は実行ユーザーの権限で動くので、root 所有にすると�
   sudo vi /usr/local/etc/claude-push/allowlist.jsonc
   ```
 
+[目次に戻る](#toc)
+
 <a name="cc-safe-pr"></a>
 
 ## cc-safe-pr
@@ -327,6 +364,8 @@ grep -qxF '.cc-pr-request.json' ~/.config/git/ignore || echo '.cc-pr-request.jso
 
 ユーザーの権限で書かれるので、改ざんを防ぐものではない。GitHub 側の記録との突合には `github_request_id`（`X-GitHub-Request-Id`）と PR の URL を使う。
 
+[目次に戻る](#toc)
+
 <a name="cc-crit"></a>
 
 ## cc-crit
@@ -379,6 +418,8 @@ mise run crit:profile-test
 
 アンインストールは、`settings.json` の `cc-crit` の行を消して `sudo rm -r /usr/local/libexec/claude-crit` を実行する。専用 HOME の `~/.cc-crit` は残るので、要らなければ消す。
 
+[目次に戻る](#toc)
+
 <a name="gh-read-token"></a>
 
 ## sandbox 内の gh
@@ -415,3 +456,45 @@ sandbox 内の `gh` には、`hooks/gh-read-token.sh` が owner ごとの読み�
 更新するときは 1〜3 をやり直す。Bash コマンドのたびにファイルを読むので、Claude Code の再起動は要らない。owner を追加するときも、トークンを置くだけでよい。
 
 `settings.json` の変更を戻すと、次のセッションから `GH_TOKEN` は設定されず、sandbox 内の `gh` は Keychain のトークンを使うようになる。
+
+[目次に戻る](#toc)
+
+<a name="trust-audit"></a>
+
+## 信頼したフォルダの点検
+
+Claude Code が信頼したフォルダ（`~/.claude.json` の `projects`）を、`scripts/trust-audit.py` で点検する。dotfiles で `mise run claude:trust-audit` を実行する。読み取りだけなので、Claude Code の sandbox の中でも動く。
+
+`projects` のキーと、各項目の `hasTrustDialogAccepted` だけを読む。認証の情報と、項目のほかのキーは出力しない。`~/.claude.json` を書き換えず、git も実行しない（点検するフォルダのリポジトリの設定を読ませないため）。区分は上から順に判定する。表示は `missing` から並べる。
+
+| 区分 | 条件 | 消す候補 |
+| --- | --- | --- |
+| `home` | ホームディレクトリ | ならない。ホームの信頼は保存されない |
+| `missing` | フォルダがない | なる |
+| `repo` | フォルダ自身か、その親に `.git`（ディレクトリかファイル）がある | ならない |
+| `not-repo` | 上のどれでもない | 信頼が `true` ならなる（親の信頼が下のフォルダに及ぶため） |
+
+表の「対応」列は、消す候補の行を `消す` とする。候補があれば、表の後に、結果の要約、残しておいたときの影響、番号付きの次の手順と、バックアップを作る `cp`・候補の項目を消す jq のコマンドを出力する。候補がなければ「消す候補はない」とだけ出す。
+
+スクリプトの終了コードは、0: 候補なし、1: 候補あり、2: 点検できない（ファイルがない、JSON として読めない、`projects` が辞書でない、フォルダを調べる権限がない、キーに制御文字があるか絶対パスでない、`CLAUDE_CONFIG_DIR` が設定されている）。`mise run claude:trust-audit` は、1 を成功として扱い、2 のときだけ失敗にする（候補があるだけで、mise が `ERROR task failed` と表示しないため）。`CLAUDE_CONFIG_DIR` を設定した環境（`~/.claude.json` の場所が変わる）には対応しない。
+
+出力したコマンドは、Claude Code をすべて閉じてから（`claude --bg` のセッションとデーモン、IDE の拡張、デスクトップアプリも）、通常のターミナルで実行する。Claude Code は動いているあいだに `~/.claude.json` を書き戻すため（前に外した項目が、セッションの後に戻っていた。終了したセッションが書き戻したと見ているが、推測）。
+
+- jq は項目ごと消す。会話の記録は残るが、項目にある local スコープの MCP サーバーの設定や `allowedTools` なども消える。戻すときは、出力の `cp` で作ったバックアップから戻す。
+- `claude purge` は提案しない。元に戻せないうえ、外付けのボリュームを外しているだけのフォルダも、改名したフォルダの古いパスも、`missing` に見えるため。改名した場合、会話の記録のディレクトリ名（パスの英数字以外を `-` に置き換えた名前）が、改名後のフォルダと同じになることがある（`foo_bar` から `foo-bar` など）。そのとき purge で古いパスを消すと、改名後の記録まで消える見込みがある（purge の実装は確かめていない）。記録も消すなら、フォルダが本当に要らないことを確かめてから、`claude purge --dry-run <パス>` で一覧を見て、`claude purge <パス>` を実行する。
+- 使っていないリポジトリかどうかは判定しない。一覧を見て消すと決めたら、jq の `--args` にパスを足す。
+- `GIT_DIR` を使う構成と bare リポジトリは、`not-repo` に出る。
+
+<a name="trust-audit-spec"></a>
+
+### 信頼の仕様の要点
+
+2026-11-21 に公式ドキュメントで確かめた。
+
+- 信頼は `~/.claude.json` の `projects["<パス>"].hasTrustDialogAccepted` に記録される。キーは、リポジトリの中ではリポジトリのルート（worktree では main checkout のルート）、外では起動したフォルダ自身（[permissions](https://code.claude.com/docs/en/permissions#project-allow-rules-and-workspace-trust)）。
+- リポジトリの外では、信頼は下のフォルダにも及ぶ。下にある Git リポジトリは除く。ただし、下のフォルダの `.claude/settings.json` の `permissions.allow` と `additionalDirectories` は、そのフォルダ自身を信頼するまで使われない（permissions）。
+- ホームで起動したときの信頼は、そのセッションのあいだだけで、保存されない（[security](https://code.claude.com/docs/en/security#additional-safeguards)・permissions）。
+- 信頼を一覧・取り消す公式のコマンドは見つからなかった。`claude purge <パス>` は、そのパスの項目（信頼・履歴・MCP サーバー）と会話の記録などをまとめて消す。パスは 1 つだけ取る（[claude-directory](https://code.claude.com/docs/en/claude-directory#clear-local-data)）。`~/.claude/backups/` の古い `~/.claude.json` の写しは消さない。フォルダがないパスにも使える（ドキュメントには書かれていない。2026-11-20 に 11 件で実測）。
+- 編集を Claude Code をすべて閉じてから行うのは、ドキュメントの記述ではなく、上の観察からの推測。
+
+[目次に戻る](#toc)
