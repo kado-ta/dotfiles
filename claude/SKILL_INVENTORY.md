@@ -81,7 +81,7 @@
 | スキル | 機能（入力 → 出力） | 起動 | 状態 | 書き込み・依存・制約 |
 | --- | --- | --- | --- | --- |
 | `review` | ベースブランチとの差分（未 commit・未追跡も含む）をレビューし、直す | 自動 | 有効 | 専門のサブエージェント（テスト、保守性、セキュリティ、API の契約、マイグレーションなど）を並列に起動し、自動で直せるものは直す。commit・push はしない。レビュー bot のコメントがあると PR に返信を投稿する（sandbox では 403）。Codex の段は Bash から `codex exec` を呼ぶ（拒否される見込み） |
-| `codex` | Codex CLI による別モデルの意見（review・challenge・consult） | 自動 | 制限 | ファイルは変えない。Bash から `codex exec` を呼ぶので、auto モードの判定で拒否された記録がある（2026-11-11）。独立レビューは、ユーザーが通常の端末で `codex review` を実行する（`!` では 2026-11-18 から、app-server の初期化が `Operation not permitted` で失敗している） |
+| `codex` | Codex CLI による別モデルの意見（review・challenge・consult） | 自動 | 制限 | ファイルは変えない。Bash から `codex exec` を呼ぶので、auto モードの判定で拒否された記録がある（2026-11-11）。独立レビューは、ユーザーが通常の端末で `codex review` を実行する（`!` では 2026-11-18 から、app-server の初期化が `Operation not permitted` で失敗している）。2026-11-21 から、セキュリティの境界・設計判断を含む変更では challenge（`codex exec`）も通常の端末で実行してもらい、結果は Claude が Codex の記録から全回分を読む。crit-sandbox の設計で `codex review` は指摘なし、challenge は P1 を 6 件挙げたことと、PR #46 で P1 が後の実行の結果に埋もれたため |
 | `cso` | セキュリティ監査。範囲（`--infra`・`--code`・`--supply-chain`・`--owasp` など）と `--diff` を選べる | 自動 | 制限 | 規則でユーザーが指定したときだけにしている。sandbox では静的な監査だけで、`.env.example` などを追跡しているリポジトリでは失敗する（[`/cso` を sandbox で使う](#cso-sandbox)）。ソースはすべてランチャー経由で読む |
 | `qa` | サイト・API・CLI を試し、見つけたバグを直して確かめる | 自動 | 有効 | 修正ごとに commit する（作業ツリーが汚れていれば commit か stash を尋ねる）。ブラウザは Aside か gstack のヘッドレスブラウザ。後者は localhost で待ち受けるので sandbox では動かない |
 | `qa-only` | `qa` の報告だけ | 自動 | 有効 | 直さない、commit しない。ブラウザの制約は `qa` と同じ |
@@ -290,7 +290,7 @@ sandbox の外で `/cso` を実行すると、保存先に秘密ファイルの�
 | 機能の要件・設計 | `brainstorming` → `writing-plans` | `/pstack:architect with checkpoint`（複雑か高リスク） | `/spec`、`/autoplan`（無効） |
 | 変更の影響 | Claude 自身の読解 | `/pstack:blast-radius`（高リスク） | `understand-diff`（グラフが前提） |
 | 差分のレビュー | `/review` | `/pstack:interrogate`（高リスクで実行による証明が要るとき） | `/code-review`、`requesting-code-review` |
-| 独立したモデルのレビュー | ユーザーが通常の端末で実行する `codex review` | — | `/codex`（Bash から拒否される）、`interrogate`・`arena`（Claude 同士） |
+| 独立したモデルのレビュー | ユーザーが通常の端末で実行する `codex review` | challenge（`codex exec`。セキュリティの境界・設計判断を含む変更） | `/codex`（Bash から拒否される）、`interrogate`・`arena`（Claude 同士） |
 | 計画の人間レビュー | `/crit-review` | — | `/crit:crit`（sandbox で動かない） |
 | セキュリティ | `/security-review` | `/cso`（ユーザーが指定したとき） | 同じ差分に `/security-review` と `/cso` を重ねない |
 | コードの理解 | 通常の読解・Explore | `understand-chat`（グラフがあるとき）、`/pstack:how` | `/understand-anything:understand` を自分で起動しない |
