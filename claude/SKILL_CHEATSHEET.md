@@ -78,7 +78,7 @@
 | 組み込み | `/security-review` | セキュリティレビュー | 自動 |
 | | `/simplify` | 変更したコードの整理 | 自動 |
 | Codex | `cd <repo> && codex review --base <base> -c 'sandbox_mode="read-only"' -c skills.include_instructions=false` | 別モデルの独立レビュー（ユーザーが通常の端末で実行する。`!` では失敗することがある） | 明示 |
-| | `cd <repo> && codex exec - -s read-only -c skills.include_instructions=false < <プロンプトのファイル>` | challenge（攻撃者の視点で突かせる。プロンプトは Claude が書く。セキュリティの境界・設計判断を含む変更で、`codex review` に加えて 1 回） | 明示 |
+| | `cd <repo> && codex exec - -s read-only -c skills.include_instructions=false < <プロンプトのファイル>` | challenge（変更前と比べた後退や、壊れる入力を挙げてもらう。プロンプトは Claude が書く。セキュリティの境界・設計判断を含む変更で、`codex review` に加えて 1 回） | 明示 |
 
 <a name="comparisons"></a>
 
