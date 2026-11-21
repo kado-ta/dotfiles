@@ -82,24 +82,38 @@ def main():
         rows.append((category, trusted, key))
     rows.sort(key=lambda r: (ORDER.index(r[0]), r[2]))
 
-    print("区分      信頼   パス")
-    for category, trusted, key in rows:
-        print(f"{category:<10}{'true' if trusted else 'false':<7}{display(key, home)}")
-
     # purge は元に戻せず、改名や外したボリュームでもフォルダがないように見えるので、項目を消すだけにする。
-    removable = [key for category, trusted, key in rows
-                 if category == "missing" or (category == "not-repo" and trusted)]
+    missing = [key for category, _, key in rows if category == "missing"]
+    outside = [key for category, trusted, key in rows if category == "not-repo" and trusted]
+    removable = set(missing + outside)
+
+    print("区分      信頼   対応  パス")
+    for category, trusted, key in rows:
+        action = "消す  " if key in removable else "-     "
+        print(f"{category:<10}{'true' if trusted else 'false':<7}{action}{display(key, home)}")
+    print()
     if not removable:
+        print("結果: 消す候補はない。やることはない。")
         return 0
 
+    kinds = [f"{label} {len(keys)} 件" for label, keys in
+             (("フォルダがない", missing), ("リポジトリの外で信頼している", outside)) if keys]
+    print(f"結果: 消す候補が {len(removable)} 件ある（{'、'.join(kinds)}）。ほかの {len(rows) - len(removable)} 件は対応不要。")
+    if missing:
+        print("残しておくと: フォルダがない項目は、同じパスにフォルダを作り直したとき、確認なしで信頼される。急ぎではない。")
+    if outside:
+        print("残しておくと: リポジトリの外の項目は、その下の、リポジトリでないフォルダも信頼されたままになる。")
     print()
-    print("# Claude Code をすべて閉じてから（claude --bg のセッションとデーモン、IDE・デスクトップアプリも）、通常のターミナルで実行する")
+    print("次の手順:")
+    print("1. Claude Code をすべて閉じる（claude --bg のセッションとデーモン、IDE、デスクトップアプリも）。")
+    print("2. 通常のターミナルで、下のコマンドを上から順に実行する。")
+    print("3. もう一度 mise run claude:trust-audit を実行し、「消す候補はない」と出ることを確かめる。")
+    print()
     print(f"cp -p ~/.claude.json ~/.claude.json.bak-{datetime.datetime.now():%Y%m%d-%H%M%S}")
-    print()
-    print("# フォルダがない項目と、リポジトリの外で信頼している項目を、項目ごと消す")
-    print("# 会話の記録は残る。項目にある local の MCP サーバーの設定なども消えるので、戻すときは上のバックアップから")
-    print(f"(umask 077; jq {shlex.quote(JQ_FILTER)} ~/.claude.json --args {' '.join(map(shlex.quote, removable))} \\")
+    print(f"(umask 077; jq {shlex.quote(JQ_FILTER)} ~/.claude.json --args {' '.join(map(shlex.quote, missing + outside))} \\")
     print("  > ~/.claude.json.new) && cat ~/.claude.json.new > ~/.claude.json && rm ~/.claude.json.new")
+    print()
+    print("jq は項目ごと消す。会話の記録は残る。項目にある local の MCP サーバーの設定なども消えるので、戻すときは上のバックアップから。")
     return 1
 
 
