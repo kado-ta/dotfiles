@@ -49,10 +49,11 @@ jobs:
         run: python3 -B .github/scripts/test-check-repo.py
 
       # 実物の ~/.claude は CI にないので、偽の ~/.claude を使う単体テストだけを実行する。
-      - name: Tests for skill doc scripts
+      - name: Tests for Claude scripts
         run: |
           python3 -B claude/scripts/test-skills-check.py
           python3 -B claude/scripts/test-skill-usage.py
+          python3 -B claude/scripts/test-trust-audit.py
 
       # herdr-agent-state.sh は herdr が生成・上書きするので対象外。
       - name: shellcheck
