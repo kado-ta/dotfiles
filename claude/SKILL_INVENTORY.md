@@ -256,7 +256,7 @@ sandbox の外で `/cso` を実行すると、保存先に秘密ファイルの�
 
 | イベント | 提供元 | 内容 |
 | --- | --- | --- |
-| PreToolUse（Bash） | settings | `validate-command.sh`（`rm -rf`・`prod` などを含むコマンドを止める）、`protect-main-branch.sh`、`ask-gh-pr-write.sh` |
+| PreToolUse（Bash） | settings | `validate-command.sh`（`rm -rf`・`prod` などを含むコマンドを止める）、`protect-main-branch.sh`、`ask-gh-pr-write.sh`、`ask-shared-tree-git.sh`（同じ作業ツリーの別セッション） |
 | PreToolUse（Edit・Write・MultiEdit・NotebookEdit） | settings | `guard-additional-dirs.sh`（`~/.gstack/projects` が symlink のあいだ、Edit・Write 系をすべて止める） |
 | PostToolUse（Bash） | settings | PR の URL を表示する |
 | PostToolUse（Bash） | understand-anything | commit・merge などの後にグラフの更新を指示する |
