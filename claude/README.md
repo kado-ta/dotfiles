@@ -34,6 +34,7 @@ pstack はサードパーティのマーケットプレイスなので自動更�
 | `hooks/validate-command.sh`    | PreToolUse（Bash） | `rm -rf` と、本番環境（`prod` / `prd`）を含むコマンドをブロックする。`sf devops` の参照系コマンドと PR 作成は、単独のコマンドに限り許可する。`cc-safe-push` / `cc-safe-pr` / `cc-crit` は、前後にコマンドや引数を付けた実行をブロックする |
 | `hooks/protect-main-branch.sh` | PreToolUse（Bash） | `main`・`master`・`staging` ブランチへの `git commit` をブロックする                                                                                                                                                          |
 | `hooks/ask-gh-pr-write.sh`     | PreToolUse（Bash） | `gh` の PR 書き込みと `gh api` を、表記ゆれも含めて人間の承認に回す                                                                                                                                                           |
+| `hooks/ask-shared-tree-git.sh` | PreToolUse（Bash） | ブランチの切り替えなど作業ツリーの状態を動かす git 操作の前に、同じ作業ツリーで別の Claude セッションが動いていれば人間の承認に回す。検査できないときは何もしない |
 | `hooks/guard-additional-dirs.sh` | PreToolUse（Edit・Write・MultiEdit・NotebookEdit） | `~/.gstack/projects`（`additionalDirectories`）が symlink に差し替えられているあいだ、Edit・Write 系のツールをすべてブロックする |
 | `hooks/guard-playwright-mcp.sh` | PreToolUse（`mcp__playwright__.*`） | Playwright MCP の呼び出しのうち、ローカルのファイルを指す `filename`・`paths` 引数を含むものと、`url` が `file:` で始まるもの、Crit のポート（47800〜47819）を指すものをブロックする。入力を検査できないときもブロックする |
 | `hooks/precompact-context.sh`  | PreCompact         | ブランチ名・未コミットの変更・直近のコミットを、コンテキスト圧縮後も残す情報として Claude に渡す                                                                                                                              |
@@ -50,6 +51,7 @@ pstack はサードパーティのマーケットプレイスなので自動更�
 bash claude/hooks/tests/test-protect-main-branch.sh
 bash claude/hooks/tests/test-validate-command.sh
 bash claude/hooks/tests/test-ask-gh-pr-write.sh
+bash claude/hooks/tests/test-ask-shared-tree-git.sh
 bash claude/hooks/tests/test-gh-read-token.sh
 bash claude/hooks/tests/test-guard-additional-dirs.sh
 bash claude/hooks/tests/test-guard-playwright-mcp.sh
