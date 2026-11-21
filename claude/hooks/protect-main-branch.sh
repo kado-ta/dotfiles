@@ -191,10 +191,11 @@ main() {
       i=$((i + 2))
       continue
     fi
-    # git branch の引数を一覧で判定するのは、git が記号より前で、裸の語としてコマンドの先頭にあるときだけ。
-    # `$(echo git branch -v) -m main` や `(git branch -v)` では、引数がその外に続きうる
+    # git branch の引数を一覧で判定するのは、裸の git が記号より前にあり、呼び出し全体の先頭か、記号のない
+    # `cd <path> &&` の直後にあるときだけ。それより前に何かあると、関数や alias で git や引数の意味を変えられる
     PLAIN_START=0
-    if [ "$COMMAND_START" -eq 1 ] && [ "${TOKENS[$i]}" = "git" ] && [ "$i" -lt "$FIRST_SPECIAL" ]; then
+    if [ "${TOKENS[$i]}" = "git" ] && [ "$i" -lt "$FIRST_SPECIAL" ] &&
+      { [ "$i" -eq 0 ] || { [ "$i" -eq 3 ] && [ "${TOKENS[0]}" = "cd" ] && [ "${TOKENS[2]}" = "&&" ]; }; }; then
       PLAIN_START=1
     fi
     COMMAND_START=0

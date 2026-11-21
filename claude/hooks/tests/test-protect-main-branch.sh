@@ -78,7 +78,14 @@ check 2 "$FEAT" 'touch -- -m zz && mkdir a && git -C * branch && git commit -m x
 check 2 "$FEAT" 'git -C [a] branch && git commit -m x' 'bracket glob in a -C value before branch'
 check 2 "$FEAT" 'git -C ^x branch && git commit -m x' 'extended glob negation in a -C value before branch'
 check 2 "$FEAT" 'git -C a# branch && git commit -m x' 'extended glob repetition in a -C value before branch'
-check 0 "$FEAT" "cd ~ && cd $FEAT && git branch --show-current && git commit -m x" 'tilde before a read-only branch call'
+check 0 "$FEAT" 'cd ~ && git branch --show-current && git commit -m x' 'cd to a tilde path before a read-only branch call'
+# Only the first command, or the one right after a plain `cd <path> &&`, may be a read-only branch call,
+# so that nothing earlier in the same call can redefine git or its arguments
+check 2 "$FEAT" 'function git; /usr/bin/git branch -M main; git branch; unfunction git; git commit -m x' 'short function definition that replaces git'
+check 2 "$FEAT" 'alias -g -- -v=-m --show-current=main'$'\n''git branch -v --show-current && git commit -m x' 'global alias defined before a read-only branch call'
+check 2 "$FEAT" 'true && git branch --show-current && git commit -m x' 'read-only branch call after another command'
+check 2 "$FEAT" 'git status && git branch --show-current && git commit -m x' 'read-only branch call after another git command'
+check 2 "$FEAT" "cd $FEAT; git branch --show-current && git commit -m x" 'read-only branch call after cd and a semicolon'
 check 2 "$MAIN" 'git branch --show-current && git commit -m x' 'showing the current branch before a commit on main'
 
 # 同名のタグがあると symbolic-ref --short は heads/main を返す
