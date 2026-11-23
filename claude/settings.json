@@ -355,6 +355,16 @@
             "command": "jq -r 'if (.tool_input.command // \"\" | test(\"gh pr create|cc-safe-pr create\")) then (.tool_response.stdout // \"\" | match(\"https://github\\\\.com/\\\\S+\") | .string) // empty else empty end' | { read -r url; [ -n \"$url\" ] && echo \"{\\\"systemMessage\\\": \\\"PR が作成されました: $url\\\"}\"; } 2>/dev/null || true"
           }
         ]
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/bin/bash ~/.claude/hooks/check-vault-note.sh",
+            "timeout": 30
+          }
+        ]
       }
     ],
     "Notification": [

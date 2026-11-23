@@ -82,6 +82,9 @@ jobs:
 
       # テストは "$BASH" でフックを起動するので、本番と同じ /bin/bash で実行する。
       - name: Shell hook tests
+        # test-check-vault-note.sh は sandbox-exec を使えないとき Seatbelt の確認をスキップする。CI ではスキップを失敗にする。
+        env:
+          CHECK_VAULT_NOTE_SEATBELT_REQUIRED: "1"
         run: |
           rc=0
           for t in claude/hooks/tests/test-*.sh; do
