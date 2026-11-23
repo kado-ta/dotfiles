@@ -109,7 +109,7 @@ https://x.com/ai_database/status/2114184481951330365?s=12
 - `mcp__claude-in-chrome__*` ツールは使わない。
 - サイト・API・CLI の動作を通しで検証し、見つけたバグまで直す依頼には gstack の `/qa` を使う。個別のブラウザ操作は上記の Playwright MCP を使う。
 - 今のブランチの差分のレビューには gstack の `/review` を使う。Codex レビューの方針は「Cross-model review (Codex)」のとおりで、これを置き換えない。
-- 今のブランチ以外の PR のレビュー依頼には、作者を問わず、チェックアウトせずに `/code-review medium <PR の URL>` を使う（番号だけなら `gh pr view` で URL にする。URL なら、読めないときにほかの差分をレビューせずに止まる）。`--comment`・`--fix` は付けない。`/review <番号>` で今のブランチ以外の PR を頼まれたら、始める前に止めてこちらを提案する。変更されたファイルの全体を読ませたい大きな PR は、`gh pr diff <URL> --name-only` で設定ファイル（`.claude/`・`.mcp.json`・`CLAUDE.md`・`AGENTS.md`・mise・direnv）が変わらないことを確かめてから、人間に `claude -w` の worktree で確かめた head のコミットを取り込んでもらい、そこで実行する。変わるなら取り込まない（手順は `~/dotfiles/claude/SKILL_INVENTORY.md`）。
+- 今のブランチ以外の PR のレビュー依頼には、作者を問わず、チェックアウトせずに `/code-review medium <PR の URL>` を使う（番号だけなら `gh pr view` で URL にする。URL なら、読めないときにほかの差分をレビューせずに止まる）。`--comment`・`--fix` は付けない。高リスクでも、今のブランチを見るレビュー（`/security-review`・Codex・`interrogate`）は重ねない。`/review <番号>` で今のブランチ以外の PR を頼まれたら、始める前に止めてこちらを提案する。レビューのために PR を手元に取り込まない（PR の hooks などが sandbox の外で動きうる）。`ultra` は、Claude のアカウントに GitHub をつなぐ必要があるので提案しない。
 - Crit での人間のレビューは `/crit-review` で開く。
   - 作業文書の design / plan を書き終えて承認を求めるときは、チャットで頼む代わりに `/crit-review <file>` で開く。`approved: true` が返ったら承認とみなす。
   - PR を作るときは毎回、push と PR 作成の前に `/crit-review` でブランチの差分を開き、`approved: true` が返るまでどちらもしない。AI のレビュー（`/review` など）をするときは、その指摘を直した後に開く。

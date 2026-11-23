@@ -43,7 +43,7 @@ created: 2026-11-23
 
 ## 決めたこと
 
-Crit で承認したときの決定。`/review` の後に、振り分けの基準・PR の指定の形・worktree の手順を変えた（[/review で変えたこと](#review-changes)）。
+Crit で承認したときの決定。`/review` の後に、振り分けの基準・PR の指定の形・worktree の手順を変えた（[/review で変えたこと](#review-changes)）。Codex レビューの後に、worktree の手順をやめた（[Codex レビューで変えたこと](#codex-changes)）。
 
 - 自分の差分（今のブランチ）: 今のまま gstack の `/review`。
 - 他人の PR: チェックアウトせずに `/code-review medium <PR番号>`。
@@ -145,6 +145,24 @@ Crit で承認したときの決定。`/review` の後に、振り分けの基�
 
 機械的に直したもの: worktree の手順と裁定の表に `medium` を付けた。`--fix` と `ultra` の理由の誤りを直した。`--comment` を付けると、差分が読めなくても手元のコードの指摘を投稿しに行くことを書いた。
 
+<a name="codex-changes"></a>
+
+## Codex レビューで変えたこと
+
+2026-11-23 に、ユーザーが通常のターミナルで `codex review` を実行した（1 回目。指摘と採否は [test-report.md](test-report.md#codex-1)）。C1 と C2 は前の決定を変えるので、人間が選んだ（どちらも推奨の案）。
+
+- C1（P1）: D1 の確認では閉じきれない。`gh pr diff --name-only` は PR の比較元からの変更しか出さず、ベースのブランチで足された設定は見えない。既存の hooks や MCP が呼ぶスクリプトの書き換えも、設定ファイルの一覧では止められない。→ worktree に取り込む手順をやめた。全体が要るときは、ユーザーが `/code-review ultra <PR の URL>` を打つか、人間が読む（`ultra` は後の Crit で提案しないことにした。[Crit で変えたこと](#crit-changes)）。C3・C4（取り込んだ後の PR の更新、`origin` がフォーク）は、この手順ごとなくなった。
+- C2（P2）: 毎回読み込まれる規則にも、今のブランチを見るレビューを重ねないと書く。→ D3 の範囲を広げ、CLAUDE.md の Tools 節に 1 文足した（SKILL_ROUTING は変えない）。
+- C6（P3）: 重複の判定を、セッションではなく対象ごとにする。→ 計測の注記を直した。
+- C5（P2）: 不採用。この環境の gh は `github.com` だけで、`GH_HOST` もない。
+
+<a name="crit-changes"></a>
+
+## ブランチの差分の Crit で変えたこと
+
+- `ultra` が PR をどこから取得するか（1 ラウンド目）: 手元の `gh` は PR の大きさを見るのにだけ使い、clone はクラウドが Claude のアカウントにつないだ GitHub の権限で行う。つないでいなければ止まる。SKILL_INVENTORY の説明を直した。
+- `ultra` を提案しない（2 ラウンド目）: 「Claude に GitHub アカウントをつなぐのは、渡す権限が大きすぎないか」という指摘。手元の GitHub CLI のログインでつなぐと、その権限（gh の既定のスコープは `repo`・`read:org`・`gist`）をクラウドに渡す見込みなので、CLAUDE.md で `ultra` を提案しないと決め、全体が要るときは人間が読むことにした。
+
 <a name="non-goals"></a>
 
 ## 入れないもの
@@ -182,6 +200,6 @@ Crit で承認したときの決定。`/review` の後に、振り分けの基�
 
 - private の業務リポジトリで、sandbox の中の `gh pr diff` が通るかは確かめていない。URL で渡すので、通らなければレビューせずに止まる。
 - フラグ `tengu_opal_circuit` が on になると、`/code-review` の後に組み込みの `/verify` が続けて起動しうる。そのときの止め方は提案に留める（`/review` の adversarial も同じ点を挙げた）。
-- 毎回読み込まれる SKILL_ROUTING は、高リスクなら `/security-review` と書いたまま。今のブランチ以外の PR には使わないことは、INVENTORY とチートシートにしか書いていない（D3 の範囲）。
+- 毎回読み込まれる SKILL_ROUTING は、高リスクなら `/security-review` と書いたまま。今のブランチ以外の PR には使わないことは、CLAUDE.md の Tools 節に書いた（Codex の C2）。
 - `/code-review` は既定で fork として、すべてのツールを持って動く。許可なしで実行できる `cc-safe-push`・`cc-safe-pr` も呼べるので、PR の差分に仕込まれた指示に従うと、ユーザーの名前で push や PR の作成ができる経路になる（adversarial の指摘。前からある種類の危険だが、他人の PR を読む機会が増える）。
 - 非常に大きな PR では、GitHub の差分の上限で `gh pr diff` が失敗しうる（Red Team の推測。確かめていない）。
