@@ -91,6 +91,16 @@ PROJECT_DENY_WRITE = [
     "./CLAUDE.md",
     "./.claude/rules",
 ]
+MWG_SKILL = "claude/skills/modern-web-guidance/SKILL.md"
+MWG_DENY = [
+    "Bash(npx *modern-web-guidance*)",
+    "Bash(pnpx *modern-web-guidance*)",
+    "Bash(pnpm *modern-web-guidance*)",
+    "Bash(bunx *modern-web-guidance*)",
+    "Bash(bun *modern-web-guidance*)",
+    "Bash(yarn *modern-web-guidance*)",
+    "Bash(npm *modern-web-guidance*)",
+]
 README = "## Foo Bar\n\n[x](#foo-bar)\n\n"
 PARANOID_CONFIG = '[settings]\nparanoid = ["config", "env_files"]\n'
 
@@ -706,6 +716,33 @@ class CheckRepoTests(unittest.TestCase):
 
     def test_docs_markdown_name_passes(self):
         self.write("docs/work/x/plan.md", "# Plan\n")
+        self.assert_passes()
+
+    def test_vendored_skill_markdown_name_passes(self):
+        # 上流から取り込んだスキルは、SKILL.md が参照ファイルを名前で指すので、上流の名前のまま置く。
+        self.write("claude/skills/chrome-extensions/references/extensions/api-calling.md", "# API\n")
+        self.assert_passes()
+
+    def test_other_skill_lowercase_markdown_name_fails(self):
+        # 例外は取り込んだスキルだけ。自分で書くスキルの参照ファイルは規約に従う。
+        self.write("claude/skills/mine/references/notes.md", "# Notes\n")
+        self.assert_fails("FAIL markdown-names", "claude/skills/mine/references/notes.md")
+
+    def test_modern_web_guidance_without_npx_deny_fails(self):
+        # ガイドと上流の SKILL.md は npx 系で最新版を動かすよう指示するので、スキルがあるあいだは deny にする。
+        self.write(MWG_SKILL, "---\nname: modern-web-guidance\n---\n")
+        for rule in MWG_DENY:
+            with self.subTest(rule=rule):
+                data = settings()
+                data["permissions"]["deny"] += [r for r in MWG_DENY if r != rule]
+                self.write_settings(data)
+                self.assert_fails("FAIL modern-web-guidance", f"permissions.deny lacks {rule}")
+
+    def test_modern_web_guidance_with_npx_deny_passes(self):
+        self.write(MWG_SKILL, "---\nname: modern-web-guidance\n---\n")
+        data = settings()
+        data["permissions"]["deny"] += MWG_DENY
+        self.write_settings(data)
         self.assert_passes()
 
     def test_missing_link_target_fails(self):

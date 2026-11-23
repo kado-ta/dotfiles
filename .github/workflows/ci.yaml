@@ -104,4 +104,5 @@ jobs:
         run: |
           /usr/bin/python3 -B claude/scripts/test-settings-home-paths.py
           /usr/bin/python3 -B claude/scripts/test-update-skills.py
+          /usr/bin/python3 -B claude/scripts/test-update-modern-web-guidance.py
           /usr/bin/python3 -B claude/scripts/test-register-mcp.py

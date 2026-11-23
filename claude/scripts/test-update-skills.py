@@ -26,6 +26,17 @@ PLUGINS = ('[{"id":"a@m","scope":"user"},{"id":"s@m","scope":"local"},'
 CLOSING = ("次に、再起動する前に dotfiles の Claude Code で /sync-skill-docs を実行し、hooks の変化を確かめる。"
            "更新したプラグインは、Claude Code を再起動すると読み込まれる。")
 
+PENDING = ("取り込みを待つ更新: modern-web-guidance（chrome-extensions を含む）。取り込むときは、作業ブランチで "
+           "/usr/bin/python3 -I -B ~/dotfiles/claude/scripts/update-modern-web-guidance.py --apply を実行する"
+           "（先に --out <dir> --latest で中身を確かめられる）。")
+
+# update-modern-web-guidance.py の偽物。実行時のディレクトリを書き、STUB_MWG_RC で終わる
+# （本物は 0: 最新、1: 失敗、3: 新しい版がある）。
+MWG_STUB = ('import os, sys\n'
+            'with open(os.environ["STUB_LOG"], "a") as f:\n'
+            '    f.write("update-modern-web-guidance " + os.getcwd() + "\\n")\n'
+            'sys.exit(int(os.environ.get("STUB_MWG_RC", "0")))\n')
+
 
 def claude_stub(on_list):
     return ('#!/bin/sh\n'
@@ -71,6 +82,7 @@ class UpdateSkillsTest(unittest.TestCase):
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy(SCRIPTS / name, target)
         write_executable(self.repo / "claude" / "hooks" / "tests" / "test-cc-crit-profile.py", PROFILE_STUB)
+        write_executable(self.repo / "claude" / "scripts" / "update-modern-web-guidance.py", MWG_STUB)
         self.settings = self.home / ".claude" / "settings.json"
         self.settings.parent.mkdir(parents=True)
         self.settings.write_text(
@@ -83,13 +95,14 @@ class UpdateSkillsTest(unittest.TestCase):
         write_executable(self.stub / "brew", BREW_STUB)
         self.work.mkdir()
 
-    def run_script(self, gstack_rc=0, profile_skip=False):
+    def run_script(self, gstack_rc=0, profile_skip=False, mwg_rc=0):
         env = {
             "HOME": str(self.home),
             "PATH": f"{self.stub}:/usr/bin:/bin",
             "STUB_LOG": str(self.log),
             "STUB_GSTACK_RC": str(gstack_rc),
             "STUB_PROFILE_SKIP": "1" if profile_skip else "0",
+            "STUB_MWG_RC": str(mwg_rc),
         }
         result = subprocess.run(
             ["/bin/bash", str(self.repo / "claude" / "scripts" / "update-skills.sh")],
@@ -107,6 +120,7 @@ class UpdateSkillsTest(unittest.TestCase):
             "claude plugin list --json",
             "claude plugin update a@m --scope user",
             "claude plugin update b@m --scope user",
+            f"update-modern-web-guidance {self.home}",
             "brew upgrade crit",
             "crit-profile-test",
         ])
@@ -159,6 +173,34 @@ class UpdateSkillsTest(unittest.TestCase):
     def test_closing_message_asks_review_before_restart(self):
         result, _ = self.run_script()
         self.assertEqual(result.stdout.rstrip().splitlines()[-1], CLOSING)
+
+    def test_mwg_up_to_date_shows_no_pending(self):
+        result, _ = self.run_script(mwg_rc=0)
+        self.assertNotIn("取り込みを待つ更新", result.stdout)
+
+    def test_mwg_candidate_is_pending_not_failure(self):
+        # 新しい版の取り込み候補を用意したときは、見落とさないように最後の案内の直前に出す。失敗には数えない。
+        result, _ = self.run_script(mwg_rc=3)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn("失敗した手順", result.stdout)
+        self.assertEqual(result.stdout.rstrip().splitlines()[-2:], [PENDING, CLOSING])
+
+    def test_mwg_runs_isolated(self):
+        # スクリプトと同じディレクトリに置かれたモジュールを読み込まない（-I で実行する）。
+        # claude/scripts は、~ などで起動したセッションの sandbox から書ける見込みがある。
+        planted = self.root / "planted"
+        (self.repo / "claude" / "scripts" / "json.py").write_text(
+            f"open({str(planted)!r}, 'w').close()\n", encoding="utf-8")
+        write_executable(self.repo / "claude" / "scripts" / "update-modern-web-guidance.py", "import json\n")
+        self.run_script()
+        self.assertFalse(planted.exists())
+
+    def test_mwg_failure_counts_as_failure(self):
+        result, log = self.run_script(mwg_rc=1)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("失敗した手順: modern-web-guidance", result.stdout)
+        self.assertNotIn("取り込みを待つ更新", result.stdout)
+        self.assertEqual(log[-1], "crit-profile-test")
 
 
 class ProfileRequiredContractTest(unittest.TestCase):
