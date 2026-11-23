@@ -1,26 +1,41 @@
 (version 1)
 ; check-vault-note.py が、Vault の点検スクリプトの写し（vault/check_note.py）を動かすための Seatbelt profile。
 ; 値は sandbox-exec -D で受け取る（すべて realpath）:
-;   HOME_DIR  ユーザーのホーム
-;   VAULT     Vault（Claude Code のプロジェクト）
-;   SELF      check-vault-note.py
-;   COPY      写し
-; 動かすのはレビュー済みの写しだけなので、守るのは、点検スクリプトに渡るデータ（ノート・リンク先・タグの辞書）の読み込み。
-; 既定は許可にして、読み込み・書き込み・ネットワークを止める。同じ操作に複数の規則が当たるときは、後の規則が勝つ。
-; 設計: docs/work/20261124_check-vault-note-hook/plan.md
+;   HOME_DIR     ユーザーのホーム
+;   VAULT        Vault（$HOME/Obsidian/main）
+;   SELF         check-vault-note.py
+;   COPY         写し
+;   PYTHON_HOME  python3 の framework（.../Python3.framework/Versions/3.9）
+; 守るのは、点検スクリプトに渡るデータ（ノート・リンク先・タグの辞書）の読み込みと、万一レビューしていないコードが
+; 動いたときの外への出口。読み込み・書き込み・ネットワーク・ほかのプログラムの起動・サービスへの接続を止める。
+; 同じ操作に複数の規則が当たるときは、後の規則が勝つ。設計: docs/work/20261124_check-vault-note-hook/plan.md
 (allow default)
 (deny network*)
 (deny file-write*)
 
+; 起動できるのは python3 だけ（sandbox-exec が起動する bin/python3.9 と、それが起動する Resources/Python.app）。
+(deny process-exec*)
+(allow process-exec (subpath (param "PYTHON_HOME")))
+(deny process-fork)
+
+; launchd・LaunchServices・Keychain（securityd）などのサービス、ほかのアプリへの Apple Events、ほかのプロセスへのシグナルを使わせない。
+(deny mach-lookup)
+(deny appleevent-send)
+(deny signal)
+(allow signal (target same-sandbox))
+
 ; Claude Code の sandbox の denyRead がある場所（$HOME と、Claude Code が使う /private/tmp の下）を含むように広めに止める。
+; 制御端末（/dev/tty）からは読ませない（ユーザーの入力を奪わせない）。
 ; メタデータ（stat・readlink）は止めない。点検スクリプトが resolve()・exists()・is_dir() を使うため。
 ; /dev/urandom は止めない。Python 3.9 が起動時のハッシュの初期化に読む（止めると起動しない。2026-11-24 に確かめた）。
 (deny file-read-data
   (subpath (param "HOME_DIR"))
   (subpath "/Volumes")
   (subpath "/private/tmp")
-  (subpath "/private/var/folders"))
+  (subpath "/private/var/folders")
+  (regex #"^/dev/tty"))
+; Vault の中でも、読めるのは .md だけ（点検スクリプトが読むのはノートと、リンク先の .md と、タグの辞書の .md）。
 (allow file-read-data
-  (subpath (param "VAULT"))
+  (require-all (subpath (param "VAULT")) (regex #"\.md$"))
   (literal (param "SELF"))
   (literal (param "COPY")))

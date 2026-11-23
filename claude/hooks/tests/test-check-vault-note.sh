@@ -45,24 +45,33 @@ cp "$SRC_DIR/check-vault-note.py" "$SRC_DIR/check-vault-note.sb" "$H/"
 HOOK="$H/check-vault-note.sh"
 COPY="$H/vault/check_note.py"
 
-# A fake Vault (the project directory) whose checker matches the copy.
-V="$T/vault"
+# The hook only checks the Vault at $HOME/Obsidian/main, so the hook gets a test HOME.
+TEST_HOME="$T/home"
+V="$TEST_HOME/Obsidian/main"
 SCRIPTS="$V/_System/Scripts"
 CHECKER="$SCRIPTS/check_note.py"
 NOTE="$V/notes/a.md"
-mkdir -p "$SCRIPTS" "$V/notes" "$T/elsewhere" "$V-other" "$T/plain/notes" "$T/nodev" "$T/outside" "$T/a/b"
+OTHER="$T/other"
+mkdir -p "$SCRIPTS" "$V/notes" "$T/elsewhere" "$V-other" "$T/plain/notes" "$T/nodev" "$T/outside" "$T/a/b" \
+  "$OTHER/_System/Scripts" "$OTHER/notes" "$T/pp"
 printf '# INSIDE-MARKER\n' >"$NOTE"
 printf 'a\n' >"$V/notes/a.txt"
+printf 'VAULT-TXT-SECRET\n' >"$V/notes/secret.txt"
 printf '# a\n' >"$T/elsewhere/a.md"
 printf '# a\n' >"$V-other/a.md"
 printf '# a\n' >"$T/plain/notes/a.md"
+printf '# a\n' >"$OTHER/notes/a.md"
 printf -- '---\nsecret: OUTSIDE-SECRET\n---\n' >"$T/outside/secret.md"
+printf 'print("PLANTED re imported")\nraise SystemExit(3)\n' >"$T/pp/re.py"
 REAL_V=$(cd -P "$V" && pwd)
 
 # fake_checker <exit-code>: print a checker that finds the Vault root from __file__ (as the real
-# one does), prints its arguments and the note, tries to write and to connect, and exits.
+# one does), prints its arguments and the note, tries to write, connect, fork and exec, prints a
+# message with a newline and an escape character in it, and exits. A note whose name starts with
+# "raw" is read without catching errors.
 fake_checker() {
   cat <<EOF
+import os
 import re
 import socket
 import sys
@@ -71,8 +80,11 @@ from pathlib import Path
 if __name__ == "__main__":
     root = Path(__file__).resolve().parents[2]
     print("CHECKER root=" + str(root) + " argv=" + "|".join(sys.argv[1:]))
+    note = Path(sys.argv[1])
+    if note.name.startswith("raw"):
+        print("RAW:" + note.read_text())
     try:
-        print("NOTE:" + Path(sys.argv[1]).read_text())
+        print("NOTE:" + note.read_text())
     except OSError as e:
         print("NOTE-DENIED " + type(e).__name__)
     try:
@@ -87,6 +99,19 @@ if __name__ == "__main__":
         print("NET-DENIED")
     except OSError:
         print("NET-ALLOWED")
+    try:
+        pid = os.fork()
+        if pid == 0:
+            os._exit(0)
+        os.waitpid(pid, 0)
+        print("FORK-ALLOWED")
+    except OSError:
+        print("FORK-DENIED")
+    print("MULTI-A\nINJECTED-LINE\x1b[31m")
+    try:
+        os.execv("/usr/bin/true", ["true"])
+    except OSError:
+        print("EXEC-DENIED")
     sys.exit($1)
 EOF
 }
@@ -104,13 +129,13 @@ input() {
     "$2" "$2" >"$T/$1.json"
 }
 
-# run <input-file> [VAR=value...]: run the hook from the Vault with CLAUDE_PROJECT_DIR=$V
-# (overridable), stop it after 20 seconds, and set rc, out and err.
+# run <input-file> [VAR=value...]: run the hook from the Vault with CLAUDE_PROJECT_DIR=$V and
+# HOME=$TEST_HOME (both overridable), stop it after 20 seconds, and set rc, out and err.
 run() {
   local in="$1"
   shift
   rm -f "$V/written"
-  (cd "$V" && env CLAUDE_PROJECT_DIR="$V" "$@" /usr/bin/perl -e 'alarm shift; exec @ARGV or die' 20 "$BASH" "$HOOK" <"$in" >"$T/out" 2>"$T/err")
+  (cd "$V" && env CLAUDE_PROJECT_DIR="$V" HOME="$TEST_HOME" "$@" /usr/bin/perl -e 'alarm shift; exec @ARGV or die' 20 "$BASH" "$HOOK" <"$in" >"$T/out" 2>"$T/err")
   rc=$?
   out=$(<"$T/out")
   err=$(<"$T/err")
@@ -127,7 +152,7 @@ quiet() {
 
 # refused <desc> <stderr-fragment>: the last run exited 2 without running the checker and said <fragment>.
 refused() {
-  if [ "$rc" = 2 ] && [ -z "$out" ] && [[ "$err" != *CHECKER* ]] && [[ "$err" == *"$2"* ]]; then
+  if [ "$rc" = 2 ] && [ -z "$out" ] && [[ "$err" != *CHECKER* ]] && [[ "$err" != *PLANTED* ]] && [[ "$err" == *"$2"* ]]; then
     ok "[2] $1"
   else
     ng "[want 2, '$2' on stderr and no run, got $rc, out='$out', err='$err'] $1"
@@ -139,6 +164,7 @@ input txt "$V/notes/a.txt"
 input outside "$T/elsewhere/a.md"
 input sibling "$V-other/a.md"
 input plain "$T/plain/notes/a.md"
+input other "$OTHER/notes/a.md"
 printf 'not json\n' >"$T/broken.json"
 printf '{"tool_name":"Edit","tool_input":{"file_path":7}}\n' >"$T/number.json"
 printf '{"tool_name":"Edit"}\n' >"$T/no-input.json"
@@ -156,7 +182,7 @@ run "$T/sibling.json"
 quiet '.md in a sibling directory that shares the prefix'
 run "$T/note.json" CLAUDE_PROJECT_DIR=
 quiet 'empty CLAUDE_PROJECT_DIR'
-(cd "$V" && env -u CLAUDE_PROJECT_DIR "$BASH" "$HOOK" <"$T/note.json" >"$T/out" 2>"$T/err")
+(cd "$V" && env -u CLAUDE_PROJECT_DIR HOME="$TEST_HOME" "$BASH" "$HOOK" <"$T/note.json" >"$T/out" 2>"$T/err")
 rc=$?
 out=$(<"$T/out")
 err=$(<"$T/err")
@@ -173,11 +199,25 @@ quiet 'file_path that is not a string'
 run "$T/no-input.json"
 quiet 'input without tool_input'
 
+# Only the Vault at $HOME/Obsidian/main is checked. Any project can hold a copy of the public
+# checker, and Seatbelt lets the checker read inside the project it is given.
+install 1
+cp "$COPY" "$OTHER/_System/Scripts/check_note.py"
+run "$T/other.json" CLAUDE_PROJECT_DIR="$OTHER"
+quiet 'project with the checker that is not the configured Vault'
+run "$T/note.json" HOME=
+quiet 'empty HOME'
+
 # Only the reviewed copy in dotfiles may run; a Vault checker that differs from it stops the check.
 install 0
 printf '# changed\n' >>"$CHECKER"
 run "$T/note.json"
 refused 'Vault checker differs from the copy' 'claude/hooks/vault/check_note.py'
+run "$T/note.json" CLAUDE_PROJECT_DIR="$V/"
+refused 'CLAUDE_PROJECT_DIR with a trailing slash' 'claude/hooks/vault/check_note.py'
+# -I keeps PYTHONPATH (and the script and working directories) off sys.path.
+run "$T/note.json" PYTHONPATH="$T/pp"
+refused 'PYTHONPATH is ignored before Seatbelt' 'claude/hooks/vault/check_note.py'
 install 0
 rm -f "$COPY"
 run "$T/note.json"
@@ -194,7 +234,7 @@ mkdir -p "$T/readonly"
 chmod 555 "$T/readonly"
 install 0
 printf '# changed\n' >>"$CHECKER"
-(cd "$T/readonly" && env CLAUDE_PROJECT_DIR="$V" TMPDIR="$T/readonly" "$BASH" "$HOOK" <"$T/note.json" >"$T/out" 2>"$T/err")
+(cd "$T/readonly" && env CLAUDE_PROJECT_DIR="$V" HOME="$TEST_HOME" TMPDIR="$T/readonly" "$BASH" "$HOOK" <"$T/note.json" >"$T/out" 2>"$T/err")
 rc=$?
 out=$(<"$T/out")
 err=$(<"$T/err")
@@ -205,7 +245,7 @@ chmod 755 "$T/readonly"
 # the input outgrows the buffer. Cover the early exit, the Python part and the no-tools exit.
 install 0
 for case in "early exit:CLAUDE_PROJECT_DIR=$T/plain" "python:CLAUDE_PROJECT_DIR=$V" "no tools:DEVELOPER_DIR=$T/nodev"; do
-  head -c 300000 /dev/zero | (cd "$V" && env CLAUDE_PROJECT_DIR="$V" "${case#*:}" "$BASH" "$HOOK" >/dev/null 2>&1)
+  head -c 300000 /dev/zero | (cd "$V" && env CLAUDE_PROJECT_DIR="$V" HOME="$TEST_HOME" "${case#*:}" "$BASH" "$HOOK" >/dev/null 2>&1)
   codes=("${PIPESTATUS[@]}")
   if [ "${codes[0]}" = 0 ]; then
     ok "large input is read to the end (${case%%:*})"
@@ -227,6 +267,15 @@ else
     echo "SKIP Seatbelt cases: sandbox-exec cannot run here (inside the Claude Code sandbox?); run this test in a normal terminal"
   fi
 fi
+
+# no_secret <desc> <marker>: the last run did not read the note and did not print <marker>.
+no_secret() {
+  if [[ "$err" == *NOTE-DENIED* ]] && [[ "$err" != *"$2"* ]]; then
+    ok "$1"
+  else
+    ng "$1 (rc=$rc, err='$err')"
+  fi
+}
 
 if [ "$seatbelt" = 1 ]; then
   # An approved checker runs on the note; its report reaches Claude only through stderr and exit 2.
@@ -254,24 +303,57 @@ if [ "$seatbelt" = 1 ]; then
   else
     ng "checker cannot connect to 127.0.0.1 (err='$err')"
   fi
+  if [[ "$err" == *FORK-DENIED* ]] && [[ "$err" == *EXEC-DENIED* ]]; then
+    ok 'checker cannot fork or run another program'
+  else
+    ng "checker cannot fork or run another program (err='$err')"
+  fi
 
-  # Notes that point outside the Vault are not read, even through the checker.
+  # Output reaches Claude as hook feedback, so each message stays on one line, with control
+  # characters escaped, under a header that marks it as data.
+  esc=$(printf '\033')
+  injected=0
+  while IFS= read -r line; do
+    [ "$line" = 'INJECTED-LINE' ] && injected=1
+  done <<<"$err"
+  if [[ "$err" == *'MULTI-A\nINJECTED-LINE'* ]] && [ "$injected" = 0 ] && [[ "$err" != *"$esc"* ]] && [[ "$err" == *点検スクリプトの出力* ]]; then
+    ok 'checker output keeps one line per message, escapes control characters and has a header'
+  else
+    ng "checker output keeps one line per message, escapes control characters and has a header (err='$err')"
+  fi
+
+  # Notes that point outside the Vault, or at files in the Vault that are not .md, are not read.
   ln -sf "$T/outside/secret.md" "$V/notes/out.md"
   input out "$V/notes/out.md"
   run "$T/out.json"
-  if [[ "$err" == *"NOTE-DENIED"* ]] && [[ "$err" != *OUTSIDE-SECRET* ]]; then
-    ok 'note linked to a file outside the Vault is not read'
-  else
-    ng "note linked to a file outside the Vault is not read (rc=$rc, err='$err')"
-  fi
+  no_secret 'note linked to a file outside the Vault is not read' OUTSIDE-SECRET
+  ln -sf "$V/notes/secret.txt" "$V/notes/txt.md"
+  input txtlink "$V/notes/txt.md"
+  run "$T/txtlink.json"
+  no_secret 'note linked to a file in the Vault that is not .md is not read' VAULT-TXT-SECRET
   HOME_FILE=$(mktemp "$HOME/.check-vault-note-test.XXXXXX") && printf '# HOME-SECRET\n' >"$HOME_FILE"
   ln -sf "$HOME_FILE" "$V/notes/home.md"
   input home "$V/notes/home.md"
   run "$T/home.json"
-  if [ -n "$HOME_FILE" ] && [[ "$err" == *"NOTE-DENIED"* ]] && [[ "$err" != *HOME-SECRET* ]]; then
-    ok 'note linked to a file under HOME is not read'
+  no_secret 'note linked to a file under HOME is not read' HOME-SECRET
+  # The same file through other names: the firmlink of the data volume, and another letter case.
+  ln -sf "/System/Volumes/Data$HOME_FILE" "$V/notes/firmlink.md"
+  input firmlink "$V/notes/firmlink.md"
+  run "$T/firmlink.json"
+  no_secret 'note linked to a file under HOME through /System/Volumes/Data is not read' HOME-SECRET
+  ln -sf "$(printf '%s' "$HOME_FILE" | tr '[:lower:]' '[:upper:]')" "$V/notes/case.md"
+  input case "$V/notes/case.md"
+  run "$T/case.json"
+  no_secret 'note linked to a file under HOME in another letter case is not read' HOME-SECRET
+
+  # A read that Seatbelt denies ends the check with a fixed message, not a traceback.
+  ln -sf "$T/outside/secret.md" "$V/notes/raw.md"
+  input raw "$V/notes/raw.md"
+  run "$T/raw.json"
+  if [ "$rc" = 2 ] && [[ "$err" == *読めない* ]] && [[ "$err" != *Traceback* ]] && [[ "$err" != *OUTSIDE-SECRET* ]]; then
+    ok '[2] a denied read is reported with a fixed message'
   else
-    ng "note linked to a file under HOME is not read (rc=$rc, err='$err')"
+    ng "[want 2 and a fixed message, got $rc, err='$err'] a denied read is reported with a fixed message"
   fi
 
   # The reported bypass: the Vault checker links to an approved copy two levels below $T, which
@@ -294,12 +376,12 @@ if [ "$seatbelt" = 1 ]; then
     ng "[want 0 and the checker run, got $rc, err='$err'] the copy in dotfiles runs, not the file at the Vault path"
   fi
 
-  # Modules planted next to the checker or in the working directory are not imported.
+  # Modules planted on PYTHONPATH, next to the checker or in the working directory are not imported.
   install 0
   for dir in "$SCRIPTS" "$V"; do
-    printf 'print("PLANTED re imported")\nraise SystemExit(3)\n' >"$dir/re.py"
+    cp "$T/pp/re.py" "$dir/re.py"
   done
-  run "$T/note.json"
+  run "$T/note.json" PYTHONPATH="$T/pp"
   if [ "$rc" = 0 ] && [[ "$err" != *PLANTED* ]] && [[ "$err" == *CHECKER* ]]; then
     ok '[0] planted re.py is not imported'
   else
