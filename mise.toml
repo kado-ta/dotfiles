@@ -27,25 +27,25 @@ description = "入っているスキルを、スナップショットとスキ�
 run = "/usr/bin/python3 -B claude/scripts/skills-check.py check"
 
 [tasks."claude:skills-snapshot"]
-description = "今のスキルの状態を claude/skills-snapshot.json に書く（文書を合わせた後に、通常の端末で実行する。sandbox の中からは claude/ に書けない）"
+description = "今のスキルの状態を claude/skills-snapshot.json に書く（文書を合わせた後に、通常のターミナルで実行する。sandbox の中からは claude/ に書けない）"
 run = "/usr/bin/python3 -B claude/scripts/skills-check.py snapshot"
 
 [tasks."claude:skill-usage"]
 description = "期間内のスキルの使われ方を集計する（例: mise run claude:skill-usage 2026-11-16 2026-12-07）"
 run = "/usr/bin/python3 -B claude/scripts/skill-usage.py"
 
-# 読み取りだけで、消すためのコマンドは出力するだけ。実行は人間が、Claude Code をすべて閉じてから通常の端末で行う。
+# 読み取りだけで、消すためのコマンドは出力するだけ。実行は人間が、Claude Code をすべて閉じてから通常のターミナルで行う。
 # スクリプトは候補があると終了コード 1 を返す。mise が失敗と表示しないよう 1 は成功として扱い、点検できないとき（2）だけ失敗にする。
 [tasks."claude:trust-audit"]
 description = "Claude Code が信頼したフォルダを点検し、消す候補があれば次の手順とコマンドを出す（点検できないときだけ失敗する）"
 run = "/usr/bin/python3 -B claude/scripts/trust-audit.py || [ $? -eq 1 ]"
 
-# スキル・プラグインをまとめて更新する。sandbox の中からは ~/.claude と Homebrew に書けないので、通常の端末で実行する。
+# スキル・プラグインをまとめて更新する。sandbox の中からは ~/.claude と Homebrew に書けないので、通常のターミナルで実行する。
 # Claude Code の ! は、セッションによっては sandbox の中で動き、更新も profile のテストも失敗する。
 # ! で実行するときは、mise を通さず /bin/bash ~/dotfiles/claude/scripts/update-skills.sh で実行する。
 # mise は dotfiles のルートの設定ファイル（mise.local.toml など）を読み込み、ルートには sandbox から書けるため。
 # paranoid で、信頼されていない設定は読み込まれないが、念のため mise を通さない。
 # 終わったら、Claude Code を再起動する前に /sync-skill-docs で文書と hooks を見直す。
 [tasks."claude:update"]
-description = "gstack・プラグイン・crit の CLI を更新し、gstack が settings.json に書いた絶対パスを ~/ に戻す（端末で実行する）"
+description = "gstack・プラグイン・crit の CLI を更新し、gstack が settings.json に書いた絶対パスを ~/ に戻す（ターミナルで実行する）"
 run = "/bin/bash claude/scripts/update-skills.sh"

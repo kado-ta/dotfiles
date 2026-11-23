@@ -1,7 +1,7 @@
 #!/bin/bash
 # gstack・Claude Code のプラグイン・crit の CLI をまとめて更新する。
-# ~/.claude/skills・~/.claude/plugins・Homebrew に書くので、sandbox の外（通常の端末）で実行する。
-#   端末から: /bin/bash ~/dotfiles/claude/scripts/update-skills.sh か、dotfiles で mise run claude:update
+# ~/.claude/skills・~/.claude/plugins・Homebrew に書くので、sandbox の外（通常のターミナル）で実行する。
+#   ターミナルから: /bin/bash ~/dotfiles/claude/scripts/update-skills.sh か、dotfiles で mise run claude:update
 # Claude Code の ! は、セッションによっては sandbox の中で動く。そのときは更新の手順が失敗するうえ、
 # 最後の crit-profile-test も、sandbox-exec を入れ子にできず profile を確かめられないので、失敗に数えられる。
 # Claude Code から mise run を使わないのは、mise が dotfiles のルートの設定ファイル（mise.local.toml など）を
@@ -36,7 +36,7 @@ step marketplaces claude plugin marketplace update
 # local スコープは別のリポジトリのものなので、user スコープだけを更新する。
 # -y は付けない。マーケットプレイスが宣言したインストールコマンドが変わったときに、人が見ないまま受け入れないため。
 # 確認が要るプラグインは、TTY がないとき（! や mise run）に拒否されて失敗に数えられる。
-# そのときは端末で claude plugin update <id> --scope user を直接実行する。
+# そのときはターミナルで claude plugin update <id> --scope user を直接実行する。
 echo "==> plugin-list"
 if plugins=$(claude plugin list --json | /usr/bin/python3 -I -B -c '
 import json, sys

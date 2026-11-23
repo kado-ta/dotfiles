@@ -95,7 +95,7 @@ GUARD_TOOLS = ("Edit", "Write", "MultiEdit", "NotebookEdit")
 # Playwright MCP は sandbox の外でユーザーの権限で動く。定義があるあいだは、任意のコードを動かすツールと
 # プロジェクトのファイルをページに渡すツールを deny にし、ローカルのファイルを指す filename・paths 引数をフックで止める。
 # matcher は完全一致で比べる（一部のツールにしか当たらないと、ほかのツールの filename・paths が通る）。
-# ブラウザは localhost に届くので、cc-crit 以外の crit（プラグインの自動プランレビュー、端末の crit）がランダムなポートを
+# ブラウザは localhost に届くので、cc-crit 以外の crit（プラグインの自動プランレビュー、ターミナルの crit）がランダムなポートを
 # 書く ~/.crit も読ませない（ポートを知って開けば、承認を偽造できる）。プロジェクトの .mcp.json の playwright は、
 # 強化した user スコープの定義を上書きするので拒否する。
 PLAYWRIGHT_DEFINITION = "claude/mcp/playwright.json"

@@ -1,16 +1,16 @@
 #!/bin/bash
 # claude/mcp/<name>.json の MCP サーバーを、Claude Code の user スコープに <name> で登録する。
 # 同じ名前の user スコープの登録は消してから足すので、何度実行しても登録は 1 つで、定義を変えれば置き換わる。
-# ~/.claude.json と ~/.local/share/claude-mcp に書くので、sandbox の外（通常の端末）で実行する。
+# ~/.claude.json と ~/.local/share/claude-mcp に書くので、sandbox の外（通常のターミナル）で実行する。
 # ~/.claude.json は claude の CLI だけが書く。Claude Code の ! は、セッションによっては sandbox の中で動き、失敗する。
-#   端末から: /bin/bash ~/dotfiles/claude/scripts/register-mcp.sh（claude/setup.sh からも呼ばれる）
+#   ターミナルから: /bin/bash ~/dotfiles/claude/scripts/register-mcp.sh（claude/setup.sh からも呼ばれる）
 # 定義の npmPackage は、~/.local/share/claude-mcp/<name> に npm install し、登録する定義からは外す。
 # 実行時に npx を使わないのは、npx が作業ディレクトリ（sandbox から書けるプロジェクト）の node_modules・
 # node_modules/.bin・.npmrc を使い、そこに置かれたコードが sandbox の外で動くため。入れる場所は settings.json の
 # denyWrite と Edit の deny で、~ で起動したセッションからも書かせない。場所を変えるときは、それらと check-repo.py も変える。
 # 定義の ${HOME}・${NODE_BIN}・${PACKAGE_DIR} は、登録するときに実際のパスに置き換える（公開リポジトリにユーザー名を
 # 入れないため）。ほかの ${...} は置き換えずに残し、Claude Code がサーバーの起動時に展開する。
-# NODE_BIN は mise のグローバル設定の Node.js の bin。Claude Code の起動元（端末以外の PATH）と、プロジェクトの
+# NODE_BIN は mise のグローバル設定の Node.js の bin。Claude Code の起動元（ターミナル以外の PATH）と、プロジェクトの
 # mise の設定（版の違いと、信頼していない設定での shim の失敗）に左右されないよう、絶対パスで登録する。
 # Node.js を更新したら、このスクリプトを再実行する。
 # update-skills.sh と同じく、ホームに移ってから実行し、Python には -I を付ける。macOS の /bin/bash 3.2 で動かす。

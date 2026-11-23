@@ -1,7 +1,7 @@
 """cc-crit.sb（Crit 専用の Seatbelt profile）が、必要なものだけを許可していることを確かめる。
 
 Claude Code の sandbox の中では sandbox-exec を入れ子にできないので、その場合はスキップする。
-人間が通常の端末で実行するか、CI（macOS）で実行する。Claude Code の `!` は、セッションによっては
+人間が通常のターミナルで実行するか、CI（macOS）で実行する。Claude Code の `!` は、セッションによっては
 sandbox の中で動き、スキップされる。crit か Homebrew の git がない環境でもスキップする。
 CC_CRIT_PROFILE_REQUIRED=1 を付けると（update-skills.sh が付ける）、これらとポートの範囲に空きがないときは、
 profile を確かめられないので、スキップせずに失敗する。確かめる対象のファイルがないときのテストごとのスキップは、

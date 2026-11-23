@@ -33,7 +33,7 @@ description: Use after adding, removing or updating a Claude Code plugin or skil
    - crit: sandbox の外で `mise run crit:profile-test` を実行してもらう。
    - understand-anything: hooks が変わったら、続けて使うか判断してもらう。
 10. `git diff claude/settings.json` に差分があれば、CLI がキーの並びを変えただけかを `jq -S` で確かめる（中身が変わっていたら伝える）。
-11. 文書が合ったら、スナップショットの作り直しをユーザーに頼む。通常の端末で実行するよう、次のコマンドの `<root>` を、このセッションの作業ツリーのルート（`git rev-parse --show-toplevel`。worktree ならそのパス）の絶対パスに置き換え、そのまま入力できる形で示す。スナップショットは、スクリプトがあるツリーに書かれる。sandbox の中の Bash は `claude/` に書けない（dotfiles の `.claude/settings.json` の `denyWrite`）ので、Claude は実行しない。Claude Code のプロンプトの `!` も、セッションによっては sandbox の中で動き、失敗する。
+11. 文書が合ったら、スナップショットの作り直しをユーザーに頼む。通常のターミナルで実行するよう、次のコマンドの `<root>` を、このセッションの作業ツリーのルート（`git rev-parse --show-toplevel`。worktree ならそのパス）の絶対パスに置き換え、そのまま入力できる形で示す。スナップショットは、スクリプトがあるツリーに書かれる。sandbox の中の Bash は `claude/` に書けない（dotfiles の `.claude/settings.json` の `denyWrite`）ので、Claude は実行しない。Claude Code のプロンプトの `!` も、セッションによっては sandbox の中で動き、失敗する。
 
     ```
     /usr/bin/python3 -B <root>/claude/scripts/skills-check.py snapshot
@@ -46,6 +46,6 @@ description: Use after adding, removing or updating a Claude Code plugin or skil
 
 ## 注意
 
-- sandbox の中では、`claude/` と `.claude/skills/` に Bash から書けない。文書は Edit と Write のツールで直し、スナップショットはユーザーに通常の端末で作ってもらう（手順 11）。
+- sandbox の中では、`claude/` と `.claude/skills/` に Bash から書けない。文書は Edit と Write のツールで直し、スナップショットはユーザーに通常のターミナルで作ってもらう（手順 11）。
 - スナップショット（`claude/skills-snapshot.json`）は、文書を合わせた後にだけ作り直す。先に作り直すと、文書に残った古い記述が次の `check` で見つからなくなる。
 - スナップショットには説明文と hooks のハッシュだけが入る。何が変わったかは、新しいファイルを読んで確かめる。

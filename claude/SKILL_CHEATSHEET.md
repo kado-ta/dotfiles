@@ -78,7 +78,7 @@
 | | `/commit-staged-pr` | ステージ済みの変更の commit・push・PR | 自動 |
 | 組み込み | `/security-review` | セキュリティレビュー | 自動 |
 | | `/simplify` | 変更したコードの整理 | 自動 |
-| Codex | `cd <repo> && codex review --base <base> -c 'sandbox_mode="read-only"' -c skills.include_instructions=false` | 別モデルの独立レビュー（ユーザーが通常の端末で実行する。`!` では失敗することがある） | 明示 |
+| Codex | `cd <repo> && codex review --base <base> -c 'sandbox_mode="read-only"' -c skills.include_instructions=false` | 別モデルの独立レビュー（ユーザーが通常のターミナルで実行する。`!` では失敗することがある） | 明示 |
 | | `cd <repo> && codex exec - -s read-only -c skills.include_instructions=false < <プロンプトのファイル>` | challenge（変更前と比べた後退や、壊れる入力を挙げてもらう。プロンプトは Claude が書く。セキュリティの境界・設計判断を含む変更で、`codex review` に加えて 1 回） | 明示 |
 
 <a name="comparisons"></a>
@@ -92,7 +92,7 @@
 | understand-anything と pstack | understand-anything はリポジトリ全体のグラフを作って何度も使う。`/pstack:how` は 1 つの領域を 1 回説明する | 同じ質問に両方は使わない |
 | crit と gstack | `/crit-review` は人間の承認で、CLAUDE.md が必須と定めている。gstack の `/plan-ceo-review`・`/office-hours` は AI の計画レビューで、任意 | AI のレビューを先に済ませてから `/crit-review` |
 | gstack `/review` と pstack `interrogate` | `/review` は専門家の観点で広く見て直す。`interrogate` は壊せるかを実行で示し、直さない | 高リスクで、`/review` の後に実行で確かめたい不変条件が残るとき |
-| gstack `/codex` と pstack `interrogate` | どちらも別の視点だが、独立したモデルは Codex だけ（`interrogate` は Claude 同士）。`/codex` は Bash から拒否されるので、ユーザーが通常の端末で `codex review` を実行する | 複雑・高リスクでは Codex を提案する。`interrogate` は実行で示したいときだけ足す |
+| gstack `/codex` と pstack `interrogate` | どちらも別の視点だが、独立したモデルは Codex だけ（`interrogate` は Claude 同士）。`/codex` は Bash から拒否されるので、ユーザーが通常のターミナルで `codex review` を実行する | 複雑・高リスクでは Codex を提案する。`interrogate` は実行で示したいときだけ足す |
 
 <a name="by-size"></a>
 
@@ -105,7 +105,7 @@
 | 複雑な機能開発 | `brainstorming` → `writing-plans` → `/crit-review` → 実装（TDD。独立したタスクが多ければ `subagent-driven-development`）→ `/review` → Codex → `/crit-review` → PR | plan の完了条件を満たし、レビューの指摘に対応した |
 | 高リスク変更 | 複雑の構成に足す: 実装の前に `/pstack:blast-radius`、セキュリティの境界なら `/security-review`、ロールバックの手順、必要なら `/pstack:interrogate` | ロールバックの手順と、影響の確認の結果がそろった |
 | 障害調査 | `systematic-debugging`（読み取りだけ）→ 必要なら `/pstack:why` → 原因と修正案を報告する。本番を変える操作は別に承認を得る | 原因を根拠つきで説明でき、再現テストがある |
-| 独立レビュー | `/review` の指摘を直した後に、ユーザーが通常の端末で `codex review ...` を実行する。セキュリティの境界か設計判断を含むなら、challenge（`codex exec`）も 1 回実行する。Claude は Codex の記録から全回の最終メッセージを読み（[rules/SKILL_ROUTING.md](rules/SKILL_ROUTING.md) の Exit criteria）、1 回ずつ test-report に記録してから、採用と不採用を整理する | 1 PR あたり 5 回まで（challenge も数える） |
+| 独立レビュー | `/review` の指摘を直した後に、ユーザーが通常のターミナルで `codex review ...` を実行する。セキュリティの境界か設計判断を含むなら、challenge（`codex exec`）も 1 回実行する。Claude は Codex の記録から全回の最終メッセージを読み（[rules/SKILL_ROUTING.md](rules/SKILL_ROUTING.md) の Exit criteria）、1 回ずつ test-report に記録してから、採用と不採用を整理する | 1 PR あたり 5 回まで（challenge も数える） |
 
 <a name="examples"></a>
 
