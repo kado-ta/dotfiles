@@ -22,7 +22,7 @@ Codex のレビューへの対応（`5af70d3` の次のコミット）の時点�
 | 実行した場所 | コマンド | 結果 |
 | --- | --- | --- |
 | Claude Code の sandbox | `bash claude/hooks/tests/test-check-vault-note.sh` | pass=23 fail=0 skip=1（Seatbelt の中の確認はスキップ） |
-| ユーザーのターミナル | `CHECK_VAULT_NOTE_SEATBELT_REQUIRED=1 bash claude/hooks/tests/test-check-vault-note.sh` | pass=40 fail=0 skip=0（共有フォルダの確認のパスの書き方と名前を、`check-repo.py` の誤検知を避けるために変える前の版） |
+| ユーザーのターミナル | `CHECK_VAULT_NOTE_SEATBELT_REQUIRED=1 bash claude/hooks/tests/test-check-vault-note.sh` | pass=40 fail=0 skip=0（`561899c`） |
 | Claude Code の sandbox | 既存のフックの試験 7 本 | すべて fail=0 |
 | Claude Code の sandbox | `python3 -B .github/scripts/check-repo.py`、`python3 -B .github/scripts/test-check-repo.py`、shellcheck、`actionlint` | すべて通過 |
 
