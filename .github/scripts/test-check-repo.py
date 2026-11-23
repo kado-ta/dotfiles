@@ -100,6 +100,7 @@ MWG_DENY = [
     "Bash(bun *modern-web-guidance*)",
     "Bash(yarn *modern-web-guidance*)",
     "Bash(npm *modern-web-guidance*)",
+    "Bash(deno *modern-web-guidance*)",
 ]
 README = "## Foo Bar\n\n[x](#foo-bar)\n\n"
 PARANOID_CONFIG = '[settings]\nparanoid = ["config", "env_files"]\n'

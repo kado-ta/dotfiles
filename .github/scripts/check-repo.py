@@ -129,6 +129,7 @@ MWG_DENY = (
     "Bash(bun *modern-web-guidance*)",
     "Bash(yarn *modern-web-guidance*)",
     "Bash(npm *modern-web-guidance*)",
+    "Bash(deno *modern-web-guidance*)",
 )
 JSONC_FILES = {"vscode/settings.json", "vscode/keybindings.json"}
 SETTINGS = "claude/settings.json"

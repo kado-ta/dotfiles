@@ -64,7 +64,7 @@ created: 2026-11-23
 | 4b | `claude/skills/chrome-extensions/`（`SKILL.md`・`references/`・`skill-version.txt`・`LICENSE.md`） | 新規。tarball のものをそのまま置く（2 が書く） | 人（4 と同じ実行で置かれる） |
 | 5 | `claude/scripts/update-skills.sh` | 2 を呼ぶ手順と、取り込み待ちの表示を足す | Claude |
 | 6 | `claude/scripts/test-update-skills.py` | 5 のテストを足す | Claude |
-| 7 | `claude/settings.json` | `permissions.deny` に 7 行を足す（[権限](#permissions)） | 人（Claude Code の設定ファイルなので Edit で書けない） |
+| 7 | `claude/settings.json` | `permissions.deny` に 8 行を足す（[権限](#permissions)） | 人（Claude Code の設定ファイルなので Edit で書けない） |
 | 8 | `.github/workflows/ci.yaml` | 3 を macOS のジョブ（`/usr/bin/python3`）で実行する | Claude |
 | 9 | `CLAUDE.md` | 「規約」のテストの一覧に 3 を足す | Claude |
 | 10 | `claude/SKILL_INVENTORY.md`・`SKILL_CHEATSHEET.md`・`skills-snapshot.json`（要れば `rules/SKILL_ROUTING.md`） | `/sync-skill-docs` で更新する | Claude |
@@ -107,7 +107,7 @@ created: 2026-11-23
    - `claude/skills/chrome-extensions/` に、tarball のファイルをそのまま（上流でなくなったファイルは消す）と `LICENSE.md`
    - mise の版の行（`--apply` のときだけ）
 9. `skillspector` があれば、2 つのスキルそれぞれに `skillspector scan <スキル> --no-llm` を実行し、要約を表示する。結果は失敗に数えない。ないときは、入れていないことを表示する。
-10. `--apply` のときは、`check-repo.py` を mise の `python3` で実行して結果を表示し、パス付きの戻し方（`git -C <リポジトリ> restore --source=HEAD --staged --worktree -- <3 つのパス>` と `git -C <リポジトリ> clean -fdx -- <2 つのスキル>`）を表示する。スクリプト自身は `git` を実行しない（`check-repo.py` は内部で `git ls-files` を使う。人が続けて使う `git` と同じ程度なので受け入れる）。`check-repo.py` が失敗しても、取り込みは済んでいるので終了コードは 0 で、失敗したことを表示する。
+10. `--apply` のときは、スキルと mise の版の両方をそろって書けたときだけ残す（版の書き込みに失敗したら、スキルも元に戻し、版の一時ファイルも残さない）。書いた後に、`check-repo.py` を Claude のセッション（sandbox の中）で実行するよう案内し、パス付きの戻し方（`git -C <リポジトリ> restore --source=HEAD --staged --worktree -- <3 つのパス>` と `git -C <リポジトリ> clean -fdx -- <2 つのスキル>`）を表示する。スクリプト自身は `git` も `check-repo.py` も実行しない。`.github/scripts` は sandbox から書けるので、sandbox の外で動くこのスクリプトから実行すると、仕込まれたコードが人の権限で動くため（Codex の challenge の指摘。最初は `--apply` の最後に実行していた）。
 
 終了コード: 0 は最新、`--out`・`--apply` で書いた。1 は失敗（`--apply` の書き込みの途中の失敗を除き、何も書いていない。途中の失敗では、戻せたかに関わらず戻し方を表示する）。3 は新しい版がある（引数なしのときだけ）。
 
@@ -130,10 +130,11 @@ created: 2026-11-23
 検証（どれかに当たったら、2 つのスキルとも書かない）:
 
 - package.json に依存（`dependencies`・`optionalDependencies`・`peerDependencies`・`bundleDependencies`）か、インストール時のスクリプト（`preinstall`・`install`・`postinstall`・`prepare` など）がある。`mise install` は sandbox の外で npm のパッケージを入れるため（mise 2026.11 は aube を使う。1.0.1 にはどれもない）。
-- package.json の `name` が `modern-web-guidance` でないか、`bin` のコマンドが `modern-web-guidance` だけでないか、`directories.bin` がある。mise は `node_modules/.bin` を PATH の先頭に入れるので、bin が増えると `git` などが置き換わるため。
+- package.json の `name` が `modern-web-guidance` でないか、`bin` のコマンドが `modern-web-guidance` だけでないか、`directories.bin` がある。mise は `node_modules/.bin` を PATH の先頭に入れるので、bin が増えると `git` などが置き換わるため。`bin` の参照先が、正規の相対パスで tarball の中の通常のファイルでない（ないと CLI が成り立たない）。
+- SKILL.md に LF 以外の改行（CR・NEL・LS・PS）がある。YAML はこれらも改行として扱うので、LF で分けた行の検査では、同じ行に見える `hooks` を見逃すため（Codex の challenge の指摘）。
 - frontmatter が閉じていないか、トップレベルのキーに `name`・`description`・`license`・`metadata` 以外がある（`hooks` は sandbox の外で動き、`allowed-tools` は確認なしでツールを使えるので、取り込む前に人が判断する）。`name` が `modern-web-guidance` でない。
 - 読み込み時にコマンドを実行する書き方（インラインの `` !`…` `` と、フェンスの ` ```! `・` ~~~! `）がある。フェンスの形が Claude Code で動くかは確かめていない（2 回目のレビューの指摘。拒否しても害はないので含めた）。
-- 4 の表示と 5 の節を足した後の本文に、実行できる形が残っている。`npx`・`pnpx`・`bunx` の後に、同じ行で `modern-web-guidance` があるもの。`pnpm`・`bun`・`yarn`・`npm`・`deno` で、オプションの後のサブコマンド（`dlx`・`exec`・`x`・`run`）と、`modern-web-guidance` が同じ行にあるもの。行末の `\` で続けた行は、つなげてから調べる。上流の構成が変わって 2 で消せなかったときに当たる。そのときは手で取り込み、スクリプトの規則を直す。足した表示と節もこの形を含まないように書く（実装中に、最初の文面が SkillSpector の RP1 に当たったため、足す前だけを調べる計画から変えた）。
+- 4 の表示と 5 の節を足した後の本文に、実行できる形が残っている。`npx`・`pnpx`・`bunx` の後に、同じ行で `modern-web-guidance` があるもの。`pnpm`・`bun`・`yarn`・`npm`・`deno` の後に、同じ行でサブコマンド（`dlx`・`exec`・`x`・`run`・`install`・`i`・`add`）と `modern-web-guidance` があるもの（間の値付きオプションは問わない）。行末の `\` で続けた行は、つなげてから調べる。上流の構成が変わって 2 で消せなかったときに当たる。そのときは手で取り込み、スクリプトの規則を直す。足した表示と節もこの形を含まないように書く（実装中に、最初の文面が SkillSpector の RP1 に当たったため、足す前だけを調べる計画から変えた）。
 - `DISABLE_TELEMETRY=1 modern-web-guidance search` が 1 つもない。
 - SKILL.md の `--skill-version` が、tarball の `skill-version.txt` と一致しない。
 - UTF-8 でない。
@@ -154,7 +155,7 @@ dotfiles の作業ツリーはそのまま使われている設定（スキル�
 
 ## 権限
 
-`claude/settings.json` の `permissions.deny` に次の 7 行を足す（人が編集する）。最初は 5 行（`npm` は `npm exec` だけ）だったが、`/review` で `npm x`（`npm exec` の別名）・`bun x`・`yarn dlx` の漏れが分かり、`npm`・`bun`・`yarn` はサブコマンドを問わない形にした。
+`claude/settings.json` の `permissions.deny` に次の 8 行を足す（人が編集する）。最初は 5 行（`npm` は `npm exec` だけ）だったが、`/review` で `npm x`（`npm exec` の別名）・`bun x`・`yarn dlx` の漏れが分かり、`npm`・`bun`・`yarn` はサブコマンドを問わない形にした。Codex の challenge で、CLI が返すガイドの本文は検査しないので、ガイドから `deno run npm:…` を示されると防げないと分かり、`deno` を足した。
 
 ```text
 Bash(npx *modern-web-guidance*)
@@ -164,6 +165,7 @@ Bash(bunx *modern-web-guidance*)
 Bash(bun *modern-web-guidance*)
 Bash(yarn *modern-web-guidance*)
 Bash(npm *modern-web-guidance*)
+Bash(deno *modern-web-guidance*)
 ```
 
 ガイドの本文の参照や、上流の SKILL.md の指示に従ってエージェントが npx 系で実行し、固定した版を迂回するのを止める。確かめ方は、ダウンロードしない形（`npx --no-install …`・`pnpm --version …` など）が拒否されること。Bash の規則は、ふだんの形を止めるもので、絶対パスや `sh -c` で包んだ形には当たらない（境界ではない）。`modern-web-guidance` という文字列を含むだけのコマンド（`npx prettier docs/work/20261123_modern-web-guidance/plan.md` など）も止まる（受け入れる）。
@@ -180,7 +182,7 @@ Bash(npm *modern-web-guidance*)
 | 4 | `update-skills.sh` と、そのテストを変える | `test-update-skills.py` が通る |
 | 5 | mise に `1.0.1` を足し、人が通常のターミナルで `mise install` する | sandbox の中で `modern-web-guidance --version` が 1.0.1 を返す |
 | 6 | `--out <scratchpad>` で、本物の 1.0.1 から 2 つのスキルを生成して確かめる。人が通常のターミナルで `--out ~/dotfiles/claude/skills` を実行して置く（`chrome-extensions` は 25 ファイルあり、Write で置くと確認が多いため、実装中に変えた） | SkillSpector の RP1 が消える。置いたものが、scratchpad に生成したものと `diff -r` で一致する |
-| 7 | 人が `permissions.deny` に 7 行を足す（`/review` の後に 5 行から広げた） | `npx --no-install modern-web-guidance --version` などが拒否される |
+| 7 | 人が `permissions.deny` に 8 行を足す（`/review` と Codex の challenge の後に、5 行から広げた） | `npx --no-install modern-web-guidance --version` などが拒否される |
 | 8 | 人が 2 つのスキルのリンクを張る: `ln -s ~/dotfiles/claude/skills/modern-web-guidance/ ~/.claude/skills/modern-web-guidance` と、`chrome-extensions` の同じ形（`setup.sh` は全セッションを閉じる必要があるため） | 新しいセッションで 2 つともスキルの一覧に出る。`search` と `retrieve` が、更新の警告なしで動く |
 | 9 | `ci.yaml` と `CLAUDE.md` を変える | `actionlint` |
 | 10 | `/sync-skill-docs` | 文書がスナップショットと一致する |
@@ -199,6 +201,7 @@ Bash(npm *modern-web-guidance*)
 | D2 | セキュリティの 7 件を直す | `//` を含むパスが検査を抜けて、任意の絶対パスに書けた（再現した）。frontmatter をそのまま写していた。大文字小文字だけが違う名前で、検証した SKILL.md が上書きされうる。ドットで始まる名前で差分から隠せる。package.json の依存とインストール時のスクリプトを見ていない。npm が作業ディレクトリの `.npmrc` と共有のキャッシュを読む。npx 系の網羅（`npm x`・`bun x`・`yarn dlx`） |
 | D3 | 堅牢性・テスト・文書を直す | 戻し方の案内にパスがなく、共有の作業ツリーでほかのファイルを消しうる。書き込みの途中の失敗で元に戻さない。壊れた tarball などで例外のまま終わる。latest が固定した版より古くても黙る。`check-repo.py` を取り込みの後に実行しない。テスト 3 件が失敗しえない。sandbox の外で `git status` を自動で実行する |
 | D4 | sandbox の中から `~/.npm` に書ける問題は、GitHub Issue にして別の作業で扱う（#74） | この PR の前からある問題 |
+| D7 | Codex の challenge の 6 件（高 2・中 4）を直す | SKILL.md の CR で、許可リストを通って `hooks` を持ち込める。`--apply` が、sandbox から書ける `check-repo.py` を sandbox の外で実行する（D3 で足した処理が作った経路）。版の書き込みの失敗で、スキルだけ新しくなる。置いた直後の Ctrl-C で戻せない。正規表現が値付きオプションを見逃し、deny に `deno` がない。`bin` の参照先が存在しなくても通る |
 | D6 | Codex のレビュー（`codex review`）の P2 を直す | 取り込まないエントリーには正規のパスの検査が当たらず、`package/./package.json` や `package//package.json` が、検証した package.json を展開時に上書きしうる |
 | D5 | 2 回目のレビュー（攻撃者視点）の 8 件を直す | フェンス形式（` ```! `）の拒否がない。package.json の `bin` を確かめていない（mise の PATH で `git` などが置き換わる）。`package/` の外や重複のエントリーと `binding.gyp`。`chrome-extensions` がどんな名前でも受け入れる（`CLAUDE.md` など）。`check-repo.py` が git を使う点が、テストと計画と食い違う。入れ替えの戻しが不完全。npx 系の検出の抜け（オプション付き・行の継続・`deno`）。npm の `--prefix` |
 

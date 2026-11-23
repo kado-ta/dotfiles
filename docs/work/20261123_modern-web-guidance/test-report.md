@@ -47,7 +47,7 @@ created: 2026-11-23
 
 | コマンド | 結果 |
 | --- | --- |
-| `python3 -B claude/scripts/test-update-modern-web-guidance.py`（mise と `/usr/bin/python3`） | OK（60 件。レビューの前は 30 件、1 回目の修正の後は 49 件、2 回目の修正の後は 58 件） |
+| `python3 -B claude/scripts/test-update-modern-web-guidance.py`（mise と `/usr/bin/python3`） | OK（65 件。レビューの前は 30 件、1 回目の修正の後は 49 件、2 回目の修正の後は 58 件、Codex のレビューの修正の後は 60 件） |
 | `/usr/bin/python3 -B claude/scripts/test-update-skills.py` | OK（15 件。レビューの前は 14 件） |
 | `python3 -B .github/scripts/test-check-repo.py` | OK（87 件） |
 | `python3 -B claude/scripts/test-skills-check.py` | OK |
@@ -104,6 +104,15 @@ created: 2026-11-23
 
 Codex のレビューの指摘（D6）を直した後に足した 2 つ（取り込まないエントリーへの、正規のパスの検査と、通常のファイルの検査）も、外すとテストが失敗した。
 
+Codex の challenge の指摘（D7）を直した後に足した 6 つも、外すとテストが失敗した。
+
+- LF 以外の改行の拒否
+- 入れ替えの後の処理（mise の版の書き込み）を、戻しの範囲に入れること
+- ディスクの状態からの戻し
+- 値付きオプションとインストールの指示の検出
+- `bin` の参照先の検査
+- 版の一時ファイルの片付け（最初は、mise のディレクトリを書き込み禁止にするテストだけで、一時ファイルを作る前に失敗していたので捕まえられなかった。置き換えで失敗させるテストを足した）
+
 <a name="review"></a>
 
 ## レビュー
@@ -113,6 +122,8 @@ Codex のレビューの指摘（D6）を直した後に足した 2 つ（取り
 2 回目は、直した差分を自分で読み直し、攻撃者視点のレビューを 1 つ出した。専門観点のレビューは出し直していない。8 件の指摘を受け、ユーザーが D5（すべて直す）を選んだ。直した後に、本物の 1.0.1 から `--out` で生成し直したものは、強くした検証をすべて通り、置いてあるスキルと一致した。
 
 コミット（`074ee93`）の後、ユーザーが通常のターミナルで `codex review --base main` を実行した。指摘は P2 の 1 件（取り込まないエントリーの正規でないパス）で、ユーザーの承認のもとで直した（D6）。Codex は、メモリ上の再現で入力が通ることを確かめていた。直した後も、本物の 1.0.1 は検証を通り、置いてあるスキルと一致した。
+
+続けて、ユーザーが challenge（`codex exec`、`.gstack/tmp/codex-challenge-mwg.md`）を実行した。高 2 件・中 4 件の指摘を、ユーザーの承認のもとで直した（D7）。そのうち 1 件（`--apply` が、sandbox から書ける `check-repo.py` を sandbox の外で実行する）は、D3 で私が足した処理が作った経路だった。直した後も、本物の 1.0.1 は検証を通り、置いてあるスキルと一致した。Codex は、このタスクで 2 回使った（上限は 5 回）。
 
 2 回目のサブエージェントは、自分の Bash が sandbox の外で動いていた（`$HOME` に書けた）と報告し、確かめるために `$TMPDIR` と `$HOME` に空のディレクトリを作ってすぐ消したと書いた。指示はファイルの編集を禁じていた。この実行は確かめていない。
 
@@ -131,6 +142,6 @@ Codex のレビューの指摘（D6）を直した後に足した 2 つ（取り
 ## 確かめていないこと
 
 - 新しい版があるときの流れ（引数なしの終了コード 3、`--out --latest`、`--apply`）。npm に 1.0.1 より新しい版がないので、本物では動かしていない。テストの偽物（`npm`・`skillspector`・`check-repo.py`）で確かめた。
-- `--apply` の最後の `check-repo.py` は、PATH の `python3` で動かす。mise が効いていないターミナルで `/usr/bin/python3`（3.9）が選ばれると、tomllib がなくて失敗と表示される。
+- `deno` の deny の行は、`deno --version modern-web-guidance` が拒否されることだけを確かめた。手元に deno がないので、対照の `deno --version` は試していない（拒否が deny の規則によるものか、auto mode の判定によるものかは区別していない）。
 - `DISABLE_TELEMETRY=1` を付け忘れたときに、sandbox の通信制限で `play.googleapis.com` への送信が止まるか、許可を求める確認が出るか。
 - 新しいセッションで、フロントエンドの作業のときに `modern-web-guidance` が実際に起動するか。

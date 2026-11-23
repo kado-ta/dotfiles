@@ -141,6 +141,7 @@
       "Bash(bun *modern-web-guidance*)",
       "Bash(yarn *modern-web-guidance*)",
       "Bash(npm *modern-web-guidance*)",
+      "Bash(deno *modern-web-guidance*)",
       "Read(**/.env*)",
       "Read(~/**/.env*)",
       "Read(**/id_rsa*)",

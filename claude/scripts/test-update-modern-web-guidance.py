@@ -127,8 +127,8 @@ CHECK_REPO_STUB = ('import os, sys\n'
                    'sys.exit(int(os.environ.get("STUB_CHECK_RC", "0")))\n')
 
 RUNNABLE = re.compile(r"\b(?:npx|pnpx|bunx)\b[^\n`]*?modern-web-guidance"
-                      r"|\b(?:pnpm|bun|yarn|npm|deno)\b(?:\s+-\S+)*\s+(?:dlx|exec|x|run)\b[^\n`]*?modern-web-guidance"
-                      r"|\b(?:pnpm|bun|yarn|npm|deno)\b[^\n`]*?modern-web-guidance[^\n`]*?\s(?:dlx|exec|x|run)\b")
+                      r"|\b(?:pnpm|bun|yarn|npm|deno)\b[^\n`]*?\s(?:dlx|exec|x|run|install|i|add)\b[^\n`]*?modern-web-guidance"
+                      r"|\b(?:pnpm|bun|yarn|npm|deno)\b[^\n`]*?modern-web-guidance[^\n`]*?\s(?:dlx|exec|x|run|install|i|add)\b")
 
 
 def write_executable(path, text):
@@ -402,14 +402,13 @@ class UpdateModernWebGuidanceTest(unittest.TestCase):
         result, _ = self.apply()
         self.assertIn("skillspector", result.stdout)
 
-    def test_apply_runs_check_repo(self):
+    def test_apply_does_not_run_check_repo(self):
+        # .github/scripts は sandbox から書けるので、sandbox の外で動く --apply から実行しない（Codex の challenge）。
+        # 代わりに、Claude のセッション（sandbox の中）で実行するよう案内する。
         result, log = self.apply()
-        self.assertIn(f"check-repo {self.repo}", log)
-        self.assertIn("PASS stub", result.stdout)
-
-    def test_apply_reports_check_repo_failure(self):
-        result, _ = self.apply(env_extra={"STUB_CHECK_RC": "1"})
-        self.assertIn("check-repo.py が失敗した", result.stdout)
+        self.assertFalse(any(line.startswith("check-repo") for line in log), log)
+        self.assertIn("check-repo.py", result.stdout)
+        self.assertIn("sandbox の中", result.stdout)
 
     def test_apply_shows_exact_restore_commands(self):
         # 作業ツリーは共有なので、パスを付けた戻し方だけを示す（パスのない git clean は、ほかのファイルを消す）。
@@ -420,6 +419,17 @@ class UpdateModernWebGuidanceTest(unittest.TestCase):
         self.assertIn(f"git -C {self.repo} restore --source=HEAD --staged --worktree -- {paths}", result.stdout)
         self.assertIn(f"git -C {self.repo} clean -fdx -- claude/skills/modern-web-guidance "
                       "claude/skills/chrome-extensions", result.stdout)
+
+    def test_apply_pin_failure_restores_skills(self):
+        # mise の版を書けなかったら、スキルも元に戻す（新しいスキルと古い CLI の組み合わせを残さない）。一時ファイルも残さない。
+        self.mise.parent.chmod(0o555)
+        self.addCleanup(self.mise.parent.chmod, 0o755)
+        before = self.snapshot()
+        result, _ = self.run_script("--apply")
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertEqual(self.snapshot(), before)
+        self.assertEqual(sorted(p.name for p in self.mise.parent.iterdir()), ["mise_config.toml"])
+        self.assertEqual(sorted(p.name for p in self.skills.iterdir()), ["chrome-extensions", "modern-web-guidance"])
 
     def test_apply_script_itself_does_not_run_git(self):
         # スクリプト自身は git を動かさない（戻し方は表示するだけ）。本物の check-repo.py は git ls-files を使うが、
@@ -465,6 +475,22 @@ class UpdateModernWebGuidanceTest(unittest.TestCase):
                         files = package_files(chrome_skill=CHROME_SKILL.replace("description: >", key + "description: >"))
                     self.assert_apply_fails_without_writes(files, reason="frontmatter")
 
+    def test_other_line_breaks_in_skill_md(self):
+        # YAML は CR（と YAML 1.1 の NEL・LS・PS）も改行として扱うので、LF で分けた行の検査では、
+        # 同じ行に見える hooks を見逃す（Codex の challenge）。
+        for line_break in ("\r", "\x85", " ", " "):
+            hidden = f"description: guide{line_break}hooks:{line_break}  PreToolUse: []\n"
+            for skill in ("modern-web-guidance", "chrome-extensions"):
+                with self.subTest(line_break=repr(line_break), skill=skill):
+                    if skill == "modern-web-guidance":
+                        files = package_files(skill=UPSTREAM_SKILL.replace(
+                            "description: |\n  Search tool for modern web development best practices.\n", hidden))
+                    else:
+                        files = package_files(chrome_skill=CHROME_SKILL.replace(
+                            "description: >\n  Build and publish Chrome Extensions using Manifest V3 best practices.\n",
+                            hidden))
+                    self.assert_apply_fails_without_writes(files, reason="改行")
+
     def test_frontmatter_allowed_keys_pass(self):
         chrome = CHROME_SKILL.replace("description: >", "license: Apache-2.0\nmetadata:\n  a: b\ndescription: >")
         make_tgz(self.tgz, package_files(chrome_skill=chrome))
@@ -488,7 +514,14 @@ class UpdateModernWebGuidanceTest(unittest.TestCase):
                         "yarn dlx modern-web-guidance retrieve x", "pnpm dlx modern-web-guidance",
                         "pnpm --package=modern-web-guidance dlx mwg search x",
                         "yarn --silent dlx modern-web-guidance", "npx \\\n  modern-web-guidance search x",
-                        "deno run npm:modern-web-guidance search x"):
+                        "deno run npm:modern-web-guidance search x",
+                        # 値を取るオプション（Codex の challenge）と、インストールの指示。
+                        "pnpm --dir /tmp dlx modern-web-guidance@latest retrieve html",
+                        "bun --cwd /tmp x modern-web-guidance@latest retrieve html",
+                        "yarn --cwd /tmp dlx modern-web-guidance@latest retrieve html",
+                        "npm --prefix /tmp exec -- modern-web-guidance@latest retrieve html",
+                        "deno run -A npm:modern-web-guidance@latest retrieve html",
+                        "npm install modern-web-guidance@latest", "pnpm add -g modern-web-guidance"):
             with self.subTest(command=command):
                 self.assert_apply_fails_without_writes(
                     package_files(chrome_skill=CHROME_SKILL + f"\nRun `{command}`.\n"))
@@ -616,9 +649,21 @@ class UpdateModernWebGuidanceTest(unittest.TestCase):
                 self.assert_apply_fails_without_writes(package_files(package_json=package_json),
                                                        reason="package.json")
 
+    def test_package_json_bin_target_must_exist(self):
+        # bin の参照先は、tarball の中の通常のファイルでなければならない（Codex の challenge）。
+        base = '{"name": "modern-web-guidance", "bin": '
+        for bin_field in ('"absent.mjs"', '{"modern-web-guidance": "absent.mjs"}', '"../outside.mjs"',
+                          '{"modern-web-guidance": "/usr/bin/git"}', '{"modern-web-guidance": 1}'):
+            with self.subTest(bin_field=bin_field):
+                self.assert_apply_fails_without_writes(package_files(package_json=base + bin_field + "}"),
+                                                       reason="bin")
+
     def test_package_json_string_bin_passes(self):
-        make_tgz(self.tgz, package_files(package_json='{"name": "modern-web-guidance", "bin": "a.mjs"}'))
-        self.apply()
+        for target in ("skills/modern-web-guidance/modern-web.mjs", "./skills/modern-web-guidance/modern-web.mjs"):
+            with self.subTest(target=target):
+                self.mise.write_text(MISE_CONFIG, encoding="utf-8")
+                make_tgz(self.tgz, package_files(package_json=f'{{"name": "modern-web-guidance", "bin": "{target}"}}'))
+                self.apply()
 
     def test_package_json_other_scripts_pass(self):
         package_json = PACKAGE_JSON[:-1] + ', "scripts": {"test": "node --test"}}'
@@ -694,6 +739,29 @@ class WriteSkillsRollbackTest(unittest.TestCase):
                 self.module.write_skills(self.skills(), self.root)
         self.assert_old_restored()
 
+    def test_interrupt_right_after_placing_restores_both(self):
+        # 新しい版を置いた直後（記録する前）に止まっても、ディスクの状態から元に戻す（Codex の challenge）。
+        real_replace = os.replace
+
+        def replace(src, dst):
+            real_replace(src, dst)
+            if Path(dst) == self.root / "modern-web-guidance" and "new" in Path(src).parts:
+                raise KeyboardInterrupt()
+
+        with mock.patch.object(self.module.os, "replace", side_effect=replace):
+            with self.assertRaises(KeyboardInterrupt):
+                self.module.write_skills(self.skills(), self.root)
+        self.assert_old_restored()
+
+    def test_failure_after_swap_restores_both(self):
+        # 入れ替えの後の処理（mise の版の書き込み）が失敗したら、スキルも元に戻す。
+        def then():
+            raise OSError("pin")
+
+        with self.assertRaises(OSError):
+            self.module.write_skills(self.skills(), self.root, then=then)
+        self.assert_old_restored()
+
     def test_rollback_removes_skill_that_did_not_exist(self):
         # 前になかったスキル（ここでは modern-web-guidance）は、戻した後に残さない。
         shutil.rmtree(self.root / "modern-web-guidance")
@@ -719,6 +787,32 @@ class WriteSkillsRollbackTest(unittest.TestCase):
         kept = list(self.root.glob(".update-mwg-*/old/modern-web-guidance/SKILL.md"))
         self.assertEqual(len(kept), 1, list(self.root.rglob("*")))
         self.assertEqual(kept[0].read_text(encoding="utf-8"), "old modern-web-guidance\n")
+
+
+class WritePinTest(unittest.TestCase):
+    """mise の版の書き込みが、一時ファイルを作った後で失敗しても、一時ファイルを残さない。"""
+
+    def test_failure_after_temporary_file_leaves_nothing(self):
+        spec = importlib.util.spec_from_file_location("update_mwg", SCRIPTS / SCRIPT_NAME)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        root = Path(tempfile.mkdtemp()).resolve()
+        self.addCleanup(shutil.rmtree, root)
+        config = root / "mise_config.toml"
+        config.write_text(MISE_CONFIG, encoding="utf-8")
+        real_replace = os.replace
+
+        def replace(src, dst):
+            if Path(dst) == config:
+                raise OSError("simulated")
+            return real_replace(src, dst)
+
+        with mock.patch.object(module, "MISE_CONFIG", config), \
+                mock.patch.object(module.os, "replace", side_effect=replace):
+            with self.assertRaises(OSError):
+                module.write_pin("new\n")
+        self.assertEqual(sorted(p.name for p in root.iterdir()), ["mise_config.toml"])
+        self.assertEqual(config.read_text(encoding="utf-8"), MISE_CONFIG)
 
 
 if __name__ == "__main__":

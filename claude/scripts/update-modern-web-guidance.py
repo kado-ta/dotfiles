@@ -15,8 +15,9 @@ npm と mise の設定を読むので、通常のターミナルでホームか�
       固定している版（--latest なら npm の latest）のスキルを、DIR の下にだけ書く。取り込む前に中身を確かめる。
       sandbox の中では claude/ と mise/ に書けないので、Claude のセッションからはこれを使う。
   /usr/bin/python3 -I -B ~/dotfiles/claude/scripts/update-modern-web-guidance.py --apply
-      作業ブランチで実行する。npm の latest のスキルと mise の版を書き、check-repo.py を実行する。
+      作業ブランチで実行する。npm の latest のスキルと mise の版を書く（両方そろって書けたときだけ残す）。
       ~/.claude/skills と mise のグローバルの設定はこのリポジトリへのリンクなので、書いた時点で有効になる。
+      check-repo.py は、.github/scripts が sandbox から書けるので、ここでは実行せず、Claude のセッションで実行する。
 
 終了コード: 0 は最新、--out・--apply で書いた。1 は失敗（--apply の書き込みの途中の失敗を除き、何も書いていない）。
 3 は新しい版がある（引数なしのときだけ）。
@@ -40,18 +41,20 @@ REGISTRY = "https://registry.npmjs.org/"
 REPO = Path(__file__).resolve().parents[2]
 MISE_CONFIG = REPO / "mise" / "mise_config.toml"
 SKILLS_DIR = REPO / "claude" / "skills"
-CHECK_REPO = REPO / ".github" / "scripts" / "check-repo.py"
 MWG = "modern-web-guidance"
 CHROME = "chrome-extensions"
 TARGET_PATHS = ("mise/mise_config.toml", f"claude/skills/{MWG}", f"claude/skills/{CHROME}")
+CHECK_REPO_COMMAND = "python3 -B .github/scripts/check-repo.py"
 
 PIN_RE = re.compile(r'^"npm:modern-web-guidance" = "(\d+\.\d+\.\d+)"$', re.M)
 VERSION_RE = re.compile(r"^\d+\.\d+\.\d+$")
 # npx 系で modern-web-guidance を動かす指示。同じ行の中で、間にバッククォートを挟まないものを数える
 # （行末の \ で続けた行は、つなげてから調べる）。pnpm・bun・yarn・npm・deno は、オプションの後のサブコマンドで見る。
 RUNNABLE_RE = re.compile(r"\b(?:npx|pnpx|bunx)\b[^\n`]*?modern-web-guidance"
-                         r"|\b(?:pnpm|bun|yarn|npm|deno)\b(?:\s+-\S+)*\s+(?:dlx|exec|x|run)\b[^\n`]*?modern-web-guidance"
-                         r"|\b(?:pnpm|bun|yarn|npm|deno)\b[^\n`]*?modern-web-guidance[^\n`]*?\s(?:dlx|exec|x|run)\b")
+                         r"|\b(?:pnpm|bun|yarn|npm|deno)\b[^\n`]*?\s(?:dlx|exec|x|run|install|i|add)\b[^\n`]*?modern-web-guidance"
+                         r"|\b(?:pnpm|bun|yarn|npm|deno)\b[^\n`]*?modern-web-guidance[^\n`]*?\s(?:dlx|exec|x|run|install|i|add)\b")
+# YAML は LF のほかに CR（と YAML 1.1 の NEL・LS・PS）も改行として扱う。LF で分けた行の検査を通さないよう拒否する。
+OTHER_LINE_BREAKS = ("\r", "\x85", " ", " ")
 NPX_SECTION_RE = re.compile(r"^## .*\b(?:npx|pnpx)\b")
 SKILL_VERSION_RE = re.compile(r"--skill-version (\S+)")
 FRONTMATTER_KEY_RE = re.compile(r"^([A-Za-z0-9_-]+):")
@@ -133,7 +136,10 @@ def check_canonical_path(rel, name):
 
 
 def read_package(tgz):
-    """tarball から要るファイルだけをメモリに読む。展開せず、パスは正規の相対パスだけを許す。"""
+    """tarball から要るファイルだけをメモリに読む。展開せず、パスは正規の相対パスだけを許す。
+
+    要るファイルの中身と、すべての通常のファイルの名前（package/ から下）を返す。
+    """
     files = {}
     seen = {}
     total = 0
@@ -173,7 +179,7 @@ def read_package(tgz):
                 f"skills/{CHROME}/SKILL.md"):
         if rel not in files:
             raise Failure(f"tarball に {rel} がない")
-    return files
+    return files, set(seen.values())
 
 
 def fetch_package(version, tmp):
@@ -188,7 +194,8 @@ def fetch_package(version, tmp):
     return read_package(tgz)
 
 
-def check_package_json(data):
+def check_package_json(data, names):
+    """names: tarball の中のすべての通常のファイルの名前（package/ から下）。bin の参照先を確かめる。"""
     try:
         pkg = json.loads(data)
     except ValueError as e:
@@ -204,13 +211,20 @@ def check_package_json(data):
         raise Failure(f"package.json の name が {PACKAGE} でない: {pkg.get('name')!r}")
     bin_field = pkg.get("bin")
     # 文字列の bin は、パッケージの名前のコマンドになる。
-    names = {PACKAGE} if isinstance(bin_field, str) else set(bin_field) if isinstance(bin_field, dict) else set()
-    if names != {PACKAGE} or (pkg.get("directories") or {}).get("bin"):
+    commands = {PACKAGE} if isinstance(bin_field, str) else set(bin_field) if isinstance(bin_field, dict) else set()
+    if commands != {PACKAGE} or (pkg.get("directories") or {}).get("bin"):
         raise Failure(f"package.json の bin が {PACKAGE} だけでない（PATH に入るコマンドが変わる）: {bin_field!r}")
+    # bin の参照先は、tarball の中の通常のファイルでなければならない（ないと CLI が成り立たない）。
+    for target in ([bin_field] if isinstance(bin_field, str) else list(bin_field.values())):
+        rel = target[2:] if isinstance(target, str) and target.startswith("./") else target
+        if not isinstance(rel, str) or rel.startswith("/") or str(PurePosixPath(rel)) != rel or rel not in names:
+            raise Failure(f"package.json の bin の参照先が、tarball の中の通常のファイルでない: {target!r}")
 
 
 def split_frontmatter(text, name):
     """frontmatter のトップレベルのキーを確かめ、閉じる行までと、その後ろに分けて返す。"""
+    if any(line_break in text for line_break in OTHER_LINE_BREAKS):
+        raise Failure(f"{name} の SKILL.md に、LF 以外の改行（CR・NEL・LS・PS）がある")
     lines = text.split("\n")
     if lines[0] != "---" or "---" not in lines[1:]:
         raise Failure(f"{name} の SKILL.md の frontmatter が閉じていない")
@@ -281,9 +295,13 @@ def decode(data, rel):
         raise Failure(f"{rel} が UTF-8 でない")
 
 
-def build_skills(files, version):
-    """書き込むファイルを {スキル名: {スキルの中のパス: 中身}} で返す。検証に失敗したら Failure。"""
-    check_package_json(files["package.json"])
+def build_skills(package, version):
+    """package: read_package の結果。書き込むファイルを {スキル名: {スキルの中のパス: 中身}} で返す。
+
+    検証に失敗したら Failure。
+    """
+    files, names = package
+    check_package_json(files["package.json"], names)
     license_text = files["LICENSE"]
     skill_version = decode(files[f"skills/{MWG}/skill-version.txt"], "skill-version.txt").strip()
     mwg = transform_mwg(decode(files[f"skills/{MWG}/SKILL.md"], f"skills/{MWG}/SKILL.md"), skill_version, version)
@@ -312,11 +330,12 @@ def build_skills(files, version):
     }
 
 
-def write_skills(skills, dest):
+def write_skills(skills, dest, then=None):
     """一時ディレクトリに組み立ててから入れ替える。上流でなくなったファイルは残らない。
 
-    入れ替えの途中で失敗したら（Ctrl-C を含む）、元に戻す。前になかったスキルは消す。戻すのにも失敗したら、
-    旧版の写しを一時ディレクトリに残して、その場所を表示する。
+    入れ替えの後に then を呼ぶ（mise の版の書き込み）。入れ替えか then が失敗したら（Ctrl-C を含む）、元に戻す。
+    戻すかどうかは、記録ではなくディスクの状態で決める（新しい版を置いた直後に止まっても戻せるように）。
+    前になかったスキルは消す。戻すのにも失敗したら、旧版の写しを一時ディレクトリに残して、その場所を表示する。
     """
     dest.mkdir(parents=True, exist_ok=True)
     staging = Path(tempfile.mkdtemp(prefix=".update-mwg-", dir=dest))
@@ -331,19 +350,20 @@ def write_skills(skills, dest):
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_bytes(data)
         (staging / "old").mkdir()
-        placed = []
         try:
             for name in skills:
                 if (dest / name).exists():
                     os.replace(dest / name, staging / "old" / name)
                 os.replace(staging / "new" / name, dest / name)
-                placed.append(name)
+            if then is not None:
+                then()
         except BaseException:
             try:
                 for name in skills:
-                    if name in placed:
-                        os.replace(dest / name, staging / "new" / name)
-                    old = staging / "old" / name
+                    new, old = staging / "new" / name, staging / "old" / name
+                    # 新しい版が一時ディレクトリにないなら、置いた後なので、置いた場所から戻す。
+                    if not new.exists() and (dest / name).exists():
+                        os.replace(dest / name, new)
                     if old.exists():
                         os.replace(old, dest / name)
             except BaseException:
@@ -364,10 +384,18 @@ def bumped_pin(version):
 
 def write_pin(text):
     # ~/.config/mise/config.toml はこのファイルへのリンクなので、リンクを残してこのファイルを置き換える。
-    with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=MISE_CONFIG.parent, delete=False) as tmp:
-        tmp.write(text)
-    os.chmod(tmp.name, stat.S_IMODE(MISE_CONFIG.stat().st_mode))
-    os.replace(tmp.name, MISE_CONFIG)
+    # 失敗したら、一時ファイルを残さない。
+    tmp_name = None
+    try:
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=MISE_CONFIG.parent, delete=False) as tmp:
+            tmp_name = tmp.name
+            tmp.write(text)
+        os.chmod(tmp_name, stat.S_IMODE(MISE_CONFIG.stat().st_mode))
+        os.replace(tmp_name, MISE_CONFIG)
+    except BaseException:
+        if tmp_name is not None and os.path.exists(tmp_name):
+            os.unlink(tmp_name)
+        raise
 
 
 def scan(dest, tmp):
@@ -385,20 +413,6 @@ def scan(dest, tmp):
                   f"recommendation={risk['recommendation']} issues={len(data['issues'])}")
         except (OSError, ValueError, LookupError, TypeError):
             print(f"skillspector: {name} の結果を読めなかった。skillspector scan {dest / name} --no-llm で確かめる")
-
-
-def run_check_repo(tmp):
-    # check-repo.py は tomllib を使うので、mise の python3（3.11 以上）で動かす。
-    python = shutil.which("python3")
-    if python is None:
-        print("python3 がないので、check-repo.py を実行しなかった。PR の前に実行する")
-        return
-    result = subprocess.run([python, "-I", "-B", str(CHECK_REPO), str(REPO)], cwd=tmp, capture_output=True, text=True)
-    output = (result.stdout + result.stderr).rstrip()
-    if output:
-        print(output)
-    if result.returncode != 0:
-        print("check-repo.py が失敗した。PR の前に直す（取り込んだスキルは手で編集しない）")
 
 
 def print_restore():
@@ -441,19 +455,20 @@ def main(argv=None):
                 print(f"{PACKAGE}: {version} のスキルを {dest} に書いた")
                 scan(dest, tmp)
                 return 0
-            # 書き始める前に、検証と組み立てをすべて終える。
+            # 書き始める前に、検証と組み立てをすべて終える。スキルと mise の版は、両方そろって書けたときだけ残す。
             pin_text = bumped_pin(version)
             try:
-                write_skills(skills, SKILLS_DIR)
-                write_pin(pin_text)
+                write_skills(skills, SKILLS_DIR, then=lambda: write_pin(pin_text))
             except (OSError, Failure) as e:
-                print(f"{PACKAGE}: 書き込みの途中で失敗した: {e}", file=sys.stderr)
+                print(f"{PACKAGE}: 書き込みに失敗したので、元に戻した（戻せなかったときは、その旨を上に表示した）: {e}",
+                      file=sys.stderr)
                 print_restore()
                 return 1
             print(f"{PACKAGE}: {pinned} → {version} を取り込んだ（{CHROME} を含む）。"
                   "差分を確かめて PR にし、マージしてから通常のターミナルで mise install を実行する")
             scan(SKILLS_DIR, tmp)
-            run_check_repo(tmp)
+            # .github/scripts は sandbox から書けるので、sandbox の外で動くこのスクリプトからは実行しない。
+            print(f"次に、Claude のセッション（sandbox の中）で {CHECK_REPO_COMMAND} を実行して、取り込んだファイルを検査する")
             print_restore()
             return 0
     except Failure as e:
