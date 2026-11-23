@@ -270,6 +270,7 @@
     "runaway-stopper": "off",
     "write-skill": "off",
     "design-motion": "off",
+    "plan-eng-review": "user-invocable-only",
     "document-release": "user-invocable-only",
     "document-generate": "user-invocable-only",
     "spec": "user-invocable-only"
