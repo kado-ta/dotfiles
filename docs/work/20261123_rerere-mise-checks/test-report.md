@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: done
 created: 2026-11-23
 ---
 
@@ -72,7 +72,15 @@ created: 2026-11-23
 
 ## Codex のレビュー
 
-まだ実行していない。
+このタスクで 1 回（上限は 5 回）。人間が通常のターミナルで実行し、結果は `~/.codex/sessions` の記録から読んだ。
+
+| 回 | 日時（UTC） | 対象 | コマンド | 結果 |
+| --- | --- | --- | --- | --- |
+| 1 | 2026-11-23 09:40 | `219930c` | `codex review --base main -c 'sandbox_mode="read-only"' -c skills.include_instructions=false` | 指摘なし。「patch is correct」（確信度 0.9）。`check-repo.py` の 12 項目、shellcheck、actionlint は成功し、`rerere.enabled` が `false` であることも確かめた |
+
+- 採否: 指摘がないので、直すものはない。
+- Codex は、読み取り専用の sandbox で一時ディレクトリを作れず、`test-check-repo.py` を実行できなかった。テストは、このセッションで 89 件 OK を確かめている（[確認コマンド](#commands)）。
+- challenge（`codex exec`）は実行していない。
 
 <a name="follow-ups"></a>
 
