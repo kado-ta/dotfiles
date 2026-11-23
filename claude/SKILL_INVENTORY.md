@@ -313,7 +313,7 @@ sandbox の外で `/cso` を実行すると、保存先に秘密ファイルの�
 
 更新は、sandbox の外で `claude/scripts/update-skills.sh` を実行してまとめて行う。通常のターミナルで `/bin/bash ~/dotfiles/claude/scripts/update-skills.sh` を実行する（dotfiles では `mise run claude:update` でもよい）。gstack・user スコープのプラグイン・crit の CLI を更新し、gstack が `claude/settings.json` に書いた絶対パスを `~/` に戻し、cc-crit の profile テストまで実行する。Claude Code のプロンプトの `!` は、セッションによっては sandbox の中で動く（2026-11-19 に観測）。そのときは更新が失敗し、cc-crit の profile テストも「失敗した手順」に出る。profile テストは sandbox の中や crit がないときにスキップして終了コード 0 で終わるので、`update-skills.sh` は `CC_CRIT_PROFILE_REQUIRED=1` を付けて実行し、profile を確かめられないときは失敗させる。
 
-- Claude Code から `mise run` を使わないのは、mise が dotfiles のルートの設定ファイル（`mise.local.toml` など）を読み込み、ルートには sandbox から書けるため。paranoid で、信頼されていない設定は読み込まれないが、念のため mise を通さない。
+- Claude Code のプロンプトの `!` で実行するときは、`mise run claude:update` ではなく `/bin/bash` の絶対パスを使う。`!` は sandbox の外で動くことがあり、mise は dotfiles のルートの設定ファイル（`mise.local.toml` など）を読み込み、ルートには sandbox から書けるため。paranoid で、信頼されていない設定は読み込まれないが、念のため mise を通さない。Claude が Bash ツールで実行する `mise run`（`/sync-skill-docs` の `claude:skills-check` など）は sandbox の中で動くので、これに当たらない。
 - 確認が要るプラグイン（マーケットプレイスが宣言したインストールコマンドが変わったもの）は、TTY がないと拒否されて失敗に数えられる。ターミナルで `claude plugin update <id> --scope user` を実行する。
 - 更新した hooks は、Claude Code を再起動した後のセッションで動き始める。再起動する前に、次の手順で見直す。
 
