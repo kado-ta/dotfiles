@@ -6,7 +6,9 @@ Claude Code の設定を管理するディレクトリ。`setup.sh` で `~/.clau
 
 ## 目次
 
-- [セットアップ（`setup.sh`）](#setup)
+- [セットアップと更新](#setup)
+  - [新規セットアップ（`setup.sh`）](#setup-new)
+  - [スキル・プラグインのアップデート](#setup-update)
 - [フック](#hooks)
 - [MCP サーバー](#mcp)
   - [Playwright MCP](#playwright-mcp)
@@ -31,9 +33,15 @@ Claude Code の設定を管理するディレクトリ。`setup.sh` で `~/.clau
 
 <a name="setup"></a>
 
-## セットアップ（`setup.sh`）
+## セットアップと更新
 
-`setup.sh` は次を行う。
+最初に入れるときは `setup.sh`、入れた後に gstack・プラグイン・crit の CLI を新しくするときは `update-skills.sh` を使う。`setup.sh` はインストール済みのプラグインと gstack をスキップするので、更新には使えない。
+
+<a name="setup-new"></a>
+
+### 新規セットアップ（`setup.sh`）
+
+通常のターミナルで、Claude Code のセッションをすべて閉じてから実行する（dotfiles 全体のセットアップでは、ルートの `setup.command` から実行される）。セッションの中と IDE の統合ターミナルでは実行を拒否する。`setup.sh` は次を行う。
 
 - `settings.json`・`CLAUDE.md`・`rules/`・`hooks/`・`scripts/statusline.sh` を `~/.claude/` にリンクする。`~/.claude/hooks/` が実ディレクトリの場合は、削除してからリンクに置き換える。
 - `skills/*/` の個人スキルを `~/.claude/skills/` にリンクする（全プロジェクトで使える）。
@@ -42,9 +50,25 @@ Claude Code の設定を管理するディレクトリ。`setup.sh` で `~/.clau
 
 `settings.json` のセキュリティ設定は、[【2026年最新版】Claude Codeで行うべきセキュリティ設定 10選 - Qiita](https://qiita.com/miruky/items/51db293a7a7d0d277a5d) を参考にしている。
 
-gstack・プラグイン・crit の CLI は、sandbox の外で `claude/scripts/update-skills.sh` を実行してまとめて更新する。通常のターミナルで `/bin/bash ~/dotfiles/claude/scripts/update-skills.sh` を実行する（dotfiles では `mise run claude:update` でもよい。gstack の確認だけなら zsh の `gstack-upgrade --check`）。Claude Code のプロンプトの `!` は、セッションによっては sandbox の中で動く（2026-11-19 に観測）。そのときは更新が失敗し、最後の cc-crit の profile テストも、profile を確かめられないので失敗に数えられる。手順は [SKILL_INVENTORY.md の「更新したときの見直し」](SKILL_INVENTORY.md#upgrade) にある。
+`settings.json` の `permissions.deny` は、pstack のうちモデルから起動できる `setup-pstack` と、使わないエージェント 2 つを止めている。ほかの使わないスキルはモデルから起動できず、deny ではユーザーのスラッシュコマンドを止められないので、方針として使わない。スキルの分類は [pstack の導入の plan](../docs/work/20261114_pstack-skill-routing/plan.md#decisions) にある。
 
-pstack はサードパーティのマーケットプレイスなので自動更新されない。`update-skills.sh` か `claude plugin update pstack@cursor-plugins` で更新し、Claude Code を再起動する前に、hooks が増えていないか、スキルの一覧と依存が変わっていないかを確かめる（`/sync-skill-docs`）。`settings.json` の `permissions.deny` は、モデルから起動できる `setup-pstack` と、使わないエージェント 2 つを止めている。ほかの使わないスキルはモデルから起動できず、deny ではユーザーのスラッシュコマンドを止められないので、方針として使わない。スキルの分類は [pstack の導入の plan](../docs/work/20261114_pstack-skill-routing/plan.md#decisions) にある。
+<a name="setup-update"></a>
+
+### スキル・プラグインのアップデート
+
+gstack・user スコープのプラグイン・crit の CLI は、`claude/scripts/update-skills.sh` でまとめて更新する。`~/.claude` と Homebrew に書くので、sandbox の外（通常のターミナル）で実行する。
+
+```sh
+/bin/bash ~/dotfiles/claude/scripts/update-skills.sh
+```
+
+- dotfiles では `mise run claude:update` でもよい。gstack の新しい版があるかを確かめるだけなら、zsh の `gstack-upgrade --check` を使う。
+- pstack はサードパーティのマーケットプレイスなので自動更新されない。`update-skills.sh` か `claude plugin update pstack@cursor-plugins` で更新する。
+
+> [!WARNING]
+> Claude Code のプロンプトの `!` は、セッションによっては sandbox の中で動く（2026-11-19 に観測）。そのときは更新が失敗し、最後の cc-crit の profile テストも、profile を確かめられないので失敗に数えられる。
+
+更新した hooks とプラグインは、Claude Code を再起動した後のセッションで読み込まれる。再起動する前に、dotfiles の Claude Code で `/sync-skill-docs` を実行し、hooks が増えていないか、スキルの一覧と依存が変わっていないかを確かめる。手順は [SKILL_INVENTORY.md の「更新したときの見直し」](SKILL_INVENTORY.md#upgrade)、流れの早見表は [SKILL_CHEATSHEET.md の「F. スキル・プラグインのアップデート」](SKILL_CHEATSHEET.md#update) にある。
 
 スキルの役割分担は、次の 3 つに分けて書いている。プラグインやスキルを更新したら、棚卸しの「更新したときの見直し」に従って 3 つを直す。
 
