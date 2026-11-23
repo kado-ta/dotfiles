@@ -15,3 +15,31 @@ auto_switch = false
 
 [theme.custom]
 teal = "#89b4fa"
+
+# prefix なしのキーを足す。タブの作成・移動と、ペインの上下左右・直前に戻る・分割・閉じるは cmd+option、
+# ペインを順に移動するのは cmd+ctrl に割り当てる（cmd+option+[ / ] はタブの移動に使っている）。
+# Ghostty は macos-option-as-alt = left のため、左の Option で押す。
+# Ghostty の split 用のキー（cmd+[ / ]、cmd+option+矢印、cmd+ctrl+矢印）とは重ねない。
+[keys]
+# 新しいタブは Ghostty の cmd+t に倣う。
+new_tab = ["prefix+c", "cmd+alt+t"]
+next_tab = ["prefix+n", "cmd+alt+]"]
+previous_tab = ["prefix+p", "cmd+alt+["]
+# 分割は prefix と同じ v（右）と minus（下）にする。Ghostty の cmd+d に倣った cmd+option+d は、
+# macOS の Dock の自動非表示の切り替えに使われているので避ける。
+split_vertical = ["prefix+v", "cmd+alt+v"]
+split_horizontal = ["prefix+minus", "cmd+alt+minus"]
+# 閉じるは prefix と同じ x にする。cmd+option+w は Ghostty がタブを閉じるのに使っている。
+close_pane = ["prefix+x", "cmd+alt+x"]
+# focus_pane_left の cmd+option+h は Ghostty のメニューの「Hide Others」（macOS 標準）が使うので、herdr に届かない。
+# macOS のシステム設定 → キーボード → キーボードショートカット → アプリのショートカットで、
+# Ghostty の「Hide Others」に普段押さないキー （例: ctrl+option+shift+cmd+h） を割り当てて空けている。
+# この設定は dotfiles で管理していないので、新しい Mac では入れ直す。コマンドでは次のとおり。
+#   defaults write com.mitchellh.ghostty NSUserKeyEquivalents -dict-add "Hide Others" '@~^$h'
+focus_pane_left = ["prefix+h", "cmd+alt+h"]
+focus_pane_down = ["prefix+j", "cmd+alt+j"]
+focus_pane_up = ["prefix+k", "cmd+alt+k"]
+focus_pane_right = ["prefix+l", "cmd+alt+l"]
+cycle_pane_next = ["prefix+tab", "cmd+ctrl+]"]
+cycle_pane_previous = ["prefix+shift+tab", "cmd+ctrl+["]
+last_pane = "cmd+alt+o"
