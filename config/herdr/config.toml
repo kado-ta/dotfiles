@@ -1,0 +1,17 @@
+onboarding = false
+
+[ui.toast]
+delivery = "terminal"
+
+[ui]
+status_indicators = "symbols"
+
+[ui.sound]
+enabled = true
+
+[theme]
+name = "catppuccin"
+auto_switch = false
+
+[theme.custom]
+teal = "#89b4fa"

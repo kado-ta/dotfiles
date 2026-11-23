@@ -8,6 +8,7 @@
 | `sheldon/` | Sheldon の設定（Zsh プラグインの定義） | `~/.config/sheldon/plugins.toml` |
 | `uv/` | uv の設定 | `~/.config/uv/uv.toml` |
 | `sf/` | Salesforce CLI のプラグインの一覧と同期スクリプト | `~/.config/sf/` |
+| `herdr/` | herdr の設定 | `~/.config/herdr/config.toml` |
 | `karabiner/` | Karabiner の設定（現在はリンクしていない） | なし |
 
 <a name="sf-plugins"></a>
