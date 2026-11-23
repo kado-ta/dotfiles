@@ -2,7 +2,7 @@
 
 入っているプラグイン・スキル・エージェント・hooks・MCP の一覧と、その状態・制約を書く。スキルの選び方の規則は [rules/SKILL_ROUTING.md](rules/SKILL_ROUTING.md)（毎回読み込まれる）、タスク別の早見表は [SKILL_CHEATSHEET.md](SKILL_CHEATSHEET.md) にある。重複の裁定の根拠は [作業文書](../docs/work/20261116_skill-role-division/research-routing.md) にある。
 
-- 時点: 2026-11-16。Claude Code の版は 2.1.323（2026-11-14 に確認）。各スキルの SKILL.md・設定・hooks の実物を読んで書いた。
+- 時点: 2026-11-16。2026-11-23 に gstack 1.102.2.0 と pstack 0.15.46 への更新を反映した。Claude Code の版は 2.1.330（2026-11-23 に確認）。各スキルの SKILL.md・設定・hooks の実物を読んで書いた。
 - この文書は `~/.claude` にリンクされない。Claude のコンテキストには載らない。
 - プラグインやスキルを更新したら、[更新したときの見直し](#upgrade)に従って直す。
 
@@ -29,10 +29,10 @@
 | 提供元 | 版 | 入れ方・スコープ | スキル | エージェント | hooks | 更新 |
 | --- | --- | --- | --- | --- | --- | --- |
 | superpowers | 7.0.2 | プラグイン（claude-plugins-official）、user | 15 | 0 | SessionStart | `/plugin` |
-| gstack | 1.99.4.0 | `git clone` で `~/.claude/skills/gstack`。プラグインではないので、名前に接頭辞が付かない | 63（有効 25、明示 7、無効 31） | 0 | スキルの frontmatter だけ | `update-skills.sh` か zsh の `gstack-upgrade`（sandbox の外） |
-| pstack | 0.15.42 | プラグイン（cursor-plugins）、user | 58 | 2（deny） | なし | `/plugin`（自動更新 off） |
+| gstack | 1.102.2.0 | `git clone` で `~/.claude/skills/gstack`。プラグインではないので、名前に接頭辞が付かない | 64（有効 25、明示 8、無効 31） | 0 | スキルの frontmatter だけ | `update-skills.sh` か zsh の `gstack-upgrade`（sandbox の外） |
+| pstack | 0.15.46 | プラグイン（cursor-plugins）、user | 58 | 2（deny） | なし | `/plugin`（自動更新 off） |
 | understand-anything | 2.9.8 | プラグイン、user | 9 | 11 | SessionStart、PostToolUse | `/plugin`（自動更新 on） |
-| crit | 1.8.15 | プラグイン、user。CLI は 0.23.3 | 3 | 0 | PermissionRequest | `/plugin` と Homebrew |
+| crit | 1.8.15 | プラグイン、user。CLI は 0.24.0 | 3 | 0 | PermissionRequest | `/plugin` と Homebrew |
 | claude-code-setup | 1.0.0 | プラグイン、user | 1 | 0 | なし | `/plugin` |
 | ruby-lsp | 1.0.0 | プラグイン、user | 0（LSP だけ） | 0 | なし | `/plugin` |
 | 個人スキル | — | dotfiles の `claude/skills/` を `~/.claude/skills/` にリンク | 4 | 0 | なし | dotfiles |
@@ -70,9 +70,11 @@
 
 <a name="gstack"></a>
 
-## gstack（63）
+## gstack（64）
 
 呼び出しは `/<名前>`（接頭辞なし）。`proactive=core` なので、頼まれずに提案するのは `/office-hours`・`/review`・`/qa`（と無効の `/ship`）だけ。`codex_reviews=enabled`。多くのスキルが共通の前処理で `~/.gstack/` に記録を書くが、`~/.gstack/projects` と `~/.gstack/security/cso` 以外は sandbox で書けず、失敗は無視される。
+
+1.102.1.0 から、Claude Code はスキルを読み込むときに SKILL.md の `` !`…` `` の行を実行する。これで `bin/gstack-skill-load` が共通の前処理と開始の処理を動かす。各スキルの `allowed-tools` がこのコマンドを許可している。sandbox の中で動くかは確かめていない。1.100.0.0 から、説明文に「いつ使うか」の節が付いた（Claude が `/review` などを読み込みやすくするため）。
 
 <a name="gstack-enabled"></a>
 
@@ -108,10 +110,11 @@
 
 <a name="gstack-limited"></a>
 
-### 明示だけ（7。`user-invocable-only`）
+### 明示だけ（8。`user-invocable-only`）
 
 | スキル | 機能 | 理由 |
 | --- | --- | --- |
+| `plan-eng-review` | 計画を、アーキテクチャ・データの流れ・境界条件・テスト・性能の観点でレビューし、計画ファイルを直す。`.gstack/tmp/` と `.git/info/exclude` に書き、Web の調査は Aside を使う | 説明文が「機能を作る前に計画するとき」で、`brainstorming`・`writing-plans` と同じ場面に当たる。1.99.5.0 で戻った（2026-11-23） |
 | `document-release` | 差分に合わせて README・CHANGELOG などを直し、commit・`git push`・PR の本文とタイトルの編集まで行う | push と PR 編集が止まる。説明文の一致で自動起動させない（2026-11-16） |
 | `document-generate` | 足りない文書を一から書き、commit・`git push` まで行う | 同上 |
 | `spec` | 曖昧な要望を 5 段階で spec にし、GitHub Issue を作る | Issue 作成が止まる。既定で `git worktree add` と `claude -p` を使う |
@@ -126,7 +129,7 @@
 
 `ios-qa`、`ios-fix`、`ios-design-review`、`ios-sync`、`ios-clean`、`ship`（commit・`git push`・PR 作成）、`land-and-deploy`（PR のマージとデプロイの見守り）、`setup-deploy`、`landing-report`、`modernize`（rebase と `git push --force-with-lease`）、`connect-chrome`、`open-gstack-browser`、`setup-browser-cookies`、`pair-agent`、`scrape`、`skillify`、`autoplan`（CEO・デザイン・DX・エンジニアリングのレビューを続けて流す）、`plan-devex-review`、`devex-review`、`setup-gbrain`、`sync-gbrain`、`ubicloud`、`benchmark-models`、`eval-plan`、`gstack`（ルート）、`_gstack-command`、`plan-tune`、`learn`、`runaway-stopper`、`write-skill`、`design-motion`。
 
-- `/plan-eng-review` と `/investigate` は gstack で廃止された（CHANGELOG）。技術設計のレビューは `/autoplan` に移ったが、`/autoplan` は無効。
+- `/investigate` は gstack で廃止された（CHANGELOG）。技術設計のレビューは、1.99.5.0 で戻ったスキルを[明示だけ](#gstack-limited)で使う。
 
 <a name="cso-sandbox"></a>
 
@@ -287,7 +290,7 @@ sandbox の外で `/cso` を実行すると、保存先に秘密ファイルの�
 | --- | --- | --- | --- |
 | TDD・デバッグ・実装計画 | superpowers | `/pstack:how`・`/pstack:why`（原因が設計の意図に関わるとき） | pstack `tdd` |
 | 何を作るか | `/office-hours` | — | 同じ要件に `brainstorming` を重ねない |
-| 機能の要件・設計 | `brainstorming` → `writing-plans` | `/pstack:architect with checkpoint`（複雑か高リスク） | `/spec`、`/autoplan`（無効） |
+| 機能の要件・設計 | `brainstorming` → `writing-plans` | `/pstack:architect with checkpoint`（複雑か高リスク）、`/plan-eng-review`（明示だけ。計画のレビュー） | `/spec`、`/autoplan`（無効） |
 | 変更の影響 | Claude 自身の読解 | `/pstack:blast-radius`（高リスク） | `understand-diff`（グラフが前提） |
 | 差分のレビュー | `/review` | `/pstack:interrogate`（高リスクで実行による証明が要るとき） | `/code-review`、`requesting-code-review` |
 | 独立したモデルのレビュー | ユーザーが通常の端末で実行する `codex review` | challenge（`codex exec`。セキュリティの境界・設計判断を含む変更） | `/codex`（Bash から拒否される）、`interrogate`・`arena`（Claude 同士） |
@@ -333,7 +336,7 @@ sandbox の外で `/cso` を実行すると、保存先に秘密ファイルの�
 
 | 提供元 | 見ること |
 | --- | --- |
-| gstack（例: 1.99.4.0） | `update-skills.sh` か zsh の `gstack-upgrade` で更新する（`~/.claude/skills` に書くので sandbox の外で）。CHANGELOG で、廃止・追加されたスキルを見る。増えたスキルは `skillOverrides` が `on` のまま入るので、要るかを決める。`skillOverrides` は gstack が管理していない（dotfiles のコミット 02d0add で手で足した）。`/cso` が、読めない秘密ファイルで止まらなくなったかを確かめる（[`/cso` を sandbox で使う](#cso-sandbox)）。直っていれば、一時的に消す手順をやめ、規則で `/cso` を使う場面を決め直す。setup は、`~/.gstack/config.yaml` で on のフックを `claude/settings.json` に絶対パスで登録する（`_gstack_source` の項目）。どちらもこれを `~/` に戻す（setup は `~/` の項目も絶対パスに書き戻すので、更新のたびに要る）。`/gstack-upgrade` で更新したときは、後で通常の端末で `/usr/bin/python3 -B ~/dotfiles/claude/scripts/settings-home-paths.py` を実行する（`claude/settings.json` に書くので、sandbox の中で動いた `!` では失敗する）。timeline-stop-hook と ceo-review-gate は、`claude/setup.sh` のフラグで off にしている。項目が増えていたら、`gstack-config set <キー> off` を実行してから項目を消す（項目だけ消すと、次の setup で戻る） |
+| gstack（例: 1.99.4.0） | `update-skills.sh` か zsh の `gstack-upgrade` で更新する（`~/.claude/skills` に書くので sandbox の外で）。CHANGELOG で、廃止・追加されたスキルを見る。増えたスキルは `skillOverrides` が `on` のまま入るので、要るかを決める。`skillOverrides` は gstack が管理していない（dotfiles のコミット 02d0add で手で足した）。`/cso` が、読めない秘密ファイルで止まらなくなったかを確かめる（[`/cso` を sandbox で使う](#cso-sandbox)）。直っていれば、一時的に消す手順をやめ、規則で `/cso` を使う場面を決め直す。setup は、`~/.gstack/config.yaml` で on のフックを `claude/settings.json` に絶対パスで登録する（`_gstack_source` の項目）。どちらもこれを `~/` に戻す（setup は `~/` の項目も絶対パスに書き戻すので、更新のたびに要る）。`/gstack-upgrade` で更新したときは、後で通常の端末で `/usr/bin/python3 -B ~/dotfiles/claude/scripts/settings-home-paths.py` を実行する（`claude/settings.json` に書くので、sandbox の中で動いた `!` では失敗する）。timeline-stop-hook と ceo-review-gate は、`claude/setup.sh` のフラグで off にしている。1.102.0.0 から既定で on になった `skill_routing`（UserPromptSubmit）・`skill_contracts`（Stop）・`destructive_guard`（PreToolUse の Bash）も off にしている。どれも、そのたびに sandbox の外で bun が動く。setup.sh のフラグが config に保存されるのは setup.sh を実行したときだけで、保存されていないキーは、更新の setup が既定の値で登録する（2026-11-23 に、この 3 つが登録された）。項目が増えていたら、`gstack-config set <キー> off` を実行してから項目を消す（項目だけ消すと、次の setup で戻る） |
 | understand-anything（例: 2.9.8） | 自動更新が on なので、気づかないうちに変わる。hooks は sandbox の外で動く（2026-11-14 に承知のうえで自動更新を選んだ）。hooks が変わったら判断し直す |
 | crit（例: 1.8.15） | プラグインと CLI の版の組み合わせと、`plan-hook` の変化を見る。`update-skills.sh` は CLI の更新と cc-crit の profile テストまで実行する。個別に更新したときは、sandbox の外で `mise run crit:profile-test` を実行する |
 | pstack | [README](README.md) の手順で、hooks・スキルの一覧・依存を見直す。新しいスキルが増えても deny は広がらない |
@@ -355,3 +358,5 @@ sandbox の外で `/cso` を実行すると、保存先に秘密ファイルの�
 - **削除:** 前後で差がなく、提案も使われていない。規則を消し、チートシートとこの文書だけを残す。
 
 `/pstack:` の提案の回数には、スキルの設定を扱うセッション（この文書を作ったセッションなど）で Claude がコマンド名を書いた分も入る。増減は、セッションの一覧と合わせて見る。
+
+後の期間の途中（2026-11-23）で gstack を 1.102.2.0 に更新した。説明文に「いつ使うか」の節が付き（1.100.0.0）、gstack のスキルの起動は、規則とは別の理由でも増えうる。gstack のスキルの増減は、この日の前後に分けて見る。

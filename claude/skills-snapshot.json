@@ -15,7 +15,7 @@
     "understand-anything:tour-builder"
   ],
   "gstack": {
-    "version": "1.99.4.0"
+    "version": "1.102.2.0"
   },
   "plugin_hooks": {
     "crit@crit": [
@@ -49,7 +49,7 @@
       "scopes": [
         "user"
       ],
-      "version": "0.15.42"
+      "version": "0.15.46"
     },
     "ruby-lsp@claude-plugins-official": {
       "enabled": true,
@@ -82,7 +82,7 @@
   },
   "skills": {
     "_gstack-command": {
-      "description": "sha256:aba61a00d517aae9",
+      "description": "sha256:a325317ae7749dc1",
       "dmi": false,
       "hooks": null,
       "override": "off",
@@ -90,7 +90,7 @@
       "user_invocable": true
     },
     "autoplan": {
-      "description": "sha256:370cdae91bbf5635",
+      "description": "sha256:208bbbd5a00be9f6",
       "dmi": false,
       "hooks": "sha256:100661e8a4deef7c",
       "override": "off",
@@ -98,7 +98,7 @@
       "user_invocable": true
     },
     "benchmark": {
-      "description": "sha256:610a8b126d3a0593",
+      "description": "sha256:dce21f2b56c2c439",
       "dmi": false,
       "hooks": null,
       "override": "on",
@@ -106,7 +106,7 @@
       "user_invocable": true
     },
     "benchmark-models": {
-      "description": "sha256:9b5191459085e9c2",
+      "description": "sha256:128c8959ede9cbe6",
       "dmi": false,
       "hooks": null,
       "override": "off",
@@ -114,7 +114,7 @@
       "user_invocable": true
     },
     "browse": {
-      "description": "sha256:babc369ef353983c",
+      "description": "sha256:ff34f439f758ff9b",
       "dmi": false,
       "hooks": null,
       "override": "on",
@@ -122,7 +122,7 @@
       "user_invocable": true
     },
     "canary": {
-      "description": "sha256:6d5612547ffcc772",
+      "description": "sha256:609000f2c4e97884",
       "dmi": false,
       "hooks": null,
       "override": "on",
@@ -130,7 +130,7 @@
       "user_invocable": true
     },
     "careful": {
-      "description": "sha256:116fb49d74fce1d2",
+      "description": "sha256:5a7d5e48d2887962",
       "dmi": false,
       "hooks": "sha256:69f1bd0c590d030f",
       "override": "user-invocable-only",
@@ -154,7 +154,7 @@
       "user_invocable": true
     },
     "codex": {
-      "description": "sha256:29b9d8eb251ac762",
+      "description": "sha256:fe1e26c7cd74cd68",
       "dmi": false,
       "hooks": null,
       "override": "on",
@@ -170,7 +170,7 @@
       "user_invocable": true
     },
     "connect-chrome": {
-      "description": "sha256:00a8fcada5a3693e",
+      "description": "sha256:63fe6cce977a5b6b",
       "dmi": false,
       "hooks": null,
       "override": "off",
@@ -178,7 +178,7 @@
       "user_invocable": true
     },
     "context-restore": {
-      "description": "sha256:d1fd051fc09b9197",
+      "description": "sha256:a4bdae4a4d25b6fa",
       "dmi": false,
       "hooks": null,
       "override": "on",
@@ -186,7 +186,7 @@
       "user_invocable": true
     },
     "context-save": {
-      "description": "sha256:0c60bb556d02f249",
+      "description": "sha256:c4b4eb5cdd768091",
       "dmi": false,
       "hooks": null,
       "override": "on",
@@ -226,7 +226,7 @@
       "user_invocable": true
     },
     "cso": {
-      "description": "sha256:644a35e9e6bc95f6",
+      "description": "sha256:281e49787367e45f",
       "dmi": false,
       "hooks": null,
       "override": "on",
@@ -242,7 +242,7 @@
       "user_invocable": true
     },
     "design-html": {
-      "description": "sha256:33466af2bb48422a",
+      "description": "sha256:c47222328b5f5a94",
       "dmi": false,
       "hooks": null,
       "override": "on",
@@ -250,7 +250,7 @@
       "user_invocable": true
     },
     "design-motion": {
-      "description": "sha256:4b3153b72acb77e8",
+      "description": "sha256:1d307339acf94b67",
       "dmi": false,
       "hooks": null,
       "override": "off",
@@ -258,7 +258,7 @@
       "user_invocable": true
     },
     "design-review": {
-      "description": "sha256:1f49c4734daac75e",
+      "description": "sha256:659a157fae28aaac",
       "dmi": false,
       "hooks": null,
       "override": "on",
@@ -266,7 +266,7 @@
       "user_invocable": true
     },
     "design-shotgun": {
-      "description": "sha256:09d6eccbf731bb1a",
+      "description": "sha256:cf10b4a89e7c26f8",
       "dmi": false,
       "hooks": null,
       "override": "on",
@@ -274,7 +274,7 @@
       "user_invocable": true
     },
     "deslop-shared-libs": {
-      "description": "sha256:631a75240986090a",
+      "description": "sha256:045a93e0291e3674",
       "dmi": false,
       "hooks": null,
       "override": "on",
@@ -282,7 +282,7 @@
       "user_invocable": true
     },
     "devex-review": {
-      "description": "sha256:366a127b59e3e96c",
+      "description": "sha256:0eb9784580ad190f",
       "dmi": false,
       "hooks": null,
       "override": "off",
@@ -290,7 +290,7 @@
       "user_invocable": true
     },
     "diagram": {
-      "description": "sha256:7be1d10455037936",
+      "description": "sha256:b4ea81ed9b23c52d",
       "dmi": false,
       "hooks": null,
       "override": "on",
@@ -298,7 +298,7 @@
       "user_invocable": true
     },
     "document-generate": {
-      "description": "sha256:c1e4f5e00b77a1af",
+      "description": "sha256:047690f3eca44b03",
       "dmi": false,
       "hooks": null,
       "override": "user-invocable-only",
@@ -306,7 +306,7 @@
       "user_invocable": true
     },
     "document-release": {
-      "description": "sha256:7a08bc5340527e60",
+      "description": "sha256:5fd5be4f888ea664",
       "dmi": false,
       "hooks": null,
       "override": "user-invocable-only",
@@ -322,7 +322,7 @@
       "user_invocable": true
     },
     "freeze": {
-      "description": "sha256:5bf34292a87d8af6",
+      "description": "sha256:d45e207a0bfb3d8d",
       "dmi": false,
       "hooks": "sha256:baabde3dbce15610",
       "override": "user-invocable-only",
@@ -330,7 +330,7 @@
       "user_invocable": true
     },
     "gstack": {
-      "description": "sha256:aba61a00d517aae9",
+      "description": "sha256:a325317ae7749dc1",
       "dmi": false,
       "hooks": null,
       "override": "off",
@@ -338,7 +338,7 @@
       "user_invocable": true
     },
     "gstack-upgrade": {
-      "description": "sha256:1c184b00b20cd0f4",
+      "description": "sha256:5966eea32f7e8d2b",
       "dmi": false,
       "hooks": null,
       "override": "on",
@@ -346,7 +346,7 @@
       "user_invocable": true
     },
     "guard": {
-      "description": "sha256:e26d69a9d3627d45",
+      "description": "sha256:f36c03bf70b81d8a",
       "dmi": false,
       "hooks": "sha256:3cea7982471bd8d1",
       "override": "user-invocable-only",
@@ -354,7 +354,7 @@
       "user_invocable": true
     },
     "health": {
-      "description": "sha256:7260f9d9c097a909",
+      "description": "sha256:e71e7acd4d50277b",
       "dmi": false,
       "hooks": null,
       "override": "on",
@@ -362,7 +362,7 @@
       "user_invocable": true
     },
     "ios-clean": {
-      "description": "sha256:1a4ddcdf8c47b573",
+      "description": "sha256:5f7313dd5fb35d2f",
       "dmi": false,
       "hooks": null,
       "override": "off",
@@ -370,7 +370,7 @@
       "user_invocable": true
     },
     "ios-design-review": {
-      "description": "sha256:5543e014b4afb24c",
+      "description": "sha256:5bbcf7610467f0d6",
       "dmi": false,
       "hooks": null,
       "override": "off",
@@ -378,7 +378,7 @@
       "user_invocable": true
     },
     "ios-fix": {
-      "description": "sha256:4d503ac9efea177c",
+      "description": "sha256:0d2282f38483049b",
       "dmi": false,
       "hooks": null,
       "override": "off",
@@ -386,7 +386,7 @@
       "user_invocable": true
     },
     "ios-qa": {
-      "description": "sha256:a9e2a18b50827e1a",
+      "description": "sha256:a4864948814d1adf",
       "dmi": false,
       "hooks": null,
       "override": "off",
@@ -394,7 +394,7 @@
       "user_invocable": true
     },
     "ios-sync": {
-      "description": "sha256:2d78486469f68c2a",
+      "description": "sha256:52306480f6ff0e34",
       "dmi": false,
       "hooks": null,
       "override": "off",
@@ -402,7 +402,7 @@
       "user_invocable": true
     },
     "land-and-deploy": {
-      "description": "sha256:def22022ed06b6bd",
+      "description": "sha256:a67806f4bf8c848f",
       "dmi": true,
       "hooks": null,
       "override": "off",
@@ -410,7 +410,7 @@
       "user_invocable": true
     },
     "landing-report": {
-      "description": "sha256:fd4d197405b9141d",
+      "description": "sha256:2feb11c4d15baa79",
       "dmi": false,
       "hooks": null,
       "override": "off",
@@ -418,7 +418,7 @@
       "user_invocable": true
     },
     "learn": {
-      "description": "sha256:ea69aeaba1341e76",
+      "description": "sha256:3a2d60076fb23bc1",
       "dmi": false,
       "hooks": null,
       "override": "off",
@@ -426,7 +426,7 @@
       "user_invocable": true
     },
     "make-pdf": {
-      "description": "sha256:17d7cbe13f70bf36",
+      "description": "sha256:30995b5e98f9f04f",
       "dmi": false,
       "hooks": null,
       "override": "on",
@@ -434,7 +434,7 @@
       "user_invocable": true
     },
     "modernize": {
-      "description": "sha256:b3a7d685801a090f",
+      "description": "sha256:0af712620c26e5a0",
       "dmi": true,
       "hooks": null,
       "override": "off",
@@ -442,7 +442,7 @@
       "user_invocable": true
     },
     "office-hours": {
-      "description": "sha256:0aec7e20d10e6b5a",
+      "description": "sha256:33d38d115f39722b",
       "dmi": false,
       "hooks": null,
       "override": "on",
@@ -450,7 +450,7 @@
       "user_invocable": true
     },
     "open-gstack-browser": {
-      "description": "sha256:00a8fcada5a3693e",
+      "description": "sha256:63fe6cce977a5b6b",
       "dmi": false,
       "hooks": null,
       "override": "off",
@@ -458,7 +458,7 @@
       "user_invocable": true
     },
     "pair-agent": {
-      "description": "sha256:c62815e591cc5717",
+      "description": "sha256:73d7e8bdee906e73",
       "dmi": false,
       "hooks": null,
       "override": "off",
@@ -466,7 +466,7 @@
       "user_invocable": true
     },
     "plan-ceo-review": {
-      "description": "sha256:80597ff24a8a47c1",
+      "description": "sha256:ffced441440d0d44",
       "dmi": false,
       "hooks": "sha256:ba37f92750a3cd2c",
       "override": "on",
@@ -474,7 +474,7 @@
       "user_invocable": true
     },
     "plan-design-review": {
-      "description": "sha256:b682b9d4871e22de",
+      "description": "sha256:a6adb9b631202902",
       "dmi": false,
       "hooks": null,
       "override": "on",
@@ -482,15 +482,23 @@
       "user_invocable": true
     },
     "plan-devex-review": {
-      "description": "sha256:c3a22ad033299c5f",
+      "description": "sha256:0310dcd3034fc564",
       "dmi": false,
       "hooks": null,
       "override": "off",
       "provider": "gstack",
       "user_invocable": true
     },
+    "plan-eng-review": {
+      "description": "sha256:97b8b4a999ef6774",
+      "dmi": false,
+      "hooks": null,
+      "override": "user-invocable-only",
+      "provider": "gstack",
+      "user_invocable": true
+    },
     "plan-tune": {
-      "description": "sha256:e8c65c3f661cafa6",
+      "description": "sha256:81fad45d3aaa62b3",
       "dmi": false,
       "hooks": null,
       "override": "off",
@@ -866,7 +874,7 @@
       "user_invocable": true
     },
     "pstack:reflect": {
-      "description": "sha256:3a49c77517034bb5",
+      "description": "sha256:ed38a40c4297bf14",
       "dmi": true,
       "hooks": null,
       "override": null,
@@ -962,7 +970,7 @@
       "user_invocable": true
     },
     "qa": {
-      "description": "sha256:2d1a7f49357bda60",
+      "description": "sha256:e9203458deac3f34",
       "dmi": false,
       "hooks": null,
       "override": "on",
@@ -970,7 +978,7 @@
       "user_invocable": true
     },
     "qa-only": {
-      "description": "sha256:4ba0055a3325eb80",
+      "description": "sha256:457f8c1d86fd63b5",
       "dmi": false,
       "hooks": null,
       "override": "on",
@@ -978,7 +986,7 @@
       "user_invocable": true
     },
     "retro": {
-      "description": "sha256:6e7c63da18a996ea",
+      "description": "sha256:92ea98595f6063cd",
       "dmi": false,
       "hooks": null,
       "override": "on",
@@ -986,7 +994,7 @@
       "user_invocable": true
     },
     "review": {
-      "description": "sha256:6b24c922897b3de5",
+      "description": "sha256:0d3a172d7880482f",
       "dmi": false,
       "hooks": null,
       "override": "on",
@@ -994,7 +1002,7 @@
       "user_invocable": true
     },
     "runaway-stopper": {
-      "description": "sha256:53993931d939b8a8",
+      "description": "sha256:620c12309c0667ed",
       "dmi": false,
       "hooks": null,
       "override": "off",
@@ -1010,7 +1018,7 @@
       "user_invocable": true
     },
     "scrape": {
-      "description": "sha256:45b85f0831943f77",
+      "description": "sha256:f417d2d0ca7bb0b5",
       "dmi": false,
       "hooks": null,
       "override": "off",
@@ -1018,7 +1026,7 @@
       "user_invocable": true
     },
     "setup-browser-cookies": {
-      "description": "sha256:9ce52c73ab546439",
+      "description": "sha256:8aa6200947d1e197",
       "dmi": false,
       "hooks": null,
       "override": "off",
@@ -1026,7 +1034,7 @@
       "user_invocable": true
     },
     "setup-deploy": {
-      "description": "sha256:de4128325e41fce6",
+      "description": "sha256:b52c1a4434e33a77",
       "dmi": false,
       "hooks": null,
       "override": "off",
@@ -1034,7 +1042,7 @@
       "user_invocable": true
     },
     "setup-gbrain": {
-      "description": "sha256:1b2692837b523665",
+      "description": "sha256:c1bdbc036a0c0b00",
       "dmi": false,
       "hooks": null,
       "override": "off",
@@ -1042,7 +1050,7 @@
       "user_invocable": true
     },
     "ship": {
-      "description": "sha256:56a4b49e9bdc59c6",
+      "description": "sha256:97e3e5951b7172f7",
       "dmi": false,
       "hooks": null,
       "override": "off",
@@ -1050,7 +1058,7 @@
       "user_invocable": true
     },
     "skillify": {
-      "description": "sha256:caf39fdd3f44c634",
+      "description": "sha256:8c4e02a1bd408cb8",
       "dmi": false,
       "hooks": null,
       "override": "off",
@@ -1058,7 +1066,7 @@
       "user_invocable": true
     },
     "spec": {
-      "description": "sha256:7f48124193b5a616",
+      "description": "sha256:12ead099ad73756e",
       "dmi": false,
       "hooks": null,
       "override": "user-invocable-only",
@@ -1186,7 +1194,7 @@
       "user_invocable": true
     },
     "sync-gbrain": {
-      "description": "sha256:07cc4bd040d5f9e8",
+      "description": "sha256:a9929434438588d6",
       "dmi": false,
       "hooks": null,
       "override": "off",
@@ -1202,7 +1210,7 @@
       "user_invocable": true
     },
     "test-audit": {
-      "description": "sha256:84c44092dbbbeb22",
+      "description": "sha256:c0d9f87de07fe632",
       "dmi": false,
       "hooks": null,
       "override": "on",
@@ -1210,7 +1218,7 @@
       "user_invocable": true
     },
     "ubicloud": {
-      "description": "sha256:e8d3c7573bebad34",
+      "description": "sha256:a429a7294b589554",
       "dmi": false,
       "hooks": null,
       "override": "off",
@@ -1290,7 +1298,7 @@
       "user_invocable": true
     },
     "unfreeze": {
-      "description": "sha256:b3d89d6c4f18932c",
+      "description": "sha256:24292398fcd6a1da",
       "dmi": false,
       "hooks": null,
       "override": "user-invocable-only",
@@ -1298,7 +1306,7 @@
       "user_invocable": true
     },
     "verify": {
-      "description": "sha256:5f2f0ad62f7af374",
+      "description": "sha256:6a3371be1884eea1",
       "dmi": false,
       "hooks": null,
       "override": "on",
@@ -1306,7 +1314,7 @@
       "user_invocable": true
     },
     "write-skill": {
-      "description": "sha256:9285cbe1d41bdc70",
+      "description": "sha256:9d8597df063829bc",
       "dmi": false,
       "hooks": null,
       "override": "off",

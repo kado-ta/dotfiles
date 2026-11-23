@@ -65,6 +65,7 @@
 | | `/qa`・`/qa-only`・`/browse` | 動作確認（`/qa` は修正ごとに commit） | 自動 |
 | | `/office-hours` | 何を作るかを決める | 自動 |
 | | `/plan-ceo-review`・`/plan-design-review` | 計画をスコープ・デザインの観点でレビューする | 自動 |
+| | `/plan-eng-review` | 計画をアーキテクチャ・テストの観点でレビューする | 明示 |
 | | `/context-save`・`/context-restore` | 作業状態の保存と再開 | 自動 |
 | | `/careful`・`/freeze <dir>` | 危険なコマンドの警告、編集範囲の制限 | 明示 |
 | | `/document-release`・`/document-generate`・`/spec` | 文書の更新・作成、Issue 化（push・Issue 作成は止まる） | 明示 |
@@ -87,7 +88,7 @@
 | 組み合わせ | 使い分け | 併用 |
 | --- | --- | --- |
 | superpowers と pstack | TDD・デバッグ・計画は superpowers。pstack の `tdd` は使わない。pstack は `how`・`why`（理解）と `architect`・`blast-radius`・`interrogate`（高リスクの設計と検証）だけ | 高リスクで、superpowers の計画に `/pstack:blast-radius` の影響調査を足す |
-| gstack と pstack | gstack に技術設計のスキルはない（`/plan-eng-review` は廃止、`/autoplan` は無効）。技術設計は superpowers と pstack。差分のレビューは gstack の `/review` | `/review` の後に `/pstack:interrogate`（高リスクだけ） |
+| gstack と pstack | gstack の技術設計のスキルは、計画をレビューする `/plan-eng-review`（明示だけ）だけ（`/autoplan` は無効）。技術設計は superpowers と pstack。差分のレビューは gstack の `/review` | `/review` の後に `/pstack:interrogate`（高リスクだけ） |
 | understand-anything と pstack | understand-anything はリポジトリ全体のグラフを作って何度も使う。`/pstack:how` は 1 つの領域を 1 回説明する | 同じ質問に両方は使わない |
 | crit と gstack | `/crit-review` は人間の承認で、CLAUDE.md が必須と定めている。gstack の `/plan-ceo-review`・`/office-hours` は AI の計画レビューで、任意 | AI のレビューを先に済ませてから `/crit-review` |
 | gstack `/review` と pstack `interrogate` | `/review` は専門家の観点で広く見て直す。`interrogate` は壊せるかを実行で示し、直さない | 高リスクで、`/review` の後に実行で確かめたい不変条件が残るとき |
