@@ -789,6 +789,63 @@ class WriteSkillsRollbackTest(unittest.TestCase):
         self.assertEqual(kept[0].read_text(encoding="utf-8"), "old modern-web-guidance\n")
 
 
+class ApplySkillsAndPinTest(unittest.TestCase):
+    """スキルと mise の版は、両方そろって書けたときだけ残す。途中で止まったら、両方とも元に戻す。"""
+
+    def setUp(self):
+        spec = importlib.util.spec_from_file_location("update_mwg", SCRIPTS / SCRIPT_NAME)
+        self.module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(self.module)
+        self.root = Path(tempfile.mkdtemp()).resolve()
+        self.addCleanup(shutil.rmtree, self.root)
+        self.skills_dir = self.root / "skills"
+        for name in ("modern-web-guidance", "chrome-extensions"):
+            (self.skills_dir / name).mkdir(parents=True)
+            (self.skills_dir / name / "SKILL.md").write_text(f"old {name}\n", encoding="utf-8")
+        self.config = self.root / "mise" / "mise_config.toml"
+        self.config.parent.mkdir()
+        self.config.write_text(MISE_CONFIG, encoding="utf-8")
+        self.new_pin = MISE_CONFIG.replace('"1.0.1"', '"1.0.2"')
+        self.skills = {name: {"SKILL.md": f"new {name}\n".encode()}
+                       for name in ("modern-web-guidance", "chrome-extensions")}
+
+    def apply(self, replace=None):
+        patches = [mock.patch.object(self.module, "MISE_CONFIG", self.config),
+                   mock.patch.object(self.module, "SKILLS_DIR", self.skills_dir)]
+        if replace is not None:
+            patches.append(mock.patch.object(self.module.os, "replace", side_effect=replace))
+        for patch in patches:
+            patch.start()
+            self.addCleanup(patch.stop)
+        self.module.apply_skills_and_pin(self.skills, self.new_pin)
+
+    def skill_texts(self):
+        return {name: (self.skills_dir / name / "SKILL.md").read_text(encoding="utf-8")
+                for name in ("modern-web-guidance", "chrome-extensions")}
+
+    def test_success_writes_both(self):
+        self.apply()
+        self.assertEqual(self.config.read_text(encoding="utf-8"), self.new_pin)
+        self.assertEqual(self.skill_texts(), {name: f"new {name}\n" for name in self.skills})
+
+    def test_interrupt_right_after_pin_replaced_restores_both(self):
+        # 版の置き換えが済んだ直後（then から戻る前）に止まっても、版も元に戻す（Codex のレビュー）。
+        # 版だけ新しいまま残ると、次の --apply が「最新」で終わり、スキルが直らない。
+        real_replace = os.replace
+
+        def replace(src, dst):
+            real_replace(src, dst)
+            if Path(dst) == self.config and self.config.read_text(encoding="utf-8") == self.new_pin:
+                raise KeyboardInterrupt()
+
+        with self.assertRaises(KeyboardInterrupt):
+            self.apply(replace)
+        self.assertEqual(self.config.read_text(encoding="utf-8"), MISE_CONFIG)
+        self.assertEqual(self.skill_texts(), {name: f"old {name}\n" for name in self.skills})
+        self.assertEqual(sorted(p.name for p in self.config.parent.iterdir()), ["mise_config.toml"])
+        self.assertEqual(sorted(p.name for p in self.skills_dir.iterdir()), ["chrome-extensions", "modern-web-guidance"])
+
+
 class WritePinTest(unittest.TestCase):
     """mise の版の書き込みが、一時ファイルを作った後で失敗しても、一時ファイルを残さない。"""
 

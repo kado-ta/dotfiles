@@ -330,10 +330,11 @@ def build_skills(package, version):
     }
 
 
-def write_skills(skills, dest, then=None):
+def write_skills(skills, dest, then=None, undo=None):
     """一時ディレクトリに組み立ててから入れ替える。上流でなくなったファイルは残らない。
 
-    入れ替えの後に then を呼ぶ（mise の版の書き込み）。入れ替えか then が失敗したら（Ctrl-C を含む）、元に戻す。
+    入れ替えの後に then を呼ぶ（mise の版の書き込み）。入れ替えか then が失敗したら（Ctrl-C を含む）、undo を呼んで
+    then の結果を戻し（then が済んでいてもいなくても呼ぶ）、スキルも元に戻す。
     戻すかどうかは、記録ではなくディスクの状態で決める（新しい版を置いた直後に止まっても戻せるように）。
     前になかったスキルは消す。戻すのにも失敗したら、旧版の写しを一時ディレクトリに残して、その場所を表示する。
     """
@@ -359,6 +360,8 @@ def write_skills(skills, dest, then=None):
                 then()
         except BaseException:
             try:
+                if undo is not None:
+                    undo()
                 for name in skills:
                     new, old = staging / "new" / name, staging / "old" / name
                     # 新しい版が一時ディレクトリにないなら、置いた後なので、置いた場所から戻す。
@@ -415,6 +418,21 @@ def scan(dest, tmp):
             print(f"skillspector: {name} の結果を読めなかった。skillspector scan {dest / name} --no-llm で確かめる")
 
 
+def apply_skills_and_pin(skills, pin_text):
+    """スキルを入れ替え、mise の版を書く。両方そろって書けたときだけ残す。
+
+    途中で止まったら（版の置き換えの直後の Ctrl-C を含む）、スキルと一緒に版も元の中身に戻す。
+    版だけ新しいまま残ると、次の --apply が「最新」で終わり、スキルが直らないため。
+    """
+    old_pin = MISE_CONFIG.read_text(encoding="utf-8")
+
+    def undo():
+        if MISE_CONFIG.read_text(encoding="utf-8") != old_pin:
+            write_pin(old_pin)
+
+    write_skills(skills, SKILLS_DIR, then=lambda: write_pin(pin_text), undo=undo)
+
+
 def print_restore():
     print("取り込まないときは、次の 2 つで戻す（作業ツリーは共有なので、パスを付けて実行する）:")
     print(f"  git -C {REPO} restore --source=HEAD --staged --worktree -- {' '.join(TARGET_PATHS)}")
@@ -458,7 +476,7 @@ def main(argv=None):
             # 書き始める前に、検証と組み立てをすべて終える。スキルと mise の版は、両方そろって書けたときだけ残す。
             pin_text = bumped_pin(version)
             try:
-                write_skills(skills, SKILLS_DIR, then=lambda: write_pin(pin_text))
+                apply_skills_and_pin(skills, pin_text)
             except (OSError, Failure) as e:
                 print(f"{PACKAGE}: 書き込みに失敗したので、元に戻した（戻せなかったときは、その旨を上に表示した）: {e}",
                       file=sys.stderr)
