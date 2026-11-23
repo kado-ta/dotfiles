@@ -5,7 +5,7 @@ created: 2026-11-23
 
 # git の rerere を止め、mise の信頼の経路を check-repo.py で確かめる
 
-中止した cc-checkout-guard の作業（`bb73bb8`。push していない）から、ガードがなくても独立して効く守りだけを入れる。範囲は rerere と mise の 2 つ（2026-11-23、人間の判断）。
+中止した cc-checkout-guard の作業（`bb73bb8`。GitHub のブランチ `archive/git-route-writes`）から、ガードがなくても独立して効く守りだけを入れる。範囲は rerere と mise の 2 つ（2026-11-23、人間の判断）。
 
 関連: [Issue #75](https://github.com/kado-ta/dotfiles/issues/75)（design の非目標「前の作業の小さな項目」）、[docs/work/20261116_sandbox-path-gaps/design.md](../20261116_sandbox-path-gaps/design.md)（paranoid の経緯）
 
