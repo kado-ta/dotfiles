@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: done
 created: 2026-11-24
 ---
 
@@ -16,6 +16,7 @@ created: 2026-11-24
 | Claude Code の sandbox | `bash claude/hooks/tests/test-check-vault-note.sh` | pass=27 fail=0 skip=1（Seatbelt の中の確認はスキップ） |
 | ユーザーのターミナル | `CHECK_VAULT_NOTE_SEATBELT_REQUIRED=1 bash claude/hooks/tests/test-check-vault-note.sh` | pass=44 fail=0 skip=0 |
 | Claude Code の sandbox | 既存のフックの試験 7 本、`check-repo.py`、`test-check-repo.py`、shellcheck、`actionlint` | すべて通過 |
+| GitHub Actions（PR #102） | Hook regression tests（`CHECK_VAULT_NOTE_SEATBELT_REQUIRED=1`）と Repository checks | `090be95`・`f2aba31`（`26d2832` を含む）・`a4d0d11` で通過 |
 
 足した試験（どこでも動く）:
 
@@ -50,7 +51,7 @@ Vault 以外のプロジェクトで点検スクリプトがない場合（Comma
 | --- | --- | --- | --- |
 | 1 | [P2] 入れ子のリストの中で、行頭から 4 文字以上字下げしたフェンスを認識しない。コード例の `[[example]]` を Wikilink と誤報する | 再現した（写しは exit 1）。Vault の新しい版（SHA-256 `24b70d52…`）では exit 0 | 採用。Vault 側で直った版を写しに取り込む |
 | 2 | [P2] `[ガイド](guide(v2).md)` のように、リンク先に対応の取れた丸括弧があると、`guide(v2` を探してリンク切れを誤報する | 写しと Vault の新しい版の両方で再現した（`リンク先 guide(v2 がない`） | 採用。Vault 側で直した版を写しに取り込む（[2 回目の更新](#copy-update-2)） |
-| 3 | [P3] 出力の `- # …` は、Markdown ではリストの中の見出しになる。Vault 直下の `# Draft.md` のような名前で起きる | コードで確かめた | 不採用（提案）。出力は、描画されない文字列として Claude に届く。`- ` は、引用した行が出力の構造の外に見えないように付けている。見出しの文と合わせて、行が点検の出力の一部だと分かる |
+| 3 | [P3] 出力の `- # …` は、Markdown ではリストの中の見出しになる。Vault 直下の `# Draft.md` のような名前で起きる | コードで確かめた | 不採用（ユーザーが 2026-11-24 に決めた）。出力は、描画されない文字列として Claude に届く。行頭に来るのはファイル名だけで、起きるのは Vault の直下の `#` で始まる名前のノートだけ。`- ` は、引用した行が出力の構造の外に見えないように付けている。見出しの文と合わせて、行が点検の出力の一部だと分かる |
 | 4 | [P3] 見出しが `Topic`・`Topic-1`・`Topic` の順だと、3 つ目にも `topic-1` を割り当て、有効な `#topic-2` へのリンクを誤報する | 写しと Vault の新しい版の両方で再現した（`リンク先のアンカー #topic-2 がない`） | 採用。Vault 側で直した版を写しに取り込む（[2 回目の更新](#copy-update-2)） |
 
 再現に使ったノートは、一時ディレクトリに作った（コミットしていない）。点検スクリプトは `/usr/bin/python3 -I -B` で直接実行した。
