@@ -236,6 +236,26 @@ ln -sf "$T/a/b/check_note.py" "$CHECKER"
 run "$T/note.json"
 refused 'Vault checker that is a link to an identical file elsewhere' 'symlink'
 
+# In the Vault, a missing checker is reported (it can vanish, or not be synced to this machine),
+# while other projects without a checker stay silent (the cases above).
+install 0
+rm -f "$CHECKER"
+run "$T/note.json"
+refused 'Vault without the checker' 'syncUnderscoreItems'
+mkdir "$CHECKER"
+run "$T/note.json"
+refused 'Vault checker that is a directory' 'syncUnderscoreItems'
+rmdir "$CHECKER"
+run "$T/note.json" DEVELOPER_DIR="$T/nodev"
+refused 'Vault without the checker on a Mac without the Command Line Tools' 'xcode-select --install'
+head -c 300000 /dev/zero | (cd "$V" && env CLAUDE_PROJECT_DIR="$V" HOME="$TEST_HOME" "$BASH" "$HOOK" >/dev/null 2>&1)
+codes=("${PIPESTATUS[@]}")
+if [ "${codes[0]}" = 0 ]; then
+  ok 'large input is read to the end (Vault without the checker)'
+else
+  ng "[want writer 0, got ${codes[0]}] large input is read to the end (Vault without the checker)"
+fi
+
 # A profile that sandbox-exec cannot use stops the check with exit 2 instead of passing silently.
 install 0
 cp "$HOOK" "$H/check-vault-note.py" "$T/badhooks/"

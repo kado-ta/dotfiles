@@ -18,8 +18,13 @@ skip() {
 project=${CLAUDE_PROJECT_DIR:-}
 [ -n "$project" ] || skip
 project=${project%/}
-# Vault 以外のプロジェクトでは Python を起動しない。
-[ -f "$project/_System/Scripts/check_note.py" ] || skip
+# 点検スクリプトがないプロジェクトでは Python を起動しない。ただし Vault（$HOME/Obsidian/main）では、点検スクリプトが
+# ないこと（消えた、または Remotely Save で届いていない）を Python の段で知らせる。Vault かどうかの正式な判定は Python の段で行う。
+if [ ! -f "$project/_System/Scripts/check_note.py" ]; then
+  real_project=$(cd -P -- "$project" 2>/dev/null && pwd) || skip
+  real_vault=$(cd -P -- "${HOME:-/nonexistent}/Obsidian/main" 2>/dev/null && pwd) || skip
+  [ "$real_project" = "$real_vault" ] || skip
+fi
 
 # Command Line Tools がないと python3 は動かず、/usr/bin/python3 を呼ぶと導入を促すダイアログが出るので、先に確かめる。
 # /usr/bin/python3（xcrun の shim）は /private/var/folders のキャッシュを使い、Seatbelt の中では読めないので、

@@ -128,7 +128,7 @@ PR と main への push では、GitHub Actions が macOS の `/bin/bash` と `/
 
 ### Vault のノートの点検
 
-`hooks/check-vault-note.sh` は、Obsidian Vault（`~/Obsidian/main`。Claude Code のプロジェクトの realpath がこれと同じときだけ）のノートを点検する。Vault の点検スクリプト `_System/Scripts/check_note.py` の代わりに、dotfiles にあるレビュー済みの写し `hooks/vault/check_note.py` を実行する。Vault の点検スクリプトは sandbox から書ける場所にあるので、実行せず、写しと同じかを比べるだけにする。違うとき、または点検スクリプトが symlink のとき（点検スクリプトが決める Vault のルートがずれる）は点検せず、そのことを Claude に伝える。写しは公開されていて、どのプロジェクトにも置けるので、点検スクリプトがあるだけのプロジェクトでは動かさない。
+`hooks/check-vault-note.sh` は、Obsidian Vault（`~/Obsidian/main`。Claude Code のプロジェクトの realpath がこれと同じときだけ）のノートを点検する。Vault の点検スクリプト `_System/Scripts/check_note.py` の代わりに、dotfiles にあるレビュー済みの写し `hooks/vault/check_note.py` を実行する。Vault の点検スクリプトは sandbox から書ける場所にあるので、実行せず、写しと同じかを比べるだけにする。違うとき、点検スクリプトが symlink のとき（点検スクリプトが決める Vault のルートがずれる）、点検スクリプトがない（または通常のファイルでない）ときは点検せず、そのことを Claude に伝える。点検スクリプトがないことを知らせるのは Vault だけで、ほかのプロジェクトでは何もしない。写しは公開されていて、どのプロジェクトにも置けるので、点検スクリプトがあるだけのプロジェクトでは動かさない。
 
 フックは sandbox の外で動く。点検スクリプトは、symlink を通して Vault の外のファイルも読みうるので、写しは Seatbelt（`hooks/check-vault-note.sb`）の中で動かす。読み込みは既定で拒否し、Python の起動に要るシステムの場所と、Vault の中の `.md` だけを許す（`secrets/`・`credentials/`・`id_rsa*` など、ユーザー設定の Read の deny が名前で拒否するものは `.md` でも許さない）。書き込み・ネットワーク・python3 以外のプログラムの起動・fork・サービスへの接続（mach）・Apple Events も拒否する。比べることと Seatbelt の起動は `hooks/check-vault-note.py` が行い、25 秒で点検を止める。Python は `-I -B -S` で動かす。
 
@@ -136,7 +136,7 @@ PR と main への push では、GitHub Actions が macOS の `/bin/bash` と `/
 
 Vault の `.claude/` は Remotely Save で同期されないので、フックは dotfiles に置く。Vault のプロジェクトの設定に点検のフックを登録しない（sandbox の外で Vault の点検スクリプトを動かすことと、二重の実行になる）。
 
-別の端末には、写しは dotfiles の `git pull` で、Vault の点検スクリプト（とタグの辞書 `_System/Tags.md`）は Remotely Save の同期で、別々に届く。Remotely Save は、`_` で始まるファイル・フォルダを、設定の `syncUnderscoreItems` がオンのときだけ同期する（0.5.25 の既定はオフ）。オフの端末では点検スクリプトが届かず、フックは何もしない。片方だけが新しい間は、Vault のノートを編集するたびに、フックが「写しと違う」と知らせる。
+別の端末には、写しは dotfiles の `git pull` で、Vault の点検スクリプト（とタグの辞書 `_System/Tags.md`）は Remotely Save の同期で、別々に届く。Remotely Save は、`_` で始まるファイル・フォルダを、設定の `syncUnderscoreItems` がオンのときだけ同期する（0.5.25 の既定はオフ）。オフの端末では点検スクリプトが届かず、フックは、Vault のノートを編集するたびに、点検スクリプトがないため点検しないと知らせる。片方だけが新しい間は、Vault のノートを編集するたびに、フックが「写しと違う」と知らせる。
 
 点検スクリプトを変えたら、通常のターミナルで dotfiles のルートに移動して、次の順に写しを更新する。まず、sandbox から書けない一時ディレクトリに写して、今の写しとの差分をレビューする。問題がなければ、その写しで置き換えてコミットする。Vault の点検スクリプトを直接写しの場所に `cp` しない（写した時点で Vault の版と一致し、レビューの前に Vault のセッションで実行されうる）。更新するまでは、Vault のノートを編集するたびに、フックが「写しと違う」と Claude に伝えて点検しない。
 

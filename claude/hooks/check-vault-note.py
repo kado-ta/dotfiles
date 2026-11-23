@@ -23,6 +23,10 @@ HERE = os.path.dirname(os.path.realpath(__file__))
 COPY = os.path.join(HERE, "vault", "check_note.py")
 PROFILE = os.path.join(HERE, "check-vault-note.sb")
 COPY_NAME = "claude/hooks/vault/check_note.py"
+MISSING = (
+    "Vault の点検スクリプト（_System/Scripts/check_note.py）がないか、通常のファイルでないため点検しない。"
+    "ユーザーに、点検スクリプトが消えていないかと、Remotely Save の syncUnderscoreItems がオンかを確かめるよう頼む。"
+)
 # 点検するのは $HOME の下のこの Vault だけ。写しは公開されていて、どのプロジェクトにも置けるので、
 # 点検スクリプトがあるだけでは動かさない。
 VAULT_UNDER_HOME = os.path.join("Obsidian", "main")
@@ -62,6 +66,10 @@ def outside(project, python):
     vault_real = os.path.realpath(project)
     if not home or vault_real != os.path.realpath(os.path.join(home, VAULT_UNDER_HOME)):
         return 0
+    # 点検スクリプトが消えたときや、Remotely Save で届いていない端末で、黙って点検しないままにならないよう知らせる。
+    # 通常のファイルか先に確かめるのは、FIFO などを開いて止まらないようにするため。
+    if not os.path.isfile(checker_path(project)):
+        fail(MISSING)
     # 点検スクリプトは __file__ を resolve() して Vault のルートを決めるので、Vault の点検スクリプト（や _System・Scripts）が
     # 別の場所への symlink だと、ルートがずれて、すべてのノートを「Vault の外」として黙って点検しなくなる。
     if os.path.realpath(checker_path(project)) != checker_path(vault_real):
@@ -75,6 +83,8 @@ def outside(project, python):
         with open(checker_path(project), "rb") as f:
             # 写しより長ければ違うと分かるので、それ以上は読まない。中身は出さない。
             vault = f.read(len(copy) + 1)
+    except FileNotFoundError:
+        fail(MISSING)  # 上の確かめの後に消えた
     except OSError:
         vault = None
     if vault != copy:
