@@ -32,6 +32,6 @@ if [ -z "$dev" ] || [ ! -x "$python" ]; then
 fi
 
 # -I: スクリプトのフォルダとカレントディレクトリを sys.path に入れず、PYTHON* の環境変数を読まない。
-# -B: __pycache__ を書かない。点検スクリプトの stdout も Claude に届くよう stderr に出す。
-"$python" -I -B "$(/usr/bin/dirname -- "$0")/check-vault-note.py" "$project" "$python" 1>&2 || exit 2
+# -B: __pycache__ を書かない。-S: site を読み込まない。点検スクリプトの stdout も Claude に届くよう stderr に出す。
+"$python" -I -B -S "$(/usr/bin/dirname -- "$0")/check-vault-note.py" "$project" "$python" 1>&2 || exit 2
 exit 0

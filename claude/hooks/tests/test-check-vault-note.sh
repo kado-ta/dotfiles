@@ -16,9 +16,11 @@ T=$(mktemp -d "${TMPDIR:-/tmp}/test-check-vault-note.XXXXXX") || {
   exit 1
 }
 HOME_FILE=""
+SHARED_FILE=""
 cleanup() {
   chmod 755 "$T/readonly" 2>/dev/null
   [ -n "$HOME_FILE" ] && rm -f "$HOME_FILE"
+  [ -n "$SHARED_FILE" ] && rm -f "$SHARED_FILE"
   rm -rf "$T"
 }
 trap cleanup EXIT
@@ -53,10 +55,12 @@ CHECKER="$SCRIPTS/check_note.py"
 NOTE="$V/notes/a.md"
 OTHER="$T/other"
 mkdir -p "$SCRIPTS" "$V/notes" "$T/elsewhere" "$V-other" "$T/plain/notes" "$T/nodev" "$T/outside" "$T/a/b" \
-  "$OTHER/_System/Scripts" "$OTHER/notes" "$T/pp"
+  "$OTHER/_System/Scripts" "$OTHER/notes" "$T/pp" "$V/secrets" "$V/keys" "$T/badhooks/vault"
 printf '# INSIDE-MARKER\n' >"$NOTE"
 printf 'a\n' >"$V/notes/a.txt"
 printf 'VAULT-TXT-SECRET\n' >"$V/notes/secret.txt"
+printf '# VAULT-SECRETS-MD\n' >"$V/secrets/s.md"
+printf '# VAULT-KEY-MD\n' >"$V/keys/id_rsa.md"
 printf '# a\n' >"$T/elsewhere/a.md"
 printf '# a\n' >"$V-other/a.md"
 printf '# a\n' >"$T/plain/notes/a.md"
@@ -108,6 +112,7 @@ if __name__ == "__main__":
     except OSError:
         print("FORK-DENIED")
     print("MULTI-A\nINJECTED-LINE\x1b[31m")
+    print("# HEADING-LIKE")
     try:
         os.execv("/usr/bin/true", ["true"])
     except OSError:
@@ -223,6 +228,28 @@ rm -f "$COPY"
 run "$T/note.json"
 refused 'no copy in dotfiles' 'claude/hooks/vault/check_note.py'
 
+# The checker finds the Vault root from __file__, so a Vault checker that is a link to an identical
+# file elsewhere would move that root and silently skip every note. The hook refuses such a checker.
+install 0
+cp "$COPY" "$T/a/b/check_note.py"
+ln -sf "$T/a/b/check_note.py" "$CHECKER"
+run "$T/note.json"
+refused 'Vault checker that is a link to an identical file elsewhere' 'symlink'
+
+# A profile that sandbox-exec cannot use stops the check with exit 2 instead of passing silently.
+install 0
+cp "$HOOK" "$H/check-vault-note.py" "$T/badhooks/"
+cp "$COPY" "$T/badhooks/vault/check_note.py"
+printf '(version 1)\n(this is not a valid rule\n' >"$T/badhooks/check-vault-note.sb"
+(cd "$V" && env CLAUDE_PROJECT_DIR="$V" HOME="$TEST_HOME" "$BASH" "$T/badhooks/check-vault-note.sh" <"$T/note.json" >"$T/out" 2>"$T/err")
+rc=$?
+err=$(<"$T/err")
+if [ "$rc" = 2 ] && [[ "$err" != *CHECKER* ]]; then
+  ok '[2] a profile that sandbox-exec rejects ends with exit 2'
+else
+  ng "[want 2 and no run, got $rc, err='$err'] a profile that sandbox-exec rejects ends with exit 2"
+fi
+
 # Without the Command Line Tools, python3 cannot run; the hook says so instead.
 install 0
 run "$T/note.json" DEVELOPER_DIR="$T/nodev"
@@ -286,6 +313,8 @@ if [ "$seatbelt" = 1 ]; then
   else
     ng "[want 2, the checker output on stderr only, got $rc, out='$out', err='$err'] checker exit 1 is reported on stderr"
   fi
+  # The Vault checker is a .py file, which Seatbelt does not let the checker read, so a run here
+  # also shows that the copy in dotfiles runs, not the file at the Vault path.
   install 0
   run "$T/note.json"
   if [ "$rc" = 0 ] && [ -z "$out" ] && [[ "$err" == *"NOTE:# INSIDE-MARKER"* ]]; then
@@ -321,6 +350,16 @@ if [ "$seatbelt" = 1 ]; then
   else
     ng "checker output keeps one line per message, escapes control characters and has a header (err='$err')"
   fi
+  # Every message line starts with a fixed mark, so a quoted "# ..." cannot become a heading.
+  heading=0
+  while IFS= read -r line; do
+    case "$line" in '#'*) heading=1 ;; esac
+  done <<<"$err"
+  if [[ "$err" == *'- # HEADING-LIKE'* ]] && [ "$heading" = 0 ]; then
+    ok 'no output line starts with #'
+  else
+    ng "no output line starts with # (err='$err')"
+  fi
 
   # Notes that point outside the Vault, or at files in the Vault that are not .md, are not read.
   ln -sf "$T/outside/secret.md" "$V/notes/out.md"
@@ -331,6 +370,28 @@ if [ "$seatbelt" = 1 ]; then
   input txtlink "$V/notes/txt.md"
   run "$T/txtlink.json"
   no_secret 'note linked to a file in the Vault that is not .md is not read' VAULT-TXT-SECRET
+  # .md files in the Vault under names the sandbox's denyRead covers are not read either.
+  ln -sf "$V/secrets/s.md" "$V/notes/sec.md"
+  input sec "$V/notes/sec.md"
+  run "$T/sec.json"
+  no_secret 'note linked to a .md under secrets/ in the Vault is not read' VAULT-SECRETS-MD
+  ln -sf "$V/keys/id_rsa.md" "$V/notes/key.md"
+  input key "$V/notes/key.md"
+  run "$T/key.json"
+  no_secret 'note linked to an id_rsa*.md in the Vault is not read' VAULT-KEY-MD
+  # Files outside $HOME and the temporary directories are not read either (reads are denied by default).
+  # The shared folder of all users is writable by everyone. (The path is split so that the repository
+  # check does not take "Shared" for a user name.)
+  users_dir=/Users
+  SHARED_FILE=$(mktemp "$users_dir/Shared/.check-vault-note-test.XXXXXX") && printf '# SHARED-SECRET\n' >"$SHARED_FILE"
+  ln -sf "$SHARED_FILE" "$V/notes/shared.md"
+  input shared "$V/notes/shared.md"
+  run "$T/shared.json"
+  if [ -n "$SHARED_FILE" ]; then
+    no_secret 'note linked to a file in the shared folder of all users is not read' SHARED-SECRET
+  else
+    ng 'note linked to a file in the shared folder of all users is not read (could not create the file)'
+  fi
   HOME_FILE=$(mktemp "$HOME/.check-vault-note-test.XXXXXX") && printf '# HOME-SECRET\n' >"$HOME_FILE"
   ln -sf "$HOME_FILE" "$V/notes/home.md"
   input home "$V/notes/home.md"
@@ -354,26 +415,6 @@ if [ "$seatbelt" = 1 ]; then
     ok '[2] a denied read is reported with a fixed message'
   else
     ng "[want 2 and a fixed message, got $rc, err='$err'] a denied read is reported with a fixed message"
-  fi
-
-  # The reported bypass: the Vault checker links to an approved copy two levels below $T, which
-  # moves the checker's Vault root to $T, and the note links to a file there.
-  install 0
-  cp "$COPY" "$T/a/b/check_note.py"
-  ln -sf "$T/a/b/check_note.py" "$CHECKER"
-  run "$T/out.json"
-  if [[ "$err" == *"CHECKER root="* ]] && [[ "$err" != *OUTSIDE-SECRET* ]]; then
-    ok 'moving the Vault root with a linked checker does not expose files outside the Vault'
-  else
-    ng "moving the Vault root with a linked checker does not expose files outside the Vault (rc=$rc, err='$err')"
-  fi
-  # The same link also shows that the copy runs, not the Vault path: the linked file is outside
-  # the Vault, so reading it under Seatbelt would fail.
-  run "$T/note.json"
-  if [ "$rc" = 0 ] && [[ "$err" == *"NOTE:# INSIDE-MARKER"* ]]; then
-    ok '[0] the copy in dotfiles runs, not the file at the Vault path'
-  else
-    ng "[want 0 and the checker run, got $rc, err='$err'] the copy in dotfiles runs, not the file at the Vault path"
   fi
 
   # Modules planted on PYTHONPATH, next to the checker or in the working directory are not imported.

@@ -14,7 +14,6 @@ dotfiles の写しだけ（承認は、写しの差分のレビュー）。点�
 """
 import json
 import os
-import pwd
 import signal
 import sys
 import types
@@ -58,10 +57,15 @@ def outside(project, python):
     # Vault の外なら点検しない。読み込みは Seatbelt が Vault に閉じ込める）。
     if not isinstance(note, str) or not note.startswith(project + "/") or not note.endswith(".md"):
         return 0
-    # Vault の場所は、Claude Code に渡った HOME から決める。Seatbelt で拒否する範囲は、下で、環境変数に頼らずに決める。
+    # Vault の場所は、Claude Code に渡った HOME から決める。
     home = os.environ.get("HOME", "")
-    if not home or os.path.realpath(project) != os.path.realpath(os.path.join(home, VAULT_UNDER_HOME)):
+    vault_real = os.path.realpath(project)
+    if not home or vault_real != os.path.realpath(os.path.join(home, VAULT_UNDER_HOME)):
         return 0
+    # 点検スクリプトは __file__ を resolve() して Vault のルートを決めるので、Vault の点検スクリプト（や _System・Scripts）が
+    # 別の場所への symlink だと、ルートがずれて、すべてのノートを「Vault の外」として黙って点検しなくなる。
+    if os.path.realpath(checker_path(project)) != checker_path(vault_real):
+        fail("Vault の点検スクリプトが symlink か、Vault の外にあるため点検しない。ユーザーに確認を頼む。")
     try:
         with open(COPY, "rb") as f:
             copy = f.read()
@@ -82,13 +86,13 @@ def outside(project, python):
     self_path = os.path.realpath(__file__)
     os.execv("/usr/bin/sandbox-exec", [
         "sandbox-exec", "-f", PROFILE,
-        "-D", "HOME_DIR=" + os.path.realpath(pwd.getpwuid(os.getuid()).pw_dir),
-        "-D", "VAULT=" + os.path.realpath(project),
+        "-D", "VAULT=" + vault_real,
         "-D", "SELF=" + self_path,
         "-D", "COPY=" + os.path.realpath(COPY),
-        # 起動を許すのは、この python3 の framework の中だけ（bin/python3.9 と Resources/Python.app）。
+        # 起動と読み込みを許す、この python3 の framework（bin/python3.9・Resources/Python.app・標準ライブラリ）。
         "-D", "PYTHON_HOME=" + os.path.dirname(os.path.dirname(os.path.realpath(python))),
-        python, "-I", "-B", self_path, "--run", project, note,
+        # -S: site を読み込まない（標準ライブラリしか使わない）。
+        python, "-I", "-B", "-S", self_path, "--run", project, note,
     ])
 
 
@@ -144,11 +148,12 @@ def run(project, note):
         lines.append(escape(f"点検スクリプトが例外で止まった: {type(e).__name__}: {e}"))
         code = 2
     if lines:
+        # 各行は決まった印で始め、引用した「# ...」などが見出しや別の構造に見えないようにする。
         print(HEADER)
         for line in lines[:MAX_LINES]:
-            print(line)
+            print("- " + line)
         if len(lines) > MAX_LINES:
-            print(f"（ほか {len(lines) - MAX_LINES} 行）")
+            print(f"- （ほか {len(lines) - MAX_LINES} 行）")
     sys.exit(code)
 
 
