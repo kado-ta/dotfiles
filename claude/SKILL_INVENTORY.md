@@ -72,7 +72,7 @@
 
 ## gstack（64）
 
-呼び出しは `/<名前>`（接頭辞なし）。`proactive=core` なので、頼まれずに提案するのは `/office-hours`・`/review`・`/qa`（と無効の `/ship`）だけ。`codex_reviews=enabled`。多くのスキルが共通の前処理で `~/.gstack/` に記録を書くが、`~/.gstack/projects` と `~/.gstack/security/cso` 以外は sandbox で書けず、失敗は無視される。
+呼び出しは `/<名前>`（接頭辞なし）。`proactive=core` なので、頼まれずに提案するのは `/office-hours`・`/review`・`/qa`（と無効の `/ship`）だけ。`codex_reviews=disabled`（2026-11-23 から。外部レビューの段でリポジトリの内容を Codex に送らない。Codex はユーザーが通常のターミナルで実行する。名前で呼んだ `/codex` は動く）。多くのスキルが共通の前処理で `~/.gstack/` に記録を書くが、`~/.gstack/projects` と `~/.gstack/security/cso` 以外は sandbox で書けず、失敗は無視される。
 
 1.102.1.0 から、Claude Code はスキルを読み込むときに SKILL.md の `` !`…` `` の行を実行する。これで `bin/gstack-skill-load` が共通の前処理と開始の処理を動かす。各スキルの `allowed-tools` がこのコマンドを許可している。sandbox の中で動くかは確かめていない。1.100.0.0 から、説明文に「いつ使うか」の節が付いた（Claude が `/review` などを読み込みやすくするため）。
 
@@ -82,7 +82,7 @@
 
 | スキル | 機能（入力 → 出力） | 起動 | 状態 | 書き込み・依存・制約 |
 | --- | --- | --- | --- | --- |
-| `review` | ベースブランチとの差分（未 commit・未追跡も含む）をレビューし、直す | 自動 | 有効 | 専門のサブエージェント（テスト、保守性、セキュリティ、API の契約、マイグレーションなど）を並列に起動し、自動で直せるものは直す。commit・push はしない。レビュー bot のコメントがあると PR に返信を投稿する（sandbox では 403）。Codex の段は Bash から `codex exec` を呼ぶ（拒否される見込み） |
+| `review` | ベースブランチとの差分（未 commit・未追跡も含む）をレビューし、直す | 自動 | 有効 | 専門のサブエージェント（テスト、保守性、セキュリティ、API の契約、マイグレーションなど）を並列に起動し、自動で直せるものは直す。commit・push はしない。レビュー bot のコメントがあると PR に返信を投稿する（sandbox では 403）。Codex の段は `codex_reviews=disabled` で飛ばし、Claude の敵対的レビューだけを行う |
 | `codex` | Codex CLI による別モデルの意見（review・challenge・consult） | 自動 | 制限 | ファイルは変えない。Bash から `codex exec` を呼ぶので、auto モードの判定で拒否された記録がある（2026-11-11）。独立レビューは、ユーザーが通常のターミナルで `codex review` を実行する（`!` では 2026-11-18 から、app-server の初期化が `Operation not permitted` で失敗している）。2026-11-21 から、セキュリティの境界・設計判断を含む変更では challenge（`codex exec`）も通常のターミナルで実行してもらい、結果は Claude が Codex の記録から全回分を読む。crit-sandbox の設計で `codex review` は指摘なし、challenge は P1 を 6 件挙げたことと、PR #46 で P1 が後の実行の結果に埋もれたため |
 | `cso` | セキュリティ監査。範囲（`--infra`・`--code`・`--supply-chain`・`--owasp` など）と `--diff` を選べる | 自動 | 制限 | 規則でユーザーが指定したときだけにしている。sandbox では静的な監査だけで、`.env.example` などを追跡しているリポジトリでは失敗する（[`/cso` を sandbox で使う](#cso-sandbox)）。ソースはすべてランチャー経由で読む |
 | `qa` | サイト・API・CLI を試し、見つけたバグを直して確かめる | 自動 | 有効 | 修正ごとに commit する（作業ツリーが汚れていれば commit か stash を尋ねる）。ブラウザは Aside か gstack のヘッドレスブラウザ。後者は localhost で待ち受けるので sandbox では動かない |
@@ -90,13 +90,13 @@
 | `browse` | 1 回だけのブラウザ作業（開く、操作、スクリーンショット、console） | 自動 | 有効 | ブラウザの制約は `qa` と同じ。Aside が sandbox で動くかは未確認。Claude が直接ブラウザを操作するときは Playwright MCP を使う（CLAUDE.md の Tools 節）ので、gstack のスキルの中で使う |
 | `benchmark` | ページの性能を測り、ベースラインと比べる | 自動 | 有効 | ブラウザが必要 |
 | `canary` | デプロイ後にページを定期的に確かめる | 自動 | 有効 | ブラウザが必要。長く待つ |
-| `office-hours` | 対話で「何を作るか」を詰め、設計文書を作る | 自動 | 有効 | 設計文書だけを書く。既定の保存先は `docs/designs/` と `~/.gstack/projects/`。DOCUMENTS.md が優先する |
-| `plan-ceo-review` | 計画をスコープと戦略の観点でレビューする（11 節。1 節目はアーキテクチャ） | 自動 | 有効 | 計画ファイルを編集する。Codex の段がある |
-| `plan-design-review` | 計画を UI・UX の観点で 0〜10 点で評価し、足りない決定を書き足す | 自動 | 有効 | 画像生成（OpenAI か Gemini の鍵）と localhost の比較ボードを使う |
-| `design-consultation` | デザインシステム一式を提案し、DESIGN.md にまとめる | 自動 | 有効 | 画像生成、`/tmp` と `open` を使う（sandbox で不可） |
+| `office-hours` | 対話で「何を作るか」を詰め、設計文書を作る | 自動 | 有効 | 設計文書だけを書く。既定の保存先は `docs/designs/` と `~/.gstack/projects/`。DOCUMENTS.md が優先する。2 つ目の意見とデザイン案の Codex の段は、`codex_reviews=disabled` で尋ねずに飛ばす |
+| `plan-ceo-review` | 計画をスコープと戦略の観点でレビューする（11 節。1 節目はアーキテクチャ） | 自動 | 有効 | 計画ファイルを編集する。外部レビュー（Codex）の段は `codex_reviews=disabled` で飛ばす |
+| `plan-design-review` | 計画を UI・UX の観点で 0〜10 点で評価し、足りない決定を書き足す | 自動 | 有効 | 画像生成（OpenAI か Gemini の鍵）と localhost の比較ボードを使う。外部の意見の Codex の段は `codex_reviews=disabled` で飛ばし、Claude 側だけで行う |
+| `design-consultation` | デザインシステム一式を提案し、DESIGN.md にまとめる | 自動 | 有効 | 画像生成、`/tmp` と `open` を使う（sandbox で不可）。外部の意見の Codex の段は `codex_reviews=disabled` で飛ばし、Claude 側だけで行う |
 | `design-shotgun` | デザイン案を複数作って比べる | 自動 | 有効 | 画像生成、localhost の比較ボード |
 | `design-html` | 承認済みのデザインから HTML/CSS を作る | 自動 | 有効 | localhost で待ち受ける |
-| `design-review` | 稼働中のサイトの見た目を監査し、直す | 自動 | 有効 | 1 件ごとに commit する（`--build` は commit しない）。ブラウザが必要 |
+| `design-review` | 稼働中のサイトの見た目を監査し、直す | 自動 | 有効 | 1 件ごとに commit する（`--build` は commit しない）。ブラウザが必要。外部の意見の Codex の段は `codex_reviews=disabled` で飛ばし、Claude 側だけで行う |
 | `diagram` | 説明文か mermaid から図を作る | 自動 | 有効 | 描画で localhost に待ち受ける |
 | `make-pdf` | Markdown から PDF を作る | 自動 | 有効 | 既定の出力先 `/tmp` と描画の待ち受けが sandbox で不可 |
 | `health` | 型チェック・lint・テストなどを実行して点数にする | 自動 | 有効 | 直さない |
@@ -114,10 +114,10 @@
 
 | スキル | 機能 | 理由 |
 | --- | --- | --- |
-| `plan-eng-review` | 計画を、アーキテクチャ・データの流れ・境界条件・テスト・性能の観点でレビューし、計画ファイルを直す。`.gstack/tmp/` と `.git/info/exclude` に書き、Web の調査は Aside を使う | 説明文が「機能を作る前に計画するとき」で、`brainstorming`・`writing-plans` と同じ場面に当たる。1.99.5.0 で戻った（2026-11-23） |
-| `document-release` | 差分に合わせて README・CHANGELOG などを直し、commit・`git push`・PR の本文とタイトルの編集まで行う | push と PR 編集が止まる。説明文の一致で自動起動させない（2026-11-16） |
+| `plan-eng-review` | 計画を、アーキテクチャ・データの流れ・境界条件・テスト・性能の観点でレビューし、計画ファイルを直す。`.gstack/tmp/` と `.git/info/exclude` に書き、Web の調査は Aside を使う。外部レビュー（Codex）の段は `codex_reviews=disabled` で飛ばす | 説明文が「機能を作る前に計画するとき」で、`brainstorming`・`writing-plans` と同じ場面に当たる。1.99.5.0 で戻った（2026-11-23） |
+| `document-release` | 差分に合わせて README・CHANGELOG などを直し、commit・`git push`・PR の本文とタイトルの編集まで行う。Codex のレビューの段は `codex_reviews=disabled` で飛ばす | push と PR 編集が止まる。説明文の一致で自動起動させない（2026-11-16） |
 | `document-generate` | 足りない文書を一から書き、commit・`git push` まで行う | 同上 |
-| `spec` | 曖昧な要望を 5 段階で spec にし、GitHub Issue を作る | Issue 作成が止まる。既定で `git worktree add` と `claude -p` を使う |
+| `spec` | 曖昧な要望を 5 段階で spec にし、GitHub Issue を作る。品質の判定の Codex の段は `codex_reviews=disabled` で飛ばす | Issue 作成が止まる。既定で `git worktree add` と `claude -p` を使う |
 | `careful` | 危険なコマンドの前に警告する（スキルの hooks） | 手動で使う |
 | `guard` | `careful` と `freeze` を合わせたもの | 手動で使う |
 | `freeze` | 編集できるディレクトリを絞る | 手動で使う |
