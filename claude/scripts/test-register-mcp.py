@@ -246,8 +246,8 @@ class PlaywrightDefinitionTest(unittest.TestCase):
         self.assertEqual(self.option("--output-dir"), "${HOME}/Library/Caches/playwright-mcp")
 
     def test_blocks_crit_ports(self):
-        # cc-crit の Crit は 47800〜47819 で待ち受ける（claude/bin/cc-crit の PORTS）。
-        self.assertEqual(self.option("--blocked-origins").split(";"), [f"*:{p}" for p in range(47800, 47820)])
+        # cc-crit の Crit は 47810〜47829 で待ち受ける（claude/bin/cc-crit の PORTS）。
+        self.assertEqual(self.option("--blocked-origins").split(";"), [f"*:{p}" for p in range(47810, 47830)])
 
     def test_headless_is_switchable(self):
         # --headless を付けると、環境変数より優先されて切り替えられなくなる。

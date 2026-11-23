@@ -6,6 +6,7 @@ import importlib.util
 import io
 import json
 import os
+import re
 import signal
 import socket
 import subprocess
@@ -891,6 +892,25 @@ class SigtermTests(RunBase):
             time.sleep(0.05)
         self.assertTrue((self.root / "terminated").exists())
         self.assertEqual(self.recorded("open"), [])
+
+
+class ProfilePortTests(unittest.TestCase):
+    """profile が待ち受けと接続を許すポートは、ラッパーが使うポートと同じにする。"""
+
+    def test_profile_network_ports_match_the_wrapper(self):
+        profile = (BIN / "cc-crit.sb").read_text(encoding="utf-8")
+        for kind, side in (("bind", "local"), ("inbound", "local"), ("outbound", "remote")):
+            with self.subTest(kind=kind):
+                rules = re.findall(rf'\(allow network-{kind}((?:\s*\({side} ip "localhost:\d+"\))+)\)', profile)
+                self.assertEqual(len(rules), 1, rules)
+                ports = [int(p) for p in re.findall(r'"localhost:(\d+)"', rules[0])]
+                self.assertEqual(ports, list(wrapper.PORTS))
+        # 上の 3 つの規則のほかに、localhost のポートを許す規則を置かない。
+        self.assertEqual(len(re.findall(r'"localhost:\d+"', profile)), 3 * len(wrapper.PORTS))
+
+    def test_ports_exclude_47809(self):
+        # 47809 を別のアプリケーションが使う端末がある。範囲に入れると、check_ports がそこで常に拒否する。
+        self.assertNotIn(47809, wrapper.PORTS)
 
 
 CLT = "/Library/Developer/CommandLineTools/usr/bin"

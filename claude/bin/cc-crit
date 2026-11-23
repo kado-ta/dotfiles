@@ -36,7 +36,7 @@ CRIT = "/opt/homebrew/bin/crit"
 OPEN = "/usr/bin/open"
 PROFILE = Path(__file__).resolve().with_name("cc-crit.sb")
 # cc-crit.sb のネットワークの規則と同じ範囲。
-PORTS = range(47800, 47820)
+PORTS = range(47810, 47830)
 AUTHOR = "Claude Code"
 PATH_ENV = "/opt/homebrew/bin:/usr/bin:/bin"
 # cc-crit.sb が拒否で覆う、claude/settings.json の sandbox.filesystem.denyRead の項目（「; denyRead:」の行と同じ）。

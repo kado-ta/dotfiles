@@ -6,9 +6,9 @@
 # MCP サーバーは sandbox の外で動くので、sandbox の denyWrite・denyRead も Edit・Write の規則も効かない。
 # filename がなければ、スクリーンショットなどは --output-dir に自動の名前で保存され、スナップショットや
 # 評価の結果は応答で返る。browser_drop は data（テキスト）なら使える。
-# url 引数が cc-crit の Crit のポート（47800〜47819）を指す呼び出しも止める。ブラウザは sandbox の外で localhost に
+# url 引数が cc-crit の Crit のポート（47810〜47829）を指す呼び出しも止める。ブラウザは sandbox の外で localhost に
 # 届くので、開けばモデルが Finish Review を押して人間の承認を偽造できる。URL は解析せず、TAB・LF・CR を取り除いて
-# （WHATWG の URL の解析器が取り除くため）、文字列に :47800〜:47819（ポートの先頭のゼロも含む）があれば止める。
+# （WHATWG の URL の解析器が取り除くため）、文字列に :47810〜:47829（ポートの先頭のゼロも含む）があれば止める。
 # JS やリンクでの移動は、定義の --blocked-origins が、正規化された後の URL で止める。
 # url 引数が file: で始まる呼び出しも止める。Playwright MCP は file: を拒否するが、Node が URL を解析できる
 # ときだけなので（file://localhost:/… などは素通りする）、ブラウザ経由で sandbox の denyRead の外のファイルを
@@ -42,8 +42,8 @@ url = re.sub(r"[\t\n\r]", "", url).lstrip("".join(map(chr, range(0x21)))) if isi
 if re.match(r"file:", url, re.IGNORECASE):
     print("Blocked: Playwright MCP must not open file: URLs, because the browser runs outside the sandbox and could read files the sandbox protects.", file=sys.stderr)
     sys.exit(2)
-if re.search(r":0*478[01][0-9](?![0-9])", url):
-    print("Blocked: Playwright MCP must not open ports 47800-47819, where Crit waits for the human review. Approvals in Crit must come from the human.", file=sys.stderr)
+if re.search(r":0*478[12][0-9](?![0-9])", url):
+    print("Blocked: Playwright MCP must not open ports 47810-47829, where Crit waits for the human review. Approvals in Crit must come from the human.", file=sys.stderr)
     sys.exit(2)
 '
 status=$?
