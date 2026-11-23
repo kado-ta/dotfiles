@@ -83,6 +83,9 @@ MISE_EDIT_ASK = ("Edit(~/dotfiles/mise/**)",)
 MISE_GLOBAL_CONFIG = "mise/mise_config.toml"
 # config は設定を、env_files は _.source などが読むファイルを、パスではなく中身で信頼させる。true（すべて）でもよい。
 PARANOID_REQUIRED = ("config", "env_files")
+# 環境変数で paranoid や信頼するパスを上書きさせない。シェルの設定（ほかに zsh/*.zsh）とグローバルの設定に書かせない。
+MISE_ENV_FORBIDDEN = ("MISE_TRUSTED_CONFIG_PATHS", "MISE_PARANOID")
+MISE_ENV_FILES = ("bin/.zshrc", "bin/.zprofile", MISE_GLOBAL_CONFIG)
 # グローバルの git の設定（~/.gitconfig の実体）。rerere が動くと、sandbox の外の git が、.git/rr-cache と MERGE_RR（どちらも
 # sandbox が書ける）の解決を任意のパス（作業ツリーの外も）に書く。rerere.enabled がなくても、rr-cache があれば動くので false にする。
 GITCONFIG = "bin/.gitconfig"
@@ -397,11 +400,21 @@ def check_mise_paranoid(root):
     path = root / MISE_GLOBAL_CONFIG
     if not path.exists():
         return [f"{MISE_GLOBAL_CONFIG}: missing"]
-    paranoid = tomllib.loads(path.read_text(encoding="utf-8")).get("settings", {}).get("paranoid")
+    config = tomllib.loads(path.read_text(encoding="utf-8")).get("settings", {})
+    paranoid = config.get("paranoid")
+    errors = []
     # 文字列は部分一致で通ってしまうので、リストのときだけ中身を見る。
-    if paranoid is True or (isinstance(paranoid, list) and all(c in paranoid for c in PARANOID_REQUIRED)):
-        return []
-    return [f"{MISE_GLOBAL_CONFIG}: settings.paranoid must be true or a list with {', '.join(PARANOID_REQUIRED)}"]
+    if not (paranoid is True or (isinstance(paranoid, list) and all(c in paranoid for c in PARANOID_REQUIRED))):
+        errors.append(f"{MISE_GLOBAL_CONFIG}: settings.paranoid must be true or a list with {', '.join(PARANOID_REQUIRED)}")
+    # 空のリストでも、パスで信頼する経路を開く。
+    if "trusted_config_paths" in config:
+        errors.append(f"{MISE_GLOBAL_CONFIG}: settings.trusted_config_paths must not be set")
+    for rel in MISE_ENV_FILES + tuple(sorted(p.relative_to(root).as_posix() for p in (root / "zsh").glob("*.zsh"))):
+        file = root / rel
+        if file.is_file():
+            text = file.read_text(encoding="utf-8")
+            errors += [f"{rel}: must not mention {name}" for name in MISE_ENV_FORBIDDEN if name in text]
+    return errors
 
 
 def check_rerere(root):

@@ -588,6 +588,24 @@ class CheckRepoTests(unittest.TestCase):
         self.write("mise/mise_config.toml", '[settings]\nparanoid = ["config", "env_files", "plugins"]\n')
         self.assert_passes()
 
+    def test_trusted_config_paths_fails(self):
+        # 空のリストでも、パスで信頼する経路を開く。
+        for value in ("[]", '["~/Dev"]'):
+            with self.subTest(value=value):
+                self.write("mise/mise_config.toml", PARANOID_CONFIG + f"trusted_config_paths = {value}\n")
+                self.assert_fails("FAIL mise-paranoid", "settings.trusted_config_paths")
+
+    def test_mise_env_override_fails(self):
+        # 環境変数で、paranoid や信頼するパスを上書きさせない。
+        for rel, text in (("bin/.zshrc", "export MISE_PARANOID=0\n"),
+                          ("bin/.zprofile", "export MISE_TRUSTED_CONFIG_PATHS=~/Dev\n"),
+                          ("zsh/x.zsh", "export MISE_TRUSTED_CONFIG_PATHS=~/Dev\n"),
+                          ("mise/mise_config.toml", PARANOID_CONFIG + '[env]\nMISE_PARANOID = "0"\n')):
+            with self.subTest(rel=rel):
+                self.write(rel, text)
+                self.assert_fails("FAIL mise-paranoid", rel)
+                self.write(rel, PARANOID_CONFIG if rel == "mise/mise_config.toml" else "")
+
     def test_gitconfig_rerere_not_false_fails(self):
         # rerere が動くと、sandbox の外の git が .git/rr-cache と MERGE_RR（sandbox が書ける）の解決を任意のパスに書く。
         for name, text in (("missing section", "[merge]\n\tff = false\n"), ("true", "[rerere]\n\tenabled = true\n"),
