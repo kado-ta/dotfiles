@@ -83,6 +83,9 @@ MISE_EDIT_ASK = ("Edit(~/dotfiles/mise/**)",)
 MISE_GLOBAL_CONFIG = "mise/mise_config.toml"
 # config は設定を、env_files は _.source などが読むファイルを、パスではなく中身で信頼させる。true（すべて）でもよい。
 PARANOID_REQUIRED = ("config", "env_files")
+# グローバルの git の設定（~/.gitconfig の実体）。rerere が動くと、sandbox の外の git が、.git/rr-cache と MERGE_RR（どちらも
+# sandbox が書ける）の解決を任意のパス（作業ツリーの外も）に書く。rerere.enabled がなくても、rr-cache があれば動くので false にする。
+GITCONFIG = "bin/.gitconfig"
 # ユーザー設定のこれらのリストは、~/ でも / でも始まらないパスが ~/.claude を起点にし、黙って効かない。
 SANDBOX_PATH_LISTS = ("denyRead", "denyWrite", "allowWrite", "allowRead")
 # additionalDirectories は作業ディレクトリとして数えられ、そこでは WRITE_BLOCK が効かない。
@@ -401,6 +404,15 @@ def check_mise_paranoid(root):
     return [f"{MISE_GLOBAL_CONFIG}: settings.paranoid must be true or a list with {', '.join(PARANOID_REQUIRED)}"]
 
 
+def check_rerere(root):
+    # git と同じく読む（最後の値が勝つ。no・0 も false）。ファイルやキーがなければ終了コード 1、bool でなければ 128。
+    cp = subprocess.run(["git", "config", "--file", str(root / GITCONFIG), "--type=bool", "--get", "rerere.enabled"],
+                        capture_output=True, text=True)
+    if cp.returncode != 0 or cp.stdout.strip() != "false":
+        return [f"{GITCONFIG}: rerere.enabled must be false"]
+    return []
+
+
 def check_syntax(root):
     errors = []
     for rel in repo_files(root):
@@ -513,6 +525,7 @@ CHECKS = (
     ("playwright-mcp", check_playwright_mcp),
     ("project-permissions", check_project_permissions),
     ("mise-paranoid", check_mise_paranoid),
+    ("rerere", check_rerere),
     ("syntax", check_syntax),
     ("markdown-names", check_markdown_names),
     ("markdown-links", check_markdown_links),

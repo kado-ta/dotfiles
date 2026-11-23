@@ -82,3 +82,14 @@ Edit・Write ツールは sandbox の外で動くので、`permissions` の規�
 - Read の deny の `*.pem` を `~/**` に広げないのは、mise で入れた pip・Ruby・aws-cli の CA 証明書の束が `~/.local/share/mise` の下にあり、sandbox の中でそれらの HTTPS が失敗する見込みのため。
 
 経緯は [docs/work/20261114_edit-write-rules/research-edit-write.md](../../docs/work/20261114_edit-write-rules/research-edit-write.md) を参照する。この規則の外に残る経路と、次の作業の候補は、その [8 章](../../docs/work/20261114_edit-write-rules/research-edit-write.md#residual-risks) にある。paranoid とフックの経緯と、受け入れたリスクは、[docs/work/20261116_sandbox-path-gaps/design.md](../../docs/work/20261116_sandbox-path-gaps/design.md) を参照する。
+
+<a name="git-rerere"></a>
+
+## git の rerere
+
+`bin/.gitconfig`（`~/.gitconfig` の実体）で、`rerere.enabled = false` にしている。sandbox は `.git/rr-cache` と `.git/MERGE_RR` に書ける。rerere が動くと、sandbox の外の git（人間のターミナルと `!`）が、そこに置かれた解決を任意のパス（作業ツリーの外も）に書く。`rerere.enabled` を設定していなくても、`rr-cache` があれば動くので、明示的に false にする。人間の git でも rerere は動かない。
+
+- `[includeIf]` の後（ファイルの最後）に置く。include は書いた位置で読み込まれ、後の値が勝つので、前に置くと include の先の設定で黙って上書きされうる。
+- `check-repo.py` の `rerere` は、`git config --file bin/.gitconfig --type=bool --get rerere.enabled` が `false` であることを確かめる。include の先と、リポジトリの `.git/config`（sandbox が既定で書き込みを止めている）は見ない。
+
+経緯は [docs/work/20261123_rerere-mise-checks/plan.md](../../docs/work/20261123_rerere-mise-checks/plan.md) を参照する。
