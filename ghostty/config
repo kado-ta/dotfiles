@@ -11,8 +11,8 @@ font-feature = +liga
 # =============================================================================
 # Window
 # =============================================================================
-window-width = 180
-window-height = 62
+window-width = 194
+window-height = 63
 window-padding-x = 4
 window-padding-y = 4
 window-padding-color = extend
