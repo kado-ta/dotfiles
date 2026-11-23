@@ -8,6 +8,9 @@
 "npm:@salesforce/cli" = { version = "latest", trust_policy_excludes = [
   "pino@9.14.0",
 ] }
+# Web 標準の書き方のガイド（スキル modern-web-guidance・chrome-extensions）の CLI。スキルと同じ版にそろえる。
+# 新しい版は update-skills.sh が知らせる。上げるときは、作業ブランチで claude/scripts/update-modern-web-guidance.py --apply を実行し、スキルと一緒に書き換える（手で上げない）。
+"npm:modern-web-guidance" = "1.0.1"
 # AI エージェントのスキル・プラグインを、入れる前に検査する。
 # 依存の yara-python には Python 3.14 以降の wheel がなく、ソースからのビルドが失敗しうるので、3.13 を指定する。
 # Git から入れると依存のハッシュを lockfile に残せないので、版を固定する。上げる前に mise ls-remote 'pypi:NVIDIA/SkillSpector' で確かめる。

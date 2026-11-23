@@ -137,6 +137,14 @@
       "provider": "gstack",
       "user_invocable": true
     },
+    "chrome-extensions": {
+      "description": "sha256:7ce1654627afec61",
+      "dmi": false,
+      "hooks": null,
+      "override": "on",
+      "provider": "personal",
+      "user_invocable": true
+    },
     "claude-code-setup:claude-automation-recommender": {
       "description": "sha256:db90afcde3c999d6",
       "dmi": false,
@@ -431,6 +439,14 @@
       "hooks": null,
       "override": "on",
       "provider": "gstack",
+      "user_invocable": true
+    },
+    "modern-web-guidance": {
+      "description": "sha256:9d6677815983e05b",
+      "dmi": false,
+      "hooks": null,
+      "override": "on",
+      "provider": "personal",
       "user_invocable": true
     },
     "modernize": {

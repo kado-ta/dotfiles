@@ -1,5 +1,5 @@
 #!/bin/bash
-# gstack・Claude Code のプラグイン・crit の CLI をまとめて更新する。
+# gstack・Claude Code のプラグイン・crit の CLI をまとめて更新し、modern-web-guidance に新しい版があれば知らせる。
 # ~/.claude/skills・~/.claude/plugins・Homebrew に書くので、sandbox の外（通常のターミナル）で実行する。
 #   ターミナルから: /bin/bash ~/dotfiles/claude/scripts/update-skills.sh か、dotfiles で mise run claude:update
 # Claude Code の ! は、セッションによっては sandbox の中で動く。そのときは更新の手順が失敗するうえ、
@@ -16,6 +16,7 @@ set -o pipefail
 script_dir=$(cd "$(dirname "$0")" && pwd)
 repo=$(cd "${script_dir}/../.." && pwd)
 failed=""
+pending=""
 # gstack-upgrade も、呼び出し元の git リポジトリを検査する（zsh の gstack-upgrade 関数と同じく、ホームから実行する）。
 cd "$HOME" || exit 1
 
@@ -54,6 +55,18 @@ else
   failed="${failed} plugin-list"
 fi
 
+# modern-web-guidance は版を固定しているので、新しい版があっても知らせるだけで、何も書かない
+# （chrome-extensions も同じ配布物から取る）。スキルと mise の設定はリンクで即座に有効になり、mise は足りない版を
+# 自動で入れるので、取り込みは作業ブランチで --apply を明示して行う。
+# 終了コード 3 は「取り込み待ち」で、失敗には数えない。step の中で 3 を区別すると、ほかの手順の 3 を取り違えるので、ここで見る。
+echo "==> modern-web-guidance"
+/usr/bin/python3 -I -B "${script_dir}/update-modern-web-guidance.py"
+case $? in
+  0) ;;
+  3) pending="modern-web-guidance" ;;
+  *) failed="${failed} modern-web-guidance" ;;
+esac
+
 # crit はプラグインと CLI の版の組み合わせで動くので、CLI も一緒に更新し、cc-crit の profile を確かめる。
 step crit-cli brew upgrade crit
 # profile テストは、sandbox の中や crit がないときにスキップして終了コード 0 で終わる。
@@ -63,6 +76,9 @@ step crit-profile-test /usr/bin/env CC_CRIT_PROFILE_REQUIRED=1 \
 
 if [ -n "${failed}" ]; then
   echo "失敗した手順:${failed}"
+fi
+if [ -n "${pending}" ]; then
+  echo "取り込みを待つ更新: modern-web-guidance（chrome-extensions を含む）。取り込むときは、作業ブランチで /usr/bin/python3 -I -B ~/dotfiles/claude/scripts/update-modern-web-guidance.py --apply を実行する（先に --out <dir> --latest で中身を確かめられる）。"
 fi
 # 更新した hooks は、再起動した後のセッションで動き始めるので、その前に見直す。
 echo "次に、再起動する前に dotfiles の Claude Code で /sync-skill-docs を実行し、hooks の変化を確かめる。更新したプラグインは、Claude Code を再起動すると読み込まれる。"

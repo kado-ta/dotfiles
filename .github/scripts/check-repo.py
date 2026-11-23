@@ -114,6 +114,23 @@ PLAYWRIGHT_DENY_READ = ("~/.crit",)
 PLAYWRIGHT_SERVER = "playwright"
 PLAYWRIGHT_HOOK = "hooks/guard-playwright-mcp.sh"
 PLAYWRIGHT_MATCHER = "mcp__playwright__.*"
+# 上流から取り込んだスキル。claude/scripts/update-modern-web-guidance.py が npm の配布物から書く。
+# SKILL.md が参照ファイルを名前で指すので、上流の名前のまま置き、markdown-names の対象から外す。
+VENDORED_SKILLS = ("claude/skills/modern-web-guidance/", "claude/skills/chrome-extensions/")
+# modern-web-guidance のガイドと上流の SKILL.md は、npx 系で最新版を取得して動かすよう指示する。スキルがあるあいだは
+# deny にして、mise で固定した CLI を迂回させない。npm は exec の別名（x）や npm i もあるので、サブコマンドを問わない。
+# Bash の規則は、絶対パスや sh -c で包んだ形には当たらない（境界ではなく、ふだんの形を止める）。
+MWG_SKILL = "claude/skills/modern-web-guidance/SKILL.md"
+MWG_DENY = (
+    "Bash(npx *modern-web-guidance*)",
+    "Bash(pnpx *modern-web-guidance*)",
+    "Bash(pnpm *modern-web-guidance*)",
+    "Bash(bunx *modern-web-guidance*)",
+    "Bash(bun *modern-web-guidance*)",
+    "Bash(yarn *modern-web-guidance*)",
+    "Bash(npm *modern-web-guidance*)",
+    "Bash(deno *modern-web-guidance*)",
+)
 JSONC_FILES = {"vscode/settings.json", "vscode/keybindings.json"}
 SETTINGS = "claude/settings.json"
 PROJECT_SETTINGS = ".claude/settings.json"
@@ -365,6 +382,14 @@ def check_playwright_mcp(root):
     return errors
 
 
+def check_modern_web_guidance(root):
+    if not (root / MWG_SKILL).exists():
+        return []
+    deny = set(load_settings(root).get("permissions", {}).get("deny", []))
+    return [f"{SETTINGS}: permissions.deny lacks {rule} (required while {MWG_SKILL} exists)"
+            for rule in MWG_DENY if rule not in deny]
+
+
 def key_paths(value, prefix=""):
     """dict を末端のキーのパス（a.b.c）に展開する。空の dict も末端として返す。"""
     if isinstance(value, dict) and value:
@@ -421,7 +446,8 @@ def check_markdown_names(root):
     return [
         f"{rel}: Markdown file names outside docs/ use only A-Z and _"
         for rel in repo_files(root)
-        if rel.endswith(".md") and not rel.startswith("docs/") and not re.fullmatch(r"[A-Z_]+", PurePosixPath(rel).stem)
+        if rel.endswith(".md") and not rel.startswith(("docs/",) + VENDORED_SKILLS)
+        and not re.fullmatch(r"[A-Z_]+", PurePosixPath(rel).stem)
     ]
 
 
@@ -511,6 +537,7 @@ CHECKS = (
     ("push-permissions", check_push_permissions),
     ("edit-permissions", check_edit_permissions),
     ("playwright-mcp", check_playwright_mcp),
+    ("modern-web-guidance", check_modern_web_guidance),
     ("project-permissions", check_project_permissions),
     ("mise-paranoid", check_mise_paranoid),
     ("syntax", check_syntax),
