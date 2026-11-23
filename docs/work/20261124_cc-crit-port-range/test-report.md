@@ -46,7 +46,7 @@ created: 2026-11-24
 [plan の確かめること](plan.md#verification)と[入れる手順](plan.md#rollout)のとおりに行い、結果をここに書く。
 
 - [x] 古い profile で、47809 の拒否のテストが 2 件失敗する
-- [x] 新しい profile で、`test-cc-crit-profile.py` が通る（環境による ERROR が 1 件。下記）
+- [x] 新しい profile で、`test-cc-crit-profile.py` が通る（ステルスモードがオンのあいだは、環境による ERROR が 1 件。下記）
 - [ ] 端末ごと: `cmp` が何も出さない、`mise run crit:profile-test` が通る、`/crit-review` で Crit が 47810 で開く
 
 2026-11-24 に、人間が worktree で実行した（crit 0.24.0、git 2.56.1、macOS 26.7.1）。
@@ -60,6 +60,7 @@ created: 2026-11-24
   - 変更前の範囲でも同じになる見込み（main のテストは実行していない）。接続は成立していないので、LAN から届かないことは崩れていない。
   - テストは変えない。タイムアウトも通すと、この環境では、全インターフェースで待ち受けたときとの区別がつかなくなるため。
   - 原因はファイアウォールのステルスモードだった。人間がステルスモードをオフにして同じ接続を試すと、6 つのポートはどれも `refused` になった。ステルスモードがオンのあいだは、`test_crit_review_answers_health` は範囲によらず失敗する。
+  - ステルスモードをオフにして `test-cc-crit-profile.py -k health` を実行すると、`test_crit_review_answers_health` は通った。新しい profile では、profile のテストがすべて通った。
 
 <a name="codex"></a>
 
