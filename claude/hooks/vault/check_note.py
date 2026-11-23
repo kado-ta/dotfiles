@@ -66,7 +66,8 @@ THEMATIC_BREAK_RE = re.compile(r"^ {0,3}([-*_])(?: *\1){2,} *$")
 COMMENT_START_RE = re.compile(r"^ {0,3}<!--")
 HEADING_RE = re.compile(r"^ {0,3}(#{1,6})[ \t]+(.*?)(?:[ \t]+#+)?[ \t]*$")
 INLINE_RE = re.compile(r"(<!--.*?-->)|(`+)(.+?)\2")  # 1 行の中の HTML コメントかインラインコード。左から先に始まるほう
-LINK_RE = re.compile(r"\]\((<[^>\n]*>|[^)\s]*)(?:\s+(?:\"[^\"]*\"|'[^']*'))?\)")
+# リンク先の中の丸括弧は、対応の取れた 1 段まで読む（CommonMark は深い入れ子も許すが、そのリンクは点検しない）
+LINK_RE = re.compile(r"\]\((<[^>\n]*>|(?:[^()\s]|\([^()\s]*\))*)(?:\s+(?:\"[^\"]*\"|'[^']*'))?\)")
 SCHEME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:")
 CALLOUT_RE = re.compile(r"^\s*(?:>\s*)+\[!([^\]]*)\]([-+]?)(.*)$")
 HIGHLIGHT_RE = re.compile(r"(?<!=)==(?=[^\s=]).*?(?<=[^\s=])==(?!=)")
@@ -420,14 +421,20 @@ def structure(lines: list[str], masked: list[str | None]):
 
 
 def link_ids(anchors, headings) -> set[str]:
-    """リンクの #... で指せる ID。明示したアンカーと、GitHub が見出しから作る ID。"""
+    """リンクの #... で指せる ID。明示したアンカーと、GitHub が見出しから作る ID。
+
+    GitHub は、重なる見出しの ID に、生成済みの ID と重ならない番号を付ける（Topic・Topic-1・Topic の 3 つ目は topic-2）。
+    """
     ids = {name for _, name in anchors}
+    used: set[str] = set()
     counts: dict[str, int] = {}
     for _, text in headings:
-        slug = github_slug(text)
-        k = counts.get(slug, 0)
-        ids.add(slug if k == 0 else f"{slug}-{k}")
-        counts[slug] = k + 1
+        slug = result = github_slug(text)
+        while result in used:
+            counts[slug] = counts.get(slug, 0) + 1
+            result = f"{slug}-{counts[slug]}"
+        used.add(result)
+        ids.add(result)
     return ids
 
 
