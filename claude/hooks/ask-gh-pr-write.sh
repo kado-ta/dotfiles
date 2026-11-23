@@ -5,8 +5,11 @@ set -euo pipefail
 # 途中の失敗は exit 2 にそろえ、onFailure の設定に依存せずブロックする。
 trap 'exit 2' ERR
 # 行継続と引用符を除き、`gh pr \<改行> merge` や `"gh" pr merge` を同じ形にそろえる。
-# bash の ${var//…} は引用符が多いと極端に遅く、長いコマンドがタイムアウトでブロックされるので jq で行う。
-COMMAND=$(jq -er '.tool_input.command | strings | gsub("\\\\\n"; "") | gsub("[\"\\x27]"; "")') || {
+# bash の ${var//…} は引用符が多いと極端に遅く、jq の gsub も一致の数と入力の長さの積で遅くなる。
+# 長いコマンドがタイムアウトでブロックされないように、jq の split と join で除く。
+# join も長さの 2 乗で伸びるが、30 s に届くのは約 4 MB からで、約 1 MB なら 2 s で終わる。
+COMMAND=$(jq -er '.tool_input.command | strings
+  | split("\\\n") | join("") | split("\"") | join("") | split([39] | implode) | join("")') || {
   echo "Blocked: jq failed, so this command cannot be checked." >&2
   exit 2
 }

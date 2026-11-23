@@ -72,6 +72,7 @@ check ask 'gh api repos/o/r/pulls/1/merge -X PUT'
 check ask '"gh" pr merge 1' 'quoted command'
 check ask 'gh "pr" merge 1' 'quoted subcommand'
 check ask 'gh pr mer""ge 1' 'quotes inside a word'
+check ask "gh pr mer''ge 1" 'single quotes inside a word'
 check ask $'gh pr \\\nmerge 1' 'line continuation between words'
 check ask $'gh pr mer\\\nge 1' 'line continuation inside a word'
 check ask $'gh \\\npr merge 1' 'line continuation after gh'
@@ -150,6 +151,20 @@ if [ "$elapsed" -lt 10 ]; then
 else
   fail=$((fail + 1))
   echo "FAIL long command took ${elapsed}s"
+fi
+
+# A command with 30000 quotes (about 135 KB) stays far below the 30 s hook timeout
+# time measures the check in this shell to the millisecond; SECONDS has 1 s steps
+longer=$(printf 'echo "a" %.0s' $(seq 1 15000))
+TIMEFORMAT=%R
+{ time check none "$longer" 'longer command with many quotes'; } 2>"$T/longer-command.time"
+elapsed=$(<"$T/longer-command.time")
+if awk -v e="$elapsed" 'BEGIN { exit !(e < 3) }'; then
+  pass=$((pass + 1))
+  echo "PASS longer command took ${elapsed}s"
+else
+  fail=$((fail + 1))
+  echo "FAIL longer command took ${elapsed}s"
 fi
 
 echo "---"
