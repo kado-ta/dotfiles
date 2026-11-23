@@ -46,7 +46,7 @@ Finder で `init.command` をダブルクリックする（ターミナルから
 | --- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
 | 1   | `bin/link.sh`          | `bin/` の dotfiles（`.zshrc`・`.zprofile`・`.gitconfig`・`.Brewfile` など）を `~` にリンクする                                  |
 | 2   | `bin/setup_brew.sh`    | `~/.Brewfile` のパッケージをインストールする（`brew bundle install --global --no-upgrade`）                                     |
-| 3   | `config/link.sh`       | Starship・Sheldon・uv・sf の設定を `~/.config/` にリンクする                                                                    |
+| 3   | `config/link.sh`       | Starship・Sheldon・uv・sf・herdr の設定を `~/.config/` にリンクする                                                             |
 | 4   | `zsh/setup_plugins.sh` | Sheldon で Zsh プラグインをインストールする                                                                                     |
 | 5   | `aws/link.sh`          | AWS CLI の設定（`config`・`credentials`）をリンクする                                                                           |
 | 6   | `mise/setup.sh`        | mise の設定を `~/.config/mise/config.toml` にリンクし、言語ランタイム・ツールをインストールする                                 |
@@ -81,7 +81,7 @@ Finder で `init.command` をダブルクリックする（ターミナルから
 | ------------ | -------------------------------------------------------------------------------------- | ------------------------------------------ | ---------------------------------------- |
 | `bin/`       | Zsh・Git・Homebrew の設定（`.zshrc`・`.zprofile`・`.gitconfig`・`.Brewfile`）          | `~/`                                       | [bin/README.md](bin/README.md)           |
 | `zsh/`       | Zsh 本体のインストールと、エイリアス・キーバインド・オプション。Sheldon が直接読み込む | なし                                       | [zsh/README.md](zsh/README.md)           |
-| `config/`    | Starship・Sheldon・uv・sf の設定（`karabiner/` は現在リンクしていない）                | `~/.config/`                               | [config/README.md](config/README.md)     |
+| `config/`    | Starship・Sheldon・uv・sf・herdr の設定（`karabiner/` は現在リンクしていない）         | `~/.config/`                               | [config/README.md](config/README.md)     |
 | `mise/`      | 言語ランタイム・ツールのグローバルバージョン（`mise_config.toml`）                     | `~/.config/mise/config.toml`               | [mise/README.md](mise/README.md)         |
 | `aws/`       | AWS CLI の設定（`config`・`credentials` は Git 管理外）                                | `~/.aws/`                                  | [aws/README.md](aws/README.md)           |
 | `claude/`    | Claude Code の設定・フック・ルール・個人スキル                                         | `~/.claude/`                               | [claude/README.md](claude/README.md)     |

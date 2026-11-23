@@ -40,6 +40,13 @@ ln -snfv "$SCRIPT_DIR/sf/plugins.txt" "$SF_DIR/"
 ln -snfv "$SCRIPT_DIR/sf/sync-plugins.sh" "$SF_DIR/"
 ln -snfv "$SCRIPT_DIR/sf/unsignedPluginAllowList.json" "$SF_DIR/"
 
+# herdr
+# ~/.config/herdr/ にはログ・ソケット・セッションの状態も置かれるため、ファイル単位でリンクする。
+HERDR_DIR="$CONFIG_DIR/herdr"
+echo "HERDR_DIR: $HERDR_DIR"
+if [ ! -d $HERDR_DIR ]; then mkdir $HERDR_DIR; fi
+ln -snfv "$SCRIPT_DIR/herdr/config.toml" "$HERDR_DIR/"
+
 # NOTE: karabiner は使用していないので、関連コマンドをコメントアウトする。
 # KARABINER_DIR="$CONFIG_DIR/karabiner"
 # echo "KARABINER_DIR: $KARABINER_DIR"
