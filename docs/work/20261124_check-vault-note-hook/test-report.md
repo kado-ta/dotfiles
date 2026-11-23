@@ -99,4 +99,11 @@ Codex の確認では、profile の書き方（`require-all` と `regex`、`(tar
 
 ## 実機の確認
 
-2026-11-24 に、ユーザーが Vault で Claude Code を起動して確かめ、完了と報告した（`5af70d3`。出力の詳細は共有されていない）。
+2026-11-24 に、ユーザーが Vault で Claude Code を起動して確かめた。1 回目は `5af70d3` で、完了と報告を受けた（出力の詳細は共有されていない）。2 回目は `1b15464` で、次の手順の出力を共有してもらった。
+
+| # | Claude への依頼 | 結果 |
+| --- | --- | --- |
+| 1 | `01_Inbox/zz-hook-test.md` を `# フックの確認` の 1 行で作る | Write の直後に「PostToolUse:Write hook reported a problem」として、見出しの行と、`- ` で始まる 3 行（Properties がない誤り、見出しのアンカーの警告、01_Inbox の下書きの補足）が Claude に届いた。Claude は誤りとして受け取った |
+| 2 | 同じファイルを、`status: draft`・`created: 2026-11-24` の Properties と本文に書き換える | フックからは何も出なかった（exit 0） |
+| 3 | `01_Inbox/zz-hook-test.txt` を作る | フックからは何も出なかった |
+| 4 | 2 つのファイルを消す | 消えたことを確かめた |

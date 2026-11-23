@@ -295,6 +295,7 @@ Claude Code の sandbox の中では `sandbox-exec` を入れ子にできない�
 
 - Claude が Bash（`sed` など）で書き換えたノートは点検しない。matcher が Edit・Write だけのため。
 - Vault のサブフォルダや `/add-dir` で Vault を足したセッション、`CLAUDE_PROJECT_DIR` と `file_path` の表記（symlink・大文字小文字・Unicode の正規化）が違う場合は、何も出さずに点検しない（依頼の仕様のまま。2026-11-24 にユーザーが選んだ）。
+- 別の端末では、写し（dotfiles の `git pull`）と Vault の点検スクリプト（Remotely Save の同期）が別々に届く。Remotely Save 0.5.25 は、`_` で始まるファイル・フォルダを、設定の `syncUnderscoreItems` がオンのときだけ同期する（既定はオフ。2026-11-24 に、ユーザーがオンにしたことを確かめた）。オフの端末では、点検スクリプトが届かず、フックは何もしない。片方だけが新しい間は、フックが「写しと違う」と知らせる（Crit での質問への回答）。
 - sandbox の外の段は、Vault の点検スクリプトのパスを（写しの長さ＋1 バイトまで）読む。symlink の点検スクリプトは、読む前の realpath の確かめで拒否するが、確かめた後に差し替える競合は残る。その場合に分かるのは、そのファイルが公開済みの写しと同じかどうかの 1 ビットだけ（challenge #4）。
 - Seatbelt の中でも、メタデータは読めるので、Vault の外のパスが存在するかどうかは点検の結果から分かる。読み込みは、Python の起動に要るシステムの場所（`/System`・`/usr/lib`・`/usr/share`・タイムゾーン・python3 の framework）と Vault の `.md` に限られる。システムの場所は、エージェントの sandbox からも読める。
 - Vault の中の FIFO のノートや巨大なノート、`/dev/urandom` への symlink（名前が `.md` で終わるもの）は、25 秒まで点検を止め、その間メモリを使いうる。中身は出ない。エージェントは Bash からも同じだけ資源を使えるので、できることは増えない。

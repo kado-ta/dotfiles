@@ -136,6 +136,8 @@ PR と main への push では、GitHub Actions が macOS の `/bin/bash` と `/
 
 Vault の `.claude/` は Remotely Save で同期されないので、フックは dotfiles に置く。Vault のプロジェクトの設定に点検のフックを登録しない（sandbox の外で Vault の点検スクリプトを動かすことと、二重の実行になる）。
 
+別の端末には、写しは dotfiles の `git pull` で、Vault の点検スクリプト（とタグの辞書 `_System/Tags.md`）は Remotely Save の同期で、別々に届く。Remotely Save は、`_` で始まるファイル・フォルダを、設定の `syncUnderscoreItems` がオンのときだけ同期する（0.5.25 の既定はオフ）。オフの端末では点検スクリプトが届かず、フックは何もしない。片方だけが新しい間は、Vault のノートを編集するたびに、フックが「写しと違う」と知らせる。
+
 点検スクリプトを変えたら、通常のターミナルで dotfiles のルートに移動して、次の順に写しを更新する。まず、sandbox から書けない一時ディレクトリに写して、今の写しとの差分をレビューする。問題がなければ、その写しで置き換えてコミットする。Vault の点検スクリプトを直接写しの場所に `cp` しない（写した時点で Vault の版と一致し、レビューの前に Vault のセッションで実行されうる）。更新するまでは、Vault のノートを編集するたびに、フックが「写しと違う」と Claude に伝えて点検しない。
 
 ```shell
