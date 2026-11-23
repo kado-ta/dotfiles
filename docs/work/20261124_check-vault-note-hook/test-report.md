@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: done
 created: 2026-11-24
 ---
 
@@ -23,6 +23,7 @@ Codex のレビューへの対応（`5af70d3` の次のコミット）の時点�
 | --- | --- | --- |
 | Claude Code の sandbox | `bash claude/hooks/tests/test-check-vault-note.sh` | pass=23 fail=0 skip=1（Seatbelt の中の確認はスキップ） |
 | ユーザーのターミナル | `CHECK_VAULT_NOTE_SEATBELT_REQUIRED=1 bash claude/hooks/tests/test-check-vault-note.sh` | pass=40 fail=0 skip=0（`561899c`） |
+| GitHub Actions（macOS のランナー、PR #102） | Shell hook tests（`CHECK_VAULT_NOTE_SEATBELT_REQUIRED=1`） | `test-check-vault-note.sh` は pass=40 fail=0 skip=0。ランナーでも `sandbox-exec` が動いた。Hook regression tests・Repository checks とも通過（`24cd456`、`main` のマージ後） |
 | Claude Code の sandbox | 既存のフックの試験 7 本 | すべて fail=0 |
 | Claude Code の sandbox | `python3 -B .github/scripts/check-repo.py`、`python3 -B .github/scripts/test-check-repo.py`、shellcheck、`actionlint` | すべて通過 |
 
