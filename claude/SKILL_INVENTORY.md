@@ -247,7 +247,7 @@ sandbox の外で `/cso` を実行すると、保存先に秘密ファイルの�
 | `/doctor`・`/skill-doctor` | 設定とスキルの一覧の診断 | 明示（CLI のコマンド） | 有効 |
 
 - 組み込みの `/review` は、同じ名前の gstack のスキルに隠れている。
-- Bash ツールの説明の「commit の直前に `/verify` を実行する」という指示は、`verify` か `simplify` という名前の、Claude が起動できるユーザー・project のスキルがあるときに Claude Code が入れる（組み込みとプラグインのスキルは数えない）。これまでは gstack の `verify` がこれに当たり、2026-10-27〜11-16 に 35 セッションで 65 回起動した。2026-11-16 に、このままにすると決めた（[research-routing.md](../docs/work/20261116_skill-role-division/research-routing.md#verify)）。gstack 1.103.0.0 で `build-check` に改名され、2026-11-23 に新しいセッションで、この指示が出なくなったことを確かめた。commit の前の検査は、CLAUDE.md の Verification 節で行う。組み込みの `/verify` は、記録した手順がないと、うまくいった手順をリポジトリのルート（monorepo では変更したパッケージのディレクトリ）の `.claude/skills/verify/SKILL.md` に書く。ルートに書いたものは project のスキルとして数えられ、次に始めるセッションから指示が戻る（公式ドキュメントの「Run and verify your app」と「Run your checks before each commit」）。
+- Bash ツールの説明の「commit の直前に `/verify` を実行する」という指示は、セッションの開始時に、`verify` か `simplify` という名前の、Claude が起動できるスキルが enterprise・個人・project・追加ディレクトリのどれかにあるとき（同じ名前の `.claude/commands/` のファイルも数える）に Claude Code が入れる。組み込み・プラグイン・claude.ai のスキルは数えない。docs と tests の変更は、この指示の対象から外れる。これまでは gstack の `verify` がこれに当たり、2026-10-27〜11-16 に 35 セッションで 65 回起動した。2026-11-16 に、このままにすると決めた（[research-routing.md](../docs/work/20261116_skill-role-division/research-routing.md#verify)）。gstack 1.103.0.0 で `build-check` に改名され、2026-11-23 に新しいセッションで、この指示が出なくなったことを確かめた。commit の前の検査は、CLAUDE.md の Verification 節で行う。組み込みの `/verify` は、記録した手順がないと、うまくいった手順をリポジトリのルート（monorepo では変更したパッケージのディレクトリ）の `.claude/skills/verify/SKILL.md` に書く。ルートに書いたものは project のスキルとして数えられ、次に始めるセッションから指示が戻る（公式ドキュメントの「Run and verify your app」と「Run your checks before each commit」）。
 
 <a name="agents"></a>
 
