@@ -15,7 +15,7 @@
     "understand-anything:tour-builder"
   ],
   "gstack": {
-    "version": "1.102.2.0"
+    "version": "1.103.0.0"
   },
   "plugin_hooks": {
     "crit@crit": [
@@ -115,6 +115,14 @@
     },
     "browse": {
       "description": "sha256:ff34f439f758ff9b",
+      "dmi": false,
+      "hooks": null,
+      "override": "on",
+      "provider": "gstack",
+      "user_invocable": true
+    },
+    "build-check": {
+      "description": "sha256:fd345b08048e300f",
       "dmi": false,
       "hooks": null,
       "override": "on",
@@ -1326,14 +1334,6 @@
       "dmi": false,
       "hooks": null,
       "override": "user-invocable-only",
-      "provider": "gstack",
-      "user_invocable": true
-    },
-    "verify": {
-      "description": "sha256:6a3371be1884eea1",
-      "dmi": false,
-      "hooks": null,
-      "override": "on",
       "provider": "gstack",
       "user_invocable": true
     },

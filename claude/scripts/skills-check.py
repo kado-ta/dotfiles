@@ -25,7 +25,7 @@ BUILTINS = {
     "code-review", "simplify", "security-review", "init", "update-config", "fewer-permission-prompts",
     "loop", "schedule", "run", "claude-api", "workflow-authoring", "plugin-authoring", "keybindings-help",
     "claude-in-chrome", "dataviz", "artifact-design", "artifact-diagramming", "artifact-capabilities",
-    "doctor", "skill-doctor", "plugin",
+    "doctor", "skill-doctor", "plugin", "verify",
 } | {f"anthropic-skills:{n}" for n in (
     "built-in-browser", "chrome-browser", "computer-use", "deep-research", "docs", "docx",
     "google-workspace", "import-memory", "morning", "pdf", "pptx", "skill-creator", "xlsx")}
