@@ -52,8 +52,8 @@ check 0 'drop with data only' '{"tool_name":"mcp__playwright__browser_drop","too
 # A cookie path is a URL path, not a file.
 check 0 'cookie path' '{"tool_name":"mcp__playwright__browser_cookie_list","tool_input":{"path":"/"}}'
 check 0 'local dev server' '{"tool_name":"mcp__playwright__browser_navigate","tool_input":{"url":"http://localhost:3000/"}}'
-check 0 'port just below the Crit range' '{"tool_name":"mcp__playwright__browser_navigate","tool_input":{"url":"http://localhost:47809/"}}'
-check 0 'port just above the Crit range' '{"tool_name":"mcp__playwright__browser_navigate","tool_input":{"url":"http://localhost:47830/"}}'
+check 0 'port just below the blocked range' '{"tool_name":"mcp__playwright__browser_navigate","tool_input":{"url":"http://localhost:47799/"}}'
+check 0 'port just above the blocked range' '{"tool_name":"mcp__playwright__browser_navigate","tool_input":{"url":"http://localhost:47830/"}}'
 
 # Claude Code writes the whole input through a pipe; a hook that exits without reading it
 # makes the writer fail (SIGPIPE) once the input outgrows the buffer. A file redirect would not show that.
@@ -116,7 +116,10 @@ check 2 'file upload with paths' '{"tool_name":"mcp__playwright__browser_file_up
 check 2 'empty paths' '{"tool_name":"mcp__playwright__browser_drop","tool_input":{"target":"e1","paths":[]}}'
 
 # cc-crit's Crit waits on 47810-47829; opening it would let the model press Finish Review itself.
+# The hook also blocks 47800-47809, part of the range before the move, so an old cc-crit stays covered.
 nav='"tool_name":"mcp__playwright__browser_navigate"'
+check 2 'port from the range before the move' "{${nav},\"tool_input\":{\"url\":\"http://localhost:47800/\"}}"
+check 2 'last port before the current range' "{${nav},\"tool_input\":{\"url\":\"http://localhost:47809/\"}}"
 check 2 'Crit on localhost' "{${nav},\"tool_input\":{\"url\":\"http://localhost:47812/\"}}"
 err=$(<"$T/err")
 case "$err" in

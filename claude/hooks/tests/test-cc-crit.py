@@ -894,8 +894,8 @@ class SigtermTests(RunBase):
         self.assertEqual(self.recorded("open"), [])
 
 
-class ProfilePortTests(unittest.TestCase):
-    """profile が待ち受けと接続を許すポートは、ラッパーが使うポートと同じにする。"""
+class PortRangeTests(unittest.TestCase):
+    """ラッパーが使うポート（PORTS）を、profile と Playwright MCP の守りにそろえる。"""
 
     def test_profile_network_ports_match_the_wrapper(self):
         profile = (BIN / "cc-crit.sb").read_text(encoding="utf-8")
@@ -911,6 +911,21 @@ class ProfilePortTests(unittest.TestCase):
     def test_ports_exclude_47809(self):
         # 47809 を別のアプリケーションが使う端末がある。範囲に入れると、check_ports がそこで常に拒否する。
         self.assertNotIn(47809, wrapper.PORTS)
+
+    def test_playwright_guards_cover_the_wrapper_ports(self):
+        # Playwright MCP から Crit を開かせない守り（--blocked-origins とフック）は、PORTS をすべて止める。
+        # 移す前の範囲も止めているので、一致ではなく包含を確かめる。
+        claude = BIN.parent
+        args = json.loads((claude / "mcp" / "playwright.json").read_text(encoding="utf-8"))["args"]
+        blocked = set(args[args.index("--blocked-origins") + 1].split(";"))
+        self.assertLessEqual({f"*:{p}" for p in wrapper.PORTS}, blocked)
+        hook = claude / "hooks" / "guard-playwright-mcp.sh"
+        for port in wrapper.PORTS:
+            with self.subTest(port=port):
+                payload = json.dumps({"tool_name": "mcp__playwright__browser_navigate",
+                                      "tool_input": {"url": f"http://127.0.0.1:{port}/"}})
+                cp = subprocess.run(["/bin/bash", str(hook)], input=payload, text=True, capture_output=True)
+                self.assertEqual(cp.returncode, 2, cp.stderr)
 
 
 CLT = "/Library/Developer/CommandLineTools/usr/bin"
