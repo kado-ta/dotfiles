@@ -18,6 +18,7 @@
 - [C. 迷いやすいスキルの使い分け](#comparisons)
 - [D. 規模別の推奨構成](#by-size)
 - [E. 利用例](#examples)
+- [F. スキル・プラグインのアップデート](#update)
 
 <a name="by-task"></a>
 
@@ -123,3 +124,22 @@
 | 「orders テーブルの status を enum に変えたい。既存データと API の互換性を保って」 | 高リスク: `writing-plans`（移行とロールバック）→ `/crit-review` → `/pstack:blast-radius` を提案 → TDD → `/review` → Codex を提案 |
 | 「この PR をレビューして」 | `/review`。高リスクなら `/pstack:interrogate` と Codex を提案する |
 | 「ALB のリスナーに Cloudflare からの通信だけを許可する Terraform を書いて」 | 高リスク: `writing-plans` → `terraform plan` まで → `/security-review` → Codex を提案。apply はしない |
+
+<a name="update"></a>
+
+## F. スキル・プラグインのアップデート
+
+gstack・プラグイン・crit の CLI を更新するときの流れ。`update-skills.sh` の説明は [README.md の「スキル・プラグインのアップデート」](README.md#setup-update)、理由と提供元ごとの注意は [SKILL_INVENTORY.md の「更新したときの見直し」](SKILL_INVENTORY.md#upgrade) にある。
+
+| # | すること | 誰が・どこで | コマンド・スキル |
+| --- | --- | --- | --- |
+| 1 | まとめて更新する | ユーザーが通常のターミナルで | `/bin/bash ~/dotfiles/claude/scripts/update-skills.sh`（dotfiles では `mise run claude:update`） |
+| 2 | 入っている状態と文書を照合し、違いがあれば文書を直す | Claude が dotfiles のセッションで（再起動の前に） | `/sync-skill-docs`（「gstack を更新した」と伝えるだけでもよい） |
+| 3 | スナップショットを作り直す（2 で文書を直したときだけ） | ユーザーが通常のターミナルで | 2 の最後に Claude が示す `/usr/bin/python3 -B <root>/claude/scripts/skills-check.py snapshot` |
+| 4 | 文書の差分を承認する | ユーザーが Crit で | 2 の最後に Claude が開く `/crit-review` |
+| 5 | Claude Code を再起動する | ユーザー | 更新した hooks とプラグインは、再起動した後のセッションで読み込まれる |
+
+- 1 は Claude Code のプロンプトの `!` で実行しない。`!` はセッションによっては sandbox の中で動き、更新も cc-crit の profile テストも失敗する。
+- 1 で、確認が要るプラグイン（マーケットプレイスが宣言したインストールコマンドが変わったもの）は失敗に数えられる。通常のターミナルで `claude plugin update <id> --scope user` を実行する。
+- gstack の新しい版があるかだけを見るなら、zsh の `gstack-upgrade --check`。Claude Code の `/gstack-upgrade` で更新したときは、後で通常のターミナルで `/usr/bin/python3 -B ~/dotfiles/claude/scripts/settings-home-paths.py` を実行する（gstack が `claude/settings.json` に書いた絶対パスを `~/` に戻す）。
+- 2 で Claude は `claude/settings.json` を直さず、提案だけをする（増えた gstack のスキルの `skillOverrides` など）。採るかはユーザーが決めて編集する。
