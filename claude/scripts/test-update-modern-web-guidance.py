@@ -548,6 +548,22 @@ class UpdateModernWebGuidanceTest(unittest.TestCase):
             with self.subTest(extra=[m[0].name for m in extra]):
                 self.assert_apply_fails_without_writes(extra=extra)
 
+    def test_non_canonical_entries_not_imported(self):
+        # 取り込まないエントリーも、展開するときは正規のパスと同じ場所を指すので、検査をすり抜けさせない
+        # （Codex のレビュー: package/./package.json が、検証した package.json を上書きしうる）。
+        deps = '{"name": "modern-web-guidance", "dependencies": {"x": "1"}}'.encode()
+        for name in ("package/./package.json", "package//package.json", "package/./binding.gyp",
+                     "package/gen/../package.json", "package/gen//a.js"):
+            with self.subTest(name=name):
+                self.assert_apply_fails_without_writes(extra=[member(name, deps)], reason="安全でないパス")
+
+    def test_non_file_entries_not_imported(self):
+        # 取り込まないエントリーでも、シンボリックリンクなどはインストールで作られるので止める。
+        info = tarfile.TarInfo("package/gen/link")
+        info.type = tarfile.SYMTYPE
+        info.linkname = "../LICENSE"
+        self.assert_apply_fails_without_writes(extra=[(info, None)], reason="通常のファイルでない")
+
     def test_binding_gyp(self):
         # ルートの binding.gyp があると、インストールで node-gyp rebuild が暗黙に動く。
         self.assert_apply_fails_without_writes(extra=[member("package/binding.gyp")], reason="binding.gyp")

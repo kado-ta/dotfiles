@@ -47,7 +47,7 @@ created: 2026-11-23
 
 | コマンド | 結果 |
 | --- | --- |
-| `python3 -B claude/scripts/test-update-modern-web-guidance.py`（mise と `/usr/bin/python3`） | OK（58 件。レビューの前は 30 件、1 回目の修正の後は 49 件） |
+| `python3 -B claude/scripts/test-update-modern-web-guidance.py`（mise と `/usr/bin/python3`） | OK（60 件。レビューの前は 30 件、1 回目の修正の後は 49 件、2 回目の修正の後は 58 件） |
 | `/usr/bin/python3 -B claude/scripts/test-update-skills.py` | OK（15 件。レビューの前は 14 件） |
 | `python3 -B .github/scripts/test-check-repo.py` | OK（87 件） |
 | `python3 -B claude/scripts/test-skills-check.py` | OK |
@@ -102,6 +102,8 @@ created: 2026-11-23
 - 戻しの失敗時に写しを残すこと
 - 前になかったスキルの片付け
 
+Codex のレビューの指摘（D6）を直した後に足した 2 つ（取り込まないエントリーへの、正規のパスの検査と、通常のファイルの検査）も、外すとテストが失敗した。
+
 <a name="review"></a>
 
 ## レビュー
@@ -109,6 +111,8 @@ created: 2026-11-23
 `/review` の 1 回目は、Testing・Maintainability・Security・Performance・Simplification の 5 つの観点、攻撃者視点のレビュー、Red Team のサブエージェントで行った（State Machines の観点は、信号が権限の `deny` の一覧に反応しただけで、状態遷移がないので出さなかった。Codex の外部のレビューは、規則でユーザーが通常のターミナルで実行するので、ここでは実行していない）。CRITICAL 4 件・INFORMATIONAL 17 件の指摘を受け、ユーザーが D1〜D4 を選んだ（[計画のレビューで変えたこと](plan.md#review-changes)）。19 件を直し、2 件（上流の modern-web-guidance のスキルに増えたファイル、NOTICE）は受け入れるリスクにした。
 
 2 回目は、直した差分を自分で読み直し、攻撃者視点のレビューを 1 つ出した。専門観点のレビューは出し直していない。8 件の指摘を受け、ユーザーが D5（すべて直す）を選んだ。直した後に、本物の 1.0.1 から `--out` で生成し直したものは、強くした検証をすべて通り、置いてあるスキルと一致した。
+
+コミット（`074ee93`）の後、ユーザーが通常のターミナルで `codex review --base main` を実行した。指摘は P2 の 1 件（取り込まないエントリーの正規でないパス）で、ユーザーの承認のもとで直した（D6）。Codex は、メモリ上の再現で入力が通ることを確かめていた。直した後も、本物の 1.0.1 は検証を通り、置いてあるスキルと一致した。
 
 2 回目のサブエージェントは、自分の Bash が sandbox の外で動いていた（`$HOME` に書けた）と報告し、確かめるために `$TMPDIR` と `$HOME` に空のディレクトリを作ってすぐ消したと書いた。指示はファイルの編集を禁じていた。この実行は確かめていない。
 

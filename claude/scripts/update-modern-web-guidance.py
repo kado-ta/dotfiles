@@ -120,14 +120,16 @@ def wanted(rel):
             or rel.startswith(f"skills/{CHROME}/"))
 
 
-def check_member_path(rel, name):
-    """tarball の中の相対パスを、正規の形（//・.・.. や末尾の / がない）だけに限る。"""
+def check_canonical_path(rel, name):
+    """tarball の中の相対パスを、正規の形（//・.・.. や末尾の / がない）だけに限る。
+
+    取り込まないエントリーにも当てる。展開するときは正規のパスと同じ場所を指すので、検証したファイルを
+    上書きしたり、禁止したファイルを置いたりできてしまうため。
+    """
     parts = PurePosixPath(rel).parts
     if (not rel or rel.startswith("/") or "\\" in rel or str(PurePosixPath(rel)) != rel
             or any(part in ("", ".", "..") for part in parts)):
         raise Failure(f"tarball に安全でないパスがある: {name!r}")
-    if any(part.startswith(".") for part in parts):
-        raise Failure(f"tarball にドットで始まる名前がある: {name!r}")
 
 
 def read_package(tgz):
@@ -145,7 +147,11 @@ def read_package(tgz):
                 if not member.name.startswith("package/"):
                     raise Failure(f"tarball に package/ の外のエントリーがある: {member.name!r}")
                 rel = member.name[len("package/"):]
-                # 取り込まないファイルも含めて、重複と、大文字小文字・Unicode の正規化だけが違う名前を止める
+                # ここからの検査は、取り込まないエントリーにも当てる。
+                check_canonical_path(rel, member.name)
+                if not member.isfile():
+                    raise Failure(f"tarball に通常のファイルでないものがある: {member.name!r}")
+                # 重複と、大文字小文字・Unicode の正規化だけが違う名前を止める
                 # （大文字小文字を区別しない APFS などで、検証した内容が別の名前のファイルに上書きされないように）。
                 key = unicodedata.normalize("NFC", rel).casefold()
                 if key in seen:
@@ -155,9 +161,8 @@ def read_package(tgz):
                     raise Failure("tarball に binding.gyp がある（インストールで node-gyp rebuild が動く）")
                 if not wanted(rel):
                     continue
-                check_member_path(rel, member.name)
-                if not member.isfile():
-                    raise Failure(f"tarball に通常のファイルでないものがある: {member.name!r}")
+                if any(part.startswith(".") for part in PurePosixPath(rel).parts):
+                    raise Failure(f"tarball にドットで始まる名前がある: {member.name!r}")
                 total += member.size
                 if total > MAX_TOTAL_BYTES:
                     raise Failure(f"取り込むファイルの合計が {MAX_TOTAL_BYTES} バイトを超えた")

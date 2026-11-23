@@ -94,10 +94,10 @@ created: 2026-11-23
 5. `npm pack modern-web-guidance@<版>` を実行する。
 6. tarball から、`package/LICENSE`・`package/package.json`、`package/skills/modern-web-guidance/` の `SKILL.md`・`skill-version.txt`、`package/skills/chrome-extensions/` の下の全ファイルだけをメモリに読む（ディスクに展開しない）。次のどれかに当たれば失敗する。
    - `package/` の外のエントリーがある（インストーラーは先頭の階層を名前によらず取り除くので、検査していない package.json がインストールで使われうる）
+   - 取り込まないものも含めて、名前が正規の相対パスでない（`//`・`.`・`..`・絶対パス・末尾の `/`・`\`）。展開するときは正規のパスと同じ場所を指すので、`package/./package.json` が検証した package.json を上書きしうるため（Codex のレビューの指摘）
+   - 取り込まないものも含めて、通常のファイルでない（シンボリックリンクなど）
    - 取り込まないファイルも含めて、重複か、大文字小文字・Unicode の正規化だけが違う名前がある（大文字小文字を区別しない APFS で、検証した内容が上書きされないように）
    - ルートに `binding.gyp` がある（インストールで node-gyp rebuild が暗黙に動く）
-   - 取り込むファイルが、通常のファイルでない
-   - 取り込むファイルの名前が、正規の相対パスでない（`//`・`.`・`..`・絶対パス・末尾の `/`・`\`）
    - 取り込むファイルの名前が、ドットで始まる（`.gitignore` などで差分から隠せないように）
    - 取り込むファイルの合計が 2 MB を超える
    - 壊れた tarball
@@ -199,6 +199,7 @@ Bash(npm *modern-web-guidance*)
 | D2 | セキュリティの 7 件を直す | `//` を含むパスが検査を抜けて、任意の絶対パスに書けた（再現した）。frontmatter をそのまま写していた。大文字小文字だけが違う名前で、検証した SKILL.md が上書きされうる。ドットで始まる名前で差分から隠せる。package.json の依存とインストール時のスクリプトを見ていない。npm が作業ディレクトリの `.npmrc` と共有のキャッシュを読む。npx 系の網羅（`npm x`・`bun x`・`yarn dlx`） |
 | D3 | 堅牢性・テスト・文書を直す | 戻し方の案内にパスがなく、共有の作業ツリーでほかのファイルを消しうる。書き込みの途中の失敗で元に戻さない。壊れた tarball などで例外のまま終わる。latest が固定した版より古くても黙る。`check-repo.py` を取り込みの後に実行しない。テスト 3 件が失敗しえない。sandbox の外で `git status` を自動で実行する |
 | D4 | sandbox の中から `~/.npm` に書ける問題は、GitHub Issue にして別の作業で扱う（#74） | この PR の前からある問題 |
+| D6 | Codex のレビュー（`codex review`）の P2 を直す | 取り込まないエントリーには正規のパスの検査が当たらず、`package/./package.json` や `package//package.json` が、検証した package.json を展開時に上書きしうる |
 | D5 | 2 回目のレビュー（攻撃者視点）の 8 件を直す | フェンス形式（` ```! `）の拒否がない。package.json の `bin` を確かめていない（mise の PATH で `git` などが置き換わる）。`package/` の外や重複のエントリーと `binding.gyp`。`chrome-extensions` がどんな名前でも受け入れる（`CLAUDE.md` など）。`check-repo.py` が git を使う点が、テストと計画と食い違う。入れ替えの戻しが不完全。npx 系の検出の抜け（オプション付き・行の継続・`deno`）。npm の `--prefix` |
 
 <a name="risks"></a>
