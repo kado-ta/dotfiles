@@ -20,6 +20,7 @@ created: 2026-11-24
   - 47800〜47808 に縮める: もう一方の端末で空いていたことがわかっている（`check_ports` は 47800 から順に調べ、47809 で止まった）。ただし、同時に開けるレビューは 9 つになる。
   - 47809 だけ抜く（19 ポート）: 範囲が飛び飛びになり、正規表現・profile・テストが読みにくくなる。
 - 47810〜47829 は、もう一方の端末でも空いている。2026-11-24 に人間が `sudo lsof -nP -iTCP:47810-47829 -sTCP:LISTEN` を実行し、何も出なかった。入れる直前にもう一度確かめる（[入れる手順](#rollout)）。
+- Playwright MCP の守り（フックと `--blocked-origins`）は、新旧の範囲の和の 47800〜47829 を止める。cc-crit が使うのは 47810〜47829 だけ（2026-11-24、`/review` の後の人間の判断。理由は[レビューで変えたこと](#review-changes)）。
 
 <a name="changes"></a>
 
@@ -29,10 +30,10 @@ created: 2026-11-24
 | --- | --- |
 | `claude/bin/cc-crit` | `PORTS = range(47810, 47830)` |
 | `claude/bin/cc-crit.sb` | bind・inbound・outbound の 60 項目とコメントを 47810〜47829 にする |
-| `claude/hooks/guard-playwright-mcp.sh` | 正規表現を `:0*478[12][0-9](?![0-9])` にし、コメントとメッセージの範囲を変える |
-| `claude/mcp/playwright.json` | `--blocked-origins` を `*:47810;…;*:47829` にする |
+| `claude/hooks/guard-playwright-mcp.sh` | 正規表現を `:0*478[0-2][0-9](?![0-9])`（47800〜47829）にし、コメントとメッセージの範囲を変える |
+| `claude/mcp/playwright.json` | `--blocked-origins` を `*:47800;…;*:47829`（30 項目）にする |
 | `claude/README.md` | 範囲の記述 3 か所 |
-| `.claude/rules/CLAUDE_CONFIG.md` | 範囲の記述 1 か所 |
+| `.claude/rules/CLAUDE_CONFIG.md` | 範囲の記述と、移す前の範囲も止める理由 |
 | テスト 4 つ | [テスト](#tests)のとおり |
 
 完了した作業文書（`docs/work/2026111*`）の 47800〜47819 は、その時点の記録なので変えない。
@@ -45,10 +46,10 @@ created: 2026-11-24
 
 | テスト | 変更 | 変更前の実装での結果 |
 | --- | --- | --- |
-| `claude/hooks/tests/test-cc-crit.py` | profile の bind・inbound・outbound のポートが、それぞれ `PORTS` と同じ並びであることを確かめる静的なテストを足す。`PORTS` に 47809 が入らないことも確かめる | 47809 のテストが失敗する |
+| `claude/hooks/tests/test-cc-crit.py` | profile の bind・inbound・outbound のポートが、それぞれ `PORTS` と同じ並びであることを確かめる静的なテストを足す。`PORTS` に 47809 が入らないことも確かめる。フックが `PORTS` のすべてを止め、`--blocked-origins` が `PORTS` を含むことを確かめるテストも足す | 47809 のテストが失敗する |
 | `claude/hooks/tests/test-cc-crit-profile.py` | `PORTS` を新しい範囲にする。47809 での待ち受けと、47809 への接続が拒否されるテストを足す | 47809 のテストが失敗する（sandbox の外でだけ動く） |
-| `claude/hooks/tests/test-guard-playwright-mcp.sh` | 範囲のすぐ外を 47809 と 47830 にし、止める例を新しい範囲（境界の 47810・47829 を含む）に変える | 47809 が止まり、新しい範囲の 47820〜47829 が通って失敗する |
-| `claude/scripts/test-register-mcp.py` | `--blocked-origins` の期待値を `range(47810, 47830)` にする | 失敗する |
+| `claude/hooks/tests/test-guard-playwright-mcp.sh` | 止める範囲のすぐ外を 47799 と 47830 にし、止める例に 47800・47809 と新しい範囲（境界の 47810・47829 を含む）を入れる | 新しい範囲の 47820〜47829 が通って失敗する |
+| `claude/scripts/test-register-mcp.py` | `--blocked-origins` の期待値を `range(47800, 47830)` にする | 失敗する |
 
 <a name="verification"></a>
 
@@ -63,27 +64,35 @@ sandbox の中（Claude）:
 
 sandbox の外（人間。差分を Crit で確かめた後）:
 
-- worktree で `/usr/bin/python3 -B claude/hooks/tests/test-cc-crit-profile.py`（リポジトリの profile を試す）
-- 入れた後に、`mise run crit:profile-test` と、`/crit-review` で Crit が 47810 で開くこと
+- worktree で、47809 の拒否のテストが古い profile で失敗し、新しい profile で通ること（リポジトリの profile を試す）:
+
+  ```sh
+  git show c007b65:claude/bin/cc-crit.sb > "$TMPDIR/cc-crit-old.sb"
+  CC_CRIT_PROFILE="$TMPDIR/cc-crit-old.sb" /usr/bin/python3 -B claude/hooks/tests/test-cc-crit-profile.py -k excluded  # 2 件失敗する
+  /usr/bin/python3 -B claude/hooks/tests/test-cc-crit-profile.py  # すべて通る
+  ```
+
+- 入れた後に、[入れる手順](#rollout)の `cmp` と `mise run crit:profile-test`、`/crit-review` で Crit が 47810 で開くこと
 
 <a name="rollout"></a>
 
 ## 入れる手順（端末ごと）
 
-フック（リンクで即座に効く）・cc-crit（sudo で入れ直す）・Playwright MCP の定義（`register-mcp.sh` で登録し直す）の 3 つで、効き始める時期がずれる。Crit が待ち受けるポートを、フックか `--blocked-origins` のどちらかが常に止めているように、次の順で行う。
+フック（main を取り込むと、リンクで即座に効く）・cc-crit（sudo で入れ直す）・Playwright MCP の定義（`register-mcp.sh` で登録し直す）の 3 つは、効き始める時期がずれる。フックが止めるのはツールの `url` 引数での直接の移動だけで、JS やリンクでの移動は `--blocked-origins` だけが止める。どちらも新旧の範囲の和（47800〜47829）を止めるので、古い cc-crit の Crit も新しい cc-crit の Crit も、入れる順番によらず止まる。
 
-1. 開いている Crit のレビューをすべて終える（承認すると daemon は止まる）。古い範囲で動いている daemon が残ると、手順 4 の後はどちらも止めない。
-2. `sudo lsof -nP -iTCP:47810-47829 -sTCP:LISTEN` で何も出ないことを確かめる（`sudo` がないと、ほかのユーザーのプロセスが見えない）。出たら入れずに止め、範囲を考え直す。
-3. `~/dotfiles` で main を取り込み、[README のインストール](../../../claude/README.md#cc-crit-install)のとおりに `cc-crit` と `cc-crit.sb` を入れ直し、`mise run crit:profile-test` を実行する。
-4. Playwright MCP を使っているセッションを閉じ、`/bin/bash ~/dotfiles/claude/scripts/register-mcp.sh` を実行する。
+1. 開いている Crit のレビューをすべて終える（承認すると daemon は止まる）。前に開いたレビューには、入れ直した後の `cc-crit reply` が届かない。
+2. `sudo lsof -nP -iTCP:47800-47829 -sTCP:LISTEN` で、crit の daemon が残っていないことと、47810〜47829 にほかのアプリケーションがないことを確かめる（`sudo` がないと、ほかのユーザーのプロセスが見えない）。もう一方の端末の 47809 のアプリケーションは出てよい。47810〜47829 にほかのアプリケーションがあれば、入れずに止め、範囲を考え直す。
+3. `~/dotfiles` で main を取り込み、[README のインストール](../../../claude/README.md#cc-crit-install)のとおりに `cc-crit` と `cc-crit.sb` を入れ直す。`cmp claude/bin/cc-crit /usr/local/libexec/claude-crit/cc-crit` と `cmp claude/bin/cc-crit.sb /usr/local/libexec/claude-crit/cc-crit.sb` が何も出さないことを確かめてから、`mise run crit:profile-test` を実行する。このテストはリポジトリの profile を試すので、入れたものとの一致は `cmp` で確かめる。
+4. Playwright MCP を使っているセッションを閉じ、`/bin/bash ~/dotfiles/claude/scripts/register-mcp.sh` を実行する。動いている MCP サーバーは、セッションを始め直すまで前の定義のまま。
+5. 新しいセッションで `/crit-review` を実行し、Crit が 47810 で開くことを確かめる。
 
-手順 4 を 3 より先にしない（`setup.sh` も `register-mcp.sh` を呼ぶ）。古い cc-crit が 47800 で Crit を開いたとき、フックも `--blocked-origins` も止めなくなる。手順 3 と 4 のあいだは、フックが新しい範囲を止める。
+手順 3 と 4 は、どちらを先にしてもよい（`setup.sh` が `register-mcp.sh` を先に呼んでもよい）。残る隙間は、`--blocked-origins` が前の定義（47800〜47819）のあいだに、47820〜47829 へ JS やリンクで移動される場合だけ。新しい cc-crit が 47820 を使うのは、同時に 11 件以上のレビューを開いたときだけ。
 
 <a name="rollback"></a>
 
 ## 戻す手順
 
-PR を revert して main を取り込み、上と同じ順で、`cc-crit` と `cc-crit.sb` を入れ直してから `register-mcp.sh` を実行する。もう一方の端末では、47809 があるので、cc-crit は前と同じく拒否する。
+開いているレビューを終えてから、PR を revert して main を取り込み、`cc-crit` と `cc-crit.sb` を入れ直して、`register-mcp.sh` を実行する（順番は問わない）。戻した後は、フックと `--blocked-origins` も 47800〜47819 に戻る。残る隙間は、入れる手順と同じく、同時に 11 件以上のレビューを開いたときの 47820〜47829 だけ。もう一方の端末では、47809 があるので、cc-crit は前と同じく拒否する。
 
 <a name="risks"></a>
 
@@ -91,10 +100,25 @@ PR を revert して main を取り込み、上と同じ順で、`cc-crit` と `
 
 - 変更の前に開いたレビューに、変更の後の `cc-crit reply` は届かない（`PORTS` の外の記録は使わない）。手順 1 で避ける。
 - 専用 HOME の古い session ファイル（47800〜47819）は、`PORTS` の外なので無視される。消す必要はない。
-- 守りの強さは変わらない。範囲の広さは同じで、profile・フック・`--blocked-origins` は同じ範囲を指す。
+- cc-crit の範囲の広さ（20）は変わらない。フックと `--blocked-origins` は 47800〜47829 を止めるので、Playwright MCP から 47800〜47809（もう一方の端末の 47809 のアプリケーションも）を開けなくなる。
+- 47809 のアプリケーションが何かは分かっていない。2 つ目のインスタンスで 47810 を使う種類なら、cc-crit はまた拒否する（拒否する側に倒れるので、起きるのは使えなくなることだけ）。
 
 <a name="review"></a>
 
 ## レビュー
 
 高リスク（sandbox の profile のネットワークと、承認を守るフック）なので、`/review` の後に `/security-review` を行い、Codex のレビューを提案する。push と PR の前に、ブランチの差分を `/crit-review` で開く。
+
+<a name="review-changes"></a>
+
+## レビューで変えたこと
+
+`/review`（専門レビュー 5 つと adversarial）の指摘のうち、次を採った（2026-11-24、人間の判断）。
+
+- フックと `--blocked-origins` は、新旧の範囲の和（47800〜47829）を止める。
+  - 3 つの部品は更新の時期がずれ、`register-mcp.sh` は `setup.sh` や Node の更新でも動く。
+  - どちらの守りも新しい範囲だけにすると、`register-mcp.sh` が sudo での入れ直しより先に動いたとき、古い cc-crit が 47800 で開いた Crit を、フックも `--blocked-origins` も止めない。戻すときも同じことが起きる。
+  - 和にすれば、順番によらず守られる。代わりに、Playwright MCP から 47800〜47809 を開けなくなる。
+- `test-cc-crit.py` に、フックが `PORTS` のすべてを止め、`--blocked-origins` が `PORTS` を含むことを確かめるテストを足す。範囲を書く 4 か所のうち、`PORTS` と照らしていたのは profile だけだった。
+- 入れたファイルとリポジトリを `cmp` で比べる手順を足す。`mise run crit:profile-test` はリポジトリの profile を試すので、入れ忘れや、違うブランチからの入れ直しに気づけない。cc-crit の起動時に確かめる案は採らない（root 所有のラッパーに profile の解析を足すことになり、依頼の範囲を超える）。
+- 47809 の拒否のテストを、古い profile で失敗させてから新しい profile で通す手順を、[確かめること](#verification)に足す。
