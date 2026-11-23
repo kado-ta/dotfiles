@@ -60,9 +60,12 @@ DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 ANCHOR_RE = re.compile(r'<a\s+name="([^"]*)"\s*>\s*</a>')
 ANCHOR_LINE_RE = re.compile(r'^\s*<a\s+name="[^"]*"\s*>\s*</a>\s*$')
 FENCE_RE = re.compile(r"^ {0,3}(`{3,}|~{3,})")
-QUOTE_RE = re.compile(r"^(?: {0,3}> ?)*")
+QUOTE_MARK_RE = re.compile(r"^ {0,3}> ?")
+LIST_MARK_RE = re.compile(r"^ {0,3}(?:[-+*]|\d{1,9}[.)])(?= |$)")
+THEMATIC_BREAK_RE = re.compile(r"^ {0,3}([-*_])(?: *\1){2,} *$")
+COMMENT_START_RE = re.compile(r"^ {0,3}<!--")
 HEADING_RE = re.compile(r"^ {0,3}(#{1,6})[ \t]+(.*?)(?:[ \t]+#+)?[ \t]*$")
-INLINE_CODE_RE = re.compile(r"(`+)(.+?)\1")
+INLINE_RE = re.compile(r"(<!--.*?-->)|(`+)(.+?)\2")  # 1 行の中の HTML コメントかインラインコード。左から先に始まるほう
 LINK_RE = re.compile(r"\]\((<[^>\n]*>|[^)\s]*)(?:\s+(?:\"[^\"]*\"|'[^']*'))?\)")
 SCHEME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:")
 CALLOUT_RE = re.compile(r"^\s*(?:>\s*)+\[!([^\]]*)\]([-+]?)(.*)$")
@@ -284,31 +287,109 @@ def check_properties(rel: str, props: dict[str, Prop] | None, report: Report, ta
             report.warn(p.line, f"タグ {t} が _System/Tags.md の辞書にない")
 
 
-def mask_code(lines: list[str], start: int) -> list[str | None]:
-    """コードブロックの行を None にし、インラインコードの中身を x で伏せた行を返す。
+def match_containers(stack: list[int | None], text: str) -> tuple[int, str]:
+    """開いている入れ子のうち、この行が続けるものの数と、その記号と字下げを除いた残り。
 
+    stack の None は引用、数はリスト項目の内容が始まる桁（外側の入れ子の内容から数える）。text はタブを展開した行。
+    """
+    for k, width in enumerate(stack):
+        if width is None:
+            m = QUOTE_MARK_RE.match(text)
+            if not m:
+                return k, text
+            text = text[m.end():]
+        elif not text.strip(" "):
+            text = ""  # 空行はリスト項目を続ける
+        elif len(text) - len(text.lstrip(" ")) >= width:
+            text = text[width:]
+        else:
+            return k, text
+    return len(stack), text
+
+
+def open_containers(stack: list[int | None], text: str) -> str:
+    """行の先頭で始まる引用とリスト項目を stack に積み、残りを返す。"""
+    while True:
+        m = QUOTE_MARK_RE.match(text)
+        if m:
+            stack.append(None)
+            text = text[m.end():]
+            continue
+        m = LIST_MARK_RE.match(text)
+        if not m or THEMATIC_BREAK_RE.match(text):
+            return text
+        rest = text[m.end():]
+        spaces = len(rest) - len(rest.lstrip(" "))
+        if not rest.strip(" ") or spaces > 4:  # 空の項目と、字下げしたコードで始まる項目は、記号の 1 文字後から内容とする
+            spaces = 1
+        stack.append(m.end() + spaces)
+        text = rest[spaces:]
+
+
+def find_comment_end(lines: list[str], i: int, stack: list[int | None], block: bool) -> int | None:
+    """i 行目で閉じずに始まる HTML コメントを閉じる行の添字。閉じなければ None。
+
+    行頭の <!-- は HTML ブロックなので、空行をまたぐ。行の途中の <!-- は段落の中なので、空行で途切れる。
+    どちらも入れ子が続かない行で途切れる（段落の遅延継続は扱わず、伏せない側に倒す）。
+    """
+    for j in range(i + 1, len(lines)):
+        k, rest = match_containers(stack, lines[j].expandtabs(4))
+        if k < len(stack) or (not block and not rest.strip(" ")):
+            return None
+        if "-->" in lines[j]:
+            return j
+    return None
+
+
+def mask_inline(m: re.Match) -> str:
+    if m.group(1):
+        return " " * len(m.group(1))
+    return m.group(2) + "x" * len(m.group(3)) + m.group(2)
+
+
+def mask_code(lines: list[str], start: int) -> list[str | None]:
+    """点検しない行を None にし、ほかの行は HTML コメントを空白で、インラインコードの中身を x で伏せて返す。
+
+    点検しない行は、フェンスのコードブロックの行と、複数行の HTML コメントの間の行。
+    フェンスは引用とリスト項目の中でも認識し、その入れ子が続かない行で閉じる（CommonMark）。
+    閉じない <!-- は伏せない。伏せると、後ろの誤りをすべて隠すため。
     インラインコードの両端の ` は残す。** の前後の判定で記号として扱うため。
-    引用（> ...）の中のフェンスも扱う。引用の中のコードブロックは、同じ深さの閉じるフェンスか、引用の終わりで閉じる。
     """
     masked: list[str | None] = [None] * len(lines)
-    fence = None  # 開いているフェンスの記号と、引用の深さ
+    stack: list[int | None] = []  # 開いている入れ子（match_containers を参照）
+    fence = None  # 開いているフェンスの記号
+    comment_end = None  # 複数行の HTML コメントを閉じる行の添字
     for i in range(start, len(lines)):
-        line = lines[i]
-        quote = QUOTE_RE.match(line).group()
-        depth, body = quote.count(">"), line[len(quote):]
-        m = FENCE_RE.match(body)
-        if fence:
-            mark, fence_depth = fence
-            if depth >= fence_depth:
-                if depth == fence_depth and m and m.group(1)[0] == mark[0] and len(m.group(1)) >= len(mark) and not body.strip()[len(m.group(1)):].strip():
-                    fence = None
-                continue
-            fence = None  # 引用が終わったので、その中のコードブロックも閉じた。この行は通常どおり扱う
-        if m:
-            fence = (m.group(1), depth)
+        if comment_end is not None and i < comment_end:
             continue
-        line = re.sub(r"<!--.*?-->", lambda x: " " * len(x.group()), line)
-        masked[i] = INLINE_CODE_RE.sub(lambda x: x.group(1) + "x" * len(x.group(2)) + x.group(1), line)
+        k, rest = match_containers(stack, lines[i].expandtabs(4))
+        head = 0  # この行でコメントの外が始まる位置
+        if i == comment_end:
+            comment_end = None
+            head = lines[i].index("-->") + 3
+        elif fence and k == len(stack):
+            m = FENCE_RE.match(rest)
+            if m and m.group(1)[0] == fence[0] and len(m.group(1)) >= len(fence) and not rest.strip()[len(m.group(1)):].strip():
+                fence = None
+            continue
+        else:
+            fence = None  # 入れ子が続かなければ、その中のコードブロックも閉じる
+            del stack[k:]
+            rest = open_containers(stack, rest)
+            m = FENCE_RE.match(rest)
+            if m:
+                fence = m.group(1)
+                continue
+        line = " " * head + INLINE_RE.sub(mask_inline, lines[i][head:])
+        p = line.find("<!--")
+        if p >= 0:
+            block = head == 0 and bool(COMMENT_START_RE.match(rest)) and lines[i].find("<!--") == p
+            # ATX 見出しの中身は 1 行なので、見出しの中の <!-- は次の行に続かない
+            end = None if not block and HEADING_RE.match(rest) else find_comment_end(lines, i, stack, block)
+            if end is not None:
+                line = line[:p] + " " * (len(line) - p)
+                comment_end = end
+        masked[i] = line
     return masked
 
 
