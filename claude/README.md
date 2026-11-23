@@ -144,8 +144,8 @@ Vault の `.claude/` は Remotely Save で同期されないので、フック�
 new=$(mktemp "$(getconf DARWIN_USER_TEMP_DIR)check_note.XXXXXX")
 cp ~/Obsidian/main/_System/Scripts/check_note.py "$new"
 git diff --no-index -- claude/hooks/vault/check_note.py "$new"
-# 差分をレビューして、問題がなければ置き換える
-mv "$new" claude/hooks/vault/check_note.py && chmod 644 claude/hooks/vault/check_note.py
+# 差分をレビューして、問題がなければ置き換える。mv を mv -i の別名にしていると、上書きを断っても 0 で終わるので、/bin/mv -f を使う
+/bin/mv -f "$new" claude/hooks/vault/check_note.py && chmod 644 claude/hooks/vault/check_note.py
 ```
 
 `tests/test-check-vault-note.sh` の Seatbelt の部分は、Claude Code の sandbox の中では `sandbox-exec` を入れ子にできないのでスキップされる。フックを変えたら、通常のターミナルで `CHECK_VAULT_NOTE_SEATBELT_REQUIRED=1 bash claude/hooks/tests/test-check-vault-note.sh` も実行する（スキップを失敗として扱う。CI も同じ設定で実行する）。
