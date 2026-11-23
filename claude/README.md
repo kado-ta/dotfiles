@@ -62,7 +62,13 @@ gstack・user スコープのプラグイン・crit の CLI は、`claude/script
 /bin/bash ~/dotfiles/claude/scripts/update-skills.sh
 ```
 
-- dotfiles では `mise run claude:update` でもよい。gstack の新しい版があるかを確かめるだけなら、zsh の `gstack-upgrade --check` を使う。
+dotfiles 内では mise タスクとして実行できる。
+
+```sh
+mise run claude:update
+```
+
+- gstack の新しい版があるかを確かめるだけなら、zsh の `gstack-upgrade --check` を使う。
 - pstack はサードパーティのマーケットプレイスなので自動更新されない。`update-skills.sh` か `claude plugin update pstack@cursor-plugins` で更新する。
 
 > [!WARNING]
@@ -82,17 +88,17 @@ gstack・user スコープのプラグイン・crit の CLI は、`claude/script
 
 ## フック
 
-| ファイル                       | イベント           | 動作                                                                                                                                                                                                                          |
-| ------------------------------ | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `hooks/validate-command.sh`    | PreToolUse（Bash） | `rm -rf` と、本番環境（`prod` / `prd`）を含むコマンドをブロックする。`sf devops` の参照系コマンドと PR 作成は、単独のコマンドに限り許可する。`cc-safe-push` / `cc-safe-pr` / `cc-crit` は、前後にコマンドや引数を付けた実行をブロックする |
-| `hooks/protect-main-branch.sh` | PreToolUse（Bash） | `main`・`master`・`staging` ブランチへの `git commit` をブロックする                                                                                                                                                          |
-| `hooks/ask-gh-pr-write.sh`     | PreToolUse（Bash） | `gh` の PR 書き込みと `gh api` を、表記ゆれも含めて人間の承認に回す                                                                                                                                                           |
-| `hooks/ask-shared-tree-git.sh` | PreToolUse（Bash） | ブランチの切り替えなど作業ツリーの状態を動かす git 操作の前に、同じ作業ツリーで別の Claude セッションが動いていれば人間の承認に回す。検査できないときは何もしない |
-| `hooks/guard-additional-dirs.sh` | PreToolUse（Edit・Write・MultiEdit・NotebookEdit） | `~/.gstack/projects`（`additionalDirectories`）が symlink に差し替えられているあいだ、Edit・Write 系のツールをすべてブロックする |
-| `hooks/guard-playwright-mcp.sh` | PreToolUse（`mcp__playwright__.*`） | Playwright MCP の呼び出しのうち、ローカルのファイルを指す `filename`・`paths` 引数を含むものと、`url` が `file:` で始まるもの、Crit のポート（47800〜47819）を指すものをブロックする。入力を検査できないときもブロックする |
-| `hooks/precompact-context.sh`  | PreCompact         | ブランチ名・未コミットの変更・直近のコミットを、コンテキスト圧縮後も残す情報として Claude に渡す                                                                                                                              |
-| `hooks/herdr-agent-state.sh`   | SessionStart       | herdr 上で起動したセッションの開始を herdr に通知する。herdr が生成・管理するため、直接編集しない                                                                                                                             |
-| `hooks/gh-read-token.sh`       | SessionStart       | sandbox 内の Bash に、作業中のリポジトリの owner 用の読み取り専用トークンを `GH_TOKEN` として渡す                                                                                                                             |
+| ファイル                         | イベント                                           | 動作                                                                                                                                                                                                                                      |
+| -------------------------------- | -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `hooks/validate-command.sh`      | PreToolUse（Bash）                                 | `rm -rf` と、本番環境（`prod` / `prd`）を含むコマンドをブロックする。`sf devops` の参照系コマンドと PR 作成は、単独のコマンドに限り許可する。`cc-safe-push` / `cc-safe-pr` / `cc-crit` は、前後にコマンドや引数を付けた実行をブロックする |
+| `hooks/protect-main-branch.sh`   | PreToolUse（Bash）                                 | `main`・`master`・`staging` ブランチへの `git commit` をブロックする                                                                                                                                                                      |
+| `hooks/ask-gh-pr-write.sh`       | PreToolUse（Bash）                                 | `gh` の PR 書き込みと `gh api` を、表記ゆれも含めて人間の承認に回す                                                                                                                                                                       |
+| `hooks/ask-shared-tree-git.sh`   | PreToolUse（Bash）                                 | ブランチの切り替えなど作業ツリーの状態を動かす git 操作の前に、同じ作業ツリーで別の Claude セッションが動いていれば人間の承認に回す。検査できないときは何もしない                                                                         |
+| `hooks/guard-additional-dirs.sh` | PreToolUse（Edit・Write・MultiEdit・NotebookEdit） | `~/.gstack/projects`（`additionalDirectories`）が symlink に差し替えられているあいだ、Edit・Write 系のツールをすべてブロックする                                                                                                          |
+| `hooks/guard-playwright-mcp.sh`  | PreToolUse（`mcp__playwright__.*`）                | Playwright MCP の呼び出しのうち、ローカルのファイルを指す `filename`・`paths` 引数を含むものと、`url` が `file:` で始まるもの、Crit のポート（47800〜47819）を指すものをブロックする。入力を検査できないときもブロックする                |
+| `hooks/precompact-context.sh`    | PreCompact                                         | ブランチ名・未コミットの変更・直近のコミットを、コンテキスト圧縮後も残す情報として Claude に渡す                                                                                                                                          |
+| `hooks/herdr-agent-state.sh`     | SessionStart                                       | herdr 上で起動したセッションの開始を herdr に通知する。herdr が生成・管理するため、直接編集しない                                                                                                                                         |
+| `hooks/gh-read-token.sh`         | SessionStart                                       | sandbox 内の Bash に、作業中のリポジトリの owner 用の読み取り専用トークンを `GH_TOKEN` として渡す                                                                                                                                         |
 
 このほか、入力待ちや応答完了の通知、PR 作成時の URL 表示などのフックを `settings.json` に直接記述している。ステータスライン（`scripts/statusline.sh`）は、カレントディレクトリ・ブランチ・コンテキスト使用率・利用上限の使用率・モデル・effort を表示する。
 
@@ -134,17 +140,17 @@ PR と main への push では、GitHub Actions が macOS の `/bin/bash` と `/
 
 [Playwright MCP](https://github.com/microsoft/playwright-mcp) を `playwright` で登録する。使い分けは `CLAUDE.md` の Tools 節にある。経緯と受け入れたリスクは [plan](../docs/work/20261118_playwright-mcp/plan.md#decisions) にある。
 
-| 項目 | 値 | 理由 |
-| --- | --- | --- |
-| 版 | `npmPackage` で `@playwright/mcp@0.0.85` に固定 | `@latest` では、ツールが増えたこと（ファイルを読み書きする引数など）に気づけない。依存の `playwright`・`playwright-core` も完全に固定した版 |
-| `command`・`args` の先頭 | `${NODE_BIN}/node` で `${PACKAGE_DIR}/node_modules/@playwright/mcp/cli.js` を起動 | npx を使わない（上記）。ネットワークも要らない |
-| `--isolated` | プロファイルをメモリに置く | ログイン状態を残さない。並行したセッションでプロファイルがぶつからない |
-| `--browser chrome` | インストール済みの Google Chrome | ダウンロードが要らない。Chrome の自動更新でセキュリティ修正が入る。既定値と同じだが、版を上げて既定が変わったときに気づけるよう明示する |
-| `--output-dir` | `~/Library/Caches/playwright-mcp` | どのリポジトリにも出力しない。sandbox からも Edit・Write ツールからも書かせない（下記）ので、symlink で出力先を向け替えられない |
-| `--no-webmcp` | ページが登録するツールを使わない | 説明をページが決めたツールが、Claude のツールの一覧に入るのを防ぐ。今の用途では使わない |
-| `--blocked-origins` | ポート 47800〜47819（`*:47800;…;*:47819`） | cc-crit の Crit の画面を開かせない。JS やリンクでの移動も止める（リダイレクトは止まらない） |
-| `PLAYWRIGHT_MCP_HEADLESS` | 既定は `true` | ウィンドウを出さない。`--headless` 引数は環境変数より優先されて切り替えられなくなるので使わない |
-| `env.PATH` | mise のグローバル設定の Node.js | 上の `${NODE_BIN}` の理由 |
+| 項目                      | 値                                                                                | 理由                                                                                                                                        |
+| ------------------------- | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| 版                        | `npmPackage` で `@playwright/mcp@0.0.85` に固定                                   | `@latest` では、ツールが増えたこと（ファイルを読み書きする引数など）に気づけない。依存の `playwright`・`playwright-core` も完全に固定した版 |
+| `command`・`args` の先頭  | `${NODE_BIN}/node` で `${PACKAGE_DIR}/node_modules/@playwright/mcp/cli.js` を起動 | npx を使わない（上記）。ネットワークも要らない                                                                                              |
+| `--isolated`              | プロファイルをメモリに置く                                                        | ログイン状態を残さない。並行したセッションでプロファイルがぶつからない                                                                      |
+| `--browser chrome`        | インストール済みの Google Chrome                                                  | ダウンロードが要らない。Chrome の自動更新でセキュリティ修正が入る。既定値と同じだが、版を上げて既定が変わったときに気づけるよう明示する     |
+| `--output-dir`            | `~/Library/Caches/playwright-mcp`                                                 | どのリポジトリにも出力しない。sandbox からも Edit・Write ツールからも書かせない（下記）ので、symlink で出力先を向け替えられない             |
+| `--no-webmcp`             | ページが登録するツールを使わない                                                  | 説明をページが決めたツールが、Claude のツールの一覧に入るのを防ぐ。今の用途では使わない                                                     |
+| `--blocked-origins`       | ポート 47800〜47819（`*:47800;…;*:47819`）                                        | cc-crit の Crit の画面を開かせない。JS やリンクでの移動も止める（リダイレクトは止まらない）                                                 |
+| `PLAYWRIGHT_MCP_HEADLESS` | 既定は `true`                                                                     | ウィンドウを出さない。`--headless` 引数は環境変数より優先されて切り替えられなくなるので使わない                                             |
+| `env.PATH`                | mise のグローバル設定の Node.js                                                   | 上の `${NODE_BIN}` の理由                                                                                                                   |
 
 MCP サーバーは sandbox の外で、ユーザーの権限で動く。sandbox の denyWrite・denyRead、Edit・Write の規則、ネットワークのプロキシは効かない。そのため、次を止めている。定義（`mcp/playwright.json`）があるあいだは、`check-repo.py` の `playwright-mcp` が、これらがあることを確かめる。
 
@@ -404,10 +410,10 @@ Plan Mode の plan のレビューは、Crit プラグインの hook（sandbox �
 
 Claude は個人スキル `/crit-review`（`claude/skills/crit-review/SKILL.md`）の手順に従う。作業ディレクトリに `.cc-crit-request.json` を書き、次のどちらかを単独で実行する。
 
-| コマンド | 依頼ファイル | 動作 |
-| --- | --- | --- |
-| `/usr/local/libexec/claude-crit/cc-crit review` | `{"files": ["path"]}`、ブランチの差分なら `{}` | crit をポート 47800〜47819 で起動してブラウザを開き、Finish Review まで待つ |
-| `/usr/local/libexec/claude-crit/cc-crit reply` | `{"session": "<id>", "replies": [{"reply_to": "c_…", "body": "…"}]}` | 既存のコメント（行・ファイルは `c_`、レビュー全体は `r_`）に返信する。author は `Claude Code` に固定 |
+| コマンド                                        | 依頼ファイル                                                         | 動作                                                                                                 |
+| ----------------------------------------------- | -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `/usr/local/libexec/claude-crit/cc-crit review` | `{"files": ["path"]}`、ブランチの差分なら `{}`                       | crit をポート 47800〜47819 で起動してブラウザを開き、Finish Review まで待つ                          |
+| `/usr/local/libexec/claude-crit/cc-crit reply`  | `{"session": "<id>", "replies": [{"reply_to": "c_…", "body": "…"}]}` | 既存のコメント（行・ファイルは `c_`、レビュー全体は `r_`）に返信する。author は `Claude Code` に固定 |
 
 終了コードは、0 が成功、1 が失敗、2 が拒否。依頼ファイルは実行のたびに消える。
 
@@ -491,12 +497,12 @@ Claude Code が信頼したフォルダ（`~/.claude.json` の `projects`）を�
 
 `projects` のキーと、各項目の `hasTrustDialogAccepted` だけを読む。認証の情報と、項目のほかのキーは出力しない。`~/.claude.json` を書き換えず、git も実行しない（点検するフォルダのリポジトリの設定を読ませないため）。区分は上から順に判定する。表示は `missing` から並べる。
 
-| 区分 | 条件 | 消す候補 |
-| --- | --- | --- |
-| `home` | ホームディレクトリ | ならない。ホームの信頼は保存されない |
-| `missing` | フォルダがない | なる |
-| `repo` | フォルダ自身か、その親に `.git`（ディレクトリかファイル）がある | ならない |
-| `not-repo` | 上のどれでもない | 信頼が `true` ならなる（親の信頼が下のフォルダに及ぶため） |
+| 区分       | 条件                                                            | 消す候補                                                   |
+| ---------- | --------------------------------------------------------------- | ---------------------------------------------------------- |
+| `home`     | ホームディレクトリ                                              | ならない。ホームの信頼は保存されない                       |
+| `missing`  | フォルダがない                                                  | なる                                                       |
+| `repo`     | フォルダ自身か、その親に `.git`（ディレクトリかファイル）がある | ならない                                                   |
+| `not-repo` | 上のどれでもない                                                | 信頼が `true` ならなる（親の信頼が下のフォルダに及ぶため） |
 
 表の「対応」列は、消す候補の行を `消す` とする。候補があれば、表の後に、結果の要約、残しておいたときの影響、番号付きの次の手順と、バックアップを作る `cp`・候補の項目を消す jq のコマンドを出力する。候補がなければ「消す候補はない」とだけ出す。
 
