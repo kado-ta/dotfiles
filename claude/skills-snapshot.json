@@ -49,7 +49,7 @@
       "scopes": [
         "user"
       ],
-      "version": "0.15.46"
+      "version": "0.15.47"
     },
     "ruby-lsp@claude-plugins-official": {
       "enabled": true,
@@ -899,6 +899,14 @@
     },
     "pstack:reflect": {
       "description": "sha256:ed38a40c4297bf14",
+      "dmi": true,
+      "hooks": null,
+      "override": null,
+      "provider": "pstack",
+      "user_invocable": true
+    },
+    "pstack:reframe": {
+      "description": "sha256:2e566d5cb7f880c0",
       "dmi": true,
       "hooks": null,
       "override": null,
