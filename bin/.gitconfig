@@ -1,3 +1,5 @@
+# checkout は switch / restore に分割された。この分割後コマンドが推奨されている。
+# restore は 2文字のエイリアスを作成しづらいので、そのまま使用する。
 [alias]
 	st = status
 	br = branch -vv
@@ -6,7 +8,6 @@
 	sw = switch
 	cm = commit
 	gr = grep
-	re = remote -v
 [merge]
 	ff = false
 [pull]
