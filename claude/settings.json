@@ -162,7 +162,6 @@
       "Read(~/Dev/**/*.pem)",
       "Read(**/.pgpass)",
       "Read(~/**/.pgpass)",
-      "Edit(/etc/**)",
       "Edit(**/.env*)",
       "Edit(**/.git/config)",
       "Edit(**/.git/**/hooks/**)",
