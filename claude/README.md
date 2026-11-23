@@ -10,6 +10,7 @@ Claude Code の設定を管理するディレクトリ。`setup.sh` で `~/.clau
   - [新規セットアップ（`setup.sh`）](#setup-new)
   - [スキル・プラグインのアップデート](#setup-update)
 - [フック](#hooks)
+  - [Vault のノートの点検](#vault-note-check)
 - [MCP サーバー](#mcp)
   - [Playwright MCP](#playwright-mcp)
 - [cc-safe-push](#cc-safe-push)
@@ -97,6 +98,7 @@ mise run claude:update
 | `hooks/ask-shared-tree-git.sh`   | PreToolUse（Bash）                                 | ブランチの切り替えなど作業ツリーの状態を動かす git 操作の前に、同じ作業ツリーで別の Claude セッションが動いていれば人間の承認に回す。検査できないときは何もしない                                                                         |
 | `hooks/guard-additional-dirs.sh` | PreToolUse（Edit・Write・MultiEdit・NotebookEdit） | `~/.gstack/projects`（`additionalDirectories`）が symlink に差し替えられているあいだ、Edit・Write 系のツールをすべてブロックする                                                                                                          |
 | `hooks/guard-playwright-mcp.sh`  | PreToolUse（`mcp__playwright__.*`）                | Playwright MCP の呼び出しのうち、ローカルのファイルを指す `filename`・`paths` 引数を含むものと、`url` が `file:` で始まるもの、Crit のポート（47800〜47819）を指すものをブロックする。入力を検査できないときもブロックする                |
+| `hooks/check-vault-note.sh`      | PostToolUse（Edit・Write・MultiEdit）              | Obsidian Vault（`_System/Scripts/check_note.py` があるプロジェクト）の `.md` を Edit・Write したときに点検スクリプトを実行し、誤りを Claude に伝える。承認した版と違うときは実行しない（[詳細](#vault-note-check)）                       |
 | `hooks/precompact-context.sh`    | PreCompact                                         | ブランチ名・未コミットの変更・直近のコミットを、コンテキスト圧縮後も残す情報として Claude に渡す                                                                                                                                          |
 | `hooks/herdr-agent-state.sh`     | SessionStart                                       | herdr 上で起動したセッションの開始を herdr に通知する。herdr が生成・管理するため、直接編集しない                                                                                                                                         |
 | `hooks/gh-read-token.sh`         | SessionStart                                       | sandbox 内の Bash に、作業中のリポジトリの owner 用の読み取り専用トークンを `GH_TOKEN` として渡す                                                                                                                                         |
@@ -115,11 +117,26 @@ bash claude/hooks/tests/test-ask-shared-tree-git.sh
 bash claude/hooks/tests/test-gh-read-token.sh
 bash claude/hooks/tests/test-guard-additional-dirs.sh
 bash claude/hooks/tests/test-guard-playwright-mcp.sh
+bash claude/hooks/tests/test-check-vault-note.sh
 /usr/bin/python3 -B claude/hooks/tests/test-cc-safe-push.py
 /usr/bin/python3 -B claude/hooks/tests/test-cc-safe-pr.py
 ```
 
 PR と main への push では、GitHub Actions が macOS の `/bin/bash` と `/usr/bin/python3` で同じテストを実行する。
+
+<a name="vault-note-check"></a>
+
+### Vault のノートの点検
+
+`hooks/check-vault-note.sh` は、Obsidian Vault の点検スクリプト `_System/Scripts/check_note.py` を、sandbox の外で `/usr/bin/python3 -I -B` で実行する。点検スクリプトは Vault の中（sandbox から書ける場所）にあるので、人間がレビューした版の SHA-256 を `hooks/check-vault-note.sha256` に記録し、一致するときだけ実行する。照合と実行のあいだに差し替えられないよう、一度だけ読んだ内容を照合し、同じ内容を実行する。一致しないときと、Command Line Tools がなく `/usr/bin/python3` が動かないときは、点検せずに、そのことを Claude に伝える。経緯は [docs/work/20261124_check-vault-note-hook/plan.md](../docs/work/20261124_check-vault-note-hook/plan.md) を参照する。
+
+Vault の `.claude/` は Remotely Save で同期されないので、フックは dotfiles に置く。Vault のプロジェクトの設定に点検のフックを登録しない（照合なしの実行と、二重の実行になる）。
+
+点検スクリプトを変えたら、人間が差分をレビューしてから、通常のターミナルで dotfiles のルートに移動して次を実行し、コミットする。更新するまでは、Vault のノートを編集するたびに、フックが「承認済みの版と違う」と Claude に伝えて点検しない。
+
+```shell
+shasum -a 256 ~/Obsidian/main/_System/Scripts/check_note.py | cut -d' ' -f1 > claude/hooks/check-vault-note.sha256
+```
 
 [目次に戻る](#toc)
 
