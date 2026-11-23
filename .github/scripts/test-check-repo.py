@@ -597,9 +597,12 @@ class CheckRepoTests(unittest.TestCase):
 
     def test_mise_env_override_fails(self):
         # 環境変数で、paranoid や信頼するパスを上書きさせない。
+        # bin/link.sh は bin/.??* をすべて ~ にリンクするので、bin/.zshenv なども zsh が読む。sheldon の inline も zsh の起動で動く。
         for rel, text in (("bin/.zshrc", "export MISE_PARANOID=0\n"),
                           ("bin/.zprofile", "export MISE_TRUSTED_CONFIG_PATHS=~/Dev\n"),
+                          ("bin/.zshenv", "export MISE_PARANOID=0\n"),
                           ("zsh/x.zsh", "export MISE_TRUSTED_CONFIG_PATHS=~/Dev\n"),
+                          ("config/sheldon/plugins.toml", '[plugins.x]\ninline = "export MISE_PARANOID=0"\n'),
                           ("mise/mise_config.toml", PARANOID_CONFIG + '[env]\nMISE_PARANOID = "0"\n')):
             with self.subTest(rel=rel):
                 self.write(rel, text)
@@ -616,6 +619,18 @@ class CheckRepoTests(unittest.TestCase):
                 self.assert_fails("FAIL rerere", "bin/.gitconfig: rerere.enabled must be false")
         self.git("rm", "-q", "-f", "bin/.gitconfig")
         self.assert_fails("FAIL rerere", "bin/.gitconfig: rerere.enabled must be false")
+
+    def test_gitconfig_include_after_rerere_fails(self):
+        # include は書いた位置で読み込まれ、後の値が勝つ。--file は include をたどらないので、順序で確かめる。
+        for name, text in (("include", GITCONFIG + "[include]\n\tpath = ~/.gitconfig_x\n"),
+                           ("includeIf", GITCONFIG + '[includeIf "gitdir:~/x/"]\n\tpath = ~/.gitconfig_x\n')):
+            with self.subTest(case=name):
+                self.write("bin/.gitconfig", text)
+                self.assert_fails("FAIL rerere", "bin/.gitconfig: rerere.enabled must come after every include")
+
+    def test_gitconfig_include_before_rerere_passes(self):
+        self.write("bin/.gitconfig", '[includeIf "gitdir:~/x/"]\n\tpath = ~/.gitconfig_x\n' + GITCONFIG)
+        self.assert_passes()
 
     def test_gitconfig_rerere_false_forms_pass(self):
         for text in ("[ReReRe]\n\tEnabled = no\n", "[rerere]\n\tenabled = 0\n",

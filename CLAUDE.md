@@ -55,13 +55,13 @@ worktree は `claude -w <name>` で始める。この設定では EnterWorktree�
 - Colima（Lima）の VM に入る鍵（`~/.colima/_lima/_config`）を `denyRead` から外さない。
 - `permissions.blockWritesOutsideWorkingDirectories`、`.git` の hooks の Edit の deny、mise の設定の Edit の ask、`Edit(~/.local/state/mise/**)` の deny と `Edit(~/dotfiles/mise/**)` の ask、`sandbox.filesystem.denyWrite` の `~/.config/mise`・`~/dotfiles/mise`・`~/.local/state/mise`、PreToolUse の `guard-additional-dirs.sh` の登録を外さない（`check-repo.py` の `edit-permissions` が失敗する）。
 - `mise/mise_config.toml` の `paranoid` から `config`・`env_files` を外さない（`mise-paranoid` が失敗する）。
-- `mise/mise_config.toml` に `settings.trusted_config_paths` を足さない（空のリストでも）。`bin/.zshrc`・`bin/.zprofile`・`zsh/*.zsh`・`mise/mise_config.toml` に `MISE_TRUSTED_CONFIG_PATHS`・`MISE_PARANOID` を書かない（`mise-paranoid` が失敗する。理由は [.claude/rules/CLAUDE_CONFIG.md](.claude/rules/CLAUDE_CONFIG.md#edit-write-rules)）。
+- `mise/mise_config.toml` に `settings.trusted_config_paths` を足さない（空のリストでも）。`bin/.z*`・`zsh/*.zsh`・`config/sheldon/plugins.toml`・`mise/mise_config.toml` に `MISE_TRUSTED_CONFIG_PATHS`・`MISE_PARANOID` を書かない（`mise-paranoid` が失敗する。理由は [.claude/rules/CLAUDE_CONFIG.md](.claude/rules/CLAUDE_CONFIG.md#edit-write-rules)）。
 - `permissions.additionalDirectories` に `~/.gstack/projects` 以外を足さない（`edit-permissions` が失敗する）。
 - `Edit(//**/.git/**/hooks/**)` と `Edit(//**/.git/config)` を deny にしない。Edit の deny は sandbox の denyWrite にもなり、どこでも `git init`・`git clone` が失敗する見込み（`edit-permissions` が失敗する）。
 - ユーザー設定の `sandbox.filesystem` に、接頭辞のないパスを書かない。`~/` か `/` で始める（接頭辞がないと `~/.claude` が基準になる。`edit-permissions` が失敗する）。
 - Read の deny の `*.pem` を `~/**` に広げない。
 - `claude/mcp/playwright.json` があるあいだは、`permissions.deny` の `mcp__playwright__browser_run_code_unsafe`・`mcp__playwright__browser_file_upload`・`Read(~/.crit/**)`・`Edit(~/.local/share/claude-mcp/**)`・`Edit(~/Library/Caches/playwright-mcp/**)`、`sandbox.filesystem.denyRead` の `~/.crit`、`sandbox.filesystem.denyWrite` の `~/.local/share/claude-mcp`・`~/Library/Caches/playwright-mcp`、`disabledMcpjsonServers` の `playwright`、PreToolUse の `guard-playwright-mcp.sh` の登録（matcher `mcp__playwright__.*`、`onFailure: block`）を外さない（`check-repo.py` の `playwright-mcp` が失敗する）。Playwright MCP を実行時に npx で起動しない。`sandbox.filesystem.allowWrite` に `~/.local/share/claude-mcp` と `~/Library/Caches/playwright-mcp` を入れない（理由は [.claude/rules/CLAUDE_CONFIG.md](.claude/rules/CLAUDE_CONFIG.md#playwright-mcp)）。
-- `bin/.gitconfig` の `rerere.enabled = false` を外さない（`check-repo.py` の `rerere` が失敗する）。`[includeIf]` より前に移さない（理由は [.claude/rules/CLAUDE_CONFIG.md](.claude/rules/CLAUDE_CONFIG.md#git-rerere)）。
+- `bin/.gitconfig` の `rerere.enabled = false` を外さない。その後ろに `[include]`・`[includeIf]` を置かない（`check-repo.py` の `rerere` が失敗する。理由は [.claude/rules/CLAUDE_CONFIG.md](.claude/rules/CLAUDE_CONFIG.md#git-rerere)）。
 
 ## 規約
 

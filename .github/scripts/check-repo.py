@@ -83,9 +83,11 @@ MISE_EDIT_ASK = ("Edit(~/dotfiles/mise/**)",)
 MISE_GLOBAL_CONFIG = "mise/mise_config.toml"
 # config は設定を、env_files は _.source などが読むファイルを、パスではなく中身で信頼させる。true（すべて）でもよい。
 PARANOID_REQUIRED = ("config", "env_files")
-# 環境変数で paranoid や信頼するパスを上書きさせない。シェルの設定（ほかに zsh/*.zsh）とグローバルの設定に書かせない。
+# 環境変数で paranoid や信頼するパスを上書きさせない。zsh の起動で読まれる設定とグローバルの設定に書かせない。
+# bin/link.sh は bin/.??* をすべて ~ にリンクするので、bin/.z* は zsh が読む。sheldon の inline も zsh の起動で動く。
 MISE_ENV_FORBIDDEN = ("MISE_TRUSTED_CONFIG_PATHS", "MISE_PARANOID")
-MISE_ENV_FILES = ("bin/.zshrc", "bin/.zprofile", MISE_GLOBAL_CONFIG)
+MISE_ENV_FILES = (MISE_GLOBAL_CONFIG, "config/sheldon/plugins.toml")
+MISE_ENV_GLOBS = ("bin/.z*", "zsh/*.zsh")
 # グローバルの git の設定（~/.gitconfig の実体）。rerere が動くと、sandbox の外の git が、.git/rr-cache と MERGE_RR（どちらも
 # sandbox が書ける）の解決を任意のパス（作業ツリーの外も）に書く。rerere.enabled がなくても、rr-cache があれば動くので false にする。
 GITCONFIG = "bin/.gitconfig"
@@ -409,7 +411,7 @@ def check_mise_paranoid(root):
     # 空のリストでも、パスで信頼する経路を開く。
     if "trusted_config_paths" in config:
         errors.append(f"{MISE_GLOBAL_CONFIG}: settings.trusted_config_paths must not be set")
-    for rel in MISE_ENV_FILES + tuple(sorted(p.relative_to(root).as_posix() for p in (root / "zsh").glob("*.zsh"))):
+    for rel in MISE_ENV_FILES + tuple(sorted(p.relative_to(root).as_posix() for g in MISE_ENV_GLOBS for p in root.glob(g))):
         file = root / rel
         if file.is_file():
             text = file.read_text(encoding="utf-8")
@@ -423,6 +425,11 @@ def check_rerere(root):
                         capture_output=True, text=True)
     if cp.returncode != 0 or cp.stdout.strip() != "false":
         return [f"{GITCONFIG}: rerere.enabled must be false"]
+    # include は書いた位置で読み込まれ、後の値が勝つ。--file は include をたどらないので、include が後ろにあれば失敗にする。
+    keys = git(root, "config", "--file", GITCONFIG, "--null", "--name-only", "--list").split("\0")
+    last = max(i for i, key in enumerate(keys) if key == "rerere.enabled")
+    if any(key == "include.path" or (key.startswith("includeif.") and key.endswith(".path")) for key in keys[last + 1:]):
+        return [f"{GITCONFIG}: rerere.enabled must come after every include.path and includeif.*.path"]
     return []
 
 

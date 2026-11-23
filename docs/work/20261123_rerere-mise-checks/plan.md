@@ -46,17 +46,22 @@ created: 2026-11-23
 - **`rerere`（新しい検査）:** `git config --file bin/.gitconfig --type=bool --get rerere.enabled` の出力が `false` でなければ失敗する。`bb73bb8` では `check_checkout_guard` の中にあったものを、独立した関数にする。
   - git と同じく読むので、最後の値が勝ち、`no`・`0`・大文字小文字の違いも false として通る。
   - ファイルやキーがない（終了コード 1）、bool でない（128）、値のないキー（true）は失敗する。
-  - include の先（`~/.gitconfig_numm`）とリポジトリの `.git/config` は見ない。
+  - 最後の `rerere.enabled` より後ろに `include.path`・`includeif.*.path` があれば失敗する（`/review` の指摘で足した。2026-11-23、人間の判断）。include は書いた位置で読み込まれ、後の値が勝つが、`--file` は include をたどらないため。
+  - include の先の中身とリポジトリの `.git/config` は見ない。
 - **`mise-paranoid`（既存の検査に足す）:**
   - `mise/mise_config.toml` の `settings` に `trusted_config_paths` があれば、値によらず失敗する。
-  - `bin/.zshrc`・`bin/.zprofile`・`mise/mise_config.toml`・`zsh/*.zsh` の本文に `MISE_TRUSTED_CONFIG_PATHS`・`MISE_PARANOID` が含まれれば失敗する。コメントの中も失敗にする（文字列の一致だけで判定し、単純に保つ）。
+  - `mise/mise_config.toml`・`bin/.z*`・`zsh/*.zsh`・`config/sheldon/plugins.toml` の本文に `MISE_TRUSTED_CONFIG_PATHS`・`MISE_PARANOID` が含まれれば失敗する。コメントの中も失敗にする（文字列の一致だけで判定し、単純に保つ）。
+  - 作業メモの一覧（`bin/.zshrc`・`bin/.zprofile`）を、`bin/.z*` と `config/sheldon/plugins.toml` に広げた（`/review` の指摘で広げた。2026-11-23、人間の判断）。`bin/link.sh` は `bin/.??*` をすべて `~` にリンクし、sheldon の `inline` は zsh の起動で動くため。
 
 <a name="claude-decisions"></a>
 
 ## Claude の判断（承認のときに確かめる）
 
-- **`[rerere]` をファイルの最後に置く。** `bb73bb8` は `[merge]` の後に置いていた。git の include は書いた位置で読み込まれ、後の値が勝つ。`[includeIf "gitdir:~/Dev/numm/"]` より前に置くと、include の先で `rerere.enabled = true` と書いたときに、そのリポジトリでだけ黙って効かなくなる。最後に置けば、`~/.gitconfig` の中では上書きされない（リポジトリの `.git/config` と `git -c` は上書きできる。前者は sandbox が既定で書き込みを止めている）。
-- **環境変数の検査に、paranoid の土台を動かすほかの変数を足さない。** 推測だが、mise には、グローバルの設定の場所や信頼の記録の場所を変える環境変数（`MISE_GLOBAL_CONFIG_FILE`・`MISE_CONFIG_DIR`・`MISE_STATE_DIR` など）がある見込み。設定されると、paranoid が効かない設定や、sandbox から書ける信頼の記録を読む恐れがある。名前と効き方を mise の文書で確かめていないので、この PR には入れず、後続の候補にする。
+- **`[rerere]` をファイルの最後に置く。** `bb73bb8` は `[merge]` の後に置いていた。git の include は書いた位置で読み込まれ、後の値が勝つ。今ある `[includeIf]` より前に置くと、include の先で `rerere.enabled = true` と書いたときに、そのリポジトリでだけ黙って効かなくなる。最後に置けば、`~/.gitconfig` の中では上書きされない（リポジトリの `.git/config` と `git -c` は上書きできる。前者は sandbox が既定で書き込みを止めている）。
+- **環境変数の検査に、paranoid の土台を動かすほかの変数を足さない。** mise には、グローバルの設定の場所や信頼の記録の場所を変える環境変数（`MISE_GLOBAL_CONFIG_FILE`・`MISE_CONFIG_DIR`・`MISE_STATE_DIR` など）がある。設定されると、paranoid が効かない設定や、sandbox から書ける信頼の記録を読む恐れがある。この PR には入れず、後続の候補にする。
+  - `/review` で確かめた（2026-11-23）。mise の文書によると、`MISE_GLOBAL_CONFIG_FILE` はグローバルの設定のファイルを差し替える。`trusted_config_paths` のパスは、paranoid でも中身のハッシュを確かめずに信頼される。
+  - Security の専門家は、mise のソースで `MISE_CONFIG_DIR` も見つけた。`MISE_YES`・`settings.yes` は、paranoid では信頼を与えないと確かめた。
+  - 一覧をそろえるには、場所を変える `MISE_*` の変数をひととおり調べる必要がある。一部だけを足すと、守れているように見えてしまうので、後続で調べてから足す。
 - **新しい検査の名前は `rerere` にする。** `CLAUDE.md` の禁止事項は、失敗する検査の名前を書くので、それと合わせる。
 
 <a name="steps"></a>
@@ -82,4 +87,9 @@ created: 2026-11-23
 
 - `bin/.gitconfig` は `~/.gitconfig` のリンク先なので、マージして人間のチェックアウトに入った時点で、人間の git でも rerere が動かなくなる（今は設定していない。`rr-cache` があるリポジトリでは、今は動いている見込み）。
 - 戻すときは、`[rerere]` の節と `check-repo.py` の `rerere` を一緒に外す。
-- 残る経路: `~/.zshenv`・launchd など、検査しない場所で設定した環境変数。人間が `git -c rerere.enabled=true` などで明示的に有効にした場合。
+- すでにあるリポジトリの `rr-cache`・`MERGE_RR` は、無効になるだけで残る。
+- 残る経路:
+  - launchd など、リポジトリの外で設定した環境変数。
+  - sheldon の env-zsh が読み込む、作業ディレクトリの `.env`。この PR より前からあり、別の課題にする。
+  - git を環境変数（`GIT_CONFIG_GLOBAL`・`GIT_CONFIG_COUNT` など）や alias の `-c` で動かす経路。
+  - 人間が `git -c rerere.enabled=true` などで明示的に有効にした場合。
