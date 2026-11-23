@@ -16,7 +16,7 @@ Phase 1（`cc-safe-pr`、PR #4）の残余リスク R1 を解消する。`gh` �
 **ユーザーの決定（2026-11-09）**:
 
 - sandbox 内の `gh` の読み取りは、owner ごとの読み取り専用トークンで認証する。
-- 未許可リポジトリの PR 作成など、人間が判断する書き込みは、`git push` と同じく人間が自分の端末で実行する。
+- 未許可リポジトリの PR 作成など、人間が判断する書き込みは、`git push` と同じく人間が自分のターミナルで実行する。
 
 ## 調査で判明した前提
 
@@ -38,7 +38,7 @@ sandbox 内の Bash ─ 各コマンドの前に CLAUDE_ENV_FILE の 1 行を実
                         トークンがなければ空 → Keychain も読めないので未認証（fail closed）
 sandbox 内の Keychain ─ denyRead で遮断
 cc-safe-push / cc-safe-pr ─ sandbox 外。環境変数を引き継がないので従来どおり（変更なし）
-人間の端末 ─ 変更なし（GH_TOKEN は Claude Code のサブプロセスだけに設定）
+人間のターミナル ─ 変更なし（GH_TOKEN は Claude Code のサブプロセスだけに設定）
 ```
 
 **トークン**: owner ごとの Fine-grained PAT。権限は Metadata、Contents、Pull requests、Issues、Actions、Commit statuses の read のみ。正本は 1Password に置き、人間が `op read` で `~/.config/cc-gh-read/<owner>.token`（ファイル 0600、ディレクトリ 0700）に配置する。読み取り専用なので sandbox から読めることは許容する。
@@ -55,7 +55,7 @@ op read 'op://<Vault>/<Item>/credential' > ~/.config/cc-gh-read/<owner>.token
 | sandbox 内の `gh`（読み取り） | sandbox 内 | 読み取り専用の Fine-grained PAT |
 | PR の作成・編集（許可リポジトリ） | `cc-safe-pr`（sandbox 外） | 既存の `gh auth login` のトークン（`repo`、Keychain）。変更なし |
 | push（許可リポジトリ） | `cc-safe-push`（sandbox 外） | 1Password SSH Agent。変更なし |
-| 未許可リポジトリの PR 作成、マージなど | 人間の端末 | 既存の `gh auth login` のトークン |
+| 未許可リポジトリの PR 作成、マージなど | 人間のターミナル | 既存の `gh auth login` のトークン |
 
 `cc-safe-pr` は環境変数を引き継がず、sandbox の外で `gh auth token` を実行して Keychain からトークンを取得するので、`denyRead` と `GH_TOKEN` の影響を受けない。実行できるのは許可リポジトリの create / edit だけで、トークン自体は `repo` のまま。PR 専用の PAT への置き換えは今回の範囲外とする（root 所有のラッパーが権限を絞っているので、R1 の解消には不要）。
 

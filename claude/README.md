@@ -42,7 +42,7 @@ Claude Code の設定を管理するディレクトリ。`setup.sh` で `~/.clau
 
 `settings.json` のセキュリティ設定は、[【2026年最新版】Claude Codeで行うべきセキュリティ設定 10選 - Qiita](https://qiita.com/miruky/items/51db293a7a7d0d277a5d) を参考にしている。
 
-gstack・プラグイン・crit の CLI は、sandbox の外で `claude/scripts/update-skills.sh` を実行してまとめて更新する。通常の端末で `/bin/bash ~/dotfiles/claude/scripts/update-skills.sh` を実行する（dotfiles では `mise run claude:update` でもよい。gstack の確認だけなら zsh の `gstack-upgrade --check`）。Claude Code のプロンプトの `!` は、セッションによっては sandbox の中で動く（2026-11-19 に観測）。そのときは更新が失敗し、最後の cc-crit の profile テストも、profile を確かめられないので失敗に数えられる。手順は [SKILL_INVENTORY.md の「更新したときの見直し」](SKILL_INVENTORY.md#upgrade) にある。
+gstack・プラグイン・crit の CLI は、sandbox の外で `claude/scripts/update-skills.sh` を実行してまとめて更新する。通常のターミナルで `/bin/bash ~/dotfiles/claude/scripts/update-skills.sh` を実行する（dotfiles では `mise run claude:update` でもよい。gstack の確認だけなら zsh の `gstack-upgrade --check`）。Claude Code のプロンプトの `!` は、セッションによっては sandbox の中で動く（2026-11-19 に観測）。そのときは更新が失敗し、最後の cc-crit の profile テストも、profile を確かめられないので失敗に数えられる。手順は [SKILL_INVENTORY.md の「更新したときの見直し」](SKILL_INVENTORY.md#upgrade) にある。
 
 pstack はサードパーティのマーケットプレイスなので自動更新されない。`update-skills.sh` か `claude plugin update pstack@cursor-plugins` で更新し、Claude Code を再起動する前に、hooks が増えていないか、スキルの一覧と依存が変わっていないかを確かめる（`/sync-skill-docs`）。`settings.json` の `permissions.deny` は、モデルから起動できる `setup-pstack` と、使わないエージェント 2 つを止めている。ほかの使わないスキルはモデルから起動できず、deny ではユーザーのスラッシュコマンドを止められないので、方針として使わない。スキルの分類は [pstack の導入の plan](../docs/work/20261114_pstack-skill-routing/plan.md#decisions) にある。
 
@@ -100,9 +100,9 @@ PR と main への push では、GitHub Actions が macOS の `/bin/bash` と `/
 
 定義の `npmPackage` は、`register-mcp.sh` が `~/.local/share/claude-mcp/<name>` に `npm install --ignore-scripts` で入れ、登録する定義からは外す。実行時に npx を使わないのは、npx が作業ディレクトリ（sandbox から書けるプロジェクト）の `node_modules`・`node_modules/.bin`・`.npmrc` を使い、そこに置かれたコードが sandbox の外で動くため。入れる場所は、`settings.json` の `sandbox.filesystem.denyWrite` と `permissions.deny` の `Edit(~/.local/share/claude-mcp/**)` で、どこで起動したセッションからも書かせない（`~` で起動すると作業ディレクトリの中になるため）。`sandbox.filesystem.allowWrite` に入れない。
 
-定義の `${HOME}`・`${NODE_BIN}`（mise のグローバル設定の Node.js の `bin`）・`${PACKAGE_DIR}`（上の入れる場所）は、登録するときに実際のパスに置き換える。公開リポジトリにユーザー名を入れないためと、端末以外から起動したときの PATH や、プロジェクトの mise の設定（信頼していないと shim が失敗する）に左右されないようにするため。ほかの `${VAR:-default}` は、Claude Code がサーバーの起動時に展開する。Node.js を更新したら、`register-mcp.sh` を再実行する。
+定義の `${HOME}`・`${NODE_BIN}`（mise のグローバル設定の Node.js の `bin`）・`${PACKAGE_DIR}`（上の入れる場所）は、登録するときに実際のパスに置き換える。公開リポジトリにユーザー名を入れないためと、ターミナル以外から起動したときの PATH や、プロジェクトの mise の設定（信頼していないと shim が失敗する）に左右されないようにするため。ほかの `${VAR:-default}` は、Claude Code がサーバーの起動時に展開する。Node.js を更新したら、`register-mcp.sh` を再実行する。
 
-`~/.claude.json` と `~/.local/share/claude-mcp` に書くので、sandbox の外で実行する。通常の端末で `/bin/bash ~/dotfiles/claude/scripts/register-mcp.sh` を実行する。Claude Code のプロンプトの `!` は、セッションによっては sandbox の中で動き、失敗する（2026-11-19 に観測）。登録したサーバーは、次に始めたセッションから使える。
+`~/.claude.json` と `~/.local/share/claude-mcp` に書くので、sandbox の外で実行する。通常のターミナルで `/bin/bash ~/dotfiles/claude/scripts/register-mcp.sh` を実行する。Claude Code のプロンプトの `!` は、セッションによっては sandbox の中で動き、失敗する（2026-11-19 に観測）。登録したサーバーは、次に始めたセッションから使える。
 
 <a name="playwright-mcp"></a>
 
@@ -126,7 +126,7 @@ MCP サーバーは sandbox の外で、ユーザーの権限で動く。sandbox
 
 - `settings.json` の `permissions.deny`: `mcp__playwright__browser_run_code_unsafe`（Node のプロセスで任意のコードが動く。オプションでは無効にできない）と `mcp__playwright__browser_file_upload`（プロジェクトのファイルをページに送れる）。
 - フック `hooks/guard-playwright-mcp.sh`: `filename` 引数（相対パスはプロジェクトのルートから解決され、プロジェクトの中のどこにでも書ける）と、`paths` 引数（`browser_drop` などがローカルのファイルをページに渡す）。`browser_drop` は `data`（テキスト）なら使える。`url` が Crit のポートを指す呼び出しも止める（ブラウザは localhost に届くので、開けば人間の承認を偽造できる）。`url` が `file:` で始まる呼び出しも止める（Playwright MCP の `file:` の拒否は、Node が解析できる URL にしか効かない）。
-- `settings.json` の `sandbox.filesystem.denyRead` の `~/.crit` と `permissions.deny` の `Read(~/.crit/**)`: cc-crit 以外の crit（プラグインの自動プランレビュー、端末の crit）はランダムなポートで待ち受け、そのポートを `~/.crit/sessions` に書く。読めると、モデルがポートを知って開き、承認を偽造できる。`~/.crit` を読み書きする crit は sandbox の外で動くので、影響しない。ポートを端から試して見つける経路は残る。
+- `settings.json` の `sandbox.filesystem.denyRead` の `~/.crit` と `permissions.deny` の `Read(~/.crit/**)`: cc-crit 以外の crit（プラグインの自動プランレビュー、ターミナルの crit）はランダムなポートで待ち受け、そのポートを `~/.crit/sessions` に書く。読めると、モデルがポートを知って開き、承認を偽造できる。`~/.crit` を読み書きする crit は sandbox の外で動くので、影響しない。ポートを端から試して見つける経路は残る。
 - `settings.json` の `sandbox.filesystem.denyWrite` と `permissions.deny` の `Edit(…/**)`: 入れる場所（`~/.local/share/claude-mcp`）と出力先（`~/Library/Caches/playwright-mcp`）。`~` で起動したセッションでは作業ディレクトリの中になり、`cli.js` を書き換えれば次の起動時に sandbox の外で動き、出力先は symlink で向け替えられる。`check-repo.py` は、定義の `--output-dir` がこの出力先であることも確かめる。
 - `settings.json` の `disabledMcpjsonServers` の `playwright`: プロジェクトの `.mcp.json` に同じ名前のサーバーがあると、user スコープの定義より優先され、上の起動オプションが外れるため。`claude mcp add`（既定は local スコープ）でも `playwright` を登録しない。別の名前で Playwright を起動するプロジェクトのサーバーは、deny もフックも効かないので承認しない。
 - `check-repo.py` は、`mcp/playwright.json` 以外の定義に `playwright` が含まれていれば失敗する（`playwright`・`playwright-core` の CLI の `mcp` サブコマンドでも同じサーバーが動くため）。deny・フック・検査が、ツール名 `mcp__playwright__*` に結び付いているため。
@@ -188,16 +188,16 @@ Claude Code から `git push` するためのラッパー。`settings.json` で 
 
 `cd` や `; echo` などを前後に付けると `sandbox.excludedCommands` と一致せず、sandbox 内で動いて一時ディレクトリを作れずに失敗する（終了コード 1）。`hooks/validate-command.sh` は、この形の実行をブロックする。
 
-| 状況                                                                                                          | 結果                                   |
-| ------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
-| 許可リストのリポジトリの、保護されていないブランチ                                                            | 確認なしで push する                   |
-| 許可リストにないリポジトリ                                                                                    | 拒否する。人間が自分の端末で push する |
-| `main`, `master`, `staging`（大文字・小文字を区別しない）                                                     | 拒否する                               |
-| 判定できない場合（detached HEAD、origin が `git@github.com:OWNER/REPO.git` の形でない、許可リストの異常など） | 拒否する                               |
+| 状況                                                                                                          | 結果                                         |
+| ------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| 許可リストのリポジトリの、保護されていないブランチ                                                            | 確認なしで push する                         |
+| 許可リストにないリポジトリ                                                                                    | 拒否する。人間が自分のターミナルで push する |
+| `main`, `master`, `staging`（大文字・小文字を区別しない）                                                     | 拒否する                                     |
+| 判定できない場合（detached HEAD、origin が `git@github.com:OWNER/REPO.git` の形でない、許可リストの異常など） | 拒否する                                     |
 
 終了コードは、0 が成功、1 が push の失敗、2 が拒否。
 
-upstream は設定されないので、PR は `gh pr create --head <branch>` で作る。upstream が必要なときは、人間が自分の端末で、そのブランチに切り替えて引数なしの `git push` を実行する。`bin/.gitconfig` の `push.autoSetupRemote = true` により、送るコミットがなくても upstream が設定される（未 push のコミットがあれば、それも送られる）。`git push origin <branch>` のように送り先を指定すると設定されない。
+upstream は設定されないので、PR は `gh pr create --head <branch>` で作る。upstream が必要なときは、人間が自分のターミナルで、そのブランチに切り替えて引数なしの `git push` を実行する。`bin/.gitconfig` の `push.autoSetupRemote = true` により、送るコミットがなくても upstream が設定される（未 push のコミットがあれば、それも送られる）。`git push origin <branch>` のように送り先を指定すると設定されない。
 
 <a name="cc-safe-push-install"></a>
 
@@ -295,7 +295,7 @@ Claude は実行ユーザーの権限で動くので、root 所有にすると�
 
 ## cc-safe-pr
 
-Claude Code から PR を作成・編集するためのラッパー。`cc-safe-push` と同じ許可リストのリポジトリでは、承認なしで動く。許可リストにないリポジトリでは拒否するので、人間が自分の端末で `gh pr create` を実行する。マージとクローズの機能はない。
+Claude Code から PR を作成・編集するためのラッパー。`cc-safe-push` と同じ許可リストのリポジトリでは、承認なしで動く。許可リストにないリポジトリでは拒否するので、人間が自分のターミナルで `gh pr create` を実行する。マージとクローズの機能はない。
 
 > [!NOTE]
 > sandbox 内の `gh` は読み取り専用トークンで動き、書き込みのできるトークンには届かない（[sandbox 内の gh](#gh-read-token)）。フックと `ask` ルールはセキュリティ境界ではないが、sandbox 内からの書き込みは GitHub が 403 で拒否する。
@@ -424,17 +424,17 @@ mise run crit:profile-test
 
 ## sandbox 内の gh
 
-sandbox 内の Bash からは Keychain を読めない（`sandbox.filesystem.denyRead` に `~/Library/Keychains`）。`gh auth login` で保存した書き込みのできるトークンを使えるのは、sandbox の外で動く `cc-safe-push` と `cc-safe-pr`、人間の端末だけ。
+sandbox 内の Bash からは Keychain を読めない（`sandbox.filesystem.denyRead` に `~/Library/Keychains`）。`gh auth login` で保存した書き込みのできるトークンを使えるのは、sandbox の外で動く `cc-safe-push` と `cc-safe-pr`、人間のターミナルだけ。
 
 起動元のシェルから引き継いだ `GITHUB_TOKEN`、`GH_ENTERPRISE_TOKEN`、`GITHUB_ENTERPRISE_TOKEN` は、`sandbox.credentials.envVars` の `deny` で sandbox 内から除き、下の 1 行でも消す。`gh` は `GH_TOKEN` が空のときにこれらを使うため。`GH_TOKEN` を `export` したシェルから Claude Code を起動しない（フックが動かなかった場合に残る）。
 
 sandbox 内の `gh` には、`hooks/gh-read-token.sh` が owner ごとの読み取り専用トークンを `GH_TOKEN` として渡す。SessionStart で `CLAUDE_ENV_FILE` に 1 行を追記し、その 1 行が Bash コマンドのたびに、カレントディレクトリの origin の owner に対応するトークンを選ぶ。
 
-| 操作                                                       | 結果                                                                                             |
-| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| 読み取り（`gh pr view`、`gh pr list`、`gh run list` など） | 成功する                                                                                         |
-| 書き込み（PR の作成・編集・マージ、Issue の作成など）      | 403 で失敗する。許可リストのリポジトリの PR は `cc-safe-pr` で、それ以外は人間が自分の端末で行う |
-| トークンを置いていない owner、origin のないディレクトリ    | `GH_TOKEN` が空になり未認証になる（private リポジトリは読めない）                                |
+| 操作                                                       | 結果                                                                                                   |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| 読み取り（`gh pr view`、`gh pr list`、`gh run list` など） | 成功する                                                                                               |
+| 書き込み（PR の作成・編集・マージ、Issue の作成など）      | 403 で失敗する。許可リストのリポジトリの PR は `cc-safe-pr` で、それ以外は人間が自分のターミナルで行う |
+| トークンを置いていない owner、origin のないディレクトリ    | `GH_TOKEN` が空になり未認証になる（private リポジトリは読めない）                                      |
 
 トークンは cwd の origin で選ぶので、`-R` で別の owner のリポジトリを指定しても、その owner のトークンは使われない。
 

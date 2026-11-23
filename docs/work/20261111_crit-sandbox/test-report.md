@@ -63,9 +63,9 @@ created: 2026-11-11
 | sandbox 内からの返信（`crit comment --plan … --reply-to`） | 承認後に実行したので、返信先がなく失敗した（`comment "c_7abf44" not found`）。承認でレビューのファイルが削除されたため |
 | sandbox 内からの plan へのコメント追加と返信 | 成功（`c_60e6d4` / `rp_bc1969`）。`plans/<slug>/.crit/review.json` に書き込まれた |
 
-検証で作った `~/.crit/plans/crit-plan-hook-e2e-plan-2026-11-11/` は削除した。`~/.crit/plan-sessions.json` は sandbox から書き込めないため、人間が端末で削除した。ファイルごと消したので、11/9 のセッションと `claude-code-pr-2026-11-09` の対応付けも消えている。crit はファイルがなければ空の対応表として扱い、次の plan-hook で作り直す【コード】`internal/session/plans.go:246`。
+検証で作った `~/.crit/plans/crit-plan-hook-e2e-plan-2026-11-11/` は削除した。`~/.crit/plan-sessions.json` は sandbox から書き込めないため、人間がターミナルで削除した。ファイルごと消したので、11/9 のセッションと `claude-code-pr-2026-11-09` の対応付けも消えている。crit はファイルがなければ空の対応表として扱い、次の plan-hook で作り直す【コード】`internal/session/plans.go:246`。
 
-人間が端末で `crit docs/work/20261111_crit-sandbox/test-report.md` を実行し、コメントなしで承認した。承認後、daemon（PID 54436）は停止し、`sessions/` は空だった。
+人間がターミナルで `crit docs/work/20261111_crit-sandbox/test-report.md` を実行し、コメントなしで承認した。承認後、daemon（PID 54436）は停止し、`sessions/` は空だった。
 
 <a name="revert"></a>
 

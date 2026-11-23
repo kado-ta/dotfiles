@@ -17,7 +17,7 @@ created: 2026-11-11
 ## 1. 結論
 
 - **Plan Mode の設計レビュー**は、Crit プラグインの hook（`PermissionRequest` → `crit plan-hook`）で動く。hook は sandbox の外で動くため【公式】、設定の変更は要らない【実測】。
-- **sandbox から `~/.crit` には一切書き込ませない。** sandbox の外で動く crit（plan-hook と、人間が端末で実行する crit）は `~/.crit` の内容を信頼するので、sandbox から書けると、sandbox を抜ける経路になるうえ、レビューや承認を改ざんされる（[3.2](#shared-state)）。作業中に一度 `allowWrite` へ `~/.crit` を足したが、元に戻した。
+- **sandbox から `~/.crit` には一切書き込ませない。** sandbox の外で動く crit（plan-hook と、人間がターミナルで実行する crit）は `~/.crit` の内容を信頼するので、sandbox から書けると、sandbox を抜ける経路になるうえ、レビューや承認を改ざんされる（[3.2](#shared-state)）。作業中に一度 `allowWrite` へ `~/.crit` を足したが、元に戻した。
 - **実装レビュー（Claude が crit を起動する経路）**は、root 所有のラッパー `cc-crit` を新設し、Crit 専用の Seatbelt profile の中で crit を動かす。保存領域（HOME）は plan-hook と分ける。`allowLocalBinding` は有効にしない。ラッパーは未実装で、この文書の承認後に実装する。
 
 <a name="current-state"></a>
@@ -48,7 +48,7 @@ crit はクライアントが daemon（`crit _serve`）を子プロセスとし�
 
 ### 3.2 sandbox の外の crit が信頼する `~/.crit` に書かせてはいけない
 
-sandbox の外で動く crit（plan-hook の daemon、人間が端末で実行する crit）は、`~/.crit` の次の内容を信頼する【コード】。
+sandbox の外で動く crit（plan-hook の daemon、人間がターミナルで実行する crit）は、`~/.crit` の次の内容を信頼する【コード】。
 
 | 場所 | sandbox から書けたときの影響 |
 | --- | --- |

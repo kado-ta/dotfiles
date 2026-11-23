@@ -69,7 +69,7 @@ mise の設定を、パスではなく中身で信頼させる（mise の parano
   - グローバルとシステムの設定（`~/.config/mise/` と `/etc/mise/` の下）を除く、すべての設定に信頼が要る。`.tool-versions`、tools だけの `mise.toml`、task のファイルも含む。
   - 信頼は中身のハッシュに結び付き、編集すると信頼されていない状態に戻る。ファイルごとに信頼する（`mise.toml` を信頼しても `mise.local.toml` は信頼されない）。
   - `mise run`・`mise install`・`mise exec` などが、読み込む設定を自動で信頼しなくなる。worktree は、元のチェックアウトの信頼を引き継がない。
-  - シェルの起動や cd では確認の画面を出さず、信頼されていない設定を警告して読み飛ばす。端末のないコマンドは、信頼されていないというエラーで止まる。
+  - シェルの起動や cd では確認の画面を出さず、信頼されていない設定を警告して読み飛ばす。TTY のないコマンドは、信頼されていないというエラーで止まる。
 - **`env_files`:** `_.file`・`_.source`・`env_file` の設定が読むファイルにも、中身に結び付いた信頼が要る。
 - **`plugins`・`provenance`:** レジストリにないプラグインを拒否する。provenance の検査をやり直し、npm の provenance の失敗をエラーにする。
 - **プロジェクトからは弱められない:** `paranoid`・`trusted_config_paths`・`yes` は、グローバルの設定でだけ効く。`.miserc.toml`（信頼なしで読み込まれる）に書けるのは `env`・`ignored_config_paths` など 7 つのキーだけで、グローバルの設定の場所も変えられない。
@@ -200,7 +200,7 @@ C1 のとおり、変更は書いた時点で効く。paranoid が効く前に d
   - **V1（paranoid）:** ダミーのディレクトリで、次の 4 点を確かめる。
     - 信頼すると、cd で設定が効く。
     - 中身を変えると、cd で警告が出て読み飛ばされる。
-    - 端末のない `mise env` などは止まる。
+    - TTY のない `mise env` などは止まる。
     - Claude の Bash から `mise trust` を実行すると、失敗する。
   - **V2（denyWrite）:**
     - 作業ディレクトリの中で、Bash から `mise.toml` を作れる。

@@ -44,7 +44,7 @@ https://help.salesforce.com/s/articleView?id=<id>&language=<language>&type=<type
 
 1. WebSearch（`allowed_domains: ["help.salesforce.com"]`）で概要を探す。結果は検索の要約なので、そう明記して使う。
 2. 正確な本文が必要なら、Playwright MCP で描画して読む。`browser_navigate` で URL を開き、`browser_evaluate` の `function` に `() => document.body.innerText` を渡す（`filename` は付けない）。本文が `Loading` などのままなら、`browser_wait_for` で数秒待ってから読み直す。
-3. Playwright MCP が使えないとき（ツールがない、起動しない）は、次のコマンドを通常の端末（Ghostty）で実行して出力を貼るよう、ユーザーに依頼して待つ。Sandbox の中では Chromium が起動しない。Claude Code のプロンプトで先頭に `!` を付けると出力が会話に直接入るが、セッションによっては sandbox の中で動き、失敗する。
+3. Playwright MCP が使えないとき（ツールがない、起動しない）は、次のコマンドを通常のターミナル（Ghostty）で実行して出力を貼るよう、ユーザーに依頼して待つ。Sandbox の中では Chromium が起動しない。Claude Code のプロンプトで先頭に `!` を付けると出力が会話に直接入るが、セッションによっては sandbox の中で動き、失敗する。
 
    ```sh
    B=~/.claude/skills/gstack/browse/dist/browse

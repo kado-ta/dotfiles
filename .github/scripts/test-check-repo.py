@@ -485,7 +485,7 @@ class CheckRepoTests(unittest.TestCase):
                 self.assert_fails("FAIL playwright-mcp", "claude/mcp/playwright.json: --output-dir")
 
     def test_missing_crit_deny_read_fails(self):
-        # ほかの crit（プラグインの自動プランレビュー、端末の crit）は、ランダムなポートを ~/.crit/sessions に書く。
+        # ほかの crit（プラグインの自動プランレビュー、ターミナルの crit）は、ランダムなポートを ~/.crit/sessions に書く。
         # 読めると、モデルがポートを知って Playwright で開き、承認を偽造できる。
         data = settings()
         data["sandbox"]["filesystem"]["denyRead"].remove("~/.crit")

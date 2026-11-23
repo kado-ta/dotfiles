@@ -170,7 +170,7 @@ created: 2026-11-14
 - Modify: `claude/settings.json`（`permissions.deny`）
 
 - [x] 1. `credentials` を測る。
-  1. 人間が自分の端末で、ダミーのファイルを作る: `mkdir -p ~/cc-probe/credentials && echo probe > ~/cc-probe/credentials/a.txt && echo probe > ~/cc-probe/b.key`
+  1. 人間が自分のターミナルで、ダミーのファイルを作る: `mkdir -p ~/cc-probe/credentials && echo probe > ~/cc-probe/credentials/a.txt && echo probe > ~/cc-probe/b.key`
   2. このセッションで、Read ツールで `~/cc-probe/credentials/a.txt` を読む。拒否されれば、今の `Read(~/**/credentials)` で足りる。
   3. Bash で `head -c1 ~/cc-probe/credentials/a.txt >/dev/null; echo $?` を実行し、sandbox が止めるかを記録する。
 - [x] 2. 1 で Read ツールが拒否されなかった場合だけ、`Read(~/**/credentials/**)` を足す。sandbox が止めなかった場合は、bun のキャッシュの `@anthropic-ai/sdk` の `credentials` も読めなくなるので、research に書く。

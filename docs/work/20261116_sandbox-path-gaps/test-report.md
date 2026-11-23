@@ -43,11 +43,11 @@ created: 2026-11-18
 | V1-1 | dotfiles のセッションの Bash | そのディレクトリで `mise env` | `Config files in …/mise.toml are not trusted.` 終了コード 1 |
 | V1-2 | 同上 | そのディレクトリで `command -v jq && jq --version` | mise のインストール先の jq（shim ではない）、`jq-1.8.2`、終了コード 0 |
 | V1-3 | 同上 | `mise trust mise.toml` | `failed to ln -sf … ~/.local/state/mise/trusted-configs/…`、`Operation not permitted`、終了コード 1 |
-| V1-4 | 人間の端末（mise を有効にしたシェル） | 信頼する前に cd | `mise WARN … is not trusted`、値は空 |
+| V1-4 | 人間のターミナル（mise を有効にしたシェル） | 信頼する前に cd | `mise WARN … is not trusted`、値は空 |
 | V1-5 | 同上 | `mise trust` してから cd し直す | 値は `1` |
 | V1-6 | 同上 | 中身を `"2"` に変えてから cd し直す | `mise WARN … is not trusted`、値は空 |
 
-- 信頼されていない設定は、端末のないコマンドでは止まり、cd では警告が出て読み飛ばされた（事実）。
+- 信頼されていない設定は、TTY のないコマンドでは止まり、cd では警告が出て読み飛ばされた（事実）。
 - 中身を変えると、信頼は外れた（事実。V1-6）。
 - Claude の Bash からは、信頼の記録に書けなかった（事実。V1-3）。確かめるセッションは、グローバルの CLAUDE.md の「自分で `mise trust` を実行しない」に反して実行したが、ダミーに対する明示の依頼だった。
 
@@ -117,7 +117,7 @@ created: 2026-11-18
 
 ## 5. Codex のレビュー
 
-2026-11-18 に、人間が普段の端末で `codex review --base origin/main -c 'sandbox_mode="read-only"' -c skills.include_instructions=false` を実行した。Claude Code の `!` からは、codex の app-server の起動が `Operation not permitted` で失敗した（`!` 自体は sandbox の外で動いていることを、`~/.ssh/config` を開けることで確かめた。原因は調べていない）。
+2026-11-18 に、人間が普段のターミナルで `codex review --base origin/main -c 'sandbox_mode="read-only"' -c skills.include_instructions=false` を実行した。Claude Code の `!` からは、codex の app-server の起動が `Operation not permitted` で失敗した（`!` 自体は sandbox の外で動いていることを、`~/.ssh/config` を開けることで確かめた。原因は調べていない）。
 
 - 結果: 直すべき新しい不具合はない。
 - Codex が実行したもの: `check-repo.py`（10 項目）、shellcheck、actionlint、`git diff --check`、新しいフックが普段の HOME で通し、空の HOME で止めること。

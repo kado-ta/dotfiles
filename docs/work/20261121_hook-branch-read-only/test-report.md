@@ -45,7 +45,7 @@ created: 2026-11-21
 <a name="codex-review-1"></a>
 ### 1 回目（`codex review`）
 
-2026-11-21 に、あなたが通常の端末で `codex review --base origin/main -c 'sandbox_mode="read-only"' -c skills.include_instructions=false` を実行した（`0353087`）。結果は Codex の記録から読んだ。
+2026-11-21 に、あなたが通常のターミナルで `codex review --base origin/main -c 'sandbox_mode="read-only"' -c skills.include_instructions=false` を実行した（`0353087`）。結果は Codex の記録から読んだ。
 
 - 結果: 指摘なし（"patch is correct"、confidence 0.86）。Codex は `bash -n`・ShellCheck・`git diff --check` を実行し、成功した。読み取り専用のため、一時リポジトリを作る回帰テストは実行していない。`check-repo.py` は、差分にない未追跡の文書で失敗したと報告した（手元の結果と同じ）。
 - 対応: 指摘がないので、なし。
@@ -53,15 +53,15 @@ created: 2026-11-21
 <a name="codex-review-2"></a>
 ### 2 回目（challenge）
 
-2026-11-21 に、あなたが通常の端末で `codex exec - -s read-only -c skills.include_instructions=false` を、攻撃者の視点で迂回を探すプロンプト（gstack の challenge の既定の文を下敷きにしたもの）で実行した。
+2026-11-21 に、あなたが通常のターミナルで `codex exec - -s read-only -c skills.include_instructions=false` を、攻撃者の視点で迂回を探すプロンプト（gstack の challenge の既定の文を下敷きにしたもの）で実行した。
 
-- 結果: OpenAI 側の判定で拒否され、レビューは行われなかった（`ERROR: This content was flagged for possible cybersecurity risk.`、49,054 トークンを消費）。Codex の記録には最終メッセージがないので、端末の出力を貼ってもらった。
+- 結果: OpenAI 側の判定で拒否され、レビューは行われなかった（`ERROR: This content was flagged for possible cybersecurity risk.`、49,054 トークンを消費）。Codex の記録には最終メッセージがないので、ターミナルの出力を貼ってもらった。
 - 対応: 上限の 5 回に数える。
 
 <a name="codex-review-3"></a>
 ### 3 回目（challenge、書き直したプロンプト）
 
-2026-11-21 に、あなたが通常の端末で、同じコマンドを書き直したプロンプトで実行した（`0353087`）。攻撃者の視点という頼み方をやめ、新旧 2 版の後退を調べる形にした。結果は Codex の記録から読んだ。
+2026-11-21 に、あなたが通常のターミナルで、同じコマンドを書き直したプロンプトで実行した（`0353087`）。攻撃者の視点という頼み方をやめ、新旧 2 版の後退を調べる形にした。結果は Codex の記録から読んだ。
 
 - 結果: 後退が 2 種類（`VERDICT: FINDINGS`）。Codex の読み取り専用の環境では、ヒアストリングの一時ファイルを作れずに新旧とも 2 になるので、`<<<` をプロセス置換に置き換えた写しで確かめたとのこと。
   1. ブレース展開を使う関数で git を上書きする形（High、Blocks: yes）
@@ -71,7 +71,7 @@ created: 2026-11-21
 <a name="codex-review-4"></a>
 ### 4 回目（challenge、書き直したプロンプト）
 
-2026-11-21 に、あなたが通常の端末で、3 回目と同じプロンプト（D9 のことを書き足したもの）で実行した（`8ec4de2`）。結果は Codex の記録から読んだ。
+2026-11-21 に、あなたが通常のターミナルで、3 回目と同じプロンプト（D9 のことを書き足したもの）で実行した（`8ec4de2`）。結果は Codex の記録から読んだ。
 
 - 結果: 後退が 2 種類（`VERDICT: FINDINGS`）。3 回目と同じく、ヒアストリングをプロセス置換に置き換えた写しで確かめたとのこと。
   1. zsh の短い関数定義 `function git; /usr/bin/git branch -M main; git branch; unfunction git; git commit -m x`（High、Blocks: yes）。括弧・波括弧・引用符を使わないので、D6・D9 の記号に当たらない。

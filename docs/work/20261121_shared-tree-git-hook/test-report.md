@@ -27,7 +27,7 @@ Claude Code の sandbox の中で、worktree（`feat/shared-tree-git-hook`）で
 | `bash claude/hooks/tests/test-guard-additional-dirs.sh` | pass=17 fail=0 |
 | `bash claude/hooks/tests/test-guard-playwright-mcp.sh` | pass=49 fail=0 |
 
-人間が普段の端末（sandbox の外）で `bash claude/hooks/tests/test-ask-shared-tree-git.sh` を実行した結果は pass=94 fail=0 で、`SKIP` は出なかった（`/review` の修正の前のテスト）。実物の ps・kill を使う 3 件（生きているセッション、テストのシェル＝フックの祖先、終了したセッション）も通った。
+人間が普段のターミナル（sandbox の外）で `bash claude/hooks/tests/test-ask-shared-tree-git.sh` を実行した結果は pass=94 fail=0 で、`SKIP` は出なかった（`/review` の修正の前のテスト）。実物の ps・kill を使う 3 件（生きているセッション、テストのシェル＝フックの祖先、終了したセッション）も通った。
 
 テストが変更を検出できることは、フックの写しに変異を入れて確かめた。対象の照合・ツリーの比較・`TZ=UTC`・空白の正規化・祖先の除外・`sessionId` の除外・件数の上限・ps の失敗の扱い・`CLAUDE_PROJECT_DIR` への切り替え・stash のオプション・commit の `-a` の範囲を、それぞれ外すか広げると FAIL になる。`exit 0` を `exit 2` にすると全件 FAIL になる。
 
@@ -60,7 +60,7 @@ worktree の `.claude/settings.local.json` にだけフックを登録し、work
 | 4. 別のセッションがあると確認が出て、文面に載る | OK | OK | OK |
 | 5. auto mode で、allow の `Bash(git checkout *)` に当たる `git checkout -b` でも確認が出る | OK | OK | OK |
 
-- 1 は、生きているすべてのセッション（起動元とディレクトリを問わず 26 件）を、普段の端末で比べた。空白の正規化の後で、すべて一致した。
+- 1 は、生きているすべてのセッション（起動元とディレクトリを問わず 26 件）を、普段のターミナルで比べた。空白の正規化の後で、すべて一致した。
 - 2〜5 は、このとき worktree にいた別の CLI のセッション（実装を進めたセッション）を「別のセッション」として使い、文面にそのセッションだけが載り、確認したセッション自身が載らないことを見た。
 - `--resume` の後の CLI のセッションで `git switch -c tmp/hook-check` を実行したときの文面:
 
@@ -106,7 +106,7 @@ QA の probe（成功の経路、`git stash 2>&1`、300 KB の入力で書き手
 
 ## 6. Codex のレビュー
 
-人間が普段の端末で `codex review --base main -c 'sandbox_mode="read-only"' -c skills.include_instructions=false` を実行した。結果は Codex の記録（`last_agent_message`）から読んだ。
+人間が普段のターミナルで `codex review --base main -c 'sandbox_mode="read-only"' -c skills.include_instructions=false` を実行した。結果は Codex の記録（`last_agent_message`）から読んだ。
 
 **1 回目（2026-11-21T08:36Z、`45468c5`）:** 総評は「patch is incorrect」（確度 0.98）。指摘は次の 2 件。
 
@@ -134,6 +134,6 @@ QA の probe（成功の経路、`git stash 2>&1`、300 KB の入力で書き手
 | `format_reason <root> <件数> <一覧の各行>` | `format_reason <root>` で、標準入力の `live_others` の出力を `read` で読む | here-string を使わず、件数は中で数えるため |
 | Task 2 のテスト `home as ~` は `HOME="$T"` で動かす | `HOME` を `$T` の物理パスにした。`physical path` のテストは `HOME=/nonexistent-home` で動かした | ルートは物理パスで比べるので、`/tmp` → `/private/tmp` の symlink を含む `HOME` では `~` にならないため |
 | Task 2 のテスト `a"b` は、リポジトリの中の記録の cwd を `a"b` にする | ツリーのルート自体を `a"b` にした | 文面に出るのはルートだけで、記録の cwd では引用符が出力に現れないため |
-| Task 2 Step 5（普段の端末でのテスト）は Task 2 の中で頼む | Task 3 の人間の作業とまとめて頼んだ | 依頼を 1 回にまとめるため |
+| Task 2 Step 5（普段のターミナルでのテスト）は Task 2 の中で頼む | Task 3 の人間の作業とまとめて頼んだ | 依頼を 1 回にまとめるため |
 | Task 3 Step 8 は 1 つのコミット | 登録と文書のコミットと、試験記録のコミットに分けた | 手動の確認で別のセッションが worktree で動くあいだ、未コミットの変更を残さないため |
 | 最後のレビューは superpowers の code-reviewer | gstack の `/review` だけにした | ユーザーの skill-routing の規則（同じ差分にレビューを重ねない）に従うため |
