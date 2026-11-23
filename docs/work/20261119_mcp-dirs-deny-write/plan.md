@@ -101,7 +101,7 @@ Claude が 2 か所に書く理由がない。スクリーンショットは Rea
 
 守らない（2026-11-19 にレビューで決定）。MCP の `command` は `~/.local/share/mise/installs/node/<版>/bin/node` で、`~` で起動したセッションからは同じ理由で書ける見込み（推測。手順 1 で測る）。書き換えれば、次の MCP の起動時に sandbox の外で動く。
 
-- 採らない理由: node は MCP 専用ではなく、端末のすべての `node` で使う。`~` で起動したセッションは、ほかにも sandbox の外で動く場所（`~/Library/LaunchAgents`、`~/.npm` のキャッシュなど）に書ける。1 か所ずつ塞ぐのは別の設計で、`~` で起動しない規則（グローバルの CLAUDE.md の Safety）が主な守り。
+- 採らない理由: node は MCP 専用ではなく、ターミナルのすべての `node` で使う。`~` で起動したセッションは、ほかにも sandbox の外で動く場所（`~/Library/LaunchAgents`、`~/.npm` のキャッシュなど）に書ける。1 か所ずつ塞ぐのは別の設計で、`~` で起動しない規則（グローバルの CLAUDE.md の Safety）が主な守り。
 - 代わりに、CLAUDE_CONFIG.md の Playwright MCP の節に、残るリスクとして 1 行書く。
 - 守る案: `~/.local/share/mise` を denyWrite と Edit の deny に足す。リポジトリのルートで起動したセッションでは、もともと Bash から書けないので、失うものは `~` で起動したセッションの `mise install` くらい。採るなら、MCP ではなく mise の守り（`MISE_DENY_WRITE`）として足す。
 
@@ -110,7 +110,7 @@ Claude が 2 か所に書く理由がない。スクリーンショットは Rea
 
 - 攻撃面: `~`（と、2 か所を含むほかのディレクトリ）で起動したセッションで、2 か所への Bash と Edit・Write の書き込みがなくなる。リポジトリのルートで起動したセッションは変わらない（もともと書けない）。
 - 読み取りは変えない。出力先は sandbox の中から読めたまま（PR #46 で受け入れたリスクのまま）。
-- `register-mcp.sh`・MCP サーバー・人間の端末の操作は sandbox の外なので、影響しない。
+- `register-mcp.sh`・MCP サーバー・人間のターミナルの操作は sandbox の外なので、影響しない。
 - 後方互換: 設定を足すだけ。`check-repo.py` は、設定を足す前の作業ツリーでは失敗する。
 
 <a name="steps"></a>
@@ -125,7 +125,7 @@ Claude が 2 か所に書く理由がない。スクリーンショットは Rea
 | 5 | 文書とコメントを直す | `check-repo.py` の `markdown-links` が通る | Claude |
 | 6 | 検証: `check-repo.py`・`test-check-repo.py`・shellcheck・actionlint・フックのテスト・`test-register-mcp.py` | すべて通る | Claude |
 | 7 | 新しく `~` で起動したセッションで、[測る命令](#probe)の 2 つと、Write ツールでの 2 か所への書き込み（大文字・小文字を変えた綴りも）を試す | 2 か所が `denied`、綴りを変えても `denied`、Write も拒否される。対照の `~/Library/Caches`・`~/.local/share` は `writable`（`.` がホームであることの確認）。出力先がないときの結果で、[D8](#decision-case) の次の対応を決める | あなた |
-| 8 | `/review` → `/security-review`。Codex のレビューは通常の端末で実行し、2 回以上なら全部の結果を貼ってもらう | 指摘への対応が決まる | Claude・あなた |
+| 8 | `/review` → `/security-review`。Codex のレビューは通常のターミナルで実行し、2 回以上なら全部の結果を貼ってもらう | 指摘への対応が決まる | Claude・あなた |
 | 9 | コミット（`settings.json` は HEAD の版に今回の追加だけを入れたものを index に置く）。`/crit-review` でブランチの差分を開く | `approved: true` | Claude・あなた |
 | 10 | `cc-safe-push`、`cc-safe-pr create`、`gh pr checks` を最大 60 分待つ | CI が通る。マージはあなた | Claude |
 
@@ -176,7 +176,7 @@ done
 
 出力先がないときの確認（[D8](#decision-case)）は、出力先を退避したうえで `~` で起動したセッションで試そうとしたが、そのセッションの権限の判定でコマンドが実行されなかった。出力先は元に戻した（中身が 17 項目のまま戻ったことを確認）。D8 は未測定のまま、残るリスクとして扱う。この作業をした dotfiles のセッションの `!` は、この日は sandbox の外で動いた（`~/.ssh/config` を読めた）ので、`!` は測定に使わない（`!` は人間が操作するもので、守りの穴ではない）。
 
-出力先がないときの確認は、次の順で行う。1 と 3 は通常の端末で、2 は `~` で起動したセッションの Bash ツールで実行する。
+出力先がないときの確認は、次の順で行う。1 と 3 は通常のターミナルで、2 は `~` で起動したセッションの Bash ツールで実行する。
 
 1. `mv ~/Library/Caches/playwright-mcp ~/Library/Caches/playwright-mcp.bak`
 2. `if mkdir ~/Library/Caches/Playwright-MCP 2>/dev/null; then rmdir ~/Library/Caches/Playwright-MCP; echo "writable: missing dir with another case"; else echo "denied:   missing dir with another case"; fi`
@@ -218,7 +218,7 @@ done
 <a name="codex-review"></a>
 ### Codex のレビュー
 
-2026-11-19 に、あなたが通常の端末で `codex review --base main` を 1 回実行した。結果は「修正必須の不具合なし」。`check-repo.py`・shellcheck・actionlint・`git diff --check` は Codex の環境で通った。`test-check-repo.py`・`test-register-mcp.py` は Codex の環境（読み取り専用）では一時ディレクトリを作れずに検証できなかったが、このセッションで実行して通った。権限の実際の動きは Codex は検証していないが、手順 7 で確かめた（[結果](#results)）。
+2026-11-19 に、あなたが通常のターミナルで `codex review --base main` を 1 回実行した。結果は「修正必須の不具合なし」。`check-repo.py`・shellcheck・actionlint・`git diff --check` は Codex の環境で通った。`test-check-repo.py`・`test-register-mcp.py` は Codex の環境（読み取り専用）では一時ディレクトリを作れずに検証できなかったが、このセッションで実行して通った。権限の実際の動きは Codex は検証していないが、手順 7 で確かめた（[結果](#results)）。
 
 <a name="rollback"></a>
 ## ロールバック

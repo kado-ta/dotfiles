@@ -27,7 +27,7 @@ created: 2026-11-18
 | 1 | `claude mcp list` で接続済み | 合格 | `! claude mcp list` で `playwright: … - ✔ Connected` |
 | 2 | user スコープ・固定した版・指定したオプション | 合格 | `! claude mcp get playwright` で `Scope: User config`、`@playwright/mcp@0.0.85 --isolated --browser chrome --output-dir <HOME>/Library/Caches/playwright-mcp`。`command` と `PATH` は mise のグローバルの Node.js の絶対パス |
 | 3 | 2 回続けて登録してもエラー・重複なし | 合格 | `! /bin/bash ~/dotfiles/claude/scripts/register-mcp.sh` を 2 回。どちらも `Added stdio MCP server playwright to user config` で、`claude mcp list` の playwright は 1 つ |
-| 3a | 端末以外から起動したときの PATH でも起動する | 合格 | 信頼していない `mise.toml` を置いた一時ディレクトリで、`env -i` で PATH を `/usr/bin:/bin:/usr/sbin:/sbin` にして `claude mcp list` → `✔ Connected`。確かめたのはサーバーの起動まで（Chrome の起動は 4a〜4b で確かめた） |
+| 3a | ターミナル以外から起動したときの PATH でも起動する | 合格 | 信頼していない `mise.toml` を置いた一時ディレクトリで、`env -i` で PATH を `/usr/bin:/bin:/usr/sbin:/sbin` にして `claude mcp list` → `✔ Connected`。確かめたのはサーバーの起動まで（Chrome の起動は 4a〜4b で確かめた） |
 | 3b | 既定は headless、`PLAYWRIGHT_MCP_HEADLESS=false` でウィンドウが出る | 合格 | 4a〜4d のセッションではウィンドウが出なかった。`PLAYWRIGHT_MCP_HEADLESS=false claude` で始めたセッションで https://example.com を開くと、ウィンドウが出た |
 | 4a | Salesforce Help の本文を取得できる | 合格 | 新しいセッションで `platform.automate_flow_ref_third_party_freshservice.htm` を読ませた。salesforce-help スキルが読み込まれ、`browser_navigate` → `browser_evaluate`（`document.body.innerText`）で本文を取得した。`browser_navigate` の応答は約 560 文字で、ページの構造（約 7.3KB）は出力先のファイルに書かれ、応答には入らなかった |
 | 4b | 1440px と 390px のスクリーンショット | 合格 | https://login.salesforce.com/ を 1440×900 と 390×844 で撮影し、画像の中身を説明できた。保存先は `~/Library/Caches/playwright-mcp/page-<時刻>.png` |
@@ -87,7 +87,7 @@ created: 2026-11-18
 | R10 | 出力が `git status` に出ない | 合格 | 前後の `git status --short` が同じ。`--ignored` でも `test.png` はない |
 | R11 | ブラウザが UNIX ソケットで公開されても、sandbox からはつなげない | 合格 | sandbox の中から `/var/run/mDNSResponder` への接続が `Operation not permitted`。`/security-review` で、Playwright が実際に公開したソケット（サーバーの一時ディレクトリの `pw-<hash>/browser/browser-*.sock`）への接続も `Operation not permitted` だった |
 
-このセッションでは、`!` のコマンドが sandbox の中で動いた（`claude mcp list` の出力に `sandbox_violations` が出て、`mktemp -d` が sandbox の外の一時ディレクトリに書けなかった）。前の調査（`!` は sandbox の外で動く）と違うので、`!` で sandbox の外の操作を頼むときは、端末で実行してもらう。
+このセッションでは、`!` のコマンドが sandbox の中で動いた（`claude mcp list` の出力に `sandbox_violations` が出て、`mktemp -d` が sandbox の外の一時ディレクトリに書けなかった）。前の調査（`!` は sandbox の外で動く）と違うので、`!` で sandbox の外の操作を頼むときは、ターミナルで実行してもらう。
 
 <a name="security-review"></a>
 ## セキュリティレビュー
@@ -100,7 +100,7 @@ created: 2026-11-18
 <a name="codex-review"></a>
 ## Codex のレビュー
 
-2026-11-19 に、ユーザーが端末で `codex review --base main -c 'sandbox_mode="read-only"' -c skills.include_instructions=false` を実行した（main の取り込み `a850ec1` の後）。直すべき不具合はなかった。Codex は、リポジトリの検査、Playwright の定義のテスト 7 件、フックの読み取りだけの確認 18 件、shellcheck、actionlint を実行して通った。read-only の制約のため、一時ファイルを作る登録スクリプトの回帰テスト全体と、実際の登録・ブラウザの操作は実行していない（この 2 つは[自動の試験](#automated)と[再確認](#recheck)で確かめた）。
+2026-11-19 に、ユーザーがターミナルで `codex review --base main -c 'sandbox_mode="read-only"' -c skills.include_instructions=false` を実行した（main の取り込み `a850ec1` の後）。直すべき不具合はなかった。Codex は、リポジトリの検査、Playwright の定義のテスト 7 件、フックの読み取りだけの確認 18 件、shellcheck、actionlint を実行して通った。read-only の制約のため、一時ファイルを作る登録スクリプトの回帰テスト全体と、実際の登録・ブラウザの操作は実行していない（この 2 つは[自動の試験](#automated)と[再確認](#recheck)で確かめた）。
 
 <a name="unverified"></a>
 ## 確かめていないこと

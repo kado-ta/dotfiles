@@ -43,7 +43,7 @@ created: 2026-11-17
 1. **`HOME` の途中の symlink:** `HOME` が symlink を含むパス（macOS の `$TMPDIR` は `/var` → `/private/var`）でも、実体の `~/.gstack/projects` なら通す。比べる相手は、`HOME` を `cd -P` で解決したパスに `/.gstack/projects` を付けたものにする（plan の判断。design の「`$HOME/.gstack/projects` と違えば」をそのまま比べると、ここで誤検知する）。Task 2 のテストで確かめる。
 2. **先のない symlink と通常のファイル:** `~/.gstack/projects` がこのどちらかなら拒否する。「ない」と同じ扱いにしない。Task 2 のテストで確かめる。
 3. **paranoid の値の形:** 文字列（`"config,env_files"`）や、`config` だけのリストを通さない。部分文字列で判定しない。Task 3 のテストで確かめる。
-4. **信頼されていない設定のあるディレクトリの Bash:** paranoid では、端末のないコマンドが止まる。jq が mise の shim に解決されると、`validate-command.sh` などが fail closed になり、Bash がすべて止まる見込み（推測）。Task 3 の信頼の直後と、Task 6 の V1 で確かめる。止まるなら、CLAUDE.md の今の案内（`mise trust`）で戻せることを確かめ、test-report に書く。
+4. **信頼されていない設定のあるディレクトリの Bash:** paranoid では、TTY のないコマンドが止まる。jq が mise の shim に解決されると、`validate-command.sh` などが fail closed になり、Bash がすべて止まる見込み（推測）。Task 3 の信頼の直後と、Task 6 の V1 で確かめる。止まるなら、CLAUDE.md の今の案内（`mise trust`）で戻せることを確かめ、test-report に書く。
 5. **フックを登録した後の普段の書き込み:** 作業ディレクトリ・`~/.gstack/projects`・`.cc-crit-request.json` への Write が通る。Task 6 の V3 で確かめる。
 
 <a name="task-0"></a>

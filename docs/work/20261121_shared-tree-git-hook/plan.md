@@ -48,7 +48,7 @@ created: 2026-11-21
 
 この作業は `claude -w` の worktree で行う。`~/dotfiles` には別の作業の未コミットの変更がある。
 
-- [ ] **Step 1:** 人間に、普段の端末で `cd ~/dotfiles && claude -w shared-tree-git-hook` を実行してもらう。以降はそのセッションで行う。
+- [ ] **Step 1:** 人間に、普段のターミナルで `cd ~/dotfiles && claude -w shared-tree-git-hook` を実行してもらう。以降はそのセッションで行う。
 - [ ] **Step 2:** ブランチ名を変える: `git branch -m worktree-shared-tree-git-hook feat/shared-tree-git-hook`。`could not lock config file` と出て終了コード 128 で終わるが、名前は変わる。`git branch --show-current` が `feat/shared-tree-git-hook` を返すことを、別の Bash 呼び出しで確かめる。
 - [ ] **Step 3:** `~/dotfiles/docs/work/20261121_shared-tree-git-hook/` の `design.md` と `plan.md` を、worktree の同じ場所に写す（Read と Write）。
 - [ ] **Step 4:** コミットする。
@@ -209,9 +209,9 @@ Expected: `pid reused`・`same sessionId`・`ancestor pid`・文面の各テス�
 Run: Step 2 と同じ。
 Expected: `fail=0`、終了コード 0。sandbox の中では `SKIP real ps` が出る。
 
-- [ ] **Step 5: 普段の端末での実行を頼む**
+- [ ] **Step 5: 普段のターミナルでの実行を頼む**
 
-人間に、普段の端末で `cd ~/dotfiles/.claude/worktrees/shared-tree-git-hook && bash claude/hooks/tests/test-ask-shared-tree-git.sh` を実行してもらう。
+人間に、普段のターミナルで `cd ~/dotfiles/.claude/worktrees/shared-tree-git-hook && bash claude/hooks/tests/test-ask-shared-tree-git.sh` を実行してもらう。
 Expected: `SKIP` が出ず、`fail=0`。
 
 - [ ] **Step 6: shellcheck を通してコミットする**
@@ -287,7 +287,7 @@ git commit -m "feat(claude): register ask-shared-tree-git and document it"
 ### Task 4: レビューと PR
 
 - [ ] **Step 1:** `/review` でブランチの差分をレビューし、指摘を直す。
-- [ ] **Step 2:** 共通の基盤（すべてのセッションのフック）なので、普段の端末での Codex のレビューを提案する: `cd <worktree> && codex review --base main -c 'sandbox_mode="read-only"' -c skills.include_instructions=false`。
+- [ ] **Step 2:** 共通の基盤（すべてのセッションのフック）なので、普段のターミナルでの Codex のレビューを提案する: `cd <worktree> && codex review --base main -c 'sandbox_mode="read-only"' -c skills.include_instructions=false`。
 - [ ] **Step 3:** `/crit-review` でブランチの差分を開き、`approved: true` が返るまで push しない。
 - [ ] **Step 4:** design と plan の `status` を `done` にし、コミットする。
 - [ ] **Step 5:** `git branch --show-current` を別の呼び出しで確かめてから、`/usr/local/libexec/claude-push/cc-safe-push` を単独で実行する。

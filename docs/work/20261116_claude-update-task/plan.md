@@ -39,7 +39,7 @@ created: 2026-11-16
 
 ## 決定事項
 
-- タスク名は `claude:update` とし、リポジトリの `mise.toml` に置く。`/sync-skill-docs` は dotfiles の project スキルなので、dotfiles で実行する。sandbox の中からは `~/.claude` と Homebrew に書けないので、端末か Claude Code の `!` で実行する。
+- タスク名は `claude:update` とし、リポジトリの `mise.toml` に置く。`/sync-skill-docs` は dotfiles の project スキルなので、dotfiles で実行する。sandbox の中からは `~/.claude` と Homebrew に書けないので、ターミナルか Claude Code の `!` で実行する。
 - 順番: gstack-upgrade → 絶対パスの書き換え → マーケットプレイスの更新 → user スコープのプラグインの更新 → `brew upgrade crit` → `mise run crit:profile-test` → 失敗した手順の一覧と案内。
 - `/sync-skill-docs` は自動では起動しない。案内を表示して止める。
 - 書き換えでは `"command": "<HOME>/` を `"command": "~/` にする。gstack 以外が書いた絶対パスも対象にする（どれも公開できないため）。`$HOME` ではなく `~` にするのは、settings.json のほかのフックに合わせるため。`~` はダブルクォートの中では展開されないが、gstack がパスを引用符で囲むのは空白や記号を含むときだけで、ホームのパスには当てはまらない。
@@ -249,10 +249,10 @@ created: 2026-11-16
 - [ ] **Step 5: mise のタスクを足す**
 
   ```toml
-  # スキル・プラグインをまとめて更新する。sandbox の中からは ~/.claude と Homebrew に書けないので、端末か Claude Code の ! で実行する。
+  # スキル・プラグインをまとめて更新する。sandbox の中からは ~/.claude と Homebrew に書けないので、ターミナルか Claude Code の ! で実行する。
   # 終わったら /sync-skill-docs で文書を直す。
   [tasks."claude:update"]
-  description = "gstack・プラグイン・crit の CLI を更新し、gstack が settings.json に書いた絶対パスを ~/ に戻す（端末か Claude Code の ! で実行する）"
+  description = "gstack・プラグイン・crit の CLI を更新し、gstack が settings.json に書いた絶対パスを ~/ に戻す（ターミナルか Claude Code の ! で実行する）"
   run = "/bin/bash claude/scripts/update-skills.sh"
   ```
 
@@ -323,7 +323,7 @@ Claude は sandbox の外でコマンドを実行できないので、次の 1 �
 
 `/review`（スペシャリスト 5、adversarial、Red Team）の指摘のうち、ユーザーが選んだものを直した（2026-11-16）。
 
-- **入口:** Claude Code からは `! /bin/bash ~/dotfiles/claude/scripts/update-skills.sh` で実行する。mise は dotfiles のルートの設定ファイル（`mise.local.toml` など）を自動で信頼して読み込み、ルートには sandbox から書けるため。`mise run claude:update` は端末用に残す。mise を通すほかのタスクにも同じ経路があるので、全体の対策は別の作業にする。
+- **入口:** Claude Code からは `! /bin/bash ~/dotfiles/claude/scripts/update-skills.sh` で実行する。mise は dotfiles のルートの設定ファイル（`mise.local.toml` など）を自動で信頼して読み込み、ルートには sandbox から書けるため。`mise run claude:update` はターミナル用に残す。mise を通すほかのタスクにも同じ経路があるので、全体の対策は別の作業にする。
 - **update-skills.sh:**
   - 先頭でホームに移る。gstack-upgrade が呼び出し元のリポジトリ（dotfiles）を検査して、失敗と表示しないようにするため。
   - Python に `-I` を付ける。カレントディレクトリの `json.py` などを読み込まないようにするため。

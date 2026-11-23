@@ -48,9 +48,9 @@ Playwright MCP（`@playwright/mcp`）を Claude Code の user スコープに登
 <a name="findings-node"></a>
 ### Node.js と npx
 
-- Node.js は mise のグローバル設定（`node = "26.13.1"`）で入れている。端末では `.zshrc` の `mise activate zsh` が、インストール先の `bin` を PATH に入れる。
+- Node.js は mise のグローバル設定（`node = "26.13.1"`）で入れている。ターミナルでは `.zshrc` の `mise activate zsh` が、インストール先の `bin` を PATH に入れる。
 - mise の shim は、信頼していない mise の設定があるディレクトリで失敗する（`Config files in … are not trusted`）。paranoid では、設定を変えるたびに信頼が外れる。
-- 端末以外（Claude のデスクトップアプリ、Dock から起動した VS Code）から Claude Code を起動したときの PATH は確認していない。
+- ターミナル以外（Claude のデスクトップアプリ、Dock から起動した VS Code）から Claude Code を起動したときの PATH は確認していない。
 
 <a name="findings-cli"></a>
 ### Claude Code の CLI
@@ -111,7 +111,7 @@ Playwright MCP（`@playwright/mcp`）を Claude Code の user スコープに登
 定義ファイルに `${NODE_BIN}` と `${HOME}` を書き、登録スクリプトが実際のパスに置き換える。それ以外の `${...}`（[D2a](#decision-headless) の `PLAYWRIGHT_MCP_HEADLESS`）は置き換えずに残し、Claude Code が起動時に展開する。`NODE_BIN` は、ホームで `mise where node` を実行して得たグローバルの Node.js の `bin`。
 
 - `command` は `${NODE_BIN}/npx` にする。npx と、npx が起動する `playwright-mcp` は `#!/usr/bin/env node` で始まるので、`env.PATH` も `${NODE_BIN}:/usr/bin:/bin:/usr/sbin:/sbin` に固定する。
-- 端末以外から起動したときの PATH と、プロジェクトの mise の設定（版の違いと、信頼していないときの shim の失敗）の影響を受けない。
+- ターミナル以外から起動したときの PATH と、プロジェクトの mise の設定（版の違いと、信頼していないときの shim の失敗）の影響を受けない。
 - 公開リポジトリにユーザー名を入れない。
 - 欠点: Node.js を更新したら、登録スクリプトを再実行する（README に書く）。
 
@@ -125,7 +125,7 @@ Playwright MCP（`@playwright/mcp`）を Claude Code の user スコープに登
 
 `claude/CLAUDE.md` の Tools 節を次の内容にする。
 
-> Claude がブラウザを操作して調べるとき（公開ページのスクリーンショット・スタイル値、JS で描画される文書、ローカルの画面の確認）は Playwright MCP を使う。繰り返す確認は、そのプロジェクトの `@playwright/test` にテストとして書き、実行は人間（端末・`!`）か CI に任せる（sandbox の中ではブラウザが起動しない）。プロジェクトに Playwright がなければ、導入は提案に留める。gstack のスキル（`/qa` など）の中の browse は、スキルの手順に従う。
+> Claude がブラウザを操作して調べるとき（公開ページのスクリーンショット・スタイル値、JS で描画される文書、ローカルの画面の確認）は Playwright MCP を使う。繰り返す確認は、そのプロジェクトの `@playwright/test` にテストとして書き、実行は人間（ターミナル・`!`）か CI に任せる（sandbox の中ではブラウザが起動しない）。プロジェクトに Playwright がなければ、導入は提案に留める。gstack のスキル（`/qa` など）の中の browse は、スキルの手順に従う。
 
 salesforce-help スキルの「本文を読めないとき」は、Playwright MCP で開いて `browser_evaluate`（`filename` なし）で `document.body.innerText` を読む手順にし、Playwright MCP が使えないときだけ、今の `!` での browse を使う。棚卸し（`SKILL_INVENTORY.md`）と早見表（`SKILL_CHEATSHEET.md`）のブラウザの行も合わせる。
 
@@ -160,7 +160,7 @@ salesforce-help スキルの「本文を読めないとき」は、Playwright MC
 | （2 回目）別名の検出が `@playwright/mcp` の部分一致だけで、`playwright` の CLI の `mcp` サブコマンドや JSON のエスケープで抜ける | JSON を読んでから、大文字・小文字を区別せずに `playwright` を含む定義を止める。読めない定義も失敗にする |
 | （2 回目）ブラウザが認証のない UNIX ソケットで公開される | sandbox が UNIX ソケットへの接続を止めることを実測し、`CLAUDE_CONFIG.md` に記録した |
 | （2 回目）文書の古い箇所（この Plan の定義の例・ロールバック、README の更新の手順） | 直した。更新の前にセッションを閉じる手順も足した |
-| （2 回目）cc-crit 以外の crit（プラグインの自動プランレビュー、端末の crit）はランダムなポートで待ち受け、ポートを sandbox から読める `~/.crit/sessions` に書く | `sandbox.filesystem.denyRead` に `~/.crit`、`permissions.deny` に `Read(~/.crit/**)` を足す（ユーザーが編集）。`check-repo.py` が確かめる |
+| （2 回目）cc-crit 以外の crit（プラグインの自動プランレビュー、ターミナルの crit）はランダムなポートで待ち受け、ポートを sandbox から読める `~/.crit/sessions` に書く | `sandbox.filesystem.denyRead` に `~/.crit`、`permissions.deny` に `Read(~/.crit/**)` を足す（ユーザーが編集）。`check-repo.py` が確かめる |
 | （2 回目）プロジェクトの `.mcp.json` や local スコープの同じ名前の `playwright` が、強化した user スコープの定義を上書きする | ユーザー設定の `disabledMcpjsonServers` に `playwright` を足す（ユーザーが編集。効くかは[試験記録](test-report.md#recheck)で確かめる）。`check-repo.py` が確かめる。local スコープは文書で禁じる |
 | （2 回目）`setup.sh` が登録の失敗で止まり、`setup.command` の後の手順も止まる | 警告を出して先に進む |
 | （`/security-review`、基準未満）Playwright MCP の `file:` の拒否は、Node が解析できる URL にしか効かない（`file://localhost:/…` などは素通りする） | フックで、`url` が `file:` で始まる呼び出しも止める |
@@ -246,7 +246,7 @@ salesforce-help スキルの「本文を読めないとき」は、Playwright MC
 5. README・ルートの CLAUDE.md・`CLAUDE_CONFIG.md`・CI を更新する。→ shellcheck・actionlint・`check-repo.py`
 6. 使い分け: `claude/CLAUDE.md`・salesforce-help・棚卸し・早見表を更新する。→ `check-repo.py`（リンク）
 7. **あなた**: 登録と動作確認（[完了条件](#done)）。新しいセッションが要る。
-8. `/review` → `/security-review` → 指摘を直す → `test-report.md` を書く → `/crit-review` で差分を開く → push・PR。Codex レビューは、あなたの端末で実行する。
+8. `/review` → `/security-review` → 指摘を直す → `test-report.md` を書く → `/crit-review` で差分を開く → push・PR。Codex レビューは、あなたのターミナルで実行する。
 
 コミットは 1 論理変更ごとに分ける（フック、登録、settings と検査、使い分け、作業文書）。
 
@@ -258,7 +258,7 @@ salesforce-help スキルの「本文を読めないとき」は、Playwright MC
 | 1 | `claude mcp list` で playwright が接続済み | `! claude mcp list` | あなた |
 | 2 | user スコープ・`0.0.85`・指定したオプション | `! claude mcp get playwright` | あなた |
 | 3 | 2 回続けて登録しても、エラーも重複も出ない | `! /bin/bash ~/dotfiles/claude/scripts/register-mcp.sh` を 2 回、その後 2 | あなた |
-| 3a | 端末以外から起動したときの PATH でも起動する | 信頼していない mise の設定があるディレクトリで、`env -i` で PATH を `/usr/bin:/bin:/usr/sbin:/sbin` にして `claude mcp list` | あなた |
+| 3a | ターミナル以外から起動したときの PATH でも起動する | 信頼していない mise の設定があるディレクトリで、`env -i` で PATH を `/usr/bin:/bin:/usr/sbin:/sbin` にして `claude mcp list` | あなた |
 | 3b | 既定は headless、`PLAYWRIGHT_MCP_HEADLESS=false` でウィンドウが出る | 4b のセッションでウィンドウが出ないこと。別に `PLAYWRIGHT_MCP_HEADLESS=false claude` で始めたセッションで、ページを開くとウィンドウが出ること | あなた（新しいセッション） |
 | 4a | Salesforce Help の本文を取得できる | 新しいセッションで、WebFetch では目次だけになる記事（`platform.automate_flow_ref_third_party_freshservice.htm`）を読ませる。salesforce-help スキルが Playwright MCP に回すことも見る。応答の大きさも記録する | あなた（新しいセッション） |
 | 4b | 1440px と 390px のスクリーンショットを撮って確認できる | 同じセッションで `browser_resize` と `browser_take_screenshot` | あなた（新しいセッション） |
