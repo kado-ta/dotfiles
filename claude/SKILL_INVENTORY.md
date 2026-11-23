@@ -2,7 +2,7 @@
 
 入っているプラグイン・スキル・エージェント・hooks・MCP の一覧と、その状態・制約を書く。スキルの選び方の規則は [rules/SKILL_ROUTING.md](rules/SKILL_ROUTING.md)（毎回読み込まれる）、タスク別の早見表は [SKILL_CHEATSHEET.md](SKILL_CHEATSHEET.md) にある。重複の裁定の根拠は [作業文書](../docs/work/20261116_skill-role-division/research-routing.md) にある。
 
-- 時点: 2026-11-16。2026-11-23 に gstack 1.102.2.0 と pstack 0.15.46 への更新を反映した。Claude Code の版は 2.1.330（2026-11-23 に確認）。各スキルの SKILL.md・設定・hooks の実物を読んで書いた。
+- 時点: 2026-11-16。2026-11-23 に gstack 1.102.2.0 と pstack 0.15.46 への更新と、個人スキル `/socratic-tutor` の追加を反映した。Claude Code の版は 2.1.330（2026-11-23 に確認）。各スキルの SKILL.md・設定・hooks の実物を読んで書いた。
 - この文書は `~/.claude` にリンクされない。Claude のコンテキストには載らない。
 - プラグインやスキルを更新したら、[更新したときの見直し](#upgrade)に従って直す。
 
@@ -35,7 +35,7 @@
 | crit | 1.8.15 | プラグイン、user。CLI は 0.24.0 | 3 | 0 | PermissionRequest | `/plugin` と Homebrew |
 | claude-code-setup | 1.0.0 | プラグイン、user | 1 | 0 | なし | `/plugin` |
 | ruby-lsp | 1.0.0 | プラグイン、user | 0（LSP だけ） | 0 | なし | `/plugin` |
-| 個人スキル | — | dotfiles の `claude/skills/` を `~/.claude/skills/` にリンク | 4 | 0 | なし | dotfiles |
+| 個人スキル | — | dotfiles の `claude/skills/` を `~/.claude/skills/` にリンク | 5 | 0 | なし | dotfiles |
 | dotfiles の project スキル | — | dotfiles の `.claude/skills/`。dotfiles で起動したセッションだけで使える | 1 | 0 | なし | dotfiles |
 | 組み込み・claude.ai | — | Claude Code に同梱、または claude.ai のアカウントから提供 | 下の表 | 7 | — | Claude Code の更新 |
 | salesforce-development | 2.5.0 | プラグイン、別リポジトリの local スコープ。このリポジトリでは無効 | — | — | — | — |
@@ -204,7 +204,7 @@ sandbox の外で `/cso` を実行すると、保存先に秘密ファイルの�
 
 <a name="crit"></a>
 
-## crit（3）・個人スキル（4）・project スキル（1）
+## crit（3）・個人スキル（5）・project スキル（1）
 
 | スキル | 機能 | 起動 | 状態 | 依存・制約 |
 | --- | --- | --- | --- | --- |
@@ -215,6 +215,7 @@ sandbox の外で `/cso` を実行すると、保存先に秘密ファイルの�
 | `/commit-staged-pr`（個人） | ステージ済みの変更だけを commit し、push と PR まで進める | 自動 | 有効 | cc-safe-push・cc-safe-pr を使う |
 | `code-style`（個人） | 命名・品質・スタイルの規則 | 自動 | 有効 | 全リポジトリに当たる個人の既定。リポジトリの規約・formatter・linter を優先する |
 | `salesforce-help`（個人） | help.salesforce.com の記事を読む | 自動 | 有効 | — |
+| `/socratic-tutor`（個人） | 1 つのテーマを、診断・習熟度の表（0〜5）・1 問ずつの問答・最終試験で教える | 明示 | 有効 | janestreet/agent_skills の `7c6715c`（2026-11-03）の写し。MIT なので `LICENSE.md` を同梱した。frontmatter に `disable-model-invocation: true` だけを足した（日本語の「〜について教えて」での誤起動を避けるため）。規則に載せていないので、Claude は起動も提案もしない。pstack `teach`（説明型。方針で使わない）とは役割が別 |
 | `/sync-skill-docs`（dotfiles の project） | スキル・プラグインの更新の後、この文書・チートシート・規則を入っている状態に合わせる | 自動 | 有効 | 照合は `mise run claude:skills-check`。スナップショットの作り直しはユーザーが通常のターミナルで行う |
 | `/claude-code-setup:claude-automation-recommender` | Claude Code の自動化（hooks・スキル・MCP など）を勧める | 自動 | 有効 | 読み取りだけ |
 
@@ -312,7 +313,7 @@ sandbox の外で `/cso` を実行すると、保存先に秘密ファイルの�
 
 更新は、sandbox の外で `claude/scripts/update-skills.sh` を実行してまとめて行う。通常のターミナルで `/bin/bash ~/dotfiles/claude/scripts/update-skills.sh` を実行する（dotfiles では `mise run claude:update` でもよい）。gstack・user スコープのプラグイン・crit の CLI を更新し、gstack が `claude/settings.json` に書いた絶対パスを `~/` に戻し、cc-crit の profile テストまで実行する。Claude Code のプロンプトの `!` は、セッションによっては sandbox の中で動く（2026-11-19 に観測）。そのときは更新が失敗し、cc-crit の profile テストも「失敗した手順」に出る。profile テストは sandbox の中や crit がないときにスキップして終了コード 0 で終わるので、`update-skills.sh` は `CC_CRIT_PROFILE_REQUIRED=1` を付けて実行し、profile を確かめられないときは失敗させる。
 
-- Claude Code から `mise run` を使わないのは、mise が dotfiles のルートの設定ファイル（`mise.local.toml` など）を読み込み、ルートには sandbox から書けるため。paranoid で、信頼されていない設定は読み込まれないが、念のため mise を通さない。
+- Claude Code のプロンプトの `!` で実行するときは、`mise run claude:update` ではなく `/bin/bash` の絶対パスを使う。`!` は sandbox の外で動くことがあり、mise は dotfiles のルートの設定ファイル（`mise.local.toml` など）を読み込み、ルートには sandbox から書けるため。paranoid で、信頼されていない設定は読み込まれないが、念のため mise を通さない。Claude が Bash ツールで実行する `mise run`（`/sync-skill-docs` の `claude:skills-check` など）は sandbox の中で動くので、これに当たらない。
 - 確認が要るプラグイン（マーケットプレイスが宣言したインストールコマンドが変わったもの）は、TTY がないと拒否されて失敗に数えられる。ターミナルで `claude plugin update <id> --scope user` を実行する。
 - 更新した hooks は、Claude Code を再起動した後のセッションで動き始める。再起動する前に、次の手順で見直す。
 
@@ -341,6 +342,7 @@ sandbox の外で `/cso` を実行すると、保存先に秘密ファイルの�
 | crit（例: 1.8.15） | プラグインと CLI の版の組み合わせと、`plan-hook` の変化を見る。`update-skills.sh` は CLI の更新と cc-crit の profile テストまで実行する。個別に更新したときは、sandbox の外で `mise run crit:profile-test` を実行する |
 | pstack | [README の「スキル・プラグインのアップデート」](README.md#setup-update)の手順で、hooks・スキルの一覧・依存を見直す。新しいスキルが増えても deny は広がらない |
 | superpowers | SessionStart で注入する `using-superpowers` の変化を見る。とくに、ユーザーの指示を優先するという一文が残っているか |
+| 個人スキル `socratic-tutor` | `update-skills.sh` の対象外。上流の変更は `gh api 'repos/janestreet/agent_skills/commits?path=socratic-tutor/SKILL.md&per_page=1' --jq '.[0].sha'` で、[個人スキルの表](#crit)のコミットと比べる。写し直すときは `disable-model-invocation: true` を残し、`LICENSE.md` も比べる |
 
 <a name="measurement"></a>
 

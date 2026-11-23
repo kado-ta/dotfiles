@@ -50,6 +50,7 @@
 | Claude Code の設定改善           | `/claude-code-setup:claude-automation-recommender`            | `superpowers:writing-skills`、`/update-config`                                                                                  | 何を自動化するか知りたい                                           | 設定 1 行の変更                                                                                         |
 | 作業の中断と再開                 | `/context-save`・`/context-restore`                           | —                                                                                                                               | 別のセッションで続ける                                             | 同じセッションで続ける                                                                                  |
 | Salesforce のヘルプ記事          | `salesforce-help`                                             | —                                                                                                                               | help.salesforce.com を読む                                         | —                                                                                                       |
+| テーマを問答で身につける         | `/socratic-tutor`（明示）                                     | —                                                                                                                               | 理解を確かめながら、1 つのテーマを身につけたい                     | 単発の質問、正解が 1 つでない判断、資料を渡さずに学習データより新しい仕様を学ぶ                         |
 
 <a name="by-skill"></a>
 
@@ -77,6 +78,7 @@
 | understand-anything | `/understand-anything:understand` → `understand-chat`・`understand-explain`・`understand-onboard`            | 知識グラフを作って使う（`.ua/` を作る）                                                                                                                         | 提案・自動 |
 | 個人                | `/crit-review`                                                                                               | 人間のレビュー（plan の承認、push・PR の前）                                                                                                                    | 自動       |
 |                     | `/commit-staged-pr`                                                                                          | ステージ済みの変更の commit・push・PR                                                                                                                           | 自動       |
+|                     | `/socratic-tutor`                                                                                            | 1 つのテーマを、診断・習熟度の表・1 問ずつの問答・最終試験で身につける（Claude は起動も提案もしない）                                                           | 明示       |
 | 組み込み            | `/security-review`                                                                                           | セキュリティレビュー                                                                                                                                            | 自動       |
 |                     | `/simplify`                                                                                                  | 変更したコードの整理                                                                                                                                            | 自動       |
 | Codex               | `cd <repo> && codex review --base <base> -c 'sandbox_mode="read-only"' -c skills.include_instructions=false` | 別モデルの独立レビュー（ユーザーが通常のターミナルで実行する。`!` では失敗することがある）                                                                      | 明示       |
@@ -124,6 +126,8 @@
 | 「orders テーブルの status を enum に変えたい。既存データと API の互換性を保って」            | 高リスク: `writing-plans`（移行とロールバック）→ `/crit-review` → `/pstack:blast-radius` を提案 → TDD → `/review` → Codex を提案                            |
 | 「この PR をレビューして」                                                                    | `/review`。高リスクなら `/pstack:interrogate` と Codex を提案する                                                                                           |
 | 「ALB のリスナーに Cloudflare からの通信だけを許可する Terraform を書いて」                   | 高リスク: `writing-plans` → `terraform plan` まで → `/security-review` → Codex を提案。apply はしない                                                       |
+| `/socratic-tutor OAuth。認可コードフローから。目標は 4/5`                                     | 診断の質問（1 問ずつ 3〜5 問）→ 習熟度の表 → 弱い項目から問答。中断は `save state`、次のセッションで `resume from:` に続けて貼って再開する                  |
+| `/socratic-tutor このリポジトリの認証の流れ。コードを読んで根拠にして`                        | コードを読んでから問題を出す。社内のコードや学習データより新しい仕様は、根拠を指定しないと誤った問題や判定になりうる                                        |
 
 <a name="update"></a>
 
