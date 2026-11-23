@@ -104,6 +104,7 @@ MWG_DENY = [
 ]
 README = "## Foo Bar\n\n[x](#foo-bar)\n\n"
 PARANOID_CONFIG = '[settings]\nparanoid = ["config", "env_files"]\n'
+GITCONFIG = "[merge]\n\tff = false\n[rerere]\n\tenabled = false\n"
 
 
 def settings():
@@ -186,6 +187,7 @@ class CheckRepoTests(unittest.TestCase):
         self.write("claude/scripts/status.sh", "#!/bin/bash\n", 0o755)
         self.write("README.md", README)
         self.write("mise/mise_config.toml", PARANOID_CONFIG)
+        self.write("bin/.gitconfig", GITCONFIG)
 
     def git(self, *args):
         subprocess.run(["git", "-C", str(self.root), *args], check=True, capture_output=True)
@@ -596,6 +598,57 @@ class CheckRepoTests(unittest.TestCase):
     def test_paranoid_superset_passes(self):
         self.write("mise/mise_config.toml", '[settings]\nparanoid = ["config", "env_files", "plugins"]\n')
         self.assert_passes()
+
+    def test_trusted_config_paths_fails(self):
+        # 空のリストは既定値と同じで何も信頼しないが、キーごと置かせない（パスを足す変更を止める）。
+        for value in ("[]", '["~/Dev"]'):
+            with self.subTest(value=value):
+                self.write("mise/mise_config.toml", PARANOID_CONFIG + f"trusted_config_paths = {value}\n")
+                self.assert_fails("FAIL mise-paranoid", "settings.trusted_config_paths")
+
+    def test_mise_env_override_fails(self):
+        # 環境変数で、paranoid や信頼するパスを上書きさせない。
+        # bin/link.sh は bin/.??* をすべて ~ にリンクするので、bin/.zshenv なども zsh が読む。sheldon の inline も zsh の起動で動く。
+        for rel, text in (("bin/.zshrc", "export MISE_PARANOID=0\n"),
+                          ("bin/.zprofile", "export MISE_TRUSTED_CONFIG_PATHS=~/Dev\n"),
+                          ("bin/.zshenv", "export MISE_PARANOID=0\n"),
+                          ("zsh/x.zsh", "export MISE_TRUSTED_CONFIG_PATHS=~/Dev\n"),
+                          ("config/sheldon/plugins.toml", '[plugins.x]\ninline = "export MISE_PARANOID=0"\n'),
+                          ("mise/mise_config.toml", PARANOID_CONFIG + '[env]\nMISE_PARANOID = "0"\n')):
+            with self.subTest(rel=rel):
+                self.write(rel, text)
+                self.assert_fails("FAIL mise-paranoid", rel)
+                self.write(rel, PARANOID_CONFIG if rel == "mise/mise_config.toml" else "")
+
+    def test_gitconfig_rerere_not_false_fails(self):
+        # rerere が動くと、sandbox の外の git が .git/rr-cache と MERGE_RR（sandbox が書ける）の解決を任意のパスに書く。
+        for name, text in (("missing section", "[merge]\n\tff = false\n"), ("true", "[rerere]\n\tenabled = true\n"),
+                           ("bare key", "[rerere]\n\tenabled\n"), ("invalid", "[rerere]\n\tenabled = maybe\n"),
+                           ("last wins", GITCONFIG + "[rerere]\n\tenabled = true\n")):
+            with self.subTest(case=name):
+                self.write("bin/.gitconfig", text)
+                self.assert_fails("FAIL rerere", "bin/.gitconfig: rerere.enabled must be false")
+        self.git("rm", "-q", "-f", "bin/.gitconfig")
+        self.assert_fails("FAIL rerere", "bin/.gitconfig: rerere.enabled must be false")
+
+    def test_gitconfig_include_after_rerere_fails(self):
+        # include は書いた位置で読み込まれ、後の値が勝つ。--file は include をたどらないので、順序で確かめる。
+        for name, text in (("include", GITCONFIG + "[include]\n\tpath = ~/.gitconfig_x\n"),
+                           ("includeIf", GITCONFIG + '[includeIf "gitdir:~/x/"]\n\tpath = ~/.gitconfig_x\n')):
+            with self.subTest(case=name):
+                self.write("bin/.gitconfig", text)
+                self.assert_fails("FAIL rerere", "bin/.gitconfig: rerere.enabled must come after every include")
+
+    def test_gitconfig_include_before_rerere_passes(self):
+        self.write("bin/.gitconfig", '[includeIf "gitdir:~/x/"]\n\tpath = ~/.gitconfig_x\n' + GITCONFIG)
+        self.assert_passes()
+
+    def test_gitconfig_rerere_false_forms_pass(self):
+        for text in ("[ReReRe]\n\tEnabled = no\n", "[rerere]\n\tenabled = 0\n",
+                     "[rerere]\n\tenabled = true\n[rerere]\n\tenabled = false\n"):
+            with self.subTest(text=text):
+                self.write("bin/.gitconfig", text)
+                self.assert_passes()
 
     def test_unexpected_additional_directory_fails(self):
         # 作業ディレクトリとして数えられ、blockWritesOutsideWorkingDirectories がそこでは効かなくなる。

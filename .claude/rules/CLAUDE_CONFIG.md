@@ -73,6 +73,11 @@ Edit・Write ツールは sandbox の外で動くので、`permissions` の規�
 
 - `blockWritesOutsideWorkingDirectories` は、作業ディレクトリの外（ほかのリポジトリの `.git/hooks`、`~/Library/LaunchAgents` など）への書き込みを、場所を並べずにまとめて止める。作業ディレクトリの中の設定ファイルも拒むのは、設定ファイルからこの設定を外せるため。
 - 作業ディレクトリの中でも、人間が操作しなくても sandbox の外で動くファイルは守る。`.git` の hooks は Edit を deny にしている（Bash は、sandbox が既定で `.git/hooks` と `.git/config` を止める。submodule の `.git/modules/*/` の下は、この一覧に入っていない）。mise の設定（`mise.toml`、`.tool-versions` など）は、Edit を ask にし、グローバルの設定の `paranoid`（`config`・`env_files`）で、信頼を中身のハッシュに結び付けている。mise は、信頼済みの設定がある場所に cd したときに、設定の hooks・`_.source`・`exec()` を動かす。パスで信頼すると、sandbox の中で作ったコミットや index を人間が sandbox の外の git 操作で書き出したときに、その中身が動く。paranoid では、中身が変われば、人間がファイルの全体と読み込む env ファイルを確かめて `mise trust <ファイル>` するまで読み込まない（mise は前の中身を持たないので、差分では確かめられない）。前は `sandbox.filesystem.denyWrite` にも入れていたが、mise の設定を追跡しているリポジトリで sandbox の中の git の操作が途中で止まるので外した（[design](../../docs/work/20261116_sandbox-path-gaps/design.md#approaches)）。
+- paranoid を設定と環境変数で迂回させない。グローバルの設定に `settings.trusted_config_paths` を置かない（入れたパスの設定は、paranoid でも中身を確かめずに信頼される。空のリストは既定値と同じで何も信頼しないが、パスを足す変更を検査で止めるため、キーごと置かない）。zsh の起動で読まれる設定とグローバルの設定に `MISE_TRUSTED_CONFIG_PATHS`・`MISE_PARANOID` を書かない（環境変数で、信頼するパスや paranoid を上書きできる）。`check-repo.py` の `mise-paranoid` が、`mise/mise_config.toml`・`bin/.z*`（`bin/link.sh` が `bin/.??*` をすべて `~` にリンクする）・`zsh/*.zsh`・`config/sheldon/plugins.toml`（`inline` が zsh の起動で動く）を確かめる。名前の文字列の一致で判定するので、コメントに書いても失敗する。残る経路は次のとおり。
+  - わざと崩した書き方（`MISE_"PARANOID"` のように引用符で区切る、TOML のエスケープで書く、対象外のファイルを source する）は通る。PR のレビューで見る。
+  - リポジトリの外（launchd など）で設定した環境変数は見ない。
+  - sheldon の env-zsh が読み込む、作業ディレクトリの `.env` は見ない（[Issue #78](https://github.com/kado-ta/dotfiles/issues/78)）。
+  - グローバルの設定や信頼の記録の場所を変える環境変数（`MISE_GLOBAL_CONFIG_FILE`・`MISE_CONFIG_DIR`・`MISE_STATE_DIR` など）は、まだ検査していない（後続の候補）。
 - `sandbox.filesystem.denyWrite` には、paranoid の土台の 3 つ（`~/.config/mise`・`~/dotfiles/mise`・`~/.local/state/mise`）を置いている。グローバルの設定は paranoid でもパスで信頼され、`~/dotfiles/mise` はその実体がある場所で、`~/.local/state/mise` には信頼の記録がある（書けると Claude が自分で信頼を済ませられる）。dotfiles で起動したセッションからは、もともと書けない場所だが、`~` などで起動したセッションのために置く。denyWrite が止めるのは Bash だけなので、Edit・Write ツールは `Edit(~/.local/state/mise/**)` の deny と `Edit(~/dotfiles/mise/**)` の ask で止める（`~/.config/mise` には `**/.config/mise/**` の ask が当たる）。ユーザー設定の `sandbox.filesystem` のパスは、接頭辞がないと `~/.claude` が基準になるので、`~/` を付ける。権限の規則（`Read(...)`・`Edit(...)`）は、接頭辞がないとカレントディレクトリが基準なので、同じ形でも当たる場所が違う。`check-repo.py` は、ユーザー設定の `denyRead`・`denyWrite`・`allowWrite`・`allowRead` の全項目が `~/` か `/` で始まることを確かめる。
 - mise の Edit の ask は、接頭辞のない形と `//**/` の形を併記している。`.git` は、接頭辞のない hooks の deny に加えて、`//**/` の形の hooks と config の ask を置いている。接頭辞のない形も、`/add-dir` で足したディレクトリに当たる（2026-11-16 に実測。`.git/hooks` と `.git/config` は、ask の `//**/` の形より先に、接頭辞のない deny で拒否された）。`//**/` の形は、文書が接頭辞のない形の起点をカレントディレクトリとしているので、`/cd` などで起点が変わったときの備えとして残している。
 - Edit の deny の規則は、sandbox の denyWrite にもなる（ask はならない）。`.git` の `//**/` の形を deny にすると、sandbox の中のどこでも `git init`・`git clone` が hooks のサンプルを写せずに失敗する見込みなので、ask にしている（deny にすると `check-repo.py` が失敗する）。接頭辞のない hooks の deny も、起動したディレクトリの中では同じ働きをする。入れ子のリポジトリの `git init`・`git clone` と、`hooks` という名前の階層を含む refs（`fix/hooks/x` のようなブランチ）への書き込みは、sandbox の中で失敗しうる。
@@ -82,3 +87,15 @@ Edit・Write ツールは sandbox の外で動くので、`permissions` の規�
 - Read の deny の `*.pem` を `~/**` に広げないのは、mise で入れた pip・Ruby・aws-cli の CA 証明書の束が `~/.local/share/mise` の下にあり、sandbox の中でそれらの HTTPS が失敗する見込みのため。
 
 経緯は [docs/work/20261114_edit-write-rules/research-edit-write.md](../../docs/work/20261114_edit-write-rules/research-edit-write.md) を参照する。この規則の外に残る経路と、次の作業の候補は、その [8 章](../../docs/work/20261114_edit-write-rules/research-edit-write.md#residual-risks) にある。paranoid とフックの経緯と、受け入れたリスクは、[docs/work/20261116_sandbox-path-gaps/design.md](../../docs/work/20261116_sandbox-path-gaps/design.md) を参照する。
+
+<a name="git-rerere"></a>
+
+## git の rerere
+
+`bin/.gitconfig`（`~/.gitconfig` の実体）で、`rerere.enabled = false` にしている。sandbox は `.git/rr-cache` と `.git/MERGE_RR` に書ける。rerere が動くと、sandbox の外の git（人間のターミナルと `!`）が、そこに置かれた解決を任意のパス（作業ツリーの外も）に書く。`rerere.enabled` を設定していなくても、`rr-cache` があれば動くので、明示的に false にする。人間の git でも rerere は動かない。
+
+- `[includeIf]` の後（ファイルの最後）に置き、その後ろに include を足さない。include は書いた位置で読み込まれ、後の値が勝つので、include の先（`bin/` で追跡している設定ファイルもある）の設定で黙って上書きされうる。`git config --global include.path …` は、節をファイルの末尾に足す。
+- `check-repo.py` の `rerere` は、`git config --file bin/.gitconfig --type=bool --get rerere.enabled` が `false` であることと、最後の `rerere.enabled` より後ろに `include.path`・`includeif.*.path` がないことを確かめる。include の先の中身は読まない。
+- リポジトリの `.git/config` は、sandbox が既定で書き込みを止めている。submodule の `.git/modules/*/config` は書けるが、そこでは `core.fsmonitor` などでもっと直接コードが動くので、入れ子のリポジトリの経路として次の作業で扱う（[Issue #75](https://github.com/kado-ta/dotfiles/issues/75) の非目標）。
+
+経緯は [docs/work/20261123_rerere-mise-checks/plan.md](../../docs/work/20261123_rerere-mise-checks/plan.md) を参照する。

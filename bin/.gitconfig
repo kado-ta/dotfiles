@@ -35,3 +35,7 @@
 	path = ~/.gitconfig_numm
 [core]
 	quotePath = false
+[rerere]
+# sandbox は .git/rr-cache と MERGE_RR に書ける。rerere が動くと、sandbox の外の git がその解決を任意のパスに書く。
+# 設定がなくても rr-cache があれば動くので、false にする（check-repo.py が確かめる）。include に上書きされないよう、最後に置く。
+	enabled = false

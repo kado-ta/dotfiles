@@ -83,6 +83,14 @@ MISE_EDIT_ASK = ("Edit(~/dotfiles/mise/**)",)
 MISE_GLOBAL_CONFIG = "mise/mise_config.toml"
 # config は設定を、env_files は _.source などが読むファイルを、パスではなく中身で信頼させる。true（すべて）でもよい。
 PARANOID_REQUIRED = ("config", "env_files")
+# 環境変数で paranoid や信頼するパスを上書きさせない。zsh の起動で読まれる設定とグローバルの設定に書かせない。
+# bin/link.sh は bin/.??* をすべて ~ にリンクするので、bin/.z* は zsh が読む。sheldon の inline も zsh の起動で動く。
+MISE_ENV_FORBIDDEN = ("MISE_TRUSTED_CONFIG_PATHS", "MISE_PARANOID")
+MISE_ENV_FILES = (MISE_GLOBAL_CONFIG, "config/sheldon/plugins.toml")
+MISE_ENV_GLOBS = ("bin/.z*", "zsh/*.zsh")
+# グローバルの git の設定（~/.gitconfig の実体）。rerere が動くと、sandbox の外の git が、.git/rr-cache と MERGE_RR（どちらも
+# sandbox が書ける）の解決を任意のパス（作業ツリーの外も）に書く。rerere.enabled がなくても、rr-cache があれば動くので false にする。
+GITCONFIG = "bin/.gitconfig"
 # ユーザー設定のこれらのリストは、~/ でも / でも始まらないパスが ~/.claude を起点にし、黙って効かない。
 SANDBOX_PATH_LISTS = ("denyRead", "denyWrite", "allowWrite", "allowRead")
 # additionalDirectories は作業ディレクトリとして数えられ、そこでは WRITE_BLOCK が効かない。
@@ -419,11 +427,35 @@ def check_mise_paranoid(root):
     path = root / MISE_GLOBAL_CONFIG
     if not path.exists():
         return [f"{MISE_GLOBAL_CONFIG}: missing"]
-    paranoid = tomllib.loads(path.read_text(encoding="utf-8")).get("settings", {}).get("paranoid")
+    config = tomllib.loads(path.read_text(encoding="utf-8")).get("settings", {})
+    paranoid = config.get("paranoid")
+    errors = []
     # 文字列は部分一致で通ってしまうので、リストのときだけ中身を見る。
-    if paranoid is True or (isinstance(paranoid, list) and all(c in paranoid for c in PARANOID_REQUIRED)):
-        return []
-    return [f"{MISE_GLOBAL_CONFIG}: settings.paranoid must be true or a list with {', '.join(PARANOID_REQUIRED)}"]
+    if not (paranoid is True or (isinstance(paranoid, list) and all(c in paranoid for c in PARANOID_REQUIRED))):
+        errors.append(f"{MISE_GLOBAL_CONFIG}: settings.paranoid must be true or a list with {', '.join(PARANOID_REQUIRED)}")
+    # パスを入れると paranoid でも中身を確かめずに信頼される。空のリストは既定値と同じだが、キーごと置かせない。
+    if "trusted_config_paths" in config:
+        errors.append(f"{MISE_GLOBAL_CONFIG}: settings.trusted_config_paths must not be set")
+    for rel in MISE_ENV_FILES + tuple(sorted(p.relative_to(root).as_posix() for g in MISE_ENV_GLOBS for p in root.glob(g))):
+        file = root / rel
+        if file.is_file():
+            text = file.read_text(encoding="utf-8")
+            errors += [f"{rel}: must not mention {name}" for name in MISE_ENV_FORBIDDEN if name in text]
+    return errors
+
+
+def check_rerere(root):
+    # git と同じく読む（最後の値が勝つ。no・0 も false）。ファイルやキーがなければ終了コード 1、bool でなければ 128。
+    cp = subprocess.run(["git", "config", "--file", str(root / GITCONFIG), "--type=bool", "--get", "rerere.enabled"],
+                        capture_output=True, text=True)
+    if cp.returncode != 0 or cp.stdout.strip() != "false":
+        return [f"{GITCONFIG}: rerere.enabled must be false"]
+    # include は書いた位置で読み込まれ、後の値が勝つ。--file は include をたどらないので、include が後ろにあれば失敗にする。
+    keys = git(root, "config", "--file", GITCONFIG, "--null", "--name-only", "--list").split("\0")
+    last = max(i for i, key in enumerate(keys) if key == "rerere.enabled")
+    if any(key == "include.path" or (key.startswith("includeif.") and key.endswith(".path")) for key in keys[last + 1:]):
+        return [f"{GITCONFIG}: rerere.enabled must come after every include.path and includeif.*.path"]
+    return []
 
 
 def check_syntax(root):
@@ -540,6 +572,7 @@ CHECKS = (
     ("modern-web-guidance", check_modern_web_guidance),
     ("project-permissions", check_project_permissions),
     ("mise-paranoid", check_mise_paranoid),
+    ("rerere", check_rerere),
     ("syntax", check_syntax),
     ("markdown-names", check_markdown_names),
     ("markdown-links", check_markdown_links),
