@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: done
 created: 2026-11-24
 ---
 
@@ -47,7 +47,7 @@ created: 2026-11-24
 
 - [x] 古い profile で、47809 の拒否のテストが 2 件失敗する
 - [x] 新しい profile で、`test-cc-crit-profile.py` が通る（ステルスモードがオンのあいだは、環境による ERROR が 1 件。下記）
-- [ ] 端末ごと: `cmp` が何も出さない、`mise run crit:profile-test` が通る、`/crit-review` で Crit が 47810 で開く
+- [x] 端末ごと: `cmp` が何も出さない、`mise run crit:profile-test` が通る、`/crit-review` で Crit が 47810 で開く
 
 2026-11-24 に、人間が worktree で実行した（crit 0.24.0、git 2.56.1、macOS 26.7.1）。
 
@@ -61,6 +61,8 @@ created: 2026-11-24
   - テストは変えない。タイムアウトも通すと、この環境では、全インターフェースで待ち受けたときとの区別がつかなくなるため。
   - 原因はファイアウォールのステルスモードだった。人間がステルスモードをオフにして同じ接続を試すと、6 つのポートはどれも `refused` になった。ステルスモードがオンのあいだは、`test_crit_review_answers_health` は範囲によらず失敗する。
   - ステルスモードをオフにして `test-cc-crit-profile.py -k health` を実行すると、`test_crit_review_answers_health` は通った。新しい profile では、profile のテストがすべて通った。
+
+PR #101 のマージの後、2026-11-24 に人間が両方の端末で、[入れる手順](plan.md#rollout)のとおりに入れ直した。どちらの端末でも、`cmp` は何も出さず、`mise run crit:profile-test` は通り、新しいセッションの `/crit-review` で Crit は 47810 で開いた（人間の報告）。
 
 <a name="codex"></a>
 
