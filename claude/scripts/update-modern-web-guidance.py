@@ -423,11 +423,12 @@ def apply_skills_and_pin(skills, pin_text):
 
     途中で止まったら（版の置き換えの直後の Ctrl-C を含む）、スキルと一緒に版も元の中身に戻す。
     版だけ新しいまま残ると、次の --apply が「最新」で終わり、スキルが直らないため。
+    戻すのは、今の中身がここで書いた版のときだけ（書く前に止まったときは、ほかからの書き込みを消さない）。
     """
     old_pin = MISE_CONFIG.read_text(encoding="utf-8")
 
     def undo():
-        if MISE_CONFIG.read_text(encoding="utf-8") != old_pin:
+        if MISE_CONFIG.read_text(encoding="utf-8") == pin_text:
             write_pin(old_pin)
 
     write_skills(skills, SKILLS_DIR, then=lambda: write_pin(pin_text), undo=undo)
@@ -477,11 +478,13 @@ def main(argv=None):
             pin_text = bumped_pin(version)
             try:
                 apply_skills_and_pin(skills, pin_text)
-            except (OSError, Failure) as e:
-                print(f"{PACKAGE}: 書き込みに失敗したので、元に戻した（戻せなかったときは、その旨を上に表示した）: {e}",
-                      file=sys.stderr)
+            except (OSError, Failure, KeyboardInterrupt) as e:
+                reason = "止めた" if isinstance(e, KeyboardInterrupt) else f"書き込みに失敗した（{e}）"
+                # 戻せなかったときは、版もスキルも新しいまま残る。旧版のスキルだけを手で戻すと、組み合わせが崩れる。
+                print(f"{PACKAGE}: {reason}ので、スキルと mise の版を元に戻した。戻せなかったときは、その旨を上に表示した。"
+                      "そのときは旧版の写しを手で戻さず、次の git のコマンドで、スキルと版を一緒に戻す", file=sys.stderr)
                 print_restore()
-                return 1
+                return 130 if isinstance(e, KeyboardInterrupt) else 1
             print(f"{PACKAGE}: {pinned} → {version} を取り込んだ（{CHROME} を含む）。"
                   "差分を確かめて PR にし、マージしてから通常のターミナルで mise install を実行する")
             scan(SKILLS_DIR, tmp)

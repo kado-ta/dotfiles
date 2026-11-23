@@ -845,6 +845,64 @@ class ApplySkillsAndPinTest(unittest.TestCase):
         self.assertEqual(sorted(p.name for p in self.config.parent.iterdir()), ["mise_config.toml"])
         self.assertEqual(sorted(p.name for p in self.skills_dir.iterdir()), ["chrome-extensions", "modern-web-guidance"])
 
+    def test_failure_before_pin_is_written_leaves_config_alone(self):
+        # 版を書く前に失敗したら、mise の設定に触れない。そのあいだのほかの書き込みも消さない（/review の指摘）。
+        real_replace = os.replace
+        edited = MISE_CONFIG + 'node = "24"\n'
+        failed = []
+
+        def replace(src, dst):
+            # 2 つ目のスキルを置くところで 1 回だけ失敗させ、その前にほかから設定を書き換える。
+            if Path(dst) == self.skills_dir / "chrome-extensions" and not failed:
+                failed.append(dst)
+                self.config.write_text(edited, encoding="utf-8")
+                raise OSError("swap")
+            return real_replace(src, dst)
+
+        with self.assertRaises(OSError):
+            self.apply(replace)
+        self.assertEqual(self.config.read_text(encoding="utf-8"), edited)
+        self.assertEqual(self.skill_texts(), {name: f"old {name}\n" for name in self.skills})
+
+    def test_failed_pin_restore_leaves_skills_new(self):
+        # 版の書き戻しも失敗したら、スキルも戻さない（版より先にスキルを戻すと、版が新しくスキルが古い組み合わせになる）。
+        real_replace = os.replace
+        pin_replaces = []
+
+        def replace(src, dst):
+            if Path(dst) == self.config:
+                pin_replaces.append(src)
+                if len(pin_replaces) == 2:
+                    raise OSError("restore pin")
+                real_replace(src, dst)
+                raise KeyboardInterrupt()
+            return real_replace(src, dst)
+
+        with self.assertRaises(KeyboardInterrupt):
+            self.apply(replace)
+        self.assertEqual(self.config.read_text(encoding="utf-8"), self.new_pin)
+        self.assertEqual(self.skill_texts(), {name: f"new {name}\n" for name in self.skills})
+        self.assertEqual(len(list(self.skills_dir.glob(".update-mwg-*/old/*/SKILL.md"))), 2)
+        self.assertEqual(sorted(p.name for p in self.config.parent.iterdir()), ["mise_config.toml"])
+
+    def test_interrupt_in_main_prints_restore(self):
+        # --apply の書き込み中に Ctrl-C で止めても、git で両方を戻すコマンドを表示し、終了コード 130 で終える。
+        stdout, stderr = io.StringIO(), io.StringIO()
+        with mock.patch.object(self.module, "read_pin", return_value="1.0.1"), \
+                mock.patch.object(self.module, "latest_version", return_value="1.0.2"), \
+                mock.patch.object(self.module, "fetch_package", return_value=None), \
+                mock.patch.object(self.module, "build_skills", return_value={}), \
+                mock.patch.object(self.module, "bumped_pin", return_value=self.new_pin), \
+                mock.patch.object(self.module, "apply_skills_and_pin", side_effect=KeyboardInterrupt), \
+                mock.patch.object(sys, "stdout", stdout), mock.patch.object(sys, "stderr", stderr):
+            try:
+                code = self.module.main(["--apply"])
+            except KeyboardInterrupt:
+                self.fail("main() が Ctrl-C を受け止めなかった")
+        self.assertEqual(code, 130)
+        self.assertIn("手で戻さず", stderr.getvalue())
+        self.assertIn("restore --source=HEAD", stdout.getvalue())
+
 
 class WritePinTest(unittest.TestCase):
     """mise の版の書き込みが、一時ファイルを作った後で失敗しても、一時ファイルを残さない。"""
