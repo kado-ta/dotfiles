@@ -408,7 +408,7 @@ def check_mise_paranoid(root):
     # 文字列は部分一致で通ってしまうので、リストのときだけ中身を見る。
     if not (paranoid is True or (isinstance(paranoid, list) and all(c in paranoid for c in PARANOID_REQUIRED))):
         errors.append(f"{MISE_GLOBAL_CONFIG}: settings.paranoid must be true or a list with {', '.join(PARANOID_REQUIRED)}")
-    # 空のリストでも、パスで信頼する経路を開く。
+    # パスを入れると paranoid でも中身を確かめずに信頼される。空のリストは既定値と同じだが、キーごと置かせない。
     if "trusted_config_paths" in config:
         errors.append(f"{MISE_GLOBAL_CONFIG}: settings.trusted_config_paths must not be set")
     for rel in MISE_ENV_FILES + tuple(sorted(p.relative_to(root).as_posix() for g in MISE_ENV_GLOBS for p in root.glob(g))):

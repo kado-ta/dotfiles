@@ -589,7 +589,7 @@ class CheckRepoTests(unittest.TestCase):
         self.assert_passes()
 
     def test_trusted_config_paths_fails(self):
-        # 空のリストでも、パスで信頼する経路を開く。
+        # 空のリストは既定値と同じで何も信頼しないが、キーごと置かせない（パスを足す変更を止める）。
         for value in ("[]", '["~/Dev"]'):
             with self.subTest(value=value):
                 self.write("mise/mise_config.toml", PARANOID_CONFIG + f"trusted_config_paths = {value}\n")

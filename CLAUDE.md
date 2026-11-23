@@ -61,7 +61,7 @@ worktree は `claude -w <name>` で始める。この設定では EnterWorktree�
 - ユーザー設定の `sandbox.filesystem` に、接頭辞のないパスを書かない。`~/` か `/` で始める（接頭辞がないと `~/.claude` が基準になる。`edit-permissions` が失敗する）。
 - Read の deny の `*.pem` を `~/**` に広げない。
 - `claude/mcp/playwright.json` があるあいだは、`permissions.deny` の `mcp__playwright__browser_run_code_unsafe`・`mcp__playwright__browser_file_upload`・`Read(~/.crit/**)`・`Edit(~/.local/share/claude-mcp/**)`・`Edit(~/Library/Caches/playwright-mcp/**)`、`sandbox.filesystem.denyRead` の `~/.crit`、`sandbox.filesystem.denyWrite` の `~/.local/share/claude-mcp`・`~/Library/Caches/playwright-mcp`、`disabledMcpjsonServers` の `playwright`、PreToolUse の `guard-playwright-mcp.sh` の登録（matcher `mcp__playwright__.*`、`onFailure: block`）を外さない（`check-repo.py` の `playwright-mcp` が失敗する）。Playwright MCP を実行時に npx で起動しない。`sandbox.filesystem.allowWrite` に `~/.local/share/claude-mcp` と `~/Library/Caches/playwright-mcp` を入れない（理由は [.claude/rules/CLAUDE_CONFIG.md](.claude/rules/CLAUDE_CONFIG.md#playwright-mcp)）。
-- `bin/.gitconfig` の `rerere.enabled = false` を外さない。その後ろに `[include]`・`[includeIf]` を置かない（`check-repo.py` の `rerere` が失敗する。理由は [.claude/rules/CLAUDE_CONFIG.md](.claude/rules/CLAUDE_CONFIG.md#git-rerere)）。
+- `bin/.gitconfig` の `rerere.enabled = false` を外さない。その後ろに include（`include.path`・`includeif.*.path`）を置かない（`check-repo.py` の `rerere` が失敗する。理由は [.claude/rules/CLAUDE_CONFIG.md](.claude/rules/CLAUDE_CONFIG.md#git-rerere)）。
 
 ## 規約
 

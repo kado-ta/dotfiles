@@ -15,7 +15,9 @@ created: 2026-11-23
 
 - **rerere:** sandbox は `.git/rr-cache` と `.git/MERGE_RR` に書ける。rerere が動くと、sandbox の外の git（人間のターミナルと `!`）が、そこに置かれた解決を任意のパス（作業ツリーの外も）に書く。`rerere.enabled` を設定していなくても、`rr-cache` があれば動く。そのため、グローバルの設定で明示的に false にし、`check-repo.py` で外れないようにする。
 - **mise:** paranoid（`config`・`env_files`）の守りを、設定と環境変数で迂回させない。
-  - `settings.trusted_config_paths` は、空のリストでも、パスで信頼する経路を開く。
+  - `settings.trusted_config_paths` に入れたパスの設定は、paranoid でも中身を確かめずに信頼される。空のリストでもキーごと置かない。
+    - 作業メモは「空のリストでも、パスで信頼する経路を開く」としていたが、誤りだった。Codex の challenge の指摘で、mise v2026.11.12 のソースを確かめた。リストの要素に `.any()` を当てて判定するので、空のリストは何も信頼しない（既定値も `[]`）。
+    - それでもキーごと禁じる（2026-11-23、人間の判断）。規則と検査を単純に保ち、パスを足す変更を検査で止めるため。
   - 環境変数 `MISE_TRUSTED_CONFIG_PATHS`・`MISE_PARANOID` で、信頼するパスや paranoid を上書きさせない。
 
 <a name="non-goals"></a>
@@ -90,6 +92,6 @@ created: 2026-11-23
 - すでにあるリポジトリの `rr-cache`・`MERGE_RR` は、無効になるだけで残る。
 - 残る経路:
   - launchd など、リポジトリの外で設定した環境変数。
-  - sheldon の env-zsh が読み込む、作業ディレクトリの `.env`。この PR より前からあり、別の課題にする。
+  - sheldon の env-zsh が読み込む、作業ディレクトリの `.env`。この PR より前からあり、[Issue #78](https://github.com/kado-ta/dotfiles/issues/78) にした。
   - git を環境変数（`GIT_CONFIG_GLOBAL`・`GIT_CONFIG_COUNT` など）や alias の `-c` で動かす経路。
   - 人間が `git -c rerere.enabled=true` などで明示的に有効にした場合。

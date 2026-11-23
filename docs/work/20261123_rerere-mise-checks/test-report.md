@@ -11,7 +11,7 @@ created: 2026-11-23
 
 ## 確認コマンド
 
-最後に実行したのは、レビューの修正の後（`6c18297` と、plan の記述の直し）。
+最後に実行したのは、Codex の challenge への対応の後（理由のコメントと文書の直し）。
 
 | コマンド | 結果 |
 | --- | --- |
@@ -72,20 +72,30 @@ created: 2026-11-23
 
 ## Codex のレビュー
 
-このタスクで 1 回（上限は 5 回）。人間が通常のターミナルで実行し、結果は `~/.codex/sessions` の記録から読んだ。
+このタスクで 2 回（上限は 5 回）。人間が通常のターミナルで実行し、結果は `~/.codex/sessions` の記録から読んだ。
 
 | 回 | 日時（UTC） | 対象 | コマンド | 結果 |
 | --- | --- | --- | --- | --- |
 | 1 | 2026-11-23 09:40 | `219930c` | `codex review --base main -c 'sandbox_mode="read-only"' -c skills.include_instructions=false` | 指摘なし。「patch is correct」（確信度 0.9）。`check-repo.py` の 12 項目、shellcheck、actionlint は成功し、`rerere.enabled` が `false` であることも確かめた |
+| 2 | 2026-11-23 10:00 | `0717532` | `codex exec - -s read-only -c skills.include_instructions=false`（challenge。プロンプトは変更前と比べた後退と、検査を誤らせる入力を聞く形） | 下の表 |
 
-- 採否: 指摘がないので、直すものはない。
-- Codex は、読み取り専用の sandbox で一時ディレクトリを作れず、`test-check-repo.py` を実行できなかった。テストは、このセッションで 89 件 OK を確かめている（[確認コマンド](#commands)）。
-- challenge（`codex exec`）は実行していない。
+1 回目の採否: 指摘がないので、直すものはない。Codex は、読み取り専用の sandbox で一時ディレクトリを作れず、`test-check-repo.py` を実行できなかった。テストは、このセッションで実行して OK を確かめている（[確認コマンド](#commands)）。
+
+2 回目（challenge）の採否:
+
+| 指摘 | 採否 | 理由 |
+| --- | --- | --- |
+| `check_rerere` が PASS なのに実効値が true になる入力は、見つからない | — | 確かめた結果として残す |
+| 実効値が false でも、後ろに無害な include（`path = /dev/null`、一致しない `includeIf`）があると FAIL になる | 不採用 | 意図した保守的な判定。文書にも「後ろに include を置かない」と書いている |
+| `MISE_"PARANOID"=0` のように引用符で区切る、sheldon の TOML のエスケープ（`P`）で書く、検査の対象外のファイルを source する、で検査を抜けられる | 文書だけ採用 | 文字列の一致で判定する方式の限界。変更前の検査でも同じく抜けられる。CLAUDE_CONFIG.md の残る経路に書き、PR のレビューで見ることにした |
+| 普段の操作の変化（rerere が止まる、`unset MISE_PARANOID` も FAIL になる、空の `trusted_config_paths` も FAIL になる、など） | 不採用 | どれも意図した変化か、まれな書き方 |
+| 「空の `trusted_config_paths` でも、パスで信頼する経路を開く」という理由が誤り | 理由を直した | mise v2026.11.12 の `src/config/config_file/mod.rs`（`trusted_config_path_matches`）で確かめた。リストの要素に `.any()` を当てるので、空のリストは何も信頼しない。キーごと禁じる扱いは変えない（D3。2026-11-23、人間の判断） |
+| CLAUDE.md の「後ろに `[include]` を置かない」は、検査の実装（`include.path` のキーの位置を見る）と言葉がずれる | 採用 | CLAUDE.md を「include（`include.path`・`includeif.*.path`）を置かない」に直した |
 
 <a name="follow-ups"></a>
 
 ## 後続の候補
 
-- sheldon の env-zsh が、ディレクトリを移るたびに作業ディレクトリの `.env` を読み込む。sandbox の外のシェルで、環境変数（`MISE_*`・`GIT_CONFIG_*`）を設定でき、任意のコードも動きうる。プラグインの本体を読んで確かめたのはサブエージェントだけで、このセッションでは読めなかった。
+- sheldon の env-zsh が、ディレクトリを移るたびに作業ディレクトリの `.env` を読み込む。sandbox の外のシェルで、環境変数（`MISE_*`・`GIT_CONFIG_*`）を設定でき、任意のコードも動きうる。プラグインの本体を読んで確かめたのはサブエージェントだけで、このセッションでは読めなかった。[Issue #78](https://github.com/kado-ta/dotfiles/issues/78) にした。
 - グローバルの設定や信頼の記録の場所を変える `MISE_*` の環境変数（`MISE_GLOBAL_CONFIG_FILE`・`MISE_CONFIG_DIR`・`MISE_STATE_DIR` など）を調べて、検査に足す。
 - git を環境変数（`GIT_CONFIG_GLOBAL`・`GIT_CONFIG_COUNT`）や alias の `-c` で動かす経路と、`.git/worktrees/*/config.worktree`（`extensions.worktreeConfig` があるときだけ効く）。
