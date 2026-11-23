@@ -1065,6 +1065,14 @@
       "provider": "gstack",
       "user_invocable": true
     },
+    "socratic-tutor": {
+      "description": "sha256:41b0c4b8d0328ca9",
+      "dmi": true,
+      "hooks": null,
+      "override": "on",
+      "provider": "personal",
+      "user_invocable": true
+    },
     "spec": {
       "description": "sha256:12ead099ad73756e",
       "dmi": false,
