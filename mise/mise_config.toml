@@ -8,6 +8,10 @@
 "npm:@salesforce/cli" = { version = "latest", trust_policy_excludes = [
   "pino@9.14.0",
 ] }
+# AI エージェントのスキル・プラグインを、入れる前に検査する。
+# 依存の yara-python には Python 3.14 以降の wheel がなく、ソースからのビルドが失敗しうるので、3.13 を指定する。
+# Git から入れると依存のハッシュを lockfile に残せないので、版を固定する。上げる前に mise ls-remote 'pypi:NVIDIA/SkillSpector' で確かめる。
+"pypi:NVIDIA/SkillSpector" = { version = "v2.13.6", python = "3.13" }
 aws-cli = { version = "latest", symlink_bins = "true" }
 # インストール後に biome/biome.jsonc の $schema URL のバージョンを自動で一致させる。
 # ~/.config/mise/config.toml はこのファイルへの symlink なので、実体をたどって dotfiles の場所を特定する。
