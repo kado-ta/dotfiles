@@ -70,6 +70,7 @@ mise run claude:update
 
 - gstack の新しい版があるかを確かめるだけなら、zsh の `gstack-upgrade --check` を使う。
 - pstack はサードパーティのマーケットプレイスなので自動更新されない。`update-skills.sh` か `claude plugin update pstack@cursor-plugins` で更新する。
+- 個人スキル `modern-web-guidance`・`chrome-extensions` は版を固定している。`update-skills.sh` は、npm に新しい版があれば、最後に「取り込みを待つ更新」と表示する（何も書かない）。取り込みは、作業ブランチで `claude/scripts/update-modern-web-guidance.py --apply` を明示して行う。続きは [SKILL_INVENTORY.md の提供元ごとの注意](SKILL_INVENTORY.md#upgrade-source) にある。
 
 > [!WARNING]
 > Claude Code のプロンプトの `!` は、セッションによっては sandbox の中で動く（2026-11-19 に観測）。そのときは更新が失敗し、最後の cc-crit の profile テストも、profile を確かめられないので失敗に数えられる。

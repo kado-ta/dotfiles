@@ -47,5 +47,5 @@ run = "/usr/bin/python3 -B claude/scripts/trust-audit.py || [ $? -eq 1 ]"
 # paranoid で、信頼されていない設定は読み込まれないが、念のため mise を通さない。
 # 終わったら、Claude Code を再起動する前に /sync-skill-docs で文書と hooks を見直す。
 [tasks."claude:update"]
-description = "gstack・プラグイン・crit の CLI を更新し、gstack が settings.json に書いた絶対パスを ~/ に戻す（ターミナルで実行する）"
+description = "gstack・プラグイン・crit の CLI を更新し、gstack が settings.json に書いた絶対パスを ~/ に戻し、modern-web-guidance の新しい版を知らせる（ターミナルで実行する）"
 run = "/bin/bash claude/scripts/update-skills.sh"
