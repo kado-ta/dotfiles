@@ -469,7 +469,7 @@ sandbox 内の `gh` には、`hooks/gh-read-token.sh` が owner ごとの読み�
 
 トークンは cwd の origin で選ぶので、`-R` で別の owner のリポジトリを指定しても、その owner のトークンは使われない。
 
-`gh pr checks` は、Fine-grained PAT の制限で CI のチェック結果を読めない可能性がある（CI のあるリポジトリでは未確認）。
+`gh pr checks` は、sandbox の中でも CI のチェック結果を読める（2026-11-24 に、dotfiles の PR #76・#77・#80・#82・#89 で確認）。ただし、CI が終わった後でも `no checks reported` と出たことがある（2026-11-23 の PR #76。後で読み直すと出た。原因は分かっていない）。そのときは、少し待って読み直すか、`gh api 'repos/<owner>/<repo>/actions/runs?branch=<ブランチ>'` で確かめる。
 
 <a name="gh-read-token-setup"></a>
 
