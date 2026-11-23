@@ -52,8 +52,8 @@ check 0 'drop with data only' '{"tool_name":"mcp__playwright__browser_drop","too
 # A cookie path is a URL path, not a file.
 check 0 'cookie path' '{"tool_name":"mcp__playwright__browser_cookie_list","tool_input":{"path":"/"}}'
 check 0 'local dev server' '{"tool_name":"mcp__playwright__browser_navigate","tool_input":{"url":"http://localhost:3000/"}}'
-check 0 'port just below the Crit range' '{"tool_name":"mcp__playwright__browser_navigate","tool_input":{"url":"http://localhost:47799/"}}'
-check 0 'port just above the Crit range' '{"tool_name":"mcp__playwright__browser_navigate","tool_input":{"url":"http://localhost:47820/"}}'
+check 0 'port just below the blocked range' '{"tool_name":"mcp__playwright__browser_navigate","tool_input":{"url":"http://localhost:47799/"}}'
+check 0 'port just above the blocked range' '{"tool_name":"mcp__playwright__browser_navigate","tool_input":{"url":"http://localhost:47830/"}}'
 
 # Claude Code writes the whole input through a pipe; a hook that exits without reading it
 # makes the writer fail (SIGPIPE) once the input outgrows the buffer. A file redirect would not show that.
@@ -115,23 +115,26 @@ check 2 'drop with paths and data' '{"tool_name":"mcp__playwright__browser_drop"
 check 2 'file upload with paths' '{"tool_name":"mcp__playwright__browser_file_upload","tool_input":{"paths":["a.txt"]}}'
 check 2 'empty paths' '{"tool_name":"mcp__playwright__browser_drop","tool_input":{"target":"e1","paths":[]}}'
 
-# cc-crit's Crit waits on 47800-47819; opening it would let the model press Finish Review itself.
+# cc-crit's Crit waits on 47810-47829; opening it would let the model press Finish Review itself.
+# The hook also blocks 47800-47809, part of the range before the move, so an old cc-crit stays covered.
 nav='"tool_name":"mcp__playwright__browser_navigate"'
-check 2 'Crit on localhost' "{${nav},\"tool_input\":{\"url\":\"http://localhost:47802/\"}}"
+check 2 'port from the range before the move' "{${nav},\"tool_input\":{\"url\":\"http://localhost:47800/\"}}"
+check 2 'last port before the current range' "{${nav},\"tool_input\":{\"url\":\"http://localhost:47809/\"}}"
+check 2 'Crit on localhost' "{${nav},\"tool_input\":{\"url\":\"http://localhost:47812/\"}}"
 err=$(<"$T/err")
 case "$err" in
   Blocked:*Crit*) ok 'message starts with Blocked: and names Crit' ;;
   *) ng "message starts with Blocked: and names Crit (got '$err')" ;;
 esac
-check 2 'Crit without a scheme' "{${nav},\"tool_input\":{\"url\":\"127.0.0.1:47819\"}}"
-check 2 'Crit port on another host name' "{${nav},\"tool_input\":{\"url\":\"http://localhost.example:47800/\"}}"
-check 2 'Crit port after a backslash' "{${nav},\"tool_input\":{\"url\":\"http://127.0.0.1:47810\\\\@example.com/\"}}"
-check 2 'Crit port in a new tab' '{"tool_name":"mcp__playwright__browser_tabs","tool_input":{"action":"new","url":"http://[::1]:47810"}}'
+check 2 'Crit without a scheme' "{${nav},\"tool_input\":{\"url\":\"127.0.0.1:47829\"}}"
+check 2 'Crit port on another host name' "{${nav},\"tool_input\":{\"url\":\"http://localhost.example:47810/\"}}"
+check 2 'Crit port after a backslash' "{${nav},\"tool_input\":{\"url\":\"http://127.0.0.1:47820\\\\@example.com/\"}}"
+check 2 'Crit port in a new tab' '{"tool_name":"mcp__playwright__browser_tabs","tool_input":{"action":"new","url":"http://[::1]:47820"}}'
 # The WHATWG URL parser (Chrome, Node) drops leading zeros in the port and removes TAB, LF and CR.
-check 2 'Crit port with leading zeros' "{${nav},\"tool_input\":{\"url\":\"http://127.0.0.1:00047800/\"}}"
-check 2 'Crit port split by a tab' "{${nav},\"tool_input\":{\"url\":\"http://localhost:478\\t00/\"}}"
-check 2 'Crit port split by a line feed' "{${nav},\"tool_input\":{\"url\":\"http://localhost:47\\n800/\"}}"
-check 2 'Crit port split by a carriage return' "{${nav},\"tool_input\":{\"url\":\"http://localhost:4780\\r0/\"}}"
+check 2 'Crit port with leading zeros' "{${nav},\"tool_input\":{\"url\":\"http://127.0.0.1:00047810/\"}}"
+check 2 'Crit port split by a tab' "{${nav},\"tool_input\":{\"url\":\"http://localhost:478\\t10/\"}}"
+check 2 'Crit port split by a line feed' "{${nav},\"tool_input\":{\"url\":\"http://localhost:47\\n810/\"}}"
+check 2 'Crit port split by a carriage return' "{${nav},\"tool_input\":{\"url\":\"http://localhost:4781\\r0/\"}}"
 check 0 'zeros before another port' "{${nav},\"tool_input\":{\"url\":\"http://localhost:0003000/\"}}"
 
 # file: URLs read local files outside the sandbox. Playwright MCP refuses them only when Node can parse the URL,

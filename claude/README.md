@@ -96,7 +96,7 @@ mise run claude:update
 | `hooks/ask-gh-pr-write.sh`       | PreToolUse（Bash）                                 | `gh` の PR 書き込みと `gh api` を、表記ゆれも含めて人間の承認に回す                                                                                                                                                                       |
 | `hooks/ask-shared-tree-git.sh`   | PreToolUse（Bash）                                 | ブランチの切り替えなど作業ツリーの状態を動かす git 操作の前に、同じ作業ツリーで別の Claude セッションが動いていれば人間の承認に回す。検査できないときは何もしない                                                                         |
 | `hooks/guard-additional-dirs.sh` | PreToolUse（Edit・Write・MultiEdit・NotebookEdit） | `~/.gstack/projects`（`additionalDirectories`）が symlink に差し替えられているあいだ、Edit・Write 系のツールをすべてブロックする                                                                                                          |
-| `hooks/guard-playwright-mcp.sh`  | PreToolUse（`mcp__playwright__.*`）                | Playwright MCP の呼び出しのうち、ローカルのファイルを指す `filename`・`paths` 引数を含むものと、`url` が `file:` で始まるもの、Crit のポート（47800〜47819）を指すものをブロックする。入力を検査できないときもブロックする                |
+| `hooks/guard-playwright-mcp.sh`  | PreToolUse（`mcp__playwright__.*`）                | Playwright MCP の呼び出しのうち、ローカルのファイルを指す `filename`・`paths` 引数を含むものと、`url` が `file:` で始まるもの、Crit のポート（47800〜47829）を指すものをブロックする。入力を検査できないときもブロックする                |
 | `hooks/precompact-context.sh`    | PreCompact                                         | ブランチ名・未コミットの変更・直近のコミットを、コンテキスト圧縮後も残す情報として Claude に渡す                                                                                                                                          |
 | `hooks/herdr-agent-state.sh`     | SessionStart                                       | herdr 上で起動したセッションの開始を herdr に通知する。herdr が生成・管理するため、直接編集しない                                                                                                                                         |
 | `hooks/gh-read-token.sh`         | SessionStart                                       | sandbox 内の Bash に、作業中のリポジトリの owner 用の読み取り専用トークンを `GH_TOKEN` として渡す                                                                                                                                         |
@@ -149,7 +149,7 @@ PR と main への push では、GitHub Actions が macOS の `/bin/bash` と `/
 | `--browser chrome`        | インストール済みの Google Chrome                                                  | ダウンロードが要らない。Chrome の自動更新でセキュリティ修正が入る。既定値と同じだが、版を上げて既定が変わったときに気づけるよう明示する     |
 | `--output-dir`            | `~/Library/Caches/playwright-mcp`                                                 | どのリポジトリにも出力しない。sandbox からも Edit・Write ツールからも書かせない（下記）ので、symlink で出力先を向け替えられない             |
 | `--no-webmcp`             | ページが登録するツールを使わない                                                  | 説明をページが決めたツールが、Claude のツールの一覧に入るのを防ぐ。今の用途では使わない                                                     |
-| `--blocked-origins`       | ポート 47800〜47819（`*:47800;…;*:47819`）                                        | cc-crit の Crit の画面を開かせない。JS やリンクでの移動も止める（リダイレクトは止まらない）                                                 |
+| `--blocked-origins`       | ポート 47800〜47829（`*:47800;…;*:47829`）。47800〜47809 は移す前の cc-crit 用    | cc-crit の Crit の画面を開かせない。JS やリンクでの移動も止める（リダイレクトは止まらない）                                                 |
 | `PLAYWRIGHT_MCP_HEADLESS` | 既定は `true`                                                                     | ウィンドウを出さない。`--headless` 引数は環境変数より優先されて切り替えられなくなるので使わない                                             |
 | `env.PATH`                | mise のグローバル設定の Node.js                                                   | 上の `${NODE_BIN}` の理由                                                                                                                   |
 
@@ -413,7 +413,7 @@ Claude は個人スキル `/crit-review`（`claude/skills/crit-review/SKILL.md`�
 
 | コマンド                                        | 依頼ファイル                                                         | 動作                                                                                                 |
 | ----------------------------------------------- | -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `/usr/local/libexec/claude-crit/cc-crit review` | `{"files": ["path"]}`、ブランチの差分なら `{}`                       | crit をポート 47800〜47819 で起動してブラウザを開き、Finish Review まで待つ                          |
+| `/usr/local/libexec/claude-crit/cc-crit review` | `{"files": ["path"]}`、ブランチの差分なら `{}`                       | crit をポート 47810〜47829 で起動してブラウザを開き、Finish Review まで待つ                          |
 | `/usr/local/libexec/claude-crit/cc-crit reply`  | `{"session": "<id>", "replies": [{"reply_to": "c_…", "body": "…"}]}` | 既存のコメント（行・ファイルは `c_`、レビュー全体は `r_`）に返信する。author は `Claude Code` に固定 |
 
 終了コードは、0 が成功、1 が失敗、2 が拒否。依頼ファイルは実行のたびに消える。

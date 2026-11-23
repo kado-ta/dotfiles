@@ -29,8 +29,10 @@ PROFILE = Path(os.environ.get("CC_CRIT_PROFILE", ROOT / "claude" / "bin" / "cc-c
 SANDBOX_EXEC = "/usr/bin/sandbox-exec"
 CRIT = "/opt/homebrew/bin/crit"
 GIT = "/opt/homebrew/bin/git"
-PORTS = range(47800, 47820)
+PORTS = range(47810, 47830)
 OUT_OF_RANGE = 47900
+# 別のアプリケーションが使う端末がある。範囲のすぐ外で、profile が許さないことを確かめる。
+EXCLUDED = 47809
 
 # 探査の結果は標準出力の 1 行で返す。拒否は EPERM / EACCES だけを数え、それ以外のエラーは区別する。
 PROBE = textwrap.dedent("""\
@@ -316,6 +318,20 @@ class ProfileTests(unittest.TestCase):
             port = listener.getsockname()[1]
             self.assertNotIn(port, PORTS)
             self.assertDenied(f"attempt(lambda: socket.create_connection(('127.0.0.1', {port}), timeout=5))")
+
+    def test_bind_loopback_excluded_port_denied(self):
+        self.assertDenied(f"attempt(lambda: socket.socket().bind(('127.0.0.1', {EXCLUDED})))")
+
+    def test_connect_loopback_excluded_port_denied(self):
+        # 空いていれば自分で待ち受け、profile が許せば接続できる状態で試す。
+        # 使われていれば、そのアプリケーションが待ち受けている。
+        with socket.socket() as listener:
+            try:
+                listener.bind(("127.0.0.1", EXCLUDED))
+                listener.listen(1)
+            except OSError:
+                pass
+            self.assertDenied(f"attempt(lambda: socket.create_connection(('127.0.0.1', {EXCLUDED}), timeout=5))")
 
     # --- 拒否すべきもの: 実行 ---
     # /usr/bin/open は、許可されていると実際にブラウザが開くので試さない。任意の実行の拒否で代える。

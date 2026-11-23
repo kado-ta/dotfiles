@@ -123,24 +123,24 @@
   (literal "/dev/dtracehelper"))
 
 ; --- ネットワーク ---
-; ポート 47800〜47819 だけ。外部への接続と、範囲外のポートでの待ち受け・接続はできない。
+; ポート 47810〜47829 だけ。外部への接続と、範囲外のポートでの待ち受け・接続はできない。
 ; (local ip "localhost:N") はアドレスを区別しないので、範囲内なら 0.0.0.0 や LAN のアドレスでも待ち受けられる。
 ; 接続相手を条件にすると listen 自体が拒否されるので、待ち受けのアドレスは crit の設定（127.0.0.1）で決める。
 (allow network-bind
-  (local ip "localhost:47800") (local ip "localhost:47801") (local ip "localhost:47802") (local ip "localhost:47803")
-  (local ip "localhost:47804") (local ip "localhost:47805") (local ip "localhost:47806") (local ip "localhost:47807")
-  (local ip "localhost:47808") (local ip "localhost:47809") (local ip "localhost:47810") (local ip "localhost:47811")
-  (local ip "localhost:47812") (local ip "localhost:47813") (local ip "localhost:47814") (local ip "localhost:47815")
-  (local ip "localhost:47816") (local ip "localhost:47817") (local ip "localhost:47818") (local ip "localhost:47819"))
+  (local ip "localhost:47810") (local ip "localhost:47811") (local ip "localhost:47812") (local ip "localhost:47813")
+  (local ip "localhost:47814") (local ip "localhost:47815") (local ip "localhost:47816") (local ip "localhost:47817")
+  (local ip "localhost:47818") (local ip "localhost:47819") (local ip "localhost:47820") (local ip "localhost:47821")
+  (local ip "localhost:47822") (local ip "localhost:47823") (local ip "localhost:47824") (local ip "localhost:47825")
+  (local ip "localhost:47826") (local ip "localhost:47827") (local ip "localhost:47828") (local ip "localhost:47829"))
 (allow network-inbound
-  (local ip "localhost:47800") (local ip "localhost:47801") (local ip "localhost:47802") (local ip "localhost:47803")
-  (local ip "localhost:47804") (local ip "localhost:47805") (local ip "localhost:47806") (local ip "localhost:47807")
-  (local ip "localhost:47808") (local ip "localhost:47809") (local ip "localhost:47810") (local ip "localhost:47811")
-  (local ip "localhost:47812") (local ip "localhost:47813") (local ip "localhost:47814") (local ip "localhost:47815")
-  (local ip "localhost:47816") (local ip "localhost:47817") (local ip "localhost:47818") (local ip "localhost:47819"))
+  (local ip "localhost:47810") (local ip "localhost:47811") (local ip "localhost:47812") (local ip "localhost:47813")
+  (local ip "localhost:47814") (local ip "localhost:47815") (local ip "localhost:47816") (local ip "localhost:47817")
+  (local ip "localhost:47818") (local ip "localhost:47819") (local ip "localhost:47820") (local ip "localhost:47821")
+  (local ip "localhost:47822") (local ip "localhost:47823") (local ip "localhost:47824") (local ip "localhost:47825")
+  (local ip "localhost:47826") (local ip "localhost:47827") (local ip "localhost:47828") (local ip "localhost:47829"))
 (allow network-outbound
-  (remote ip "localhost:47800") (remote ip "localhost:47801") (remote ip "localhost:47802") (remote ip "localhost:47803")
-  (remote ip "localhost:47804") (remote ip "localhost:47805") (remote ip "localhost:47806") (remote ip "localhost:47807")
-  (remote ip "localhost:47808") (remote ip "localhost:47809") (remote ip "localhost:47810") (remote ip "localhost:47811")
-  (remote ip "localhost:47812") (remote ip "localhost:47813") (remote ip "localhost:47814") (remote ip "localhost:47815")
-  (remote ip "localhost:47816") (remote ip "localhost:47817") (remote ip "localhost:47818") (remote ip "localhost:47819"))
+  (remote ip "localhost:47810") (remote ip "localhost:47811") (remote ip "localhost:47812") (remote ip "localhost:47813")
+  (remote ip "localhost:47814") (remote ip "localhost:47815") (remote ip "localhost:47816") (remote ip "localhost:47817")
+  (remote ip "localhost:47818") (remote ip "localhost:47819") (remote ip "localhost:47820") (remote ip "localhost:47821")
+  (remote ip "localhost:47822") (remote ip "localhost:47823") (remote ip "localhost:47824") (remote ip "localhost:47825")
+  (remote ip "localhost:47826") (remote ip "localhost:47827") (remote ip "localhost:47828") (remote ip "localhost:47829"))
