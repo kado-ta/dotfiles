@@ -29,7 +29,7 @@
 
 - TDD・デバッグ・実装計画は superpowers を使う。
 - 何を作るか自体の判断は `/office-hours`、機能の要件整理と設計は `brainstorming` を使う。同じ要件に両方は使わない。
-- 差分のレビューは `/review` だけ。同じ差分に `/code-review` や `requesting-code-review` を重ねない。
+- 今のブランチの差分のレビューは `/review` だけ（ほかの PR は CLAUDE.md の Tools 節）。同じ差分に `/code-review` や `requesting-code-review` を重ねない。
 - セキュリティのレビューは `/security-review`。`/cso` はユーザーが指定したときだけ使う。sandbox が読めないファイル（`.env.example` など）を追跡していると失敗するので、始める前に `~/dotfiles/claude/SKILL_INVENTORY.md` の「`/cso` を sandbox で使う」に従う。
 - コードの理解は、まず通常の読解（広く探すなら Explore）を使う。understand-anything のグラフ（`.ua/`）が既にあるリポジトリで、全体にまたがる質問なら `understand-chat` を使ってよい。グラフを作る `understand` は、自分では起動せず提案する（下の表）。
 - PR とリリースは CLAUDE.md の Git 節に従う。`finishing-a-development-branch` の push と PR 作成の手順は使わない。

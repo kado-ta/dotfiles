@@ -60,7 +60,7 @@
 | `test-driven-development` | 失敗するテスト → 実装 → リファクタ | 自動 | 有効 | 振る舞いを変えるとき。文書や設定だけの変更には当たらない |
 | `systematic-debugging` | 再現 → 原因の切り分け → 仮説の検証 → 修正 | 自動 | 有効 | — |
 | `verification-before-completion` | 完了と言う前に検証コマンドを実行し、結果を示す | 自動 | 有効 | — |
-| `requesting-code-review` | レビュー役のサブエージェントに差分のレビューを頼む | 自動 | 制限 | 差分のレビューは `/review` に一本化。`subagent-driven-development` の中のタスク単位のレビューは別 |
+| `requesting-code-review` | レビュー役のサブエージェントに差分のレビューを頼む | 自動 | 制限 | 今のブランチの差分のレビューは `/review` に一本化。`subagent-driven-development` の中のタスク単位のレビューは別 |
 | `receiving-code-review` | 受けた指摘を検証してから対応する | 自動 | 有効 | — |
 | `using-git-worktrees` | 隔離した作業ツリーを作る | 自動 | 制限 | sandbox では `.git/worktrees` が読み取り専用で `git worktree add` が失敗する |
 | `finishing-a-development-branch` | 統合の方法を選ぶ（merge・push と PR・残す・捨てる） | 自動 | 制限 | `git push -u origin` と PR 作成の手順は CLAUDE.md の Git 節（cc-safe-push・cc-safe-pr）と合わないので使わない |
@@ -231,7 +231,7 @@ sandbox の外で `/cso` を実行すると、保存先に秘密ファイルの�
 
 | スキル・コマンド | 機能 | 起動 | 状態・制約 |
 | --- | --- | --- | --- |
-| `/code-review` | 差分のバグを探す（`--fix`・`--comment` あり） | 自動 | 制限。差分のレビューは `/review` に一本化 |
+| `/code-review` | 差分のバグを探す（`--fix`・`--comment` あり） | 自動 | 制限。今のブランチの差分は `/review` に一本化。今のブランチ以外の PR は、作者を問わず、チェックアウトせずに `/code-review medium <PR の URL>` で読む（`--comment`・`--fix` は付けない。下の箇条） |
 | `/simplify` | 変更したコードの重複・簡素化を直す | 自動 | 有効 |
 | `/security-review` | ブランチの未マージの変更のセキュリティレビュー | 自動 | 有効。セキュリティの境界に触れる変更で使う |
 | `/init` | CLAUDE.md を作る | 自動 | 有効 |
@@ -246,7 +246,20 @@ sandbox の外で `/cso` を実行すると、保存先に秘密ファイルの�
 | `anthropic-skills:*`（13） | `built-in-browser`、`chrome-browser`、`computer-use`、`deep-research`、`docs`、`docx`、`google-workspace`、`import-memory`、`morning`、`pdf`、`pptx`、`skill-creator`、`xlsx` | 自動 | 有効。`deep-research` は技術調査の報告書を頼まれたときだけ（サブエージェントが多い） |
 | `/doctor`・`/skill-doctor` | 設定とスキルの一覧の診断 | 明示（CLI のコマンド） | 有効 |
 
-- 組み込みの `/review` は、同じ名前の gstack のスキルに隠れている。
+- 組み込みの `/code-review` は、別名 `review` を持つ（`aliases:["review"]`）。`/review` と打つと、同じ名前の gstack のスキルが優先される。gstack を消すか接頭辞を付けると、`/review` は黙って `/code-review` になる。
+- gstack の `/review` と `/code-review` は、PR の扱いが違う（2026-11-23 に、2.1.330 の実行ファイルの文字列と gstack の SKILL.md で確かめた）。今のブランチ以外の PR は、作者を問わず、チェックアウトせずに `/code-review medium <PR の URL>` で読む（CLAUDE.md の Tools 節）。番号だけを渡されたら、`gh pr view <番号> --json url -q .url` で URL にする。
+  - gstack の `/review` は PR 番号を受け付けない（`/review <番号>` と打っても番号は使われない）。今のブランチの `git merge-base origin/<base> HEAD` からの差分を見て、直す前提で動く（Fix-First）。ほかの PR に使うには、チェックアウトが要り、しかも書き換える。
+  - `/code-review <PR番号>` は、差分を `gh pr diff <番号>` で読み、番号をカレントのリポジトリの PR として解決する（`pr diff` がない gh では `gh api repos/{owner}/{repo}/pulls/<番号>`）。URL で指定すると `gh pr diff <番号> -R <owner>/<repo>` で読む。どちらもチェックアウトは変えない。手元のファイルは、PR で追加された行を含むときだけ参照に使い、含まなければ差分だけで判断する。`--fix` は、その行を含むファイルにだけ当たる。
+  - 番号で指定して差分が読めないと、`--fix`・`--comment` がなければ手元のブランチのレビューに切り替わり、指摘の前に「Could not read …: … was refused or failed. This review is of the checked-out branch instead, …」と書く。別のリポジトリの PR を番号で渡すと、手元のリポジトリに同じ番号の PR があれば、それを黙って読む。URL で指定したときと `--fix` を付けたときは、「…, so nothing was reviewed.」と書いて止まる。そのため URL で渡す。
+  - sandbox の中で、公開の kado-ta/dotfiles の `gh pr diff` は通った（2026-11-23）。private の業務リポジトリでは確かめていない。
+  - `--comment` は付けない。sandbox の `gh` は読み取り専用のトークンなので 403 になり、CLAUDE.md も GitHub への書き込みを禁じている。また、`--comment` を付けると、差分が読めなくても止まらず、手元のコードの指摘を PR に投稿しに行く。`--fix` も付けない（PR で追加された行を含む手元のファイルに、修正を当てる）。段階を省くと、ユーザーが前に打った段階（`low`〜`max`。`ultra` は保存されない）を使い回し、`max` が残りうるので、`medium` を明示する。
+  - `/code-review ultra <PR番号>` は、クラウドが GitHub から PR を clone する（Claude のアカウントに GitHub をつないでいなければ、CLI がつなぐ手順を案内する）。引数なしの `ultra` は手元のブランチを送る。料金がかかるので、ユーザーが指定したときだけ使う。
+  - 変更されたファイルの全体を読ませたい大きな PR は、worktree に取り込み、そこで `/code-review medium <PR の URL>` を実行する。取り込んだファイルは、その worktree で動く Claude Code・mise・direnv に読み込まれる。PR が `.claude/`（settings の hooks・permissions、skills など）・`.mcp.json`・`CLAUDE.md`・`AGENTS.md`（どの階層でも）・mise と direnv の設定（`mise.toml`・`.mise.toml`・`.tool-versions`・`.envrc` など）を変えていると、作者の hooks が sandbox の外で動きうる。共有の作業ツリーではブランチを切り替えない。private のリポジトリの fetch は sandbox の中では通らないので、人間が行う。次の順で行う。
+    1. Claude が `gh pr view <URL> --json headRefOid -q .headRefOid` で head のコミットを控え、`gh pr diff <URL> --name-only` で上のファイルが変わらないことを確かめてから、head が同じかをもう一度見る。変わるなら取り込まず、差分だけのレビューか、ユーザーが打つ `ultra` を提案する。
+    2. 人間が `claude -w <name>` で worktree を作り、通常のターミナルで `git -C <worktree の絶対パス> fetch origin pull/<番号>/head` を実行する。`git -C <worktree の絶対パス> rev-parse FETCH_HEAD` が控えたコミットと同じことを確かめてから、`git -C <worktree の絶対パス> switch --detach FETCH_HEAD` を実行する。
+    3. その worktree のセッションで `/code-review medium <PR の URL>` を実行する。
+  - `/security-review`・`codex review --base`・`/pstack:interrogate` は、今のブランチ（手元のチェックアウト）の差分を見る。今のブランチ以外の PR には使わない（PR を見ずに、手元のブランチを問題なしと報告しうる）。高リスクの PR でも `/code-review` で読む。上の手順で worktree に取り込んだ後なら使える見込み（確かめていない）。
+- `/code-review` は、報告の後に `/verify` を続けて起動する指示を足すことがある（2026-11-23 に、2.1.330 の実行ファイルの文字列で確かめた）。次の 4 つをすべて満たすときに足す: 機能フラグ `tengu_opal_circuit` が on、提案の設定（proactivity）の判定が通る、Skill ツールがある、Claude が起動できるスキル（組み込みも数える）に `verify` がある。指示は、このセッションで `/verify` がまだ動いておらず、差分に実行時の振る舞いがある（テストや文書だけではない）ときに、`/verify` の起動を求める。組み込みの `/verify` は、同じフラグが on のときだけ Claude が起動できるので、on なら組み込みのものだけで条件を満たし、off なら個人や project に `verify` があっても指示は入らない。2026-11-23 の時点で、Claude のスキルの一覧に `verify` は出ない（フラグは off と見ている。推測）。フラグはサーバー側で変わりうる。on になると、チェックアウトしていない PR のレビューの後に、PR ではなく手元のブランチを動かし、`.claude/skills/verify/SKILL.md` を書く見込み（推測。動かして確かめていない）。止めるなら `permissions.deny` の `Skill(verify)` が候補で、モデルの起動だけを止め、ユーザーが打つ `/verify` は動く。今は入れていない。
 - Bash ツールの説明の「commit の直前に `/verify` を実行する」という指示は、セッションの開始時に、`verify` か `simplify` という名前の、Claude が起動できるスキルが enterprise・個人・project・追加ディレクトリのどれかにあるとき（同じ名前の `.claude/commands/` のファイルも数える）に Claude Code が入れる。組み込み・プラグイン・claude.ai のスキルは数えない。docs と tests の変更は、この指示の対象から外れる。これまでは gstack の `verify` がこれに当たり、2026-10-27〜11-16 に 35 セッションで 65 回起動した。2026-11-16 に、このままにすると決めた（[research-routing.md](../docs/work/20261116_skill-role-division/research-routing.md#verify)）。gstack 1.103.0.0 で `build-check` に改名され、2026-11-23 に新しいセッションで、この指示が出なくなったことを確かめた。commit の前の検査は、CLAUDE.md の Verification 節で行う。組み込みの `/verify` は、記録した手順がないと、うまくいった手順をリポジトリのルート（monorepo では変更したパッケージのディレクトリ）の `.claude/skills/verify/SKILL.md` に書く。ルートに書いたものは project のスキルとして数えられ、次に始めるセッションから指示が戻る（公式ドキュメントの「Run and verify your app」と「Run your checks before each commit」）。
 
 <a name="agents"></a>
@@ -298,7 +311,8 @@ sandbox の外で `/cso` を実行すると、保存先に秘密ファイルの�
 | 何を作るか | `/office-hours` | — | 同じ要件に `brainstorming` を重ねない |
 | 機能の要件・設計 | `brainstorming` → `writing-plans` | `/pstack:architect with checkpoint`（複雑か高リスク）、`/plan-eng-review`（明示だけ。計画のレビュー） | `/spec`、`/autoplan`（無効） |
 | 変更の影響 | Claude 自身の読解 | `/pstack:blast-radius`（高リスク） | `understand-diff`（グラフが前提） |
-| 差分のレビュー | `/review` | `/pstack:interrogate`（高リスクで実行による証明が要るとき） | `/code-review`、`requesting-code-review` |
+| 差分のレビュー（今のブランチ） | `/review` | `/pstack:interrogate`（高リスクで実行による証明が要るとき） | 同じ差分に `/code-review`、`requesting-code-review` |
+| 今のブランチ以外の PR のレビュー | `/code-review medium <PR の URL>`（チェックアウトしない。作者を問わない） | 大きな PR は、設定ファイルが変わらないことを確かめてから、人間が `claude -w` の worktree に取り込み、`/code-review medium <PR の URL>` | gstack の `/review`（チェックアウトして書き換える）、`/security-review`・`codex review`・`interrogate`（今のブランチを見る）、`--comment`・`--fix` |
 | 独立したモデルのレビュー | ユーザーが通常のターミナルで実行する `codex review` | challenge（`codex exec`。セキュリティの境界・設計判断を含む変更） | `/codex`（Bash から拒否される）、`interrogate`・`arena`（Claude 同士） |
 | 計画の人間レビュー | `/crit-review` | — | `/crit:crit`（sandbox で動かない） |
 | セキュリティ | `/security-review` | `/cso`（ユーザーが指定したとき） | 同じ差分に `/security-review` と `/cso` を重ねない |
@@ -367,4 +381,4 @@ sandbox の外で `/cso` を実行すると、保存先に秘密ファイルの�
 
 `/pstack:` の提案の回数には、スキルの設定を扱うセッション（この文書を作ったセッションなど）で Claude がコマンド名を書いた分も入る。増減は、セッションの一覧と合わせて見る。
 
-後の期間の途中（2026-11-23）で gstack を 1.102.2.0 に更新した。説明文に「いつ使うか」の節が付き（1.100.0.0）、gstack のスキルの起動は、規則とは別の理由でも増えうる。gstack のスキルの増減は、この日の前後に分けて見る。同じ日に、自動で起動する個人スキル `modern-web-guidance`・`chrome-extensions` を足した。測る対象（レビューの重複、軽微な作業での計画系のスキル）とは役割が重ならない。さらに同じ日に gstack を 1.103.0.0 に更新し、`verify` が `build-check` に改名された。基準値の gstack の起動の多く（`verify` の 65 回）は commit の前の指示によるもので、改名の後はこの指示が出なくなった（2026-11-23 に新しいセッションで確かめた）ので、gstack の起動の数を比べるときは `verify`・`build-check` を除いて見る。
+後の期間の途中（2026-11-23）で gstack を 1.102.2.0 に更新した。説明文に「いつ使うか」の節が付き（1.100.0.0）、gstack のスキルの起動は、規則とは別の理由でも増えうる。gstack のスキルの増減は、この日の前後に分けて見る。同じ日に、自動で起動する個人スキル `modern-web-guidance`・`chrome-extensions` を足した。測る対象（レビューの重複、軽微な作業での計画系のスキル）とは役割が重ならない。さらに同じ日に gstack を 1.103.0.0 に更新し、`verify` が `build-check` に改名された。基準値の gstack の起動の多く（`verify` の 65 回）は commit の前の指示によるもので、改名の後はこの指示が出なくなった（2026-11-23 に新しいセッションで確かめた）ので、gstack の起動の数を比べるときは `verify`・`build-check` を除いて見る。同じ日に、今のブランチ以外の PR のレビューを `/review` から `/code-review medium <PR の URL>` に分けた（CLAUDE.md の Tools 節、SKILL_ROUTING.md の Overlapping skills）。`skill-usage.py` は、1 つのセッションで 2 種類以上のレビューのスキル（`review`・`code-review`・`superpowers:requesting-code-review`）が動くと重複に数えるので、この日の後は、今のブランチの `/review` と、ほかの PR の `/code-review` が同じセッションにあっても数えられる。スクリプトは、重複に数えたセッションの ID も件数の下に出す。そのセッションで `/code-review` の対象が、そのセッションのブランチの PR でなければ、重複から除く（引数が PR 番号や URL でも、今のブランチの PR なら重複に数える）。
