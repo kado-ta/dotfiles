@@ -53,7 +53,7 @@ Obsidian 標準の Markdown / Mermaid の表示が読みづらいため、Typora
 |---|---|
 | Obsidian | デスクトップ版 1.14 系（同梱 Mermaid 11.13.0） |
 | Mermaid Kit | 1.1.2 |
-| 対象ビュー | Reading view は全面対応。Live Preview は一部（CSS 変数・見出し下線・字間・インラインコード・表）のみ |
+| 対象ビュー | Reading view は全面対応。Live Preview は一部（CSS 変数・見出しの下線・字間・余白・箇条書きの間隔・アンチエイリアス・インラインコード・表・ハイライト）のみ |
 | フォント | `Open Sans` が未インストールの場合は Helvetica Neue / ヒラギノ等で表示される |
 
 > [!WARNING]
@@ -91,7 +91,7 @@ Mermaid Kit 使用時は SVG が Kit の要素内に移るため、`mermaid-fill
 - Night テーマのコードブロックのシンタックスカラーは移植しておらず、Obsidian 既定の配色のまま。
 - Mermaid の配色対象は flowchart / sequence / gantt / class / state / ER。pie / mindmap / timeline / journey などは未対応。
 - Night の Mermaid 配色のうち、Typora の `night/mermaid.dark.css` に定義がない要素（シーケンス図のアクティベーションなど）は推測で補っている。CSS 内で `/* * */` を付けた変数が該当する。
-- Live Preview ではコードブロックの枠線や見出しのマージンなど、一部の装飾が反映されない。
+- Live Preview ではコードブロックの枠線など、一部の装飾が反映されない。見出しの余白は、ダークモードでは見出しの前後の空行を使って Night に近づけている。前に空行があれば見出し（h1 を除く）の上の余白をなくし、直後の空行（カーソルがある行を除く）の高さを Night の下余白に合わせる。空行がないところと、ライトモードでは Obsidian の既定のまま。
 
 <a name="references"></a>
 ## 参考

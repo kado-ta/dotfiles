@@ -4,7 +4,8 @@
      - Light mode : Typora "GitHub" テーマ相当
      - Dark mode  : Typora "Night" テーマ相当
    対象: Reading view（全面）/ Live Preview（変数 + 見出し・箇条書き・
-          インラインコード・表）。Source mode には個別指定を当てない
+          アンチエイリアス・インラインコード・表・ハイライト）。
+          Source mode には個別指定を当てない
    前提: Obsidian テーマ = Default
           Settings > Appearance のフォント指定は空（指定があるとそちらが優先）
           「Readable line length」ON で本文幅が Typora の #write 幅になる
