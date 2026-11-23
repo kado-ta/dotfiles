@@ -239,7 +239,7 @@ sandbox の外で `/cso` を実行すると、保存先に秘密ファイルの�
 | `/fewer-permission-prompts` | よく使うコマンドを project の allow に足す | 自動 | 有効。dotfiles では `.claude/settings.json` に allow を足すと `check-repo.py` が失敗する |
 | `/loop`・`/schedule` | 繰り返し実行・クラウドのルーティン | 自動 | 有効。クラウドのルーティンは手元のファイルを読めない |
 | `/run` | アプリを起動して動作を確かめる | 自動 | 有効。サーバーは localhost で待ち受けられない |
-| `/verify` | アプリをビルド・起動して、変更が意図どおり動くかを確かめる（テストや型チェックには頼らない） | Claude の一覧に出ない | [公式ドキュメント](https://code.claude.com/docs/en/skills.md)の「Run and verify your app」に、`/run` とは別のスキルとしてある。2026-11-23 に、Claude のスキルの一覧に出ないことを確かめた（同じ名前の gstack のスキルは、1.103.0.0 で `build-check` に改名された）。ユーザーが `/verify` と打って動くかは確かめていない。記録した手順がないと、うまくいった手順を `.claude/skills/verify/SKILL.md` に書く（下の箇条） |
+| `/verify` | アプリをビルド・起動して、変更が意図どおり動くかを確かめる（テストや型チェックには頼らない） | 明示（Claude の一覧に出ない） | [公式ドキュメント](https://code.claude.com/docs/en/skills.md)の「Run and verify your app」に、`/run` とは別のスキルとしてある。2026-11-23 に、Claude のスキルの一覧に出ないことを確かめた（同じ名前の gstack のスキルは、1.103.0.0 で `build-check` に改名された）。ユーザーが `/verify` と打つと組み込みのスキルが起動する（2026-11-23、2.1.330 で確かめた）。記録した手順がないと、うまくいった手順を `.claude/skills/verify/SKILL.md` に書く（下の箇条） |
 | `/claude-api`・`/workflow-authoring`・`/plugin-authoring`・`/keybindings-help` | 各分野の参照・作成 | 自動 | 有効 |
 | `claude-in-chrome` | Chrome の拡張でブラウザを操作する | 自動 | 方針で使わない（CLAUDE.md） |
 | `dataviz`・`artifact-design`・`artifact-diagramming`・`artifact-capabilities` | 図表と Artifact の作成 | 自動 | 有効 |
