@@ -68,6 +68,12 @@ class SkillUsageTest(unittest.TestCase):
         self.assertIn("assistant messages suggesting /pstack: 1", out)
         self.assertIn("  s1", out)
 
+    def test_lists_sessions_with_two_review_skills(self):
+        # 計測の日に、重複に数えたセッションを手で確かめられるように、ID を件数の下に並べる。
+        out = self.run_script("2026-11-16", "2026-12-07").stdout.splitlines()
+        i = out.index("sessions with 2+ review skills: 1")
+        self.assertEqual(out[i + 1], "  s2")
+
     def test_does_not_print_message_content(self):
         result = self.run_script("2026-11-16", "2026-12-07")
         self.assertNotIn(SECRET, result.stdout + result.stderr)

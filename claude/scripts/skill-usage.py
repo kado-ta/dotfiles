@@ -71,7 +71,10 @@ for name, n in skill_calls.most_common():
 print("slash commands typed by the user:")
 for name, n in slash.most_common():
     print(f"  {name}: {n}")
-print(f"sessions with 2+ review skills: {sum(1 for s in reviews_by_session.values() if len(s) >= 2)}")
+review_dup_sessions = sorted(sid for sid, s in reviews_by_session.items() if len(s) >= 2)
+print(f"sessions with 2+ review skills: {len(review_dup_sessions)}")
+for sid in review_dup_sessions:
+    print(f"  {sid}")
 print(f"assistant messages suggesting /pstack: {pstack_suggestions}")
 print("sessions that started brainstorming or writing-plans (check these by hand):")
 for sid in sorted(planning_sessions):
