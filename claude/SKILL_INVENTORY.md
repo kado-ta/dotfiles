@@ -239,7 +239,7 @@ sandbox の外で `/cso` を実行すると、保存先に秘密ファイルの�
 | `/fewer-permission-prompts` | よく使うコマンドを project の allow に足す | 自動 | 有効。dotfiles では `.claude/settings.json` に allow を足すと `check-repo.py` が失敗する |
 | `/loop`・`/schedule` | 繰り返し実行・クラウドのルーティン | 自動 | 有効。クラウドのルーティンは手元のファイルを読めない |
 | `/run` | アプリを起動して動作を確かめる | 自動 | 有効。サーバーは localhost で待ち受けられない |
-| `/verify` | アプリをビルド・起動して、変更が意図どおり動くかを確かめる（テストや型チェックには頼らない） | 自動 | 有効。gstack 1.103.0.0 で同じ名前の gstack のスキルが `build-check` に改名され、隠れなくなった。この環境ではまだ使っていない。手順が分からないときは、成功した手順を project のスキル `.claude/skills/verify/SKILL.md` に記録する |
+| `/verify` | アプリをビルド・起動して、変更が意図どおり動くかを確かめる（テストや型チェックには頼らない） | 明示（Claude の一覧に出ない） | [公式ドキュメント](https://code.claude.com/docs/en/skills.md)の「Run and verify your app」に、`/run` とは別のスキルとしてある。2026-11-23 に、Claude のスキルの一覧に出ないことを確かめた（同じ名前の gstack のスキルは、1.103.0.0 で `build-check` に改名された）。ユーザーが `/verify` と打つと組み込みのスキルが起動する（2026-11-23、2.1.330 で確かめた）。記録した手順がないと、うまくいった手順を `.claude/skills/verify/SKILL.md` に書く（下の箇条） |
 | `/claude-api`・`/workflow-authoring`・`/plugin-authoring`・`/keybindings-help` | 各分野の参照・作成 | 自動 | 有効 |
 | `claude-in-chrome` | Chrome の拡張でブラウザを操作する | 自動 | 方針で使わない（CLAUDE.md） |
 | `dataviz`・`artifact-design`・`artifact-diagramming`・`artifact-capabilities` | 図表と Artifact の作成 | 自動 | 有効 |
@@ -247,7 +247,7 @@ sandbox の外で `/cso` を実行すると、保存先に秘密ファイルの�
 | `/doctor`・`/skill-doctor` | 設定とスキルの一覧の診断 | 明示（CLI のコマンド） | 有効 |
 
 - 組み込みの `/review` は、同じ名前の gstack のスキルに隠れている。
-- Bash ツールの説明の「commit の直前に `/verify` を実行する」という指示は、`verify` か `simplify` という名前の、Claude が起動できるユーザー・project のスキルがあるときに Claude Code が入れる（組み込みとプラグインのスキルは数えない）。これまでは gstack の `verify` がこれに当たり、2026-10-27〜11-16 に 35 セッションで 65 回起動した。2026-11-16 に、このままにすると決めた（[research-routing.md](../docs/work/20261116_skill-role-division/research-routing.md#verify)）。gstack 1.103.0.0 で `build-check` に改名されたので、次に始めるセッションから、この指示は出なくなる見込み（確かめていない）。commit の前の検査は、CLAUDE.md の Verification 節で行う。組み込みの `/verify` が手順を `.claude/skills/verify/SKILL.md` に記録すると、それが project のスキルとして数えられ、指示が戻る見込み（推測）。
+- Bash ツールの説明の「commit の直前に `/verify` を実行する」という指示は、`verify` か `simplify` という名前の、Claude が起動できるユーザー・project のスキルがあるときに Claude Code が入れる（組み込みとプラグインのスキルは数えない）。これまでは gstack の `verify` がこれに当たり、2026-10-27〜11-16 に 35 セッションで 65 回起動した。2026-11-16 に、このままにすると決めた（[research-routing.md](../docs/work/20261116_skill-role-division/research-routing.md#verify)）。gstack 1.103.0.0 で `build-check` に改名され、2026-11-23 に新しいセッションで、この指示が出なくなったことを確かめた。commit の前の検査は、CLAUDE.md の Verification 節で行う。組み込みの `/verify` は、記録した手順がないと、うまくいった手順をリポジトリのルート（monorepo では変更したパッケージのディレクトリ）の `.claude/skills/verify/SKILL.md` に書く。ルートに書いたものは project のスキルとして数えられ、次に始めるセッションから指示が戻る（公式ドキュメントの「Run and verify your app」と「Run your checks before each commit」）。
 
 <a name="agents"></a>
 
@@ -367,4 +367,4 @@ sandbox の外で `/cso` を実行すると、保存先に秘密ファイルの�
 
 `/pstack:` の提案の回数には、スキルの設定を扱うセッション（この文書を作ったセッションなど）で Claude がコマンド名を書いた分も入る。増減は、セッションの一覧と合わせて見る。
 
-後の期間の途中（2026-11-23）で gstack を 1.102.2.0 に更新した。説明文に「いつ使うか」の節が付き（1.100.0.0）、gstack のスキルの起動は、規則とは別の理由でも増えうる。gstack のスキルの増減は、この日の前後に分けて見る。同じ日に、自動で起動する個人スキル `modern-web-guidance`・`chrome-extensions` を足した。測る対象（レビューの重複、軽微な作業での計画系のスキル）とは役割が重ならない。さらに同じ日に gstack を 1.103.0.0 に更新し、`verify` が `build-check` に改名された。基準値の gstack の起動の多く（`verify` の 65 回）は commit の前の指示によるもので、改名の後はこの指示が出なくなる見込みなので、gstack の起動の数を比べるときは `verify`・`build-check` を除いて見る。
+後の期間の途中（2026-11-23）で gstack を 1.102.2.0 に更新した。説明文に「いつ使うか」の節が付き（1.100.0.0）、gstack のスキルの起動は、規則とは別の理由でも増えうる。gstack のスキルの増減は、この日の前後に分けて見る。同じ日に、自動で起動する個人スキル `modern-web-guidance`・`chrome-extensions` を足した。測る対象（レビューの重複、軽微な作業での計画系のスキル）とは役割が重ならない。さらに同じ日に gstack を 1.103.0.0 に更新し、`verify` が `build-check` に改名された。基準値の gstack の起動の多く（`verify` の 65 回）は commit の前の指示によるもので、改名の後はこの指示が出なくなった（2026-11-23 に新しいセッションで確かめた）ので、gstack の起動の数を比べるときは `verify`・`build-check` を除いて見る。
