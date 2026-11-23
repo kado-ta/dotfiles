@@ -78,21 +78,21 @@ sandbox の外（人間。差分を Crit で確かめた後）:
 
 ## 入れる手順（端末ごと）
 
-フック（main を取り込むと、リンクで即座に効く）・cc-crit（sudo で入れ直す）・Playwright MCP の定義（`register-mcp.sh` で登録し直す）の 3 つは、効き始める時期がずれる。フックが止めるのはツールの `url` 引数での直接の移動だけで、JS やリンクでの移動は `--blocked-origins` だけが止める。どちらも新旧の範囲の和（47800〜47829）を止めるので、古い cc-crit の Crit も新しい cc-crit の Crit も、入れる順番によらず止まる。
+フック（main を取り込むと、リンクで即座に効く）・cc-crit（sudo で入れ直す）・Playwright MCP の定義（`register-mcp.sh` で登録し直し、セッションを始め直すと効く）の 3 つは、効き始める時期がずれる。フックが止めるのはツールの `url` 引数での直接の移動だけで、JS やリンクでの移動は `--blocked-origins` だけが止める。どちらも新旧の範囲の和（47800〜47829）を止めるので、新しい `--blocked-origins` を効かせてから新しい cc-crit を入れれば、Crit が待ち受けるポートは、どの時点でも両方の守りの中にある。
 
-1. 開いている Crit のレビューをすべて終える（承認すると daemon は止まる）。前に開いたレビューには、入れ直した後の `cc-crit reply` が届かない。
+1. 開いている Crit のレビューをすべて終え（承認すると daemon は止まる）、Claude Code のセッションをすべて閉じる。前に開いたレビューには、入れ直した後の `cc-crit reply` が届かない。
 2. `sudo lsof -nP -iTCP:47800-47829 -sTCP:LISTEN` で、crit の daemon が残っていないことと、47810〜47829 にほかのアプリケーションがないことを確かめる（`sudo` がないと、ほかのユーザーのプロセスが見えない）。もう一方の端末の 47809 のアプリケーションは出てよい。47810〜47829 にほかのアプリケーションがあれば、入れずに止め、範囲を考え直す。
-3. `~/dotfiles` で main を取り込み、[README のインストール](../../../claude/README.md#cc-crit-install)のとおりに `cc-crit` と `cc-crit.sb` を入れ直す。`cmp claude/bin/cc-crit /usr/local/libexec/claude-crit/cc-crit` と `cmp claude/bin/cc-crit.sb /usr/local/libexec/claude-crit/cc-crit.sb` が何も出さないことを確かめてから、`mise run crit:profile-test` を実行する。このテストはリポジトリの profile を試すので、入れたものとの一致は `cmp` で確かめる。
-4. Playwright MCP を使っているセッションを閉じ、`/bin/bash ~/dotfiles/claude/scripts/register-mcp.sh` を実行する。動いている MCP サーバーは、セッションを始め直すまで前の定義のまま。
+3. `~/dotfiles` で main を取り込み、`/bin/bash ~/dotfiles/claude/scripts/register-mcp.sh` を実行する（`setup.sh` から呼ばれてもよい）。
+4. [README のインストール](../../../claude/README.md#cc-crit-install)のとおりに `cc-crit` と `cc-crit.sb` を入れ直す。`cmp claude/bin/cc-crit /usr/local/libexec/claude-crit/cc-crit` と `cmp claude/bin/cc-crit.sb /usr/local/libexec/claude-crit/cc-crit.sb` が何も出さないことを確かめてから、`mise run crit:profile-test` を実行する。このテストはリポジトリの profile を試すので、入れたものとの一致は `cmp` で確かめる。
 5. 新しいセッションで `/crit-review` を実行し、Crit が 47810 で開くことを確かめる。
 
-手順 3 と 4 は、どちらを先にしてもよい（`setup.sh` が `register-mcp.sh` を先に呼んでもよい）。残る隙間は、`--blocked-origins` が前の定義（47800〜47819）のあいだに、47820〜47829 へ JS やリンクで移動される場合だけ。新しい cc-crit が 47820 を使うのは、同時に 11 件以上のレビューを開いたときだけ。
+手順 3 と 4 を入れ替えない。cc-crit を先に入れると、前の定義の `--blocked-origins`（47800〜47819）が残るあいだに、新しい cc-crit が 47820〜47829 で開いた Crit へ、JS やリンクで移動できる（同時に 11 件以上のレビューを開いたとき。[Codex のレビュー](test-report.md#codex)の指摘）。作業のあいだセッションを閉じておくのは、動いている MCP サーバーが、セッションを始め直すまで前の定義のままだから。
 
 <a name="rollback"></a>
 
 ## 戻す手順
 
-開いているレビューを終えてから、PR を revert して main を取り込み、`cc-crit` と `cc-crit.sb` を入れ直して、`register-mcp.sh` を実行する（順番は問わない）。戻した後は、フックと `--blocked-origins` も 47800〜47819 に戻る。残る隙間は、入れる手順と同じく、同時に 11 件以上のレビューを開いたときの 47820〜47829 だけ。もう一方の端末では、47809 があるので、cc-crit は前と同じく拒否する。
+開いているレビューを終え、Claude Code のセッションをすべて閉じてから行う。PR を revert して main を取り込み、先に `cc-crit` と `cc-crit.sb` を入れ直す。`sudo lsof -nP -iTCP:47810-47829 -sTCP:LISTEN` で crit の daemon が残っていないことを確かめてから、`register-mcp.sh` を実行する。この順なら、守りが 47800〜47819 に縮む前に、新しい cc-crit とその daemon は止まっている。もう一方の端末では、47809 があるので、cc-crit は前と同じく拒否する。
 
 <a name="risks"></a>
 
@@ -122,3 +122,5 @@ sandbox の外（人間。差分を Crit で確かめた後）:
 - `test-cc-crit.py` に、フックが `PORTS` のすべてを止め、`--blocked-origins` が `PORTS` を含むことを確かめるテストを足す。範囲を書く 4 か所のうち、`PORTS` と照らしていたのは profile だけだった。
 - 入れたファイルとリポジトリを `cmp` で比べる手順を足す。`mise run crit:profile-test` はリポジトリの profile を試すので、入れ忘れや、違うブランチからの入れ直しに気づけない。cc-crit の起動時に確かめる案は採らない（root 所有のラッパーに profile の解析を足すことになり、依頼の範囲を超える）。
 - 47809 の拒否のテストを、古い profile で失敗させてから新しい profile で通す手順を、[確かめること](#verification)に足す。
+
+Codex のレビュー（1 回目）の指摘を受けて、[入れる手順](#rollout)と[戻す手順](#rollback)の順番を固定した（2026-11-24）。入れるときは `register-mcp.sh` を先に、戻すときは cc-crit を先にし、どちらも作業のあいだ Claude Code のセッションを閉じる。記録と採否は [test-report.md](test-report.md#codex) にある。
