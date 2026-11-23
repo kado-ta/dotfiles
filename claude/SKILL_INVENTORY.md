@@ -2,7 +2,7 @@
 
 入っているプラグイン・スキル・エージェント・hooks・MCP の一覧と、その状態・制約を書く。スキルの選び方の規則は [rules/SKILL_ROUTING.md](rules/SKILL_ROUTING.md)（毎回読み込まれる）、タスク別の早見表は [SKILL_CHEATSHEET.md](SKILL_CHEATSHEET.md) にある。重複の裁定の根拠は [作業文書](../docs/work/20261116_skill-role-division/research-routing.md) にある。
 
-- 時点: 2026-11-16。2026-11-23 に gstack 1.102.2.0 と pstack 0.15.46 への更新と、個人スキル `/socratic-tutor`・`modern-web-guidance`・`chrome-extensions` の追加を反映した。Claude Code の版は 2.1.330（2026-11-23 に確認）。各スキルの SKILL.md・設定・hooks の実物を読んで書いた。
+- 時点: 2026-11-16。2026-11-23 に gstack 1.102.2.0 と pstack 0.15.46 への更新、個人スキル `/socratic-tutor`・`modern-web-guidance`・`chrome-extensions` の追加、gstack 1.103.0.0 への更新（`verify` を `build-check` に改名）を反映した。Claude Code の版は 2.1.330（2026-11-23 に確認）。各スキルの SKILL.md・設定・hooks の実物を読んで書いた。
 - この文書は `~/.claude` にリンクされない。Claude のコンテキストには載らない。
 - プラグインやスキルを更新したら、[更新したときの見直し](#upgrade)に従って直す。
 
@@ -29,7 +29,7 @@
 | 提供元 | 版 | 入れ方・スコープ | スキル | エージェント | hooks | 更新 |
 | --- | --- | --- | --- | --- | --- | --- |
 | superpowers | 7.0.2 | プラグイン（claude-plugins-official）、user | 15 | 0 | SessionStart | `/plugin` |
-| gstack | 1.102.2.0 | `git clone` で `~/.claude/skills/gstack`。プラグインではないので、名前に接頭辞が付かない | 64（有効 25、明示 8、無効 31） | 0 | スキルの frontmatter だけ | `update-skills.sh` か zsh の `gstack-upgrade`（sandbox の外） |
+| gstack | 1.103.0.0 | `git clone` で `~/.claude/skills/gstack`。プラグインではないので、名前に接頭辞が付かない | 64（有効 25、明示 8、無効 31） | 0 | スキルの frontmatter だけ | `update-skills.sh` か zsh の `gstack-upgrade`（sandbox の外） |
 | pstack | 0.15.46 | プラグイン（cursor-plugins）、user | 58 | 2（deny） | なし | `/plugin`（自動更新 off） |
 | understand-anything | 2.9.8 | プラグイン、user | 9 | 11 | SessionStart、PostToolUse | `/plugin`（自動更新 on） |
 | crit | 1.8.15 | プラグイン、user。CLI は 0.24.0 | 3 | 0 | PermissionRequest | `/plugin` と Homebrew |
@@ -100,7 +100,7 @@
 | `diagram` | 説明文か mermaid から図を作る | 自動 | 有効 | 描画で localhost に待ち受ける |
 | `make-pdf` | Markdown から PDF を作る | 自動 | 有効 | 既定の出力先 `/tmp` と描画の待ち受けが sandbox で不可 |
 | `health` | 型チェック・lint・テストなどを実行して点数にする | 自動 | 有効 | 直さない |
-| `verify` | リポジトリが宣言した検査とテストを、通るまで直しながら回す | 自動 | 有効 | 検査は CLAUDE.md の `gstack:verify:` 行、package.json などから探す。宣言がなければ何もしない（dotfiles では検査なし）。組み込みの `/verify` は、この gstack 版に隠れている |
+| `build-check` | リポジトリが宣言した検査とテストを、通るまで直しながら回す | 自動 | 有効 | 1.103.0.0 で `verify` から改名した。検査は CLAUDE.md の `gstack:verify:` 行（名前は変わっていない）、package.json などから探す。宣言がなければ何もしない（dotfiles では検査なし）。引数 `quick`・`pre-commit` は、commit の前の簡易の検査だけを行う |
 | `test-audit` | 価値の低いテストと、それを残すためだけのコードを探す | 自動 | 有効 | 承認したまとまりだけ編集する |
 | `deslop-shared-libs` | 最近の commit から共通化する価値のある箇所を挙げる | 自動 | 有効 | 読み取りだけ |
 | `retro` | 期間内の commit と PR を振り返る | 自動 | 有効 | global モードは `~/.gstack/retros/` に書くので不可 |
@@ -140,6 +140,8 @@
 - 動くのは静的な監査だけ。スキャナ 6 種と `--comprehensive` は Docker が要るので、前提条件の不足として記録される。
 - `--doctor` の static-snapshot は missing と出るが、監査（`start`）は動く。ランチャーが `TMPDIR` を渡さず、`/tmp` に書こうとするため。
 - sandbox が読めないファイルを、追跡しているか、無視されていない未追跡として持つリポジトリでは、`start` が `INVALID_SCHEMA` で失敗する。読めないファイルは `permissions.deny` の `Read(...)` で決まる（`.env*`・`*.pem`・`*.key`・`credentials`・`id_rsa*`・`id_ed25519*`・`.ssh/`・`.aws/`・`.pgpass`）。helper は秘密ファイルも一度読んでマスキングし、写しを保存するため。`.gitignore` で無視したファイルは問題ない。
+
+1.103.0.0 の CHANGELOG によると、`.env.example` のような秘密ファイルに似た名前のファイルと、`/cso` がもともと監査から外すファイル（依存・ツールの状態・エージェントの設定）は、読めなくても「読めなかった」と記録して監査を続けるようになった（#4395）。それ以外の読めないファイルでは、今も止まる。この環境ではまだ確かめていないので、下の手順を残す。
 
 失敗するリポジトリでは、追跡中で変更のないファイルを一時的に消してから監査する。消したファイルは「履歴だけで評価」と記録され、結果は `partial` になる。`--diff` では、この削除も差分に入る。2026-11-16 に、`.env.example` を 1 つ追跡する検証用のリポジトリで確かめた。
 
@@ -237,14 +239,15 @@ sandbox の外で `/cso` を実行すると、保存先に秘密ファイルの�
 | `/fewer-permission-prompts` | よく使うコマンドを project の allow に足す | 自動 | 有効。dotfiles では `.claude/settings.json` に allow を足すと `check-repo.py` が失敗する |
 | `/loop`・`/schedule` | 繰り返し実行・クラウドのルーティン | 自動 | 有効。クラウドのルーティンは手元のファイルを読めない |
 | `/run` | アプリを起動して動作を確かめる | 自動 | 有効。サーバーは localhost で待ち受けられない |
+| `/verify` | アプリをビルド・起動して、変更が意図どおり動くかを確かめる（テストや型チェックには頼らない） | 自動 | 有効。gstack 1.103.0.0 で同じ名前の gstack のスキルが `build-check` に改名され、隠れなくなった。この環境ではまだ使っていない。手順が分からないときは、成功した手順を project のスキル `.claude/skills/verify/SKILL.md` に記録する |
 | `/claude-api`・`/workflow-authoring`・`/plugin-authoring`・`/keybindings-help` | 各分野の参照・作成 | 自動 | 有効 |
 | `claude-in-chrome` | Chrome の拡張でブラウザを操作する | 自動 | 方針で使わない（CLAUDE.md） |
 | `dataviz`・`artifact-design`・`artifact-diagramming`・`artifact-capabilities` | 図表と Artifact の作成 | 自動 | 有効 |
 | `anthropic-skills:*`（13） | `built-in-browser`、`chrome-browser`、`computer-use`、`deep-research`、`docs`、`docx`、`google-workspace`、`import-memory`、`morning`、`pdf`、`pptx`、`skill-creator`、`xlsx` | 自動 | 有効。`deep-research` は技術調査の報告書を頼まれたときだけ（サブエージェントが多い） |
 | `/doctor`・`/skill-doctor` | 設定とスキルの一覧の診断 | 明示（CLI のコマンド） | 有効 |
 
-- 組み込みの `/review` と `/verify` は、同じ名前の gstack のスキルに隠れている。
-- Bash ツールの説明には「commit の直前に `/verify` を実行する」という指示がある。これは、`verify` という名前のユーザーのスキル（ここでは gstack の版）があるときに Claude Code が入れる指示で、組み込みの `/verify` を指すものではない。gstack の `verify` は 2026-10-27〜11-16 に 35 セッションで 65 回起動した。組み込みの版との違いと対応の選択肢は [research-routing.md](../docs/work/20261116_skill-role-division/research-routing.md#verify) にある。2026-11-16 に、このままにすると決めた。commit の直前というタイミングも、宣言された検査を通るまで回すという内容も適切なため。
+- 組み込みの `/review` は、同じ名前の gstack のスキルに隠れている。
+- Bash ツールの説明の「commit の直前に `/verify` を実行する」という指示は、`verify` か `simplify` という名前の、Claude が起動できるユーザー・project のスキルがあるときに Claude Code が入れる（組み込みとプラグインのスキルは数えない）。これまでは gstack の `verify` がこれに当たり、2026-10-27〜11-16 に 35 セッションで 65 回起動した。2026-11-16 に、このままにすると決めた（[research-routing.md](../docs/work/20261116_skill-role-division/research-routing.md#verify)）。gstack 1.103.0.0 で `build-check` に改名されたので、次に始めるセッションから、この指示は出なくなる見込み（確かめていない）。commit の前の検査は、CLAUDE.md の Verification 節で行う。組み込みの `/verify` が手順を `.claude/skills/verify/SKILL.md` に記録すると、それが project のスキルとして数えられ、指示が戻る見込み（推測）。
 
 <a name="agents"></a>
 
@@ -364,4 +367,4 @@ sandbox の外で `/cso` を実行すると、保存先に秘密ファイルの�
 
 `/pstack:` の提案の回数には、スキルの設定を扱うセッション（この文書を作ったセッションなど）で Claude がコマンド名を書いた分も入る。増減は、セッションの一覧と合わせて見る。
 
-後の期間の途中（2026-11-23）で gstack を 1.102.2.0 に更新した。説明文に「いつ使うか」の節が付き（1.100.0.0）、gstack のスキルの起動は、規則とは別の理由でも増えうる。gstack のスキルの増減は、この日の前後に分けて見る。同じ日に、自動で起動する個人スキル `modern-web-guidance`・`chrome-extensions` を足した。測る対象（レビューの重複、軽微な作業での計画系のスキル）とは役割が重ならない。
+後の期間の途中（2026-11-23）で gstack を 1.102.2.0 に更新した。説明文に「いつ使うか」の節が付き（1.100.0.0）、gstack のスキルの起動は、規則とは別の理由でも増えうる。gstack のスキルの増減は、この日の前後に分けて見る。同じ日に、自動で起動する個人スキル `modern-web-guidance`・`chrome-extensions` を足した。測る対象（レビューの重複、軽微な作業での計画系のスキル）とは役割が重ならない。さらに同じ日に gstack を 1.103.0.0 に更新し、`verify` が `build-check` に改名された。基準値の gstack の起動の多く（`verify` の 65 回）は commit の前の指示によるもので、改名の後はこの指示が出なくなる見込みなので、gstack の起動の数を比べるときは `verify`・`build-check` を除いて見る。
