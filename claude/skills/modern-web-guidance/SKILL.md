@@ -5,7 +5,7 @@ description: |
   Trigger immediately for: modals/dialogs/popovers, tables, dark mode, anchor positioning, container queries, view transitions, scroll-driven animations, parallax/reveals, forms, validation, autofill, accessibility, custom selects, scrollbars, CWV (LCP, INP, CLS), content-visibility, fetch priority, image optimization, security, passkeys, HTML sanitization, web components, dates/timezones, built-in AI, WebAssembly, standard HTML/CSS/DOM in frameworks, etc.
   DO NOT trigger for: backend (SQL, ORMs, API routes), infra/scripts (CI/CD, Docker, Actions, Python/Go, Git), or tooling/trivial (Vite, tsconfig, ESLint, tests, copy/renames, 3P docs), etc.
 ---
-<!-- claude/scripts/update-modern-web-guidance.py が、npm の modern-web-guidance@1.0.1 の skills/modern-web-guidance/SKILL.md から生成した、変更済みの写し（Apache-2.0、LICENSE.md）。mise で固定した CLI を、npx を使わず、テレメトリを止めて実行するように変えた。手で編集しない。 -->
+<!-- claude/scripts/update-modern-web-guidance.py が、npm の modern-web-guidance@1.0.2 の skills/modern-web-guidance/SKILL.md から生成した、変更済みの写し（Apache-2.0、LICENSE.md）。mise で固定した CLI を、npx を使わず、テレメトリを止めて実行するように変えた。手で編集しない。 -->
 
 # Modern Web Guidance
 
@@ -21,7 +21,7 @@ Run `modern-web-guidance` using a **2–5 word action-oriented English query** f
 - **Example**: Search `"light dismiss dialog"` or `"responsive data table"`, **not** `"dialog"` (too terse), `"responsive table dark mode"` (compound — split into two searches), or `"close React settings modal on outside click"` (framework/app noise).
 
 ```sh
-DISABLE_TELEMETRY=1 modern-web-guidance search "<query>" --skill-version 2026_11_10-47b4c80e
+DISABLE_TELEMETRY=1 modern-web-guidance search "<query>" --skill-version 2026_11_16-268fb9ea
 ```
 
 > **Note**: Returns `[{ "id", "description" }, ...]`. Judge results by their `description` fields:
@@ -31,7 +31,7 @@ DISABLE_TELEMETRY=1 modern-web-guidance search "<query>" --skill-version 2026_11
 
 ### Step 2. Retrieve Best Practices
 
-Once you have relevant `id`(s) from the search results, call `retrieve` to get the full guide(s)—including both specific use-case guides that match your task and any broader discipline guide (e.g., `html`, `css`, `forms`, `accessibility`, `color`, `performance`, `security`) that applies. You can pass multiple IDs separated by commas.
+Once you have relevant `id`(s) from the search results, call `retrieve` to get the full guide(s)—including both specific use-case guides that match your task and any broader discipline guide (e.g., `html`, `css`, `js`, `forms`, `accessibility`, `color`, `performance`, `security`) that applies. You can pass multiple IDs separated by commas.
 
 ```sh
 DISABLE_TELEMETRY=1 modern-web-guidance retrieve "<id>"

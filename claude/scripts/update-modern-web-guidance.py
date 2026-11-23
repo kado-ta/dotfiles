@@ -184,8 +184,10 @@ def read_package(tgz):
 
 def fetch_package(version, tmp):
     stdout = npm(["pack", f"{PACKAGE}@{version}", "--pack-destination", str(tmp), "--json"], tmp)
+    # npm 11.20.0 は配列を、npm 12.2.3 はパッケージ名をキーにしたオブジェクトを返す。
     try:
-        filename = json.loads(stdout)[0]["filename"]
+        data = json.loads(stdout)
+        filename = (data[0] if isinstance(data, list) else data[PACKAGE])["filename"]
     except (ValueError, LookupError, TypeError):
         raise Failure(f"npm pack の出力を読めない: {stdout[:200]!r}")
     tgz = tmp / PurePosixPath(filename).name
