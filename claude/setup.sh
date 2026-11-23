@@ -131,11 +131,15 @@ fi
 # - update_channel: 既定の auto は team_mode でなければ main を追い、main へのマージごとに更新される。
 # - routing_declined: CLAUDE.md にスキルのルーティングを書き足すかの確認を出さない。
 # - redact_prepush_hook: /ship が各リポジトリに認証情報の pre-push フックを入れることへの同意。/ship は無効にしている。
+# - codex_reviews: /review・/plan-ceo-review などの外部レビューの段で、リポジトリの内容を Codex に送らない。Codex はユーザーが通常のターミナルで実行する。
+# - plan_tune_hooks: plan-tune のフックを導入しない。--no-plan-tune-hooks は config.yaml に保存されないので、/gstack-upgrade が実行する setup のために設定する。
 GSTACK_CONFIG="${GSTACK_DIR}/bin/gstack-config"
 "${GSTACK_CONFIG}" set telemetry off
 "${GSTACK_CONFIG}" set update_channel stable
 "${GSTACK_CONFIG}" set routing_declined true
 "${GSTACK_CONFIG}" set redact_prepush_hook true
+"${GSTACK_CONFIG}" set codex_reviews disabled
+"${GSTACK_CONFIG}" set plan_tune_hooks no
 # clone 後の setup が途中で失敗しても、再実行で回復できるように毎回実行する。
 # "${GSTACK_DIR}/setup" は GSTACK_DIR 内で実行しないと正常終了しない。
 # サブシェル (...) 内での cd はスクリプト本体のカレントディレクトリに影響しない。
@@ -145,6 +149,7 @@ GSTACK_CONFIG="${GSTACK_DIR}/bin/gstack-config"
 # スキルのルーティング（UserPromptSubmit）、出力の契約のゲート（Stop）、破壊的なコマンドの検査（PreToolUse の Bash）も導入しない。
 # 1.102.0.0 から既定で on。どれも、そのたびに sandbox の外で bun が動く。破壊的なコマンドは validate-command.sh と deny で止めている。
 # timeline・ゲート・ルーティングなどのフラグは ~/.gstack/config.yaml に保存されるので、/gstack-upgrade が実行する setup でも登録しない。
+# --no-plan-tune-hooks だけは保存されない（~/.gstack/.plan-tune-hooks-prompted を書くだけ）ので、上で plan_tune_hooks を設定している。
 # 保存されるのはこの setup を実行したときだけ。フラグを足したときは、setup.sh を実行し直すか、gstack-config set <キー> off を実行する。
 (cd "${GSTACK_DIR}" && ./setup --no-plan-tune-hooks --no-timeline-stop-hook --no-ceo-review-gate --no-skill-routing --no-skill-contracts --no-destructive-guard)
 # setup はフックを $HOME の絶対パスで settings.json に登録する。公開リポジトリにユーザー名を入れないよう ~/ に戻す。
