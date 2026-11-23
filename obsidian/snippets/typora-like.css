@@ -3,11 +3,11 @@
    Obsidian を Typora の表示に寄せるスニペット
      - Light mode : Typora "GitHub" テーマ相当
      - Dark mode  : Typora "Night" テーマ相当
-   対象   : Reading view（全面）/ Live Preview（変数 + 見出し下線・字間・
-            インラインコード・表）。Source mode には個別指定を当てない
-   前提   : Obsidian テーマ = Default
-            Settings > Appearance のフォント指定は空（指定があるとそちらが優先）
-            「Readable line length」ON で本文幅が Typora の #write 幅になる
+   対象: Reading view（全面）/ Live Preview（変数 + 見出し・箇条書き・
+          インラインコード・表）。Source mode には個別指定を当てない
+   前提: Obsidian テーマ = Default
+          Settings > Appearance のフォント指定は空（指定があるとそちらが優先）
+          「Readable line length」ON で本文幅が Typora の #write 幅になる
    ===================================================================== */
 
 
@@ -141,7 +141,7 @@
 .theme-dark {
   /* --- Font / Text ------------------------------------------------- */
   --font-text-theme: "Helvetica Neue", Helvetica, Arial, "Segoe UI Emoji", "SF Pro",
-    "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Meiryo", sans-serif;
+    "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Yu Gothic UI", "Meiryo", sans-serif;
   --font-monospace-theme: Monaco, Consolas, "Andale Mono", "DejaVu Sans Mono", monospace;
   --line-height-normal: 1.625;          /* 1.625rem / 16px */
   --p-spacing: 1.5rem;
@@ -164,7 +164,8 @@
   --link-external-decoration: underline;
 
   /* --- Headings（line-height は Typora の rem 値を font-size 比に換算） */
-  --h1-font: "Lucida Grande", "Corbel", "Hiragino Sans", "Yu Gothic UI", "Meiryo", sans-serif;
+  --h1-font: "Lucida Grande", "Corbel", "Hiragino Kaku Gothic ProN", "Hiragino Sans",
+    "Yu Gothic UI", "Meiryo", sans-serif;
   --h2-font: var(--h1-font);
   --h3-font: var(--h1-font);
   --h4-font: var(--h1-font);
@@ -218,6 +219,13 @@
   .theme-dark { --file-line-width: 1200px; }
 }
 
+/* --- Font smoothing / List spacing（Reading view / Live Preview） --- */
+.theme-dark .markdown-preview-view,
+.theme-dark .markdown-source-view.mod-cm6.is-live-preview {
+  -webkit-font-smoothing: antialiased;
+  --list-spacing: 0.25em;
+}
+
 /* --- Headings: letter-spacing（Reading view / Live Preview 共通） --- */
 .theme-dark .markdown-rendered h1,
 .theme-dark .markdown-source-view.mod-cm6.is-live-preview .HyperMD-header-1 {
@@ -229,12 +237,32 @@
 }
 
 /* --- Headings: margin (Reading view) ------------------------------- */
+.theme-dark .markdown-preview-view {
+  --heading-spacing: 0rem;
+}
 .theme-dark .markdown-rendered :is(h1, h2, h3, h4, h5, h6) {
   margin: 0 0 1.5rem;
   padding: 0;
 }
 .theme-dark .markdown-rendered h1 { margin-top: 2em; }
 .theme-dark .markdown-rendered h6 { margin-bottom: 0.75rem; }
+
+/* --- Headings: spacing (Live Preview) ------------------------------ */
+/* 空行の後では見出しに Obsidian の上パディングを重ねない */
+.theme-dark .markdown-source-view.mod-cm6.is-live-preview .cm-content >
+  .cm-line:has(> br:only-child) + .cm-line.HyperMD-header:not(.HyperMD-header-1) {
+  padding-block-start: 0;
+}
+/* 見出し直後の空行を Night の下余白に合わせる */
+.theme-dark .markdown-source-view.mod-cm6.is-live-preview .cm-content >
+  .cm-line.HyperMD-header + .cm-line:not(.cm-active):has(> br:only-child) {
+  line-height: var(--p-spacing);
+}
+/* 表のドラッグハンドル用に確保される 16px を含めて余白を揃える */
+.theme-dark .markdown-source-view.mod-cm6.is-live-preview .cm-content >
+  .cm-line.HyperMD-header + .cm-line:not(.cm-active):has(> br:only-child):has(+ .cm-table-widget) {
+  line-height: calc(var(--p-spacing) - var(--size-4-4));
+}
 
 /* --- Paragraph / List spacing (Reading view) ----------------------- */
 .theme-dark .markdown-rendered :is(p, ul, ol, table) {
@@ -278,8 +306,27 @@
   margin: 35px 0 1.875rem 1.875rem;
 }
 
+/* --- Important（Typora Night の GitHub Alert 配色） ---------------- */
+.theme-dark .markdown-rendered .callout[data-callout="important"] {
+  --callout-color: #a371f7;
+  --callout-padding: 0 1em;
+  --callout-radius: 0;
+  --callout-title-size: 0.9em;
+  --callout-title-weight: 700;
+  --callout-blend-mode: normal;
+  background-color: transparent;
+  border-inline-start: 0.25em solid #8250df;
+}
+.theme-dark .markdown-rendered .callout[data-callout="important"] > .callout-content > :first-child {
+  margin-block-start: 0;
+}
+.theme-dark .markdown-rendered .callout[data-callout="important"] > .callout-content > :last-child {
+  margin-block-end: 0;
+}
+
 /* --- Table --------------------------------------------------------- */
 .theme-dark .markdown-rendered table {
+  --table-line-height: var(--line-height-normal);
   width: 100%;
   max-width: 100%;
   border-collapse: collapse;
