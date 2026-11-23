@@ -60,6 +60,7 @@ DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 ANCHOR_RE = re.compile(r'<a\s+name="([^"]*)"\s*>\s*</a>')
 ANCHOR_LINE_RE = re.compile(r'^\s*<a\s+name="[^"]*"\s*>\s*</a>\s*$')
 FENCE_RE = re.compile(r"^ {0,3}(`{3,}|~{3,})")
+QUOTE_RE = re.compile(r"^(?: {0,3}> ?)*")
 HEADING_RE = re.compile(r"^ {0,3}(#{1,6})[ \t]+(.*?)(?:[ \t]+#+)?[ \t]*$")
 INLINE_CODE_RE = re.compile(r"(`+)(.+?)\1")
 LINK_RE = re.compile(r"\]\((<[^>\n]*>|[^)\s]*)(?:\s+(?:\"[^\"]*\"|'[^']*'))?\)")
@@ -287,18 +288,24 @@ def mask_code(lines: list[str], start: int) -> list[str | None]:
     """コードブロックの行を None にし、インラインコードの中身を x で伏せた行を返す。
 
     インラインコードの両端の ` は残す。** の前後の判定で記号として扱うため。
+    引用（> ...）の中のフェンスも扱う。引用の中のコードブロックは、同じ深さの閉じるフェンスか、引用の終わりで閉じる。
     """
     masked: list[str | None] = [None] * len(lines)
-    fence = None
+    fence = None  # 開いているフェンスの記号と、引用の深さ
     for i in range(start, len(lines)):
         line = lines[i]
-        m = FENCE_RE.match(line)
+        quote = QUOTE_RE.match(line).group()
+        depth, body = quote.count(">"), line[len(quote):]
+        m = FENCE_RE.match(body)
         if fence:
-            if m and m.group(1)[0] == fence[0] and len(m.group(1)) >= len(fence) and not line.strip()[len(m.group(1)):].strip():
-                fence = None
-            continue
+            mark, fence_depth = fence
+            if depth >= fence_depth:
+                if depth == fence_depth and m and m.group(1)[0] == mark[0] and len(m.group(1)) >= len(mark) and not body.strip()[len(m.group(1)):].strip():
+                    fence = None
+                continue
+            fence = None  # 引用が終わったので、その中のコードブロックも閉じた。この行は通常どおり扱う
         if m:
-            fence = m.group(1)
+            fence = (m.group(1), depth)
             continue
         line = re.sub(r"<!--.*?-->", lambda x: " " * len(x.group()), line)
         masked[i] = INLINE_CODE_RE.sub(lambda x: x.group(1) + "x" * len(x.group(2)) + x.group(1), line)
@@ -324,8 +331,10 @@ def structure(lines: list[str], masked: list[str | None]):
         if m is None:
             continue
         anchors += [(i + 1, a.group(1)) for a in ANCHOR_RE.finditer(m)]
-        if HEADING_RE.match(m):
-            headings.append((i + 1, HEADING_RE.match(lines[i]).group(2)))
+        # 見出しかどうかは元の行で決める。#<!-- --> x はコメントを伏せると見出しに見えるが、# の直後が空白でないので見出しでない
+        heading = HEADING_RE.match(lines[i])
+        if heading:
+            headings.append((i + 1, heading.group(2)))
     return anchors, headings
 
 
