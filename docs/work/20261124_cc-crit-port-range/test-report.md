@@ -43,11 +43,22 @@ created: 2026-11-24
 
 ## sandbox の外（人間）
 
-未実施。[plan の確かめること](plan.md#verification)と[入れる手順](plan.md#rollout)のとおりに行い、結果をここに書く。
+[plan の確かめること](plan.md#verification)と[入れる手順](plan.md#rollout)のとおりに行い、結果をここに書く。
 
-- [ ] 古い profile で、47809 の拒否のテストが 2 件失敗する
-- [ ] 新しい profile で、`test-cc-crit-profile.py` がすべて通る
+- [x] 古い profile で、47809 の拒否のテストが 2 件失敗する
+- [x] 新しい profile で、`test-cc-crit-profile.py` が通る（環境による ERROR が 1 件。下記）
 - [ ] 端末ごと: `cmp` が何も出さない、`mise run crit:profile-test` が通る、`/crit-review` で Crit が 47810 で開く
+
+2026-11-24 に、人間が worktree で実行した（crit 0.24.0、git 2.56.1、macOS 26.7.1）。
+
+- 古い profile（`c007b65` の `cc-crit.sb` を `CC_CRIT_PROFILE` で指定、`-k excluded`）: `test_bind_loopback_excluded_port_denied` と `test_connect_loopback_excluded_port_denied` が、どちらも `ALLOWED` で失敗した。
+- 新しい profile: 29 件のうち、28 件が通るかスキップされた（スキップは `~/.lima/_config` がない 1 件）。`test_crit_review_answers_health` が ERROR になった。
+  - crit は範囲のポートで起動し、`127.0.0.1` の `/api/health` は `ok` を返した。
+  - 最後の確認で、LAN のアドレスの同じポートへの接続が、拒否（`ConnectionRefusedError`）ではなく `socket.timeout` になった。
+- ERROR の切り分け: 人間が通常のターミナルで、自分の LAN のアドレスの 47800・47809・47810・47829・47900・50123 に接続した。どれも `timeout` だった。
+  - この Mac は、自分の LAN のアドレスへの接続を、ポートによらず応答なしで落とす。今回の範囲の変更とは関係しない。
+  - 変更前の範囲でも同じになる見込み（main のテストは実行していない）。接続は成立していないので、LAN から届かないことは崩れていない。
+  - テストは変えない。タイムアウトも通すと、この環境では、全インターフェースで待ち受けたときとの区別がつかなくなるため。原因（ファイアウォールのステルスモード、ローカルネットワークの許可など）は、別の作業で調べる。
 
 <a name="ports"></a>
 
