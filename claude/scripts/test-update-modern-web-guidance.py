@@ -83,8 +83,8 @@ uv = "latest"
 """
 
 # npm の偽物。`npm view <pkg> version` は STUB_LATEST を返す。`npm pack <pkg>@<版> --pack-destination <dir> …` は、
-# STUB_TGZ を <dir> に写し、本物と同じ形の JSON（filename を持つ配列）を返す。呼ばれた引数と作業ディレクトリを
-# STUB_LOG に書く。
+# STUB_TGZ を <dir> に写し、本物と同じ形の JSON を返す。npm 12.2.3 と同じ、パッケージ名をキーにしたオブジェクトを返し、
+# STUB_PACK_JSON_ARRAY があれば npm 11.20.0 と同じ配列を返す。呼ばれた引数と作業ディレクトリを STUB_LOG に書く。
 NPM_STUB = """#!/bin/sh
 echo "npm $*" >> "$STUB_LOG"
 echo "npm-cwd $1 $(pwd -P)" >> "$STUB_LOG"
@@ -101,7 +101,11 @@ if [ "$1" = "pack" ]; then
     prev="$a"
   done
   cp "$STUB_TGZ" "$dest/pkg.tgz"
-  echo '[{"filename": "pkg.tgz"}]'
+  if [ -n "$STUB_PACK_JSON_ARRAY" ]; then
+    echo '[{"filename": "pkg.tgz"}]'
+  else
+    echo '{"modern-web-guidance": {"filename": "pkg.tgz"}}'
+  fi
   exit 0
 fi
 exit 1
@@ -693,6 +697,13 @@ class UpdateModernWebGuidanceTest(unittest.TestCase):
         self.assertEqual(self.snapshot(), before)
         self.assertTrue(any(line.startswith("npm pack modern-web-guidance@1.0.2 ") for line in log), log)
         self.assertIn("modern-web-guidance@1.0.2", (out / "modern-web-guidance" / "SKILL.md").read_text(encoding="utf-8"))
+
+    def test_out_accepts_npm11_pack_json(self):
+        # npm 11 の npm pack --json は、パッケージ名をキーにしたオブジェクトではなく配列を返す。
+        out = self.root / "out"
+        result, _ = self.run_script("--out", str(out), env_extra={"STUB_PACK_JSON_ARRAY": "1"})
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("modern-web-guidance@1.0.1", (out / "modern-web-guidance" / "SKILL.md").read_text(encoding="utf-8"))
 
 
 class WriteSkillsRollbackTest(unittest.TestCase):
