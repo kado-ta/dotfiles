@@ -284,7 +284,6 @@ sandbox の外で `/cso` を実行すると、保存先に秘密ファイルの�
 | SessionStart | superpowers | `using-superpowers` を注入する（startup・clear・compact） |
 | SessionStart | understand-anything | `config.json` の `autoUpdate` が true のリポジトリだけ、グラフの更新を指示する |
 | PermissionRequest（ExitPlanMode） | crit | `crit plan-hook` |
-| PreCompact | settings | `precompact-context.sh` |
 | Notification・Stop | settings | 通知音 |
 | PreToolUse（Bash） | gstack のスキル | `careful`・`guard`・`freeze` を起動したセッションだけ |
 
