@@ -384,17 +384,6 @@
         ]
       }
     ],
-    "PreCompact": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "~/.claude/hooks/precompact-context.sh"
-          }
-        ]
-      }
-    ],
     "Stop": [
       {
         "hooks": [
