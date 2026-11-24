@@ -2,7 +2,7 @@
 
 入っているプラグイン・スキル・エージェント・hooks・MCP の一覧と、その状態・制約を書く。スキルの選び方の規則は [rules/SKILL_ROUTING.md](rules/SKILL_ROUTING.md)（毎回読み込まれる）、タスク別の早見表は [SKILL_CHEATSHEET.md](SKILL_CHEATSHEET.md) にある。重複の裁定の根拠は [作業文書](../docs/work/20261116_skill-role-division/research-routing.md) にある。
 
-- 時点: 2026-11-16。2026-11-23 に gstack 1.102.2.0 と pstack 0.15.46 への更新、個人スキル `/socratic-tutor`・`modern-web-guidance`・`chrome-extensions` の追加、gstack 1.103.0.0 への更新（`verify` を `build-check` に改名）を反映した。Claude Code の版は 2.1.330（2026-11-23 に確認）。各スキルの SKILL.md・設定・hooks の実物を読んで書いた。
+- 時点: 2026-11-16。2026-11-23 に gstack 1.102.2.0 と pstack 0.15.46 への更新、個人スキル `/socratic-tutor`・`modern-web-guidance`・`chrome-extensions` の追加、gstack 1.103.0.0 への更新（`verify` を `build-check` に改名）を反映した。2026-11-24 に pstack 0.15.47 への更新（`reframe` の追加）を反映した。Claude Code の版は 2.1.330（2026-11-23 に確認）。各スキルの SKILL.md・設定・hooks の実物を読んで書いた。
 - この文書は `~/.claude` にリンクされない。Claude のコンテキストには載らない。
 - プラグインやスキルを更新したら、[更新したときの見直し](#upgrade)に従って直す。
 
@@ -30,7 +30,7 @@
 | --- | --- | --- | --- | --- | --- | --- |
 | superpowers | 7.0.2 | プラグイン（claude-plugins-official）、user | 15 | 0 | SessionStart | `/plugin` |
 | gstack | 1.103.0.0 | `git clone` で `~/.claude/skills/gstack`。プラグインではないので、名前に接頭辞が付かない | 64（有効 25、明示 8、無効 31） | 0 | スキルの frontmatter だけ | `update-skills.sh` か zsh の `gstack-upgrade`（sandbox の外） |
-| pstack | 0.15.46 | プラグイン（cursor-plugins）、user | 58 | 2（deny） | なし | `/plugin`（自動更新 off） |
+| pstack | 0.15.47 | プラグイン（cursor-plugins）、user | 59 | 2（deny） | なし | `/plugin`（自動更新 off） |
 | understand-anything | 2.9.8 | プラグイン、user | 9 | 11 | SessionStart、PostToolUse | `/plugin`（自動更新 on） |
 | crit | 1.8.15 | プラグイン、user。CLI は 0.24.0 | 3 | 0 | PermissionRequest | `/plugin` と Homebrew |
 | claude-code-setup | 1.0.0 | プラグイン、user | 1 | 0 | なし | `/plugin` |
@@ -168,9 +168,9 @@ sandbox の外で `/cso` を実行すると、保存先に秘密ファイルの�
 
 <a name="pstack"></a>
 
-## pstack（58）
+## pstack（59）
 
-呼び出しは `/pstack:<名前>`。`setup-pstack` 以外の 57 件は `disable-model-invocation: true` で、Claude からは起動できず、説明文も Claude に見えない。Claude Code ではすべて Claude のモデルで動く（Cursor の別モデルの指定は、セッションのモデルに置き換わる）。
+呼び出しは `/pstack:<名前>`。`setup-pstack` 以外の 58 件は `disable-model-invocation: true` で、Claude からは起動できず、説明文も Claude に見えない。Claude Code ではすべて Claude のモデルで動く（Cursor の別モデルの指定は、セッションのモデルに置き換わる）。
 
 | スキル | 機能 | 起動 | 状態 | 依存・制約 |
 | --- | --- | --- | --- | --- |
@@ -183,8 +183,9 @@ sandbox の外で `/cso` を実行すると、保存先に秘密ファイルの�
 | `setup-pstack` | pstack が使うモデルを設定する（`~/.claude/rules/pstack-models.md` を書く） | 自動 | 制限（`Skill(pstack:setup-pstack)` を deny） | 書き込み先が公開リポジトリの `claude/rules/` になる |
 
 - 依存（16。重点スキルが読む。直接は使わない）: `poteto-mode`、`in-your-own-words`、`unslop`、`principle-boundary-discipline`、`principle-encode-lessons-in-structure`、`principle-exhaust-the-design-space`、`principle-fix-root-causes`、`principle-foundational-thinking`、`principle-laziness-protocol`、`principle-make-operations-idempotent`、`principle-minimize-reader-load`、`principle-outcome-oriented-execution`、`principle-prove-it-works`、`principle-redesign-from-first-principles`、`principle-separate-before-serializing-shared-state`、`principle-subtract-before-you-add`。
-- 方針で使わない（35）: `automate-me`、`benchmark-checklist`、`bro`、`correct`、`create-formal-verification-skill`、`create-verification-skill`、`figure-it-out`、`ketchup`、`ketchup-video`、`maintain-formal-verification-skill`、`maintain-verification-skill`、`make-bot-ui`、`no-comments`、`poteto-help`、`recall`、`reflect`、`sharpen`、`show-me-your-work`、`statechart`、`swarm`、`tdd`、`teach`、`technical-writing`、`typescript-best-practices`、`principle-attack-the-premise`、`principle-build-the-lever`、`principle-experience-first`、`principle-explain-the-number`、`principle-guard-the-context-window`、`principle-migrate-callers-then-delete-legacy-apis`、`principle-model-the-domain`、`principle-never-block-on-the-human`、`principle-sequence-verifiable-units`、`principle-test-behavior-not-implementation`、`principle-type-system-discipline`。入力すれば動く（deny はスラッシュコマンドを止めない）。
+- 方針で使わない（36）: `automate-me`、`benchmark-checklist`、`bro`、`correct`、`create-formal-verification-skill`、`create-verification-skill`、`figure-it-out`、`ketchup`、`ketchup-video`、`maintain-formal-verification-skill`、`maintain-verification-skill`、`make-bot-ui`、`no-comments`、`poteto-help`、`recall`、`reflect`、`reframe`、`sharpen`、`show-me-your-work`、`statechart`、`swarm`、`tdd`、`teach`、`technical-writing`、`typescript-best-practices`、`principle-attack-the-premise`、`principle-build-the-lever`、`principle-experience-first`、`principle-explain-the-number`、`principle-guard-the-context-window`、`principle-migrate-callers-then-delete-legacy-apis`、`principle-model-the-domain`、`principle-never-block-on-the-human`、`principle-sequence-verifiable-units`、`principle-test-behavior-not-implementation`、`principle-type-system-discipline`。入力すれば動く（deny はスラッシュコマンドを止めない）。
 - 分類の理由は [pstack の導入の plan](../docs/work/20261114_pstack-skill-routing/plan.md#decisions) にある。
+- `reframe`（0.15.47 で追加）は、作りたいものの説明から専門用語を 8〜12 個挙げ、隣の分野の用語も借りて、説明を書き直す。リンクを開いて確かめる（WebFetch）。何を作るかは `/office-hours`、要件の整理は `brainstorming` が主担当なので、`sharpen`・`teach` と同じく方針で使わない。依存のスキルを読まず、重点スキルからも読まれない。
 
 <a name="understand-anything"></a>
 
