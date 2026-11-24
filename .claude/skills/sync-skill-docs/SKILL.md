@@ -40,7 +40,7 @@ description: Use after adding, removing or updating a Claude Code plugin or skil
     ```
 
     ユーザーが実行したら、`mise run claude:skills-check` が終了コード 0 になることと、`python3 -B .github/scripts/check-repo.py` を確かめる。
-12. 差分を `/crit-review` で開く。commit と PR は、頼まれたときだけ行う。
+12. 差分を `/crit-review` で開く。コメントが返ったら直して開き直す。`approved: true` が返ったら、確認を挟まずに、承認された差分をコミットし、CLAUDE.md の Git 節に従って push、PR の作成、`gh pr checks` の確認まで進める。PR のマージはしない。
 
 <a name="notes"></a>
 
