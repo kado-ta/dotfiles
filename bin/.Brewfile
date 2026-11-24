@@ -21,6 +21,7 @@ brew "openssl@3"
 brew "pandoc"            # Typora で Markdown ファイルを他形式でエクスポートするために使用する。
 brew "pinentry-mac"      # Terraform で IAM ユーザーを管理するための GPG キー発行に使用する。
 brew "sheldon"           # シェルのライブラリを管理する。
+brew "shellcheck"        # Static analysis and lint tool, for (ba)sh scripts
 brew "starship"          # シェル用プロンプト。高速でカスタマイズ性が高い。
 brew "tealdeer"          # Very fast implementation of tldr in Rust
 brew "telnet"            # RTX ルーターへの接続に使用する。
