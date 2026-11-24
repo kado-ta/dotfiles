@@ -87,6 +87,8 @@ exit 0 の stdout の読み方:
 
 ## 2. 実測: sandbox の外の git が設定からコードを動かすか
 
+<a name="measurements-setup"></a>
+
 ### 2.1 試験の作り方
 
 2026-11-25 に、sandbox の中で `/usr/bin/git`（Apple Git 2.54.0、Apple Git-157）を使って測った。
@@ -149,7 +151,8 @@ exit 0 の stdout の読み方:
 4. **sandbox の外の git（事実と推測）:** `git status` と `git log` を、何も付けずに sandbox の外で動かす。実測（#1・#12）のとおり、設定に従って fsmonitor・filter・post-index-change・gpg を動かす。
    - sandbox の中から書き換えられる設定が `CLAUDE_PROJECT_DIR` に効けば、次の圧縮（自動を含む）で、sandbox の外でコードが動く。
    - worktree のセッションでは、ルートの `.git` はファイルなので、書き換えられれば別の gitdir を指せる。書けるかどうかは確かめていない（書き込みを試す確認は権限の判定で拒否されたので、やり直していない）。
-   - 通常のリポジトリの `.git/config` と、`~/.gitconfig` の実体（`bin/.gitconfig`）は、sandbox から書けない（後者はプロジェクト設定の denyWrite の `./bin`）。
+   - 通常のリポジトリの `.git/config` は、sandbox が既定で書き込みを止める。
+   - `~/.gitconfig` の実体（`bin/.gitconfig`）は、dotfiles で起動したセッションからは書けない（プロジェクト設定の denyWrite の `./bin`）。ほかのリポジトリで起動したセッションでは、書き込み範囲の外にある。`~` で起動したセッションでは `.` に入るので書ける見込みだが、グローバルの CLAUDE.md は、リポジトリのルートで起動し直すよう定めている。
 
 > [!WARNING]
 > 問題 3 の直し（`.cwd` を優先する）は、問題 4 の攻撃面を広げる。
@@ -167,7 +170,7 @@ exit 0 の stdout の読み方:
 | | A: 直す | B: 消す（推奨） |
 | --- | --- | --- |
 | 要約に残るもの | ブランチ名・変更・直近のコミット（A-2 は未ステージの変更を出さない） | CLAUDE.md の Compaction policy の項目だけ |
-| sandbox の外の git | 残る。固めても、未知の設定項目と git の不具合に依存する | なくなる |
+| sandbox の外の git | 残る。固めても、未知の設定項目と git の不具合に依存する | このフックの分がなくなる。ステータスラインと一部のフックの、HEAD と設定だけを読む git（`symbolic-ref`・`rev-parse --git-dir`・`config --get`）は残る（`symbolic-ref` は #11 で何も動かさなかった。`rev-parse --git-dir` と `config --get` は測っていない） |
 | リポジトリ由来の文字列が要約の指示に入る | 入る。区切って印を付けても、指示として読まれる見込みは残る | 入らない |
 | 保守 | フック・試験・git の版の追従 | なし |
 | 変更の量 | フック・新しい試験・README・CLAUDE.md（A-1 は Seatbelt の profile も） | フックと README・SKILL_INVENTORY の行を消す。人間が settings.json から登録を消す |
@@ -205,7 +208,7 @@ exit 0 の stdout の読み方:
 | 4 | Claude | [検証](#verification)を実行する | すべて通る |
 | 5 | Claude | `/review`、Codex レビューの提案、`/crit-review` でブランチの差分を開く | `approved: true` |
 | 6 | Claude | `cc-safe-push`、`cc-safe-pr create`、`gh pr checks` | CI が通る |
-| 7 | 人間 | マージの後、`~/dotfiles` で main を取り込み、実機で確かめる（[5.2](#plan-b-after-merge)） | test-report に記録する |
+| 7 | 人間 | マージの後、通常のターミナルで main を取り込み、新しいセッションで実機で確かめる（[5.2](#plan-b-after-merge)） | 後続の PR で test-report に記録し、作業文書を閉じる |
 
 <a name="plan-b-human"></a>
 
@@ -243,8 +246,11 @@ Claude は `claude/settings.json` を書けない（Claude Code の設定ファ�
 
 ### 5.2 マージの後
 
-- `~/.claude/settings.json` と `~/.claude/hooks` は、main のチェックアウトを指す。main を取り込むまでは、今のフックが動き続ける。取り込むと、登録とファイルが同時になくなる。
-- 取り込んだ後、git のリポジトリで `/compact` を実行し、`PreCompact` の hook error が出ないことと、要約が作られることを確かめて、test-report に記録する。
+- `~/.claude/settings.json` と `~/.claude/hooks` は、main のチェックアウト（`~/dotfiles`）を指す。main を取り込むまでは、今のフックが動き続ける。
+- 取り込みは、`~/dotfiles` のブランチが main であることを確かめてから、通常のターミナルで行う（`git -C ~/dotfiles pull --ff-only`）。`claude/` は sandbox の denyWrite なので、sandbox の中では途中で止まる。
+- 取り込んだ後も、動いているセッションは古いフックの登録を持ち続けうる（推測）。その場合は、圧縮のたびに `PreCompact` の hook error が出る。ブロックしない失敗なので、圧縮は止まらない（[1.2](#docs-general)）。
+- 確かめるときは、動いているセッションを閉じ、新しいセッションの git のリポジトリで `/compact` を実行する。`PreCompact` の hook error が出ないことと、要約が作られることを見る。
+- 結果は、後続の小さな PR で test-report に記録し、plan と test-report の `status` を `done` にする（前例: PR #105 の `docs/cc-crit-port-range-done`）。
 - 戻すときは、この PR を revert する。
 
 <a name="verification"></a>
@@ -355,3 +361,8 @@ A のときは、ほかに次も行う。
 - 今の JSON 出力が、実機で要約に効いていないこと（[1.3](#docs-conclusion) の推測）。B ではフックがなくなるので、確かめる必要がなくなる。
 - worktree のルートの `.git` ファイルと、作業ディレクトリの中の新しい `.git` ファイルを、sandbox から書けるか（[3](#problems)）。
 - lazy fetch の子プロセスが、sandbox の外で設定の `core.sshCommand` を動かすこと（[2.3](#measurements-findings) の推測）。
+- worktree の gitdir（`~/dotfiles/.git/worktrees/<name>/`）の `commondir` と `config.worktree` を、sandbox から書けるか（`/review` の adversarial review の指摘）。
+  - このセッションの sandbox は、自分の worktree の gitdir を書き込みの例外（`allowWithinDeny`）に入れている。
+  - `commondir` は `$GIT_COMMON_DIR`（共通の設定がある場所）を決める（gitrepository-layout(5)）。`config.worktree` は、`extensions.worktreeConfig` が有効なときに読まれる（git-worktree(1)）。
+  - 書ければ、人間が通常のターミナルで worktree に実行する、index を読む git（`status`・`switch` など）の設定を決められる見込み。
+  - このフックとは関係なく前からある経路なので、この PR では扱わない（後続の Issue の候補）。

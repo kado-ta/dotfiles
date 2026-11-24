@@ -50,4 +50,10 @@ created: 2026-11-25
 
 ## マージの後の確認（人間）
 
-未実施。`~/dotfiles` で main を取り込んだ後、git のリポジトリで `/compact` を実行する。`PreCompact` の hook error が出ないことと、要約が作られることを確かめて、ここに記録する。
+未実施。手順は [plan の 5.2](plan.md#plan-b-after-merge) のとおり。
+
+- 通常のターミナルで main を取り込む。
+- 動いているセッションを閉じる。
+- 新しいセッションの git のリポジトリで `/compact` を実行する。`PreCompact` の hook error が出ないことと、要約が作られることを確かめる。
+
+結果は、後続の PR でここに記録し、作業文書を閉じる。
