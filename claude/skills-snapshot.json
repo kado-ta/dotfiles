@@ -15,7 +15,7 @@
     "understand-anything:tour-builder"
   ],
   "gstack": {
-    "version": "1.103.0.0"
+    "version": "1.103.1.0"
   },
   "plugin_hooks": {
     "crit@crit": [
@@ -42,14 +42,14 @@
       "scopes": [
         "user"
       ],
-      "version": "1.8.15"
+      "version": "1.8.18"
     },
     "pstack@cursor-plugins": {
       "enabled": true,
       "scopes": [
         "user"
       ],
-      "version": "0.15.47"
+      "version": "0.15.48"
     },
     "ruby-lsp@claude-plugins-official": {
       "enabled": true,
