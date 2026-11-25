@@ -4,6 +4,8 @@
 """
 
 import json
+import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -11,6 +13,8 @@ import unittest
 from pathlib import Path
 
 SCRIPT = Path(__file__).resolve().parent / "check-repo.py"
+# 検査対象のこのファイル自体が一致しないよう、連結で組み立てる（後半は 36 文字）。
+FAKE_PAT = "ghp_" + "Zq8rT2vX9wL4mN7pK3sB6dF1gH5jC0yE8uA2"
 
 WRAPPER_COMMANDS = [
     "/usr/local/libexec/claude-push/cc-safe-push",
@@ -209,8 +213,8 @@ class CheckRepoTests(unittest.TestCase):
     def write_playwright_args(self, args):
         self.write("claude/mcp/playwright.json", json.dumps({"args": args}, indent=2))
 
-    def check(self):
-        cp = subprocess.run([sys.executable, "-B", str(SCRIPT), str(self.root)], capture_output=True, text=True)
+    def check(self, env=None):
+        cp = subprocess.run([sys.executable, "-B", str(SCRIPT), str(self.root)], capture_output=True, text=True, env=env)
         return cp.returncode, cp.stdout + cp.stderr
 
     def assert_passes(self):
@@ -218,8 +222,8 @@ class CheckRepoTests(unittest.TestCase):
         self.assertEqual(code, 0, out)
         self.assertNotIn("FAIL", out)
 
-    def assert_fails(self, *fragments):
-        code, out = self.check()
+    def assert_fails(self, *fragments, env=None):
+        code, out = self.check(env)
         self.assertEqual(code, 1, out)
         for fragment in fragments:
             self.assertIn(fragment, out)
@@ -249,6 +253,57 @@ class CheckRepoTests(unittest.TestCase):
     def test_tracked_aws_credentials_fails(self):
         self.write("aws/config", "[default]\n")
         self.assert_fails("FAIL secret-files", "aws/config")
+
+    def test_secret_in_tracked_file_fails(self):
+        self.write("notes/token.txt", FAKE_PAT + "\n")
+        self.assert_fails("FAIL secret-content", "notes/token.txt:1: github-pat")
+        # CI のログは公開されるので、見つかった値は出さない。
+        _, out = self.check()
+        self.assertNotIn(FAKE_PAT[4:], out)
+
+    def test_secret_in_untracked_file_fails(self):
+        self.write("notes/token.txt", FAKE_PAT + "\n", add=False)
+        self.assert_fails("FAIL secret-content", "notes/token.txt:1: github-pat")
+
+    def test_secret_in_ignored_file_passes(self):
+        self.write(".gitignore", "ignored.txt\n")
+        self.write("ignored.txt", FAKE_PAT + "\n", add=False)
+        self.assert_passes()
+
+    def test_gitleaks_allow_comment_passes(self):
+        self.write("notes/token.txt", FAKE_PAT + "  # gitleaks:allow\n")
+        self.assert_passes()
+
+    def test_symlink_is_not_followed(self):
+        # 公開されるのはリンクの文字列で、リンク先の中身ではない。
+        outside = tempfile.TemporaryDirectory(prefix="check-repo-outside-")
+        self.addCleanup(outside.cleanup)
+        target = Path(outside.name) / "token.txt"
+        target.write_text(FAKE_PAT + "\n", encoding="utf-8")
+        (self.root / "link.txt").symlink_to(target)
+        self.assert_passes()
+
+    def test_path_with_space_and_japanese_is_reported(self):
+        self.write("docs/日本語 メモ.txt", FAKE_PAT + "\n")
+        self.assert_fails("FAIL secret-content", "docs/日本語 メモ.txt:1: github-pat")
+
+    def test_gitleaks_config_env_is_ignored(self):
+        # 手元の環境変数で github-pat を外されても、検査は既定の設定で動く。
+        conf = self.root.parent / f"{self.root.name}-env.toml"
+        conf.write_text('[extend]\nuseDefault = true\ndisabledRules = ["github-pat"]\n', encoding="utf-8")
+        self.addCleanup(conf.unlink)
+        self.write("notes/token.txt", FAKE_PAT + "\n")
+        self.assert_fails("notes/token.txt:1: github-pat", env={**os.environ, "GITLEAKS_CONFIG": str(conf)})
+
+    def test_repo_gitleaks_config_allowlist_passes(self):
+        self.write(".gitleaks.toml", "[extend]\nuseDefault = true\n\n[[allowlists]]\npaths = ['''(?:^|/)fixtures/''']\n")
+        self.write("fixtures/token.txt", FAKE_PAT + "\n")
+        self.assert_passes()
+
+    def test_missing_gitleaks_fails(self):
+        path = "/usr/bin:/bin"
+        self.assertIsNone(shutil.which("gitleaks", path=path))
+        self.assert_fails("FAIL secret-content", "gitleaks not found", env={**os.environ, "PATH": path})
 
     def test_direct_hook_without_exec_bit_fails(self):
         self.write("claude/hooks/direct.sh", "#!/bin/bash\n", 0o644)

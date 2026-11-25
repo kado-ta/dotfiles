@@ -10,6 +10,7 @@ brew "curl"              # データ送受信コマンド。
 brew "gh"                # GitHub CLI
 brew "git"               # Git コマンドは、Mac デフォルトではなく、 Homebrew でインストールする。
 brew "git-filter-repo"   # Git からファイル履歴を削除する。
+brew "gitleaks"          # Detect secrets in the repository files (check-repo.py)
 brew "gnupg"             # Terraform で IAM ユーザーを管理するための GPG キー発行に使用する。
 brew "grep"              # grep コマンド。当たり前に必要。
 brew "herdr"             # Agent multiplexer that lives in your terminal
