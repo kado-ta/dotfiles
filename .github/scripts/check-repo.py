@@ -1,4 +1,4 @@
-"""公開リポジトリとして守る不変条件、設定ファイルの構文、Markdown の規約を検査する。
+"""公開リポジトリとして守る不変条件、設定ファイルの構文、Markdown の規約、手元と CI の検査ツールの版を検査する。
 
 使い方: python3 -B .github/scripts/check-repo.py [ROOT]
 検査ごとに PASS / FAIL を出し、1 件でも失敗すれば終了コード 1 を返す。
@@ -25,6 +25,16 @@ FORBIDDEN_FILES = ("aws/config", "aws/credentials")
 GITLEAKS_TIMEOUT = 120
 # 見つかったときの終了コード。1 はエラー、2 は Go の panic と重なるので避ける。
 GITLEAKS_LEAKS_EXIT = 42
+CI_WORKFLOW = ".github/workflows/ci.yaml"
+# CI が版を固定して入れるツール（名前、ci.yaml の env のキーの接頭辞、版を出す引数）。
+CI_TOOLS = (
+    ("shellcheck", "SHELLCHECK", "--version"),
+    ("actionlint", "ACTIONLINT", "--version"),
+    ("zizmor", "ZIZMOR", "--version"),
+    ("gitleaks", "GITLEAKS", "version"),
+)
+TOOL_VERSION_TIMEOUT = 10
+TOOL_VERSION = re.compile(r"\d+\.\d+\.\d+")
 INTERPRETERS = {"bash", "/bin/bash", "sh", "/bin/sh"}
 CLAUDE_HOME = ("~/.claude/", "$HOME/.claude/", "${HOME}/.claude/")
 # sandbox と権限の境界なので、完全一致で検査する。広げるときはここも一緒に変える。
@@ -255,16 +265,30 @@ def load_settings(root):
     return json.loads((root / SETTINGS).read_text(encoding="utf-8"))
 
 
+def has_real_user_path(text):
+    return any(m.group(1) not in PLACEHOLDER_USERS for m in LOCAL_PATH.finditer(text))
+
+
 def check_local_paths(root):
     errors = []
+    real_root = root.resolve()
     for rel in repo_files(root):
+        path = root / rel
+        # 公開されるのはリンクの文字列なので、リンク先ではなくそれを調べる。
+        # 公開される CI のログにユーザー名を出さないよう、パスそのものは表示しない。
+        if path.is_symlink():
+            if has_real_user_path(os.readlink(path)):
+                errors.append(f"{rel}: symlink target is an absolute path under /Users or /home with a real user name")
+            continue
+        # 途中のディレクトリが symlink のファイルは、実体がリポジトリの外にあるので読まない。
+        if not path.resolve().is_relative_to(real_root):
+            continue
         try:
-            text = (root / rel).read_text(encoding="utf-8")
+            text = path.read_text(encoding="utf-8")
         except UnicodeDecodeError:
             continue
         for lineno, line in enumerate(text.splitlines(), 1):
-            if any(m.group(1) not in PLACEHOLDER_USERS for m in LOCAL_PATH.finditer(line)):
-                # 公開される CI のログにユーザー名を出さないよう、パスそのものは表示しない。
+            if has_real_user_path(line):
                 errors.append(f"{rel}:{lineno}: absolute path under /Users or /home with a real user name")
     return errors
 
@@ -287,10 +311,15 @@ def check_secret_content(root):
         src = base / "src"
         src.mkdir()
         report = base / "report.json"
+        real_root = root.resolve()
         for rel in repo_files(root):
             path = root / rel
-            # gitleaks は対象のルートの .gitleaksignore も読むので、写さない。
-            if path.is_symlink() or not path.is_file() or rel == ".gitleaksignore":
+            # 公開されるのはリンクの文字列なので、symlink とその先（途中のディレクトリが symlink の場合も）は読まない。
+            if path.is_symlink() or not path.is_file() or not path.resolve().is_relative_to(real_root):
+                continue
+            # gitleaks は対象のルートの .gitleaksignore も読む。一時ディレクトリが大文字小文字を区別しないと
+            # .GITLEAKSIGNORE なども読むので、大文字小文字を区別せずに写さない。
+            if rel.casefold() == ".gitleaksignore":
                 continue
             dest = src / rel
             dest.parent.mkdir(parents=True, exist_ok=True)
@@ -298,8 +327,17 @@ def check_secret_content(root):
         cmd = [exe, "dir", ".", "--no-banner", "--redact", "--report-format", "json",
                "--report-path", str(report), "--exit-code", str(GITLEAKS_LEAKS_EXIT)]
         # 名前（.gitleaks）で探させると .gitleaks.json などが先に読まれるので、.gitleaks.toml に固定する。
-        if (src / ".gitleaks.toml").is_file():
-            cmd += ["--config", str(src / ".gitleaks.toml")]
+        config = src / ".gitleaks.toml"
+        if config.is_file():
+            # 設定を渡すと既定のルールは使われないので、継承していない設定では全件を見逃す。
+            # 読めない設定は gitleaks に渡し、gitleaks のエラーで FAIL にする。
+            try:
+                extend = tomllib.loads(config.read_text(encoding="utf-8")).get("extend", {})
+            except tomllib.TOMLDecodeError:
+                extend = {"useDefault": True}
+            if extend.get("useDefault") is not True:
+                return [".gitleaks.toml: [extend] useDefault = true is required"]
+            cmd += ["--config", str(config)]
         # 手元の環境変数で設定が差し替わらないようにする。ログの色は --no-color では消えないので NO_COLOR で消す。
         env = {k: v for k, v in os.environ.items() if k not in ("GITLEAKS_CONFIG", "GITLEAKS_CONFIG_TOML")}
         env["NO_COLOR"] = "1"
@@ -313,6 +351,46 @@ def check_secret_content(root):
         )
     if cp.returncode == GITLEAKS_LEAKS_EXIT and not errors:
         return ["error: gitleaks reported leaks but the report is empty"]
+    return errors
+
+
+def version_key(version):
+    return tuple(int(n) for n in version.split("."))
+
+
+# 手元（Homebrew）は版を固定しないので、brew upgrade で CI と黙ってずれないよう、PATH のツールの版を ci.yaml と比べる。
+def check_tool_versions(root):
+    path = root / CI_WORKFLOW
+    if not path.is_file():
+        return [f"{CI_WORKFLOW}: missing"]
+    text = path.read_text(encoding="utf-8")
+    errors = []
+    for name, prefix, arg in CI_TOOLS:
+        # 標準ライブラリに YAML の parser がないので、env の行を正規表現で読む。
+        pinned = re.findall(rf"^\s*{prefix}_VERSION:\s*(\S+)\s*$", text, re.MULTILINE)
+        if len(pinned) != 1:
+            errors.append(f"{CI_WORKFLOW}: {prefix}_VERSION must be set exactly once")
+            continue
+        exe = shutil.which(name)
+        if exe is None:
+            errors.append(f"{name} not found (install it with brew install {name})")
+            continue
+        # CI のログは公開されるので、ツールのパスは出さない（TimeoutExpired・OSError のメッセージにはパスが入る）。
+        try:
+            cp = subprocess.run([exe, arg], capture_output=True, text=True, timeout=TOOL_VERSION_TIMEOUT)
+        except (subprocess.TimeoutExpired, OSError):
+            errors.append(f"cannot read the version of {name}")
+            continue
+        found = TOOL_VERSION.search(cp.stdout)
+        expected = pinned[0].removeprefix("v")
+        if cp.returncode != 0 or found is None:
+            errors.append(f"cannot read the version of {name}")
+        elif found.group() != expected:
+            # 手元が古いときに CI を上げる案内をすると、CI の版を下げてしまう（ほかの Mac で先に上げたときなど）。
+            local_newer = version_key(found.group()) > version_key(expected)
+            hint = (f"update {prefix}_VERSION and {prefix}_SHA256 together in a separate PR" if local_newer
+                    else f"run brew upgrade {name}")
+            errors.append(f"{name} {found.group()} on PATH, but {CI_WORKFLOW} pins {expected} ({hint})")
     return errors
 
 
@@ -704,6 +782,7 @@ CHECKS = (
     ("local-paths", check_local_paths),
     ("secret-files", check_secret_files),
     ("secret-content", check_secret_content),
+    ("tool-versions", check_tool_versions),
     ("hook-scripts", check_hook_scripts),
     ("push-permissions", check_push_permissions),
     ("edit-permissions", check_edit_permissions),
