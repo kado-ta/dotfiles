@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: done
 created: 2026-11-25
 ---
 
@@ -50,10 +50,19 @@ created: 2026-11-25
 
 ## マージの後の確認（人間）
 
-未実施。手順は [plan の 5.2](plan.md#plan-b-after-merge) のとおり。
+2026-11-25 に、[plan の 5.2](plan.md#plan-b-after-merge) のとおりに確かめた。`/compact` は人間が実行し、会話の記録と設定は Claude が sandbox の中で読んだ。
 
-- 通常のターミナルで main を取り込む。
-- 動いているセッションを閉じる。
-- 新しいセッションの git のリポジトリで `/compact` を実行する。`PreCompact` の hook error が出ないことと、要約が作られることを確かめる。
+- [x] 通常のターミナルで main を取り込む
+- [x] 新しいセッションの git のリポジトリで `/compact` を実行し、`PreCompact` の hook error が出ないことと、要約が作られることを確かめる
 
-結果は、後続の PR でここに記録し、作業文書を閉じる。
+結果:
+
+- **取り込み:** PR #111 は d61dccb でマージされた。そのとき `~/dotfiles` は別の作業のブランチ（`feat/atuin-ctrl-r`）だったので、PR #112 のマージの後に main へ切り替えて取り込んだ。取り込んだ後の状態は次のとおり。
+  - `~/dotfiles` は main（7b14ea3。d61dccb を含む）で、変更はない。
+  - `~/.claude/hooks/precompact-context.sh` はない。
+  - `~/.claude/settings.json` に `PreCompact` のキーはない。
+- **`/compact`:** `~/dotfiles` の新しいセッションで 2 回実行した。
+  - 1 回目は `Not enough messages to compact.` と出て、圧縮されなかった。
+  - 2 回目（手動）は圧縮が終わり、要約が作られた（78,415 → 18,669 トークン、26.6 秒）。Claude が見た出力は `Compacted (ctrl+o to see full summary)` だけだった。
+- **会話の記録:** このセッションの記録（`~/.claude/projects/` の JSONL）にあるフックの結果は、SessionStart の `hook_success` と `hook_additional_context` の各 2 件だけだった。PreCompact の結果は、成功も失敗もなかった。
+- **設定:** `~/.claude/settings.json`・`~/dotfiles/.claude/settings.json`・`~/dotfiles/.claude/settings.local.json` のどれにも `hooks.PreCompact` はなかった。
