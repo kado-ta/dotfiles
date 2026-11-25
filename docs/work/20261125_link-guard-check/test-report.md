@@ -72,6 +72,7 @@ scratchpad に置いた確認のスクリプト（コミットしない）で、
 - `git merge-tree --write-tree 1dd6739 54cb442`（レビューの修正の後）も衝突なし。マージ後の tree（`00072ea`）で、`check-repo.py` が全項目 PASS、`test-check-repo.py` が 123 件通った。
 - `git merge-tree --write-tree 1dd6739 4e3acc1`（Codex の指摘の修正の後）も衝突なし。マージ後の tree（`0003c2a`）で、`check-repo.py` が全項目 PASS、`test-check-repo.py` が 123 件通った。
 - PR #128 の後も、`git add` 前に消したファイルは `local-paths` が読んで例外になる（[plan の対象外と残るリスク](plan.md#out-of-scope) の記述のまま）。
+- PR を作った後、main に PR #129（`tool-versions` の検査）が入り、GitHub が `CONFLICTING` を返した。`c0de6fe` をこのブランチにマージし（`90cb915`）、`test-check-repo.py` の衝突（リンク用スクリプトの fixture と、#129 の fixture・`override_tool`）は両方を残して解消した。マージ後の作業ツリーで、`check-repo.py` は `tool-versions` を含む 16 項目すべて PASS、`test-check-repo.py` は 133 件 OK、shellcheck・actionlint・`zizmor --offline .` は指摘なしだった。
 
 <a name="codex"></a>
 
