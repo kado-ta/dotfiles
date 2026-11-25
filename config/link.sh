@@ -47,6 +47,15 @@ echo "HERDR_DIR: $HERDR_DIR"
 if [ ! -d $HERDR_DIR ]; then mkdir $HERDR_DIR; fi
 ln -snfv "$SCRIPT_DIR/herdr/config.toml" "$HERDR_DIR/"
 
+# atuin
+# atuin は ~/.atuin/config.toml を ~/.config/atuin/config.toml より先に読み、どちらもなければ ~/.atuin/config.toml を作る。
+# このスクリプトより先に atuin が動いて作ったファイルも置き換えられるよう、~/.config/ ではなく ~/.atuin/ にリンクする。
+ATUIN_DIR="$HOME/.atuin"
+echo "ATUIN_DIR: $ATUIN_DIR"
+# atuin が自分で作るときと同じく、ほかのユーザーから見えないようにする。
+if [ ! -d $ATUIN_DIR ]; then mkdir -m 700 $ATUIN_DIR; fi
+ln -snfv "$SCRIPT_DIR/atuin/config.toml" "$ATUIN_DIR/"
+
 # NOTE: karabiner は使用していないので、関連コマンドをコメントアウトする。
 # KARABINER_DIR="$CONFIG_DIR/karabiner"
 # echo "KARABINER_DIR: $KARABINER_DIR"

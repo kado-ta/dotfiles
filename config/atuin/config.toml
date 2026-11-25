@@ -1,0 +1,8 @@
+# atuin の設定。既定値から変える項目だけを書く。
+# config/link.sh が ~/.atuin/config.toml にリンクする（atuin は ~/.config/atuin/ よりこちらを先に読む）。履歴の DB は ~/.atuin/data に置かれる。
+
+# 更新を自動で確認しない。atuin は Homebrew で更新する。
+update_check = false
+
+# 検索で選んだ履歴を Enter で即座に実行せず、プロンプトに置いて編集できるようにする。
+enter_accept = false
