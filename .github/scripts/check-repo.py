@@ -225,16 +225,30 @@ def load_settings(root):
     return json.loads((root / SETTINGS).read_text(encoding="utf-8"))
 
 
+def has_real_user_path(text):
+    return any(m.group(1) not in PLACEHOLDER_USERS for m in LOCAL_PATH.finditer(text))
+
+
 def check_local_paths(root):
     errors = []
+    real_root = root.resolve()
     for rel in repo_files(root):
+        path = root / rel
+        # 公開されるのはリンクの文字列なので、リンク先ではなくそれを調べる。
+        # 公開される CI のログにユーザー名を出さないよう、パスそのものは表示しない。
+        if path.is_symlink():
+            if has_real_user_path(os.readlink(path)):
+                errors.append(f"{rel}: symlink target is an absolute path under /Users or /home with a real user name")
+            continue
+        # 途中のディレクトリが symlink のファイルは、実体がリポジトリの外にあるので読まない。
+        if not path.resolve().is_relative_to(real_root):
+            continue
         try:
-            text = (root / rel).read_text(encoding="utf-8")
+            text = path.read_text(encoding="utf-8")
         except UnicodeDecodeError:
             continue
         for lineno, line in enumerate(text.splitlines(), 1):
-            if any(m.group(1) not in PLACEHOLDER_USERS for m in LOCAL_PATH.finditer(line)):
-                # 公開される CI のログにユーザー名を出さないよう、パスそのものは表示しない。
+            if has_real_user_path(line):
                 errors.append(f"{rel}:{lineno}: absolute path under /Users or /home with a real user name")
     return errors
 

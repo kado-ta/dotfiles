@@ -246,6 +246,21 @@ class CheckRepoTests(unittest.TestCase):
         self.write("local.txt", "/Users/" + "alice/x\n", add=False)
         self.assert_passes()
 
+    def test_symlinked_dir_is_not_read_by_local_paths(self):
+        # 追跡しているディレクトリを外への symlink に差し替えても、リンク先は読まない。
+        self.write("sub/f.txt", "ok\n")
+        outside = tempfile.TemporaryDirectory(prefix="check-repo-outside-")
+        self.addCleanup(outside.cleanup)
+        (Path(outside.name) / "f.txt").write_text("/Users/" + "alice/x\n", encoding="utf-8")
+        shutil.rmtree(self.root / "sub")
+        (self.root / "sub").symlink_to(outside.name)
+        self.assert_passes()
+
+    def test_symlink_target_with_user_path_fails(self):
+        # 公開されるのはリンクの文字列なので、リンク先のパスにあるユーザー名を調べる。
+        (self.root / "link").symlink_to("/Users/" + "alice/x")
+        self.assert_fails("FAIL local-paths", "link: symlink target is an absolute path under /Users or /home with a real user name")
+
     def test_placeholder_user_path_passes(self):
         self.write("notes.txt", "/Users/example/x\n/Users/some one/x\n")
         self.assert_passes()
