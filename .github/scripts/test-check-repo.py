@@ -330,6 +330,19 @@ class CheckRepoTests(unittest.TestCase):
         self.write("notes.txt", "/Users/example/x\n/Users/some one/x\n")
         self.assert_passes()
 
+    def test_non_user_paths_pass(self):
+        # /Users/Shared は macOS の全ユーザーの共有フォルダ。シェルの変数の直後の /home/・/Users/ は、その変数の下の階層。
+        self.write("notes.txt", "/Users/" + "Shared/x\n" + "$T/home/" + "Obsidian/main\n" + "${T}/Users/" + "alice/x\n")
+        self.assert_passes()
+
+    def test_user_paths_not_right_after_a_variable_fail(self):
+        # 外すのは変数の直後だけ。パスの途中や URL の中でも、実在しうるユーザー名は止める。
+        for text in ("/Volumes/Backup/Users/" + "alice/x", "file:///Users/" + "alice/x", "HOME=/home/" + "alice",
+                     "$T/x/home/" + "alice", "${T}x/Users/" + "alice"):
+            with self.subTest(text=text):
+                self.write("notes.txt", text + "\n")
+                self.assert_fails("FAIL local-paths", "notes.txt:1:")
+
     def test_tracked_aws_credentials_fails(self):
         self.write("aws/config", "[default]\n")
         self.assert_fails("FAIL secret-files", "aws/config")

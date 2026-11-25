@@ -19,8 +19,9 @@ import tomllib
 import urllib.parse
 from pathlib import Path, PurePosixPath
 
-# 既存のプレースホルダー（codex/README.md の /Users/example と、cc-safe-push のテストの "/Users/some one"）。
-PLACEHOLDER_USERS = {"example", "some"}
+# ユーザー名ではない語。既存のプレースホルダー（codex/README.md の /Users/example と、cc-safe-push のテストの
+# "/Users/some one"）と、macOS の全ユーザーの共有フォルダ（/Users/Shared）。
+NON_USER_NAMES = {"example", "some", "Shared"}
 FORBIDDEN_FILES = ("aws/config", "aws/credentials")
 GITLEAKS_TIMEOUT = 120
 # 見つかったときの終了コード。1 はエラー、2 は Go の panic と重なるので避ける。
@@ -235,7 +236,9 @@ PROJECT_DENY_WRITE = (
 )
 
 HOOK_SCRIPT = re.compile(r"\.claude/(?:hooks|scripts)/")
-LOCAL_PATH = re.compile(r"/(?:Users|home)/([A-Za-z0-9._-]+)")
+# 直前にシェルの変数（$T・${T}）があれば、その変数の下の階層なので外す。パスの途中の /Users/ でも、
+# /Volumes/Backup/Users/<名前> のように実在するユーザー名でありうるので、外すのは変数の直後だけにする。
+LOCAL_PATH = re.compile(r"(\$(?:\w+|\{\w+\}))?/(?:Users|home)/([A-Za-z0-9._-]+)")
 FENCE = re.compile(r"^\s*(`{3,}|~{3,})(.*)$")
 INLINE_CODE = re.compile(r"(`+).+?(?<!`)\1(?!`)")
 HEADING = re.compile(r"^ {0,3}#{1,6}\s+(.*?)(?:\s+#+)?\s*$")
@@ -268,7 +271,7 @@ def load_settings(root):
 
 
 def has_real_user_path(text):
-    return any(m.group(1) not in PLACEHOLDER_USERS for m in LOCAL_PATH.finditer(text))
+    return any(m.group(1) is None and m.group(2) not in NON_USER_NAMES for m in LOCAL_PATH.finditer(text))
 
 
 def check_local_paths(root):
