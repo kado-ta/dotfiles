@@ -3,6 +3,9 @@
 一時ディレクトリに git リポジトリを作り、すべての検査を通る最小構成に違反を 1 つずつ入れて確かめる。
 """
 
+import contextlib
+import importlib.util
+import io
 import json
 import os
 import shlex
@@ -12,6 +15,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 SCRIPT = Path(__file__).resolve().parent / "check-repo.py"
 # 検査対象のこのファイル自体が一致しないよう、連結で組み立てる（後半は 36 文字）。
@@ -442,6 +446,32 @@ class CheckRepoTests(unittest.TestCase):
         path = "/usr/bin:/bin"
         self.assertIsNone(shutil.which("gitleaks", path=path))
         self.assert_fails("FAIL secret-content", "gitleaks not found", env={**os.environ, "PATH": path})
+
+    def test_hanging_gitleaks_fails_without_path(self):
+        # gitleaks がタイムアウトしたとき。例外のメッセージにはコマンド全体（gitleaks と一時ディレクトリのパス）が入る。
+        # 上限の 120 秒は待てないので、モジュールを読み込んで 1 秒にする。
+        self.override_tool("gitleaks", 'if [ "$1" = version ]; then echo 8.30.1; exit 0; fi\nexec sleep 30\n')
+        spec = importlib.util.spec_from_file_location("check_repo", SCRIPT)
+        check_repo = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(check_repo)
+        path = os.pathsep.join([*map(str, self.path_dirs), os.environ["PATH"]])
+        out = io.StringIO()
+        with (mock.patch.object(check_repo, "GITLEAKS_TIMEOUT", 1), mock.patch.dict(os.environ, {"PATH": path}),
+              contextlib.redirect_stdout(out)):
+            code = check_repo.main(["check-repo.py", str(self.root)])
+        self.assertEqual(code, 1, out.getvalue())
+        self.assertIn("FAIL secret-content\n  error: cannot run gitleaks (TimeoutExpired)\n", out.getvalue())
+        self.assertNotIn(str(self.path_dirs[0]), out.getvalue())
+        self.assertNotIn("check-repo-gitleaks-", out.getvalue())
+
+    def test_gitleaks_that_cannot_start_fails_without_path(self):
+        self.override_tool("gitleaks", "")
+        # シバンがないので、起動の時点で OSError（Exec format error）になる。
+        (self.path_dirs[0] / "gitleaks").write_text("echo 8.30.1\n", encoding="utf-8")
+        code, out = self.check()
+        self.assertEqual(code, 1, out)
+        self.assertIn("FAIL secret-content\n  error: cannot run gitleaks (OSError)\n", out)
+        self.assertNotIn(str(self.path_dirs[0]), out)
 
     def test_newer_local_tool_asks_to_bump_ci(self):
         # 1.7.12 は 1.7.9 より新しい（文字列ではなく数で比べる）。
