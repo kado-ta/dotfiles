@@ -9,7 +9,7 @@
 | 種類 | 寿命 | 更新方針 | 置き場所 |
 | --- | --- | --- | --- |
 | 仕様書 | 機能が存在する間 | 振る舞いを変える PR で一緒に更新し、常に最新に保つ | `docs/specs/` |
-| ADR | 恒久 | 本文は原則変えない。覆すときは新しい ADR を作り、旧 ADR を `superseded by ADR-NNNN` にする | `docs/decisions/` |
+| ADR | 恒久 | 書く前に決定・理由・代替案を確かめる。本文は原則変えない。覆すときは新しい ADR を作り、旧 ADR を `superseded by ADR-NNNN` にする | `docs/decisions/` |
 | runbook | 運用が続く間 | 随時更新する | `docs/runbooks/` |
 | 作業文書（plan / design / 調査 / 試験記録） | 作業完了まで | 完了後は変更しない（履歴として残す） | `docs/work/<ID>_<slug>/` |
 
