@@ -7,11 +7,14 @@ CI は push の後に動くので、公開前に防ぐには push する前に�
 """
 
 import json
+import os
 import posixpath
 import re
 import shlex
+import shutil
 import subprocess
 import sys
+import tempfile
 import tomllib
 import urllib.parse
 from pathlib import Path, PurePosixPath
@@ -19,6 +22,9 @@ from pathlib import Path, PurePosixPath
 # 既存のプレースホルダー（codex/README.md の /Users/example と、cc-safe-push のテストの "/Users/some one"）。
 PLACEHOLDER_USERS = {"example", "some"}
 FORBIDDEN_FILES = ("aws/config", "aws/credentials")
+GITLEAKS_TIMEOUT = 120
+# 見つかったときの終了コード。1 はエラー、2 は Go の panic と重なるので避ける。
+GITLEAKS_LEAKS_EXIT = 42
 INTERPRETERS = {"bash", "/bin/bash", "sh", "/bin/sh"}
 CLAUDE_HOME = ("~/.claude/", "$HOME/.claude/", "${HOME}/.claude/")
 # sandbox と権限の境界なので、完全一致で検査する。広げるときはここも一緒に変える。
@@ -236,6 +242,48 @@ def check_local_paths(root):
 def check_secret_files(root):
     tracked = set(repo_files(root))
     return [f"{rel}: must not be tracked" for rel in FORBIDDEN_FILES if rel in tracked]
+
+
+# gitleaks dir は .gitignore を見ず、読めないファイルは警告だけ出して飛ばす。
+# 対象のファイルだけを一時ディレクトリに写してから調べ、読めなければ写す時点で失敗させる。
+# 写した先を cwd にして . を調べ、allowlist の paths がリポジトリからの相対パスに当たるようにする
+# （絶対パスだと、一時ディレクトリの名前に当たる除外で全ファイルが外れる）。
+def check_secret_content(root):
+    exe = shutil.which("gitleaks")
+    if exe is None:
+        return ["gitleaks not found (install it with brew install gitleaks)"]
+    with tempfile.TemporaryDirectory(prefix="check-repo-gitleaks-") as tmp:
+        base = Path(tmp).resolve()
+        src = base / "src"
+        src.mkdir()
+        report = base / "report.json"
+        for rel in repo_files(root):
+            path = root / rel
+            # gitleaks は対象のルートの .gitleaksignore も読むので、写さない。
+            if path.is_symlink() or not path.is_file() or rel == ".gitleaksignore":
+                continue
+            dest = src / rel
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(path, dest)
+        cmd = [exe, "dir", ".", "--no-banner", "--redact", "--report-format", "json",
+               "--report-path", str(report), "--exit-code", str(GITLEAKS_LEAKS_EXIT)]
+        # 名前（.gitleaks）で探させると .gitleaks.json などが先に読まれるので、.gitleaks.toml に固定する。
+        if (src / ".gitleaks.toml").is_file():
+            cmd += ["--config", str(src / ".gitleaks.toml")]
+        # 手元の環境変数で設定が差し替わらないようにする。ログの色は --no-color では消えないので NO_COLOR で消す。
+        env = {k: v for k, v in os.environ.items() if k not in ("GITLEAKS_CONFIG", "GITLEAKS_CONFIG_TOML")}
+        env["NO_COLOR"] = "1"
+        cp = subprocess.run(cmd, cwd=src, env=env, capture_output=True, text=True, timeout=GITLEAKS_TIMEOUT)
+        if cp.returncode not in (0, GITLEAKS_LEAKS_EXIT):
+            return [f"error: gitleaks exited with {cp.returncode}", *cp.stderr.splitlines()]
+        # CI のログは公開されるので、Secret と Match は出さない。
+        errors = sorted(
+            f"{(src / f['File']).resolve().relative_to(src)}:{f['StartLine']}: {f['RuleID']}"
+            for f in json.loads(report.read_text(encoding="utf-8"))
+        )
+    if cp.returncode == GITLEAKS_LEAKS_EXIT and not errors:
+        return ["error: gitleaks reported leaks but the report is empty"]
+    return errors
 
 
 def hook_commands(settings):
@@ -565,6 +613,7 @@ def check_markdown_links(root):
 CHECKS = (
     ("local-paths", check_local_paths),
     ("secret-files", check_secret_files),
+    ("secret-content", check_secret_content),
     ("hook-scripts", check_hook_scripts),
     ("push-permissions", check_push_permissions),
     ("edit-permissions", check_edit_permissions),
