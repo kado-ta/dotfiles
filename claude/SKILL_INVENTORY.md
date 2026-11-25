@@ -2,7 +2,7 @@
 
 入っているプラグイン・スキル・エージェント・hooks・MCP の一覧と、その状態・制約を書く。スキルの選び方の規則は [rules/SKILL_ROUTING.md](rules/SKILL_ROUTING.md)（毎回読み込まれる）、タスク別の早見表は [SKILL_CHEATSHEET.md](SKILL_CHEATSHEET.md) にある。重複の裁定の根拠は [作業文書](../docs/work/20261116_skill-role-division/research-routing.md) にある。
 
-- 時点: 2026-11-16。2026-11-23 に gstack 1.102.2.0 と pstack 0.15.46 への更新、個人スキル `/socratic-tutor`・`modern-web-guidance`・`chrome-extensions` の追加、gstack 1.103.0.0 への更新（`verify` を `build-check` に改名）を反映した。2026-11-24 に pstack 0.15.47 への更新（`reframe` の追加）を反映した。Claude Code の版は 2.1.330（2026-11-23 に確認）。各スキルの SKILL.md・設定・hooks の実物を読んで書いた。
+- 時点: 2026-11-16。2026-11-23 に gstack 1.102.2.0 と pstack 0.15.46 への更新、個人スキル `/socratic-tutor`・`modern-web-guidance`・`chrome-extensions` の追加、gstack 1.103.0.0 への更新（`verify` を `build-check` に改名）を反映した。2026-11-24 に pstack 0.15.47 への更新（`reframe` の追加）を反映した。2026-11-25 に gstack 1.103.1.0・pstack 0.15.48・crit 1.8.18 への更新（スキルの増減なし）を反映した。Claude Code の版は 2.1.330（2026-11-23 に確認）。各スキルの SKILL.md・設定・hooks の実物を読んで書いた。
 - この文書は `~/.claude` にリンクされない。Claude のコンテキストには載らない。
 - プラグインやスキルを更新したら、[更新したときの見直し](#upgrade)に従って直す。
 
@@ -29,10 +29,10 @@
 | 提供元 | 版 | 入れ方・スコープ | スキル | エージェント | hooks | 更新 |
 | --- | --- | --- | --- | --- | --- | --- |
 | superpowers | 7.0.2 | プラグイン（claude-plugins-official）、user | 15 | 0 | SessionStart | `/plugin` |
-| gstack | 1.103.0.0 | `git clone` で `~/.claude/skills/gstack`。プラグインではないので、名前に接頭辞が付かない | 64（有効 25、明示 8、無効 31） | 0 | スキルの frontmatter だけ | `update-skills.sh` か zsh の `gstack-upgrade`（sandbox の外） |
-| pstack | 0.15.47 | プラグイン（cursor-plugins）、user | 59 | 2（deny） | なし | `/plugin`（自動更新 off） |
+| gstack | 1.103.1.0 | `git clone` で `~/.claude/skills/gstack`。プラグインではないので、名前に接頭辞が付かない | 64（有効 25、明示 8、無効 31） | 0 | スキルの frontmatter だけ | `update-skills.sh` か zsh の `gstack-upgrade`（sandbox の外） |
+| pstack | 0.15.48 | プラグイン（cursor-plugins）、user | 59 | 2（deny） | なし | `/plugin`（自動更新 off） |
 | understand-anything | 2.9.8 | プラグイン、user | 9 | 11 | SessionStart、PostToolUse | `/plugin`（自動更新 on） |
-| crit | 1.8.15 | プラグイン、user。CLI は 0.24.0 | 3 | 0 | PermissionRequest | `/plugin` と Homebrew |
+| crit | 1.8.18 | プラグイン、user。CLI は 0.24.0 | 3 | 0 | PermissionRequest | `/plugin` と Homebrew |
 | claude-code-setup | 1.0.0 | プラグイン、user | 1 | 0 | なし | `/plugin` |
 | ruby-lsp | 1.0.0 | プラグイン、user | 0（LSP だけ） | 0 | なし | `/plugin` |
 | 個人スキル | — | dotfiles の `claude/skills/` を `~/.claude/skills/` にリンク | 7 | 0 | なし | dotfiles（`modern-web-guidance`・`chrome-extensions` は `update-skills.sh`） |
@@ -185,7 +185,7 @@ sandbox の外で `/cso` を実行すると、保存先に秘密ファイルの�
 - 依存（16。重点スキルが読む。直接は使わない）: `poteto-mode`、`in-your-own-words`、`unslop`、`principle-boundary-discipline`、`principle-encode-lessons-in-structure`、`principle-exhaust-the-design-space`、`principle-fix-root-causes`、`principle-foundational-thinking`、`principle-laziness-protocol`、`principle-make-operations-idempotent`、`principle-minimize-reader-load`、`principle-outcome-oriented-execution`、`principle-prove-it-works`、`principle-redesign-from-first-principles`、`principle-separate-before-serializing-shared-state`、`principle-subtract-before-you-add`。
 - 方針で使わない（36）: `automate-me`、`benchmark-checklist`、`bro`、`correct`、`create-formal-verification-skill`、`create-verification-skill`、`figure-it-out`、`ketchup`、`ketchup-video`、`maintain-formal-verification-skill`、`maintain-verification-skill`、`make-bot-ui`、`no-comments`、`poteto-help`、`recall`、`reflect`、`reframe`、`sharpen`、`show-me-your-work`、`statechart`、`swarm`、`tdd`、`teach`、`technical-writing`、`typescript-best-practices`、`principle-attack-the-premise`、`principle-build-the-lever`、`principle-experience-first`、`principle-explain-the-number`、`principle-guard-the-context-window`、`principle-migrate-callers-then-delete-legacy-apis`、`principle-model-the-domain`、`principle-never-block-on-the-human`、`principle-sequence-verifiable-units`、`principle-test-behavior-not-implementation`、`principle-type-system-discipline`。入力すれば動く（deny はスラッシュコマンドを止めない）。
 - 分類の理由は [pstack の導入の plan](../docs/work/20261114_pstack-skill-routing/plan.md#decisions) にある。
-- `reframe`（0.15.47 で追加）は、作りたいものの説明から専門用語を 8〜12 個挙げ、隣の分野の用語も借りて、説明を書き直す。リンクを開いて確かめる（WebFetch）。何を作るかは `/office-hours`、要件の整理は `brainstorming` が主担当なので、`sharpen`・`teach` と同じく方針で使わない。依存のスキルを読まず、重点スキルからも読まれない。
+- `reframe`（0.15.47 で追加）は、作りたいものの説明から専門用語を 8〜12 個挙げ、隣の分野の用語も借りて、説明を書き直す。リンクを開いて確かめる（WebFetch）。何を作るかは `/office-hours`、要件の整理は `brainstorming` が主担当なので、`sharpen`・`teach` と同じく方針で使わない。依存のスキルを読まず、重点スキルからも読まれない。0.15.48 で、説明が 2〜3 個の別の問題に読めるときは、先に候補と見分け方を挙げ、いちばん見込みのあるものを選んでから用語を挙げるようになった。
 
 <a name="understand-anything"></a>
 
@@ -355,7 +355,7 @@ sandbox の外で `/cso` を実行すると、保存先に秘密ファイルの�
 | --- | --- |
 | gstack（例: 1.99.4.0） | `update-skills.sh` か zsh の `gstack-upgrade` で更新する（`~/.claude/skills` に書くので sandbox の外で）。CHANGELOG で、廃止・追加されたスキルを見る。増えたスキルは `skillOverrides` が `on` のまま入るので、要るかを決める。`skillOverrides` は gstack が管理していない（dotfiles のコミット 02d0add で手で足した）。`/cso` が、読めない秘密ファイルで止まらなくなったかを確かめる（[`/cso` を sandbox で使う](#cso-sandbox)）。直っていれば、一時的に消す手順をやめ、規則で `/cso` を使う場面を決め直す。setup は、`~/.gstack/config.yaml` で on のフックを `claude/settings.json` に絶対パスで登録する（`_gstack_source` の項目）。どちらもこれを `~/` に戻す（setup は `~/` の項目も絶対パスに書き戻すので、更新のたびに要る）。`/gstack-upgrade` で更新したときは、後で通常のターミナルで `/usr/bin/python3 -B ~/dotfiles/claude/scripts/settings-home-paths.py` を実行する（`claude/settings.json` に書くので、sandbox の中で動いた `!` では失敗する）。timeline-stop-hook と ceo-review-gate は、`claude/setup.sh` のフラグで off にしている。1.102.0.0 から既定で on になった `skill_routing`（UserPromptSubmit）・`skill_contracts`（Stop）・`destructive_guard`（PreToolUse の Bash）も off にしている。どれも、そのたびに sandbox の外で bun が動く。setup.sh のフラグが config に保存されるのは setup.sh を実行したときだけで、保存されていないキーは、更新の setup が既定の値で登録する（2026-11-23 に、この 3 つが登録された）。項目が増えていたら、`gstack-config set <キー> off` を実行してから項目を消す（項目だけ消すと、次の setup で戻る） |
 | understand-anything（例: 2.9.8） | 自動更新が on なので、気づかないうちに変わる。hooks は sandbox の外で動く（2026-11-14 に承知のうえで自動更新を選んだ）。hooks が変わったら判断し直す |
-| crit（例: 1.8.15） | プラグインと CLI の版の組み合わせと、`plan-hook` の変化を見る。`update-skills.sh` は CLI の更新と cc-crit の profile テストまで実行する。個別に更新したときは、sandbox の外で `mise run crit:profile-test` を実行する |
+| crit（例: 1.8.15） | プラグインと CLI の版の組み合わせと、`plan-hook` の変化を見る。`update-skills.sh` は CLI の更新と cc-crit の profile テストまで実行する。個別に更新したときは、sandbox の外で `mise run crit:profile-test` を実行する。上流は 2026-11-24 に、設定を `~/.config/crit`、状態を `~/.local/state/crit` に置く XDG の配置に対応した（#1175。CLI 0.24.0 には入っていない。プラグイン 1.8.18 の `crit-cli` は両方の配置を書く）。既存のインストールは `crit migrate-xdg` を実行するまで `~/.crit` を使う。移すと、`~/.crit` の denyRead（Playwright MCP から承認を偽造させないため）が状態フォルダに当たらなくなる見込みなので、移す前に denyRead に足し、cc-crit（`COVERED_DENY_READ`・`cc-crit.sb`）も合わせる。対応した CLI に上げたら、`crit check` で使っているフォルダを確かめる |
 | pstack | [README の「スキル・プラグインのアップデート」](README.md#setup-update)の手順で、hooks・スキルの一覧・依存を見直す。新しいスキルが増えても deny は広がらない |
 | superpowers | SessionStart で注入する `using-superpowers` の変化を見る。とくに、ユーザーの指示を優先するという一文が残っているか |
 | 個人スキル `socratic-tutor` | `update-skills.sh` の対象外。上流の変更は `gh api 'repos/janestreet/agent_skills/commits?path=socratic-tutor/SKILL.md&per_page=1' --jq '.[0].sha'` で、[個人スキルの表](#crit)のコミットと比べる。写し直すときは `disable-model-invocation: true` を残し、`LICENSE.md` も比べる |
