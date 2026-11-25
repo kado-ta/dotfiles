@@ -28,6 +28,7 @@ brew "tealdeer"          # Very fast implementation of tldr in Rust
 brew "telnet"            # RTX ルーターへの接続に使用する。
 brew "tree"              # ディレクトリ構造をツリー表示する。
 brew "trivy"             # コンテナイメージの脆弱性スキャンツール
+brew "zizmor"            # Find security issues in GitHub Actions setups
 # brew "zsh"               # Zsh は Mac デフォルトを使用せず、 Homebrew でインストールする。
 
 # AWS ECS への SSH を簡単にするコマンド。

@@ -46,7 +46,7 @@ Finder で `init.command` をダブルクリックする（ターミナルから
 | --- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
 | 1   | `bin/link.sh`          | `bin/` の dotfiles（`.zshrc`・`.zprofile`・`.gitconfig`・`.Brewfile` など）を `~` にリンクする                                  |
 | 2   | `bin/setup_brew.sh`    | `~/.Brewfile` のパッケージをインストールする（`brew bundle install --global --no-upgrade`）                                     |
-| 3   | `config/link.sh`       | Starship・Sheldon・uv・sf・herdr の設定を `~/.config/` に、atuin の設定を `~/.atuin/` にリンクする                              |
+| 3   | `config/link.sh`       | Starship・Sheldon・uv・sf・herdr・Git（グローバルの ignore）の設定を `~/.config/` に、atuin の設定を `~/.atuin/` にリンクする   |
 | 4   | `zsh/setup_plugins.sh` | Sheldon で Zsh プラグインをインストールする                                                                                     |
 | 5   | `aws/link.sh`          | AWS CLI の設定（`config`・`credentials`）をリンクする                                                                           |
 | 6   | `mise/setup.sh`        | mise の設定を `~/.config/mise/config.toml` にリンクし、言語ランタイム・ツールをインストールする                                 |
@@ -77,20 +77,20 @@ Finder で `init.command` をダブルクリックする（ターミナルから
 
 各ディレクトリは独立しており、それぞれのスクリプトでセットアップする。
 
-| ディレクトリ | 内容                                                                                   | 主なリンク先                               | 詳細                                     |
-| ------------ | -------------------------------------------------------------------------------------- | ------------------------------------------ | ---------------------------------------- |
-| `bin/`       | Zsh・Git・Homebrew の設定（`.zshrc`・`.zprofile`・`.gitconfig`・`.Brewfile`）          | `~/`                                       | [bin/README.md](bin/README.md)           |
-| `zsh/`       | Zsh 本体のインストールと、エイリアス・キーバインド・オプション。Sheldon が直接読み込む | なし                                       | [zsh/README.md](zsh/README.md)           |
-| `config/`    | Starship・Sheldon・uv・sf・herdr の設定（`karabiner/` は現在リンクしていない）         | `~/.config/`                               | [config/README.md](config/README.md)     |
-| `mise/`      | 言語ランタイム・ツールのグローバルバージョン（`mise_config.toml`）                     | `~/.config/mise/config.toml`               | [mise/README.md](mise/README.md)         |
-| `aws/`       | AWS CLI の設定（`config`・`credentials` は Git 管理外）                                | `~/.aws/`                                  | [aws/README.md](aws/README.md)           |
-| `claude/`    | Claude Code の設定・フック・ルール・個人スキル                                         | `~/.claude/`                               | [claude/README.md](claude/README.md)     |
-| `codex/`     | Codex CLI のグローバル指示（`AGENTS.md`）と共通設定（`config.base.toml`）              | `~/.codex/`                                | [codex/README.md](codex/README.md)       |
-| `vscode/`    | VSCode の設定・キーバインド・タスク・拡張リスト・Project Manager 拡張の設定            | `~/Library/Application Support/Code/User/` | [vscode/README.md](vscode/README.md)     |
-| `ghostty/`   | Ghostty の設定                                                                         | `~/.config/ghostty/`                       | —                                        |
-| `biome/`     | Biome のグローバル設定。`$schema` のバージョンは mise の postinstall で自動更新する    | `~/Library/Application Support/biome/`     | —                                        |
-| `obsidian/`  | Obsidian の Vault 設定と CSS スニペット                                                | `~/Obsidian/main/.obsidian/`               | [obsidian/README.md](obsidian/README.md) |
-| `docs/`      | 設計・計画などの作業文書                                                               | —                                          | —                                        |
-| `.github/`   | `init.command` を macOS ランナーで実行する CI（GitHub 上で無効化している）             | —                                          | —                                        |
+| ディレクトリ | 内容                                                                                          | 主なリンク先                               | 詳細                                     |
+| ------------ | --------------------------------------------------------------------------------------------- | ------------------------------------------ | ---------------------------------------- |
+| `bin/`       | Zsh・Git・Homebrew の設定（`.zshrc`・`.zprofile`・`.gitconfig`・`.Brewfile`）                 | `~/`                                       | [bin/README.md](bin/README.md)           |
+| `zsh/`       | Zsh 本体のインストールと、エイリアス・キーバインド・オプション。Sheldon が直接読み込む        | なし                                       | [zsh/README.md](zsh/README.md)           |
+| `config/`    | Starship・Sheldon・uv・sf・herdr・atuin・Git ignore の設定（`karabiner/` はリンクしていない） | `~/.config/`                               | [config/README.md](config/README.md)     |
+| `mise/`      | 言語ランタイム・ツールのグローバルバージョン（`mise_config.toml`）                            | `~/.config/mise/config.toml`               | [mise/README.md](mise/README.md)         |
+| `aws/`       | AWS CLI の設定（`config`・`credentials` は Git 管理外）                                       | `~/.aws/`                                  | [aws/README.md](aws/README.md)           |
+| `claude/`    | Claude Code の設定・フック・ルール・個人スキル                                                | `~/.claude/`                               | [claude/README.md](claude/README.md)     |
+| `codex/`     | Codex CLI のグローバル指示（`AGENTS.md`）と共通設定（`config.base.toml`）                     | `~/.codex/`                                | [codex/README.md](codex/README.md)       |
+| `vscode/`    | VSCode の設定・キーバインド・タスク・拡張リスト・Project Manager 拡張の設定                   | `~/Library/Application Support/Code/User/` | [vscode/README.md](vscode/README.md)     |
+| `ghostty/`   | Ghostty の設定                                                                                | `~/.config/ghostty/`                       | —                                        |
+| `biome/`     | Biome のグローバル設定。`$schema` のバージョンは mise の postinstall で自動更新する           | `~/Library/Application Support/biome/`     | —                                        |
+| `obsidian/`  | Obsidian の Vault 設定と CSS スニペット                                                       | `~/Obsidian/main/.obsidian/`               | [obsidian/README.md](obsidian/README.md) |
+| `docs/`      | 設計・計画などの作業文書                                                                      | —                                          | —                                        |
+| `.github/`   | `init.command` を macOS ランナーで実行する CI（GitHub 上で無効化している）                    | —                                          | —                                        |
 
 リポジトリルートには、セットアップのエントリーポイント（`init.command`・`setup.command`）、保守用タスク（`mise.toml`）、AI エージェント向けのリポジトリガイド（[CLAUDE.md](CLAUDE.md)・`AGENTS.md`）を置いている。
