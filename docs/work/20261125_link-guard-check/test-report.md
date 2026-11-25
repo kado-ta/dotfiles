@@ -44,6 +44,30 @@ scratchpad に置いた確認のスクリプト（コミットしない）で、
 - `config/link.sh` の 16 行目は `CONFIG_DIR="$HOME/.config"`。変数の代入も判定より前に置いてよい行に入らないので、一緒に出た（[plan の判定より前に置ける行](plan.md#prelude) のとおり）。
 - このブランチの作業ツリーで `python3 -B .github/scripts/check-repo.py` を実行すると、`link-guard` を含む全項目が PASS になった（完了条件 2）。
 
+<a name="review-fixes"></a>
+
+## /review の指摘の修正
+
+/review（specialists 5・Red Team・Claude adversarial）で、誤って PASS になる書き方が見つかった。2026-11-25 にユーザーが修正を選んだもの（[plan](plan.md#guard) に反映）を、テストを先に書いて直した。
+
+- 足したテストの 12 件（subTest）が、修正の前に失敗した。10 件は誤って PASS になって終了コード 0（`\ln`・バッククォート・`LN="ln …"`、入れ子の `if`・`else`・`elif` の中の `exit 1`、`fi # …`・`fi;` の後ろの関数の `exit 1`、macOS の確認の中の `SCRIPT_DIR=` と判定）、2 件は検査全体がファイル名のない 1 件の例外（UTF-8 でない `.sh`、`git add` 前に消した `.sh`）。
+- 修正の後は、同じテストが通り、全体の `python3 -B .github/scripts/test-check-repo.py` は 117 件が通った。
+- [壊した場合の確認](#method) をやり直し、4 つとも期待どおりだった。`ln` の選び方を広げた後も、10 本すべての判定を消すと出るのは 10 本のパスちょうどだった。`config/link.sh` の判定を `mkdir` の後ろに移した場合は、16 行目と 21 行目だけが出た（最初の修正では、21 行目の 1 行の `if` を深さに数えて「if の中」の失敗も出たので、許さない行は深さに数えないように直した）。
+
+修正分の再レビュー（Testing・Red Team・Claude adversarial）で、前の指摘が塞がったことは確かめられたが、次が見つかった。
+
+- 判定の本体の `[ … ] || {`・`||` の継続行・`case`・関数・`while` の中の `exit 1` がまだ通る。ユーザーが本体の許可リスト（空行・コメント・`echo "…"` の後の `exit 1`）を選んだ。
+- 許さない複数行の `if` を深さに数えず、その `fi` だけを数えるので、事実と違う失敗が 2 行出る（上の「許さない行は深さに数えない」の直し方の副作用）。許さない行も先頭の語で深さに数え、1 行で閉じる `if` だけを除くように直した。
+- `LN=ln`（行末の `ln`）が漏れ、`'` と `=` にテストがなかった。
+
+テストを先に足し、修正の前に 6 件（subTest）が失敗した（4 件は誤って PASS、1 件は誤った失敗が 2 行余分に出る、1 件は前置きの `fi # macOS` を許していない）。`LN='ln -snfv'` の行は修正の前から失敗になる（`'` を残す意味を固定する行）。修正の後は、全体の 118 件が通り、[壊した場合の確認](#method) も 4 つとも期待どおりだった（判定を消すと出るのは 10 本のパスちょうど）。
+
+<a name="merged-main"></a>
+
+## main との合わせ
+
+レビュー中に main が `e9042b4`（PR #127。`check-repo.py`・`test-check-repo.py` も変えた）に進んだ。`git merge-tree --write-tree e9042b4 HEAD` は衝突なしで、マージ後の tree を一時リポジトリに写して、`check-repo.py` が全項目 PASS、`test-check-repo.py` が通ることを確かめた（修正の前の HEAD `37b842f` で 118 件。修正の後の結果は下の検査の節に書く）。
+
 <a name="checks"></a>
 
 ## 検査（完了条件 4）

@@ -99,25 +99,31 @@ MISE_ENV_GLOBS = ("bin/.z*", "zsh/*.zsh")
 GITCONFIG = "bin/.gitconfig"
 # リンク用のスクリプトの worktree の判定（PR #124）。worktree の中から実行すると、リンクが worktree を指し、worktree を
 # 消すと警告なしに切れる。CI はスクリプトを動かさないので、書き方で確かめる。誤操作を防ぐためのもので、わざと崩した書き方は通る。
-# 対象は ln を呼ぶ *.sh。hook のテストは一時ディレクトリの中にリンクを作るので除く。
+# 対象は ln を呼ぶ *.sh。hook のテストは一時ディレクトリの中にリンクを作るので除く。\ln・`ln …`・LN="ln …" の形も
+# 対象にする（文字列の中の ln も当たるが、漏れて黙って通るより、誤って失敗して除外に足すほうを選ぶ）。
 LINK_GUARD_EXEMPT = ("claude/hooks/tests/",)
-LN_COMMAND = re.compile(r"(?:^|[\s;&|(])(?:\S*/)?ln\s")
+LN_COMMAND = re.compile(r"(?:^|[\s;&|(`\"'=\\])(?:\S*/)?ln(?:\s|$)")
 SHELL_BLANK_OR_COMMENT = re.compile(r"\s*(?:#.*)?")
-# 判定は $SCRIPT_DIR/../.git を見るので、スクリプトはルートの 1 つ下に置く。インデントした判定は、ほかのブロックの中で
+# 判定は $SCRIPT_DIR/../.git を見るので、スクリプトはルートの 1 つ下に置く。インデントした判定と、前置きの if の中の判定は、
 # 実行されないことがあるので数えない。
 LINK_GUARD = re.compile(r'if \[ -f "\$(?:SCRIPT_DIR|\{SCRIPT_DIR\})/\.\./\.git" \]; then\s*')
 LINK_GUARD_SCRIPT_DIR = re.compile(r'\s*SCRIPT_DIR=\$\(cd "\$\(dirname "\$0"\)" && pwd\)\s*')
+LINK_GUARD_ECHO = re.compile(r'\s*echo "[^"]*"(?: >&2)?\s*')
 # 判定より前に置いてよい行（set と、macOS や CLAUDECODE の確認の部品）。書き込むコマンドはツールの呼び出しも含めて
-# 並べきれないので、許す行を決める。
+# 並べきれないので、許す行を決める。判定の本体も同じく、echo とコメントの後の exit 1 だけを数える（抜け道の || {、
+# 継続行、case、入れ子の if・else の中の exit 1 は、条件しだいで実行されない）。
 LINK_GUARD_PRELUDE = (
     SHELL_BLANK_OR_COMMENT,
     LINK_GUARD_SCRIPT_DIR,
+    LINK_GUARD_ECHO,
     re.compile(r"\s*set(?:\s+[-+][A-Za-z]+|\s+[a-z]+)+\s*"),
     re.compile(r"\s*if \[ [^;&|<>`]* \] ?; then\s*"),
-    re.compile(r'\s*echo "[^"]*"(?: >&2)?\s*'),
     re.compile(r"\s*exit [0-9]+\s*"),
-    re.compile(r"\s*fi\s*"),
+    re.compile(r"\s*fi\s*(?:#.*)?"),
 )
+# 前置きの if の深さを数えるための fi と、1 行で閉じる if（…; fi）。
+SHELL_FI = re.compile(r"\s*fi\b")
+SHELL_ONE_LINE_FI = re.compile(r";\s*fi\b")
 # ユーザー設定のこれらのリストは、~/ でも / でも始まらないパスが ~/.claude を起点にし、黙って効かない。
 SANDBOX_PATH_LISTS = ("denyRead", "denyWrite", "allowWrite", "allowRead")
 # additionalDirectories は作業ディレクトリとして数えられ、そこでは WRITE_BLOCK が効かない。
@@ -527,13 +533,13 @@ def check_rerere(root):
     return []
 
 
-def exits_before_fi(lines):
-    """判定の if の次の行から、最初の fi までに exit 1 だけの行があるか。"""
+def guard_exits(lines):
+    """判定の if の次の行から、空行・コメント・echo "…" だけを挟んで exit 1 だけの行があるか。"""
     for line in lines:
-        if line.strip() == "fi":
-            return False
         if line.strip() == "exit 1":
             return True
+        if not (SHELL_BLANK_OR_COMMENT.fullmatch(line) or LINK_GUARD_ECHO.fullmatch(line)):
+            return False
     return False
 
 
@@ -542,22 +548,40 @@ def check_link_guard(root):
     for rel in repo_files(root):
         if not rel.endswith(".sh") or rel.startswith(LINK_GUARD_EXEMPT):
             continue
-        lines = (root / rel).read_text(encoding="utf-8").splitlines()
+        try:
+            lines = (root / rel).read_text(encoding="utf-8").splitlines()
+        except (OSError, UnicodeDecodeError) as e:
+            # 1 本読めないだけで、ほかのスクリプトの結果を隠さない。CI のログは公開されるので、例外の本文（絶対パス）は出さない。
+            errors.append(f"{rel}: cannot read ({type(e).__name__}), so the worktree guard is not checked")
+            continue
         if not any(LN_COMMAND.search(line) for line in lines if not SHELL_BLANK_OR_COMMENT.fullmatch(line)):
             continue
         if len(PurePosixPath(rel).parts) != 2:
             errors.append(f"{rel}: runs ln but is not directly under a top-level directory "
                           "(the worktree guard checks $SCRIPT_DIR/../.git)")
         start = next((i for i, line in enumerate(lines) if LINK_GUARD.fullmatch(line)), None)
-        if start is None or not exits_before_fi(lines[start + 1:]):
-            errors.append(f'{rel}: runs ln without the worktree guard (if [ -f "$SCRIPT_DIR/../.git" ]; then ... exit 1; fi)')
+        if start is None or not guard_exits(lines[start + 1:]):
+            errors.append(f'{rel}: runs ln without the worktree guard (if [ -f "$SCRIPT_DIR/../.git" ]; then '
+                          'followed by only echo "..." lines and exit 1)')
             continue
-        before = lines[:start]
-        errors += [f"{rel}:{n}: only blank lines, comments, set, SCRIPT_DIR=... and if/echo/exit/fi checks "
-                   "may come before the worktree guard"
-                   for n, line in enumerate(before, 1) if not any(p.fullmatch(line) for p in LINK_GUARD_PRELUDE)]
-        if not any(LINK_GUARD_SCRIPT_DIR.fullmatch(line) for line in before):
-            errors.append(f'{rel}: SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd) must come before the worktree guard')
+        depth, script_dir = 0, False
+        for n, line in enumerate(lines[:start], 1):
+            if not any(p.fullmatch(line) for p in LINK_GUARD_PRELUDE):
+                errors.append(f"{rel}:{n}: only blank lines, comments, set, SCRIPT_DIR=... and if/echo/exit/fi checks "
+                              "may come before the worktree guard")
+            # 前置きの if の中の SCRIPT_DIR= は、条件しだいで実行されない。
+            elif depth == 0 and LINK_GUARD_SCRIPT_DIR.fullmatch(line):
+                script_dir = True
+            # 許さない行の if も数え、対応する fi で深さがずれないようにする。
+            if line.split()[:1] == ["if"] and not SHELL_ONE_LINE_FI.search(line):
+                depth += 1
+            elif SHELL_FI.match(line):
+                depth -= 1
+        if depth != 0:
+            errors.append(f"{rel}: the worktree guard must not be inside another if block")
+        if not script_dir:
+            errors.append(f'{rel}: SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd) must come before the worktree guard, '
+                          "outside any if block")
     return errors
 
 

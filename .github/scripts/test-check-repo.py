@@ -109,7 +109,8 @@ MWG_DENY = [
 README = "## Foo Bar\n\n[x](#foo-bar)\n\n"
 PARANOID_CONFIG = '[settings]\nparanoid = ["config", "env_files"]\n'
 GITCONFIG = "[merge]\n\tff = false\n[rerere]\n\tenabled = false\n"
-# リンク用のスクリプト（aws/link.sh の形）の部品。判定は SCRIPT_DIR= の後、最初の書き込みより前に置く。
+# リンク用のスクリプト（aws/link.sh の形）の部品。判定は SCRIPT_DIR= の後に置き、その前には空行・コメント・set・
+# SCRIPT_DIR=・if/echo/exit/fi の確認だけを置く。
 SCRIPT_DIR_LINE = 'SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)\n'
 GUARD = 'if [ -f "$SCRIPT_DIR/../.git" ]; then\n  echo "$SCRIPT_DIR is in a git worktree." >&2\n  exit 1\nfi\n'
 LINK_BODY = 'mkdir -p "$HOME/.aws"\nln -snfv "$SCRIPT_DIR/config" "$HOME/.aws/config"\n'
@@ -757,11 +758,12 @@ class CheckRepoTests(unittest.TestCase):
         # 今の 10 本の判定は、$SCRIPT_DIR と ${SCRIPT_DIR}、空白とタブのインデントで書き方が分かれている。
         # 判定より前に、set・macOS の確認・CLAUDECODE の確認・コメントを置くものもある。
         prelude = ('# curl | bash で、curl の失敗を検出するため。\nset -o pipefail\nset -euo pipefail\n\n'
-                   'if [ "$(uname)" != "Darwin" ] ; then\n\techo "This is not macOS! x setup is failed ;("\n\texit 1\nfi\n\n'
+                   'if [ "$(uname)" != "Darwin" ] ; then\n\techo "This is not macOS! x setup is failed ;("\n\texit 1\nfi # macOS\n\n'
                    'if [ -n "${CLAUDECODE:-}" ]; then\n  echo "Run this from a plain terminal."\n  exit 1\nfi\n\n')
         tabs = 'if [ -f "${SCRIPT_DIR}/../.git" ]; then\n\techo "${SCRIPT_DIR} is in a git worktree." >&2\n\texit 1\nfi\n'
         for name, text in (("braced", link_script(guard=GUARD.replace("$SCRIPT_DIR", "${SCRIPT_DIR}"))),
-                           ("tabs", link_script(guard=tabs)), ("prelude", link_script(before=prelude))):
+                           ("tabs", link_script(guard=tabs)), ("prelude", link_script(before=prelude)),
+                           ("fi with comment", link_script(guard=GUARD.replace("fi\n", "fi # worktree guard\n")))):
             with self.subTest(case=name):
                 self.write("aws/link.sh", text)
                 self.assert_passes()
@@ -781,7 +783,9 @@ class CheckRepoTests(unittest.TestCase):
         # リンク用のスクリプトを足して判定を書き忘れると、worktree の中から実行したときにリンクが worktree を指す。
         for line in ('ln -snfv "$SCRIPT_DIR/x" "$HOME/x"', '/bin/ln -s "$SCRIPT_DIR/x" "$HOME/x"',
                      'command ln -s "$SCRIPT_DIR/x" "$HOME/x"', 'true;ln -s "$SCRIPT_DIR/x" "$HOME/x"',
-                     'ln "$SCRIPT_DIR/x" "$HOME/x"'):
+                     'ln "$SCRIPT_DIR/x" "$HOME/x"', '\\ln -s "$SCRIPT_DIR/x" "$HOME/x"',
+                     'out=`ln -s "$SCRIPT_DIR/x" "$HOME/x"`', 'LN="ln -snfv"\n$LN "$SCRIPT_DIR/x" "$HOME/x"',
+                     "LN='ln -snfv'\n$LN \"$SCRIPT_DIR/x\" \"$HOME/x\"", 'LN=ln\n$LN -s "$SCRIPT_DIR/x" "$HOME/x"'):
             with self.subTest(line=line):
                 self.write("aws/link.sh", "#!/bin/bash -e\n" + SCRIPT_DIR_LINE + line + "\n")
                 self.assert_fails("FAIL link-guard", "aws/link.sh: runs ln without the worktree guard")
@@ -815,10 +819,65 @@ class CheckRepoTests(unittest.TestCase):
                             ("directory test", GUARD.replace("-f", "-d")),
                             ("exit 0", GUARD.replace("exit 1", "exit 0")),
                             ("no exit", GUARD.replace("  exit 1\n", "")),
-                            ("indented", "".join("  " + line for line in GUARD.splitlines(True)))):
+                            ("indented", "".join("  " + line for line in GUARD.splitlines(True))),
+                            # 分岐や入れ子の if の中の exit 1 は、worktree の中で止まらないことがある。
+                            ("nested if", GUARD.replace("  exit 1\n", '  if [ -n "${X:-}" ]; then\n    exit 1\n  fi\n')),
+                            ("else", GUARD.replace("  exit 1\n", "else\n  exit 1\n")),
+                            ("elif", GUARD.replace("  exit 1\n", 'elif [ -n "${X:-}" ]; then\n  exit 1\n')),
+                            # fi の後ろに文字があっても判定の終わりとみなし、後ろの関数の exit 1 を拾わない。
+                            ("fi with comment", GUARD.replace("  exit 1\nfi\n", "fi # worktree guard\nlink() {\n  exit 1\n}\n")),
+                            ("fi;", GUARD.replace("  exit 1\nfi\n", "fi;\nlink() {\n  exit 1\n}\n")),
+                            # 抜け道や継続行、case の中の exit 1 も、条件しだいで実行されない。
+                            ("or brace", GUARD.replace("  exit 1\n", '  [ -n "${ALLOW_WORKTREE:-}" ] || {\n    exit 1\n  }\n')),
+                            ("or continuation", GUARD.replace("  exit 1\n", '  [ -n "${X:-}" ] ||\n  exit 1\n')),
+                            ("case", GUARD.replace("  exit 1\n", '  case "${X:-}" in\n    "")\n      exit 1\n      ;;\n  esac\n'))):
             with self.subTest(case=name):
                 self.write("aws/link.sh", link_script(guard=guard))
                 self.assert_fails("FAIL link-guard", "aws/link.sh: runs ln without the worktree guard")
+
+    def test_link_guard_inside_prelude_block_fails(self):
+        # macOS の確認の中の SCRIPT_DIR= や判定は、macOS では実行されない。判定を確認の fi の上に差し込む誤りもある。
+        darwin = 'if [ "$(uname)" != "Darwin" ] ; then\n  echo "This is not macOS!"\n  exit 1\n'
+        for name, text, fragment in (
+                ("script dir in block", darwin + "  " + SCRIPT_DIR_LINE + "fi\n" + GUARD,
+                 'aws/link.sh: SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd) must come before'),
+                ("guard above fi", darwin + SCRIPT_DIR_LINE + GUARD + "fi\n",
+                 "aws/link.sh: the worktree guard must not be inside another if block")):
+            with self.subTest(case=name):
+                self.write("aws/link.sh", "#!/bin/bash -e\n" + text + LINK_BODY)
+                self.assert_fails("FAIL link-guard", fragment)
+
+    def test_rejected_prelude_block_reports_only_its_line(self):
+        # 許さない複数行の if は、その行の失敗だけを出す。対応する fi で深さがずれ、ブロックの中だという誤った失敗を出さない。
+        block = 'if ! command -v ghostty >/dev/null 2>&1; then\n  echo "Install ghostty."\n  exit 1\nfi\n'
+        self.write("aws/link.sh", link_script(before=block))
+        code, out = self.check()
+        self.assertEqual(code, 1, out)
+        section = out.split("FAIL link-guard\n", 1)[-1].split("\nPASS ", 1)[0]
+        self.assertEqual(section.strip().splitlines(), [
+            "aws/link.sh:3: only blank lines, comments, set, SCRIPT_DIR=... and if/echo/exit/fi checks may come before "
+            "the worktree guard"], out)
+
+    def test_unreadable_script_fails_per_file(self):
+        # 1 本読めないだけで検査全体を 1 件の例外にせず、ほかのスクリプトも調べる。絶対パスは出さない。
+        # 消したファイルは local-paths も読めずに例外になる（変更前からの動き）ので、link-guard の節だけを見る。
+        self.write("ghostty/link.sh", "#!/bin/bash -e\n" + SCRIPT_DIR_LINE + LINK_BODY, add=False)
+        for name, rel in (("not utf-8", "x/latin1.sh"), ("deleted before git add", "x/gone.sh")):
+            with self.subTest(case=name):
+                path = self.root / rel
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(b"# \xe9\nln -s a b\n")
+                self.git("add", "--", rel)
+                if name == "deleted before git add":
+                    path.unlink()
+                code, out = self.check()
+                self.assertEqual(code, 1, out)
+                section = out.split("FAIL link-guard\n", 1)[-1].split("\nPASS ", 1)[0].split("\nFAIL ", 1)[0]
+                self.assertIn(f"{rel}: cannot read", section, out)
+                self.assertIn("ghostty/link.sh: runs ln without the worktree guard", section, out)
+                self.assertNotIn(str(self.root), section, out)
+                self.git("rm", "-q", "-f", "--cached", "--", rel)
+                path.unlink(missing_ok=True)
 
     def test_link_script_not_directly_under_top_level_fails(self):
         # 判定は $SCRIPT_DIR/../.git を見るので、ルートの 1 つ下にないと worktree の中でも偽になる。
