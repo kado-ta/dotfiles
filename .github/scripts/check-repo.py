@@ -811,6 +811,18 @@ CHECKS = (
 )
 
 
+def exception_detail(e, root):
+    """例外のメッセージを ": …" の形で返す。CI のログは公開されるので、ユーザー名を含むパスは出さない。
+
+    OSError などのメッセージには絶対パスが入る。リポジトリのルートは "." にして原因を追えるようにし、
+    それでもユーザー名を含むパス（ルートの外のもの）が残れば、メッセージごと出さない。
+    """
+    message = str(e).replace(str(root.absolute()), ".")
+    if has_real_user_path(message):
+        return " (the message is not shown because it contains a path with a user name)"
+    return f": {message}"
+
+
 def main(argv):
     root = Path(argv[1]) if len(argv) > 1 else Path(__file__).resolve().parents[2]
     failed = False
@@ -819,7 +831,7 @@ def main(argv):
             errors = check(root)
         except Exception as e:
             # 検査できないときは成功扱いにしない（fail closed）。
-            errors = [f"error: {type(e).__name__}: {e}"]
+            errors = [f"error: {type(e).__name__}{exception_detail(e, root)}"]
         print(f"{'FAIL' if errors else 'PASS'} {name}")
         for error in errors:
             print(f"  {error}")

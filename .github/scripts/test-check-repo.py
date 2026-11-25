@@ -212,6 +212,14 @@ def write_fake_tool(directory, name, body):
     path.chmod(0o755)
 
 
+def load_check_repo():
+    """定数や検査を差し替えて main() を試すために、check-repo.py をモジュールとして読み込む。"""
+    spec = importlib.util.spec_from_file_location("check_repo", SCRIPT)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 class CheckRepoTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -481,10 +489,8 @@ class CheckRepoTests(unittest.TestCase):
         # gitleaks がタイムアウトしたとき。例外のメッセージにはコマンド全体（gitleaks と一時ディレクトリのパス）が入る。
         # 上限の 120 秒は待てないので、モジュールを読み込んで 1 秒にする。
         self.override_tool("gitleaks", 'if [ "$1" = version ]; then echo 8.30.1; exit 0; fi\nexec sleep 30\n')
-        spec = importlib.util.spec_from_file_location("check_repo", SCRIPT)
-        check_repo = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(check_repo)
-        path = os.pathsep.join([*map(str, self.path_dirs), os.environ["PATH"]])
+        check_repo = load_check_repo()
+        path =os.pathsep.join([*map(str, self.path_dirs), os.environ["PATH"]])
         out = io.StringIO()
         with (mock.patch.object(check_repo, "GITLEAKS_TIMEOUT", 1), mock.patch.dict(os.environ, {"PATH": path}),
               contextlib.redirect_stdout(out)):
@@ -502,6 +508,40 @@ class CheckRepoTests(unittest.TestCase):
         self.assertEqual(code, 1, out)
         self.assertIn("FAIL secret-content\n  error: cannot run gitleaks (OSError)\n", out)
         self.assertNotIn(str(self.path_dirs[0]), out)
+
+    def test_exception_message_shows_paths_relative_to_the_root(self):
+        if os.geteuid() == 0:
+            self.skipTest("root can read files without read permission")
+        self.write("x.json", "{}\n")
+        (self.root / "x.json").chmod(0)
+        code, out = self.check()
+        self.assertEqual(code, 1, out)
+        self.assertIn("FAIL syntax\n  error: PermissionError: [Errno 13] Permission denied: './x.json'\n", out)
+        self.assertNotIn(str(self.root), out)
+        self.assertNotIn(str(self.root.resolve()), out)
+
+    def test_exception_message_with_a_user_path_outside_the_root_is_hidden(self):
+        # 検査の中で捕まえていない例外を、main() がどう出すか。ルートは "." にし、それでもユーザー名が残れば型だけを出す。
+        check_repo = load_check_repo()
+        user_path = "/Users/" + "alice/.config/x"
+        # CalledProcessError のメッセージの書式は Python の版で変わる（3.15 はコマンドを引用符で囲まない）。
+        cases = (
+            (subprocess.CalledProcessError(128, ["git", "-C", str(self.root), "ls-files"]),
+             ("FAIL boom\n  error: CalledProcessError: ", "'-C', '.', 'ls-files'")),
+            (FileNotFoundError(2, "No such file or directory", user_path), ("FAIL boom\n  error: FileNotFoundError",)),
+        )
+        for exc, fragments in cases:
+            with self.subTest(exc=type(exc).__name__):
+                def fail(root, exc=exc):
+                    raise exc
+                out = io.StringIO()
+                with mock.patch.object(check_repo, "CHECKS", (("boom", fail),)), contextlib.redirect_stdout(out):
+                    code = check_repo.main(["check-repo.py", str(self.root)])
+                self.assertEqual(code, 1, out.getvalue())
+                for fragment in fragments:
+                    self.assertIn(fragment, out.getvalue())
+                self.assertNotIn(str(self.root), out.getvalue())
+                self.assertNotIn(user_path, out.getvalue())
 
     def test_newer_local_tool_asks_to_bump_ci(self):
         # 1.7.12 は 1.7.9 より新しい（文字列ではなく数で比べる）。
