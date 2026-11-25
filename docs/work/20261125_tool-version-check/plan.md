@@ -46,30 +46,34 @@ created: 2026-11-25
 
 ### 3.1 `.github/scripts/check-repo.py`
 
+`/review` の指摘を受けて、3.1〜3.3 の一部を変えた（[試験記録の 5 章](test-report.md#review)）。
+
 `secret-content` の次に、検査 `tool-versions` を足す。
 
 - `.github/workflows/ci.yaml` を読み、4 つの `<名前>_VERSION` の値を行の正規表現で取る（標準ライブラリに YAML の parser がないため）。ファイルがないか、キーがちょうど 1 回現れなければ FAIL にする。
 - PATH のツールを `shutil.which` で探し、版のコマンド（gitleaks は `version`、ほかは `--version`）を実行する。出力の最初の `数字.数字.数字` を版とする。比べる前に、`ci.yaml` の値の先頭の `v` を外す。
 - 次のときは FAIL にする（検査できないときも成功扱いにしない）。メッセージにパスは出さない（CI のログは公開される）。
   - 見つからない: `<ツール> not found (install it with brew install <ツール>)`
-  - 終了コードが 0 でないか、版を読めない: `cannot read the version of <ツール>`
-  - 版が違う: `<ツール> <手元の版> on PATH, but .github/workflows/ci.yaml pins <CI の版> (update <名前>_VERSION and <名前>_SHA256 together)`
-- 版のコマンドがタイムアウト（10 秒）したときは、既存の `main()` の例外の扱いで FAIL になる。
+  - 起動できない（OSError）、タイムアウトした（10 秒）、終了コードが 0 でない、版を読めない: `cannot read the version of <ツール>`。例外のメッセージにはパスが入るので出さず、残りのツールも調べる。
+  - 版が違う: `<ツール> <手元の版> on PATH, but .github/workflows/ci.yaml pins <CI の版>` に続けて、手元が新しければ `(update <名前>_VERSION and <名前>_SHA256 together in a separate PR)`、古ければ `(run brew upgrade <ツール>)`。版は数の組で比べる。手元が古いときに CI を上げる案内をすると、CI の版を下げてしまう（ほかの Mac で先に上げたときなど）。
 
 ### 3.2 `.github/scripts/test-check-repo.py`
 
 - 最小構成に、4 つの版だけを書いた `.github/workflows/ci.yaml` を足す。
 - `check()` は既定で、2 章の出力をまねる偽のツールを置いたディレクトリを PATH の先頭に足す。手元に入っている版に結果が左右されないようにするため。偽の gitleaks は、`version` のときだけ版を出し、ほかの引数では本物の gitleaks に渡す（`secret-content` のテストは本物で動かす）。
-- 足すテスト: 版が違うと FAIL / `ci.yaml` がないと FAIL / キーがないと FAIL / キーが 2 回あると FAIL / ツールがないと FAIL / 版を読めないと FAIL / 終了コードが 0 でないと FAIL。
+- 足すテスト: 手元が新しいと CI を上げる案内で FAIL（数で比べる）/ 手元が古いと brew upgrade の案内で FAIL / `ci.yaml` がないと FAIL / キーがないと FAIL / キーが 2 回あると FAIL / ツールがないと FAIL / 版を読めないと FAIL / 終了コードが 0 でないと FAIL / タイムアウトするとパスを出さずに FAIL し、残りのツールも調べる / 起動できないとパスを出さずに FAIL。
 
 ### 3.3 `.github/workflows/ci.yaml`
 
 Install のステップのコメントを、事実に合わせて次のように直す。
 
 ```yaml
-# 版を固定し、チェックサムを確かめてから使う。手元（Homebrew）の版と違うと check-repo.py の tool-versions が失敗するので、
-# 手元が上がったら、版と SHA256 を一緒に上げる。
+# 版を固定し、チェックサムを確かめてから使う。手元（Homebrew）の版と違うと check-repo.py の tool-versions が失敗する。
+# 手元が上がったら、別の PR で版と SHA256 を一緒に上げる。SHA256 は GitHub のリリースの asset の digest か
+# checksums ファイルから取り、両方あれば照らす。
 ```
+
+版上げを別の PR にするのは、関係のない作業のブランチの中で、確かめていない値に上げないため。
 
 `CLAUDE.md` は変えない。失敗したときに何をすればよいかは、メッセージに出す。
 
