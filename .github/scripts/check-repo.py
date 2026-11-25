@@ -366,10 +366,14 @@ def check_tool_versions(root):
     text = path.read_text(encoding="utf-8")
     errors = []
     for name, prefix, arg in CI_TOOLS:
-        # 標準ライブラリに YAML の parser がないので、env の行を正規表現で読む。
-        pinned = re.findall(rf"^\s*{prefix}_VERSION:\s*(\S+)\s*$", text, re.MULTILINE)
+        # 標準ライブラリに YAML の parser がないので、env の行を正規表現で読む。引用符と行末のコメントは外す。
+        pinned = re.findall(rf"^[ \t]*{prefix}_VERSION:[ \t]*(\S+?)(?:[ \t]+#.*)?[ \t]*$", text, re.MULTILINE)
         if len(pinned) != 1:
             errors.append(f"{CI_WORKFLOW}: {prefix}_VERSION must be set exactly once")
+            continue
+        expected = pinned[0].strip("\"'").removeprefix("v")
+        if not TOOL_VERSION.fullmatch(expected):
+            errors.append(f"{CI_WORKFLOW}: cannot read {prefix}_VERSION as a version")
             continue
         exe = shutil.which(name)
         if exe is None:
@@ -382,7 +386,6 @@ def check_tool_versions(root):
             errors.append(f"cannot read the version of {name}")
             continue
         found = TOOL_VERSION.search(cp.stdout)
-        expected = pinned[0].removeprefix("v")
         if cp.returncode != 0 or found is None:
             errors.append(f"cannot read the version of {name}")
         elif found.group() != expected:

@@ -472,6 +472,25 @@ class CheckRepoTests(unittest.TestCase):
         self.write(CI_WORKFLOW, CI_VERSIONS + "      GITLEAKS_VERSION: 8.31.0\n")
         self.assert_fails("FAIL tool-versions", ".github/workflows/ci.yaml: GITLEAKS_VERSION must be set exactly once")
 
+    def test_quoted_version_values_pass(self):
+        # 引用符で囲んでも、GitHub Actions に渡る値は変わらない。
+        text = CI_VERSIONS.replace("SHELLCHECK_VERSION: v0.11.0", 'SHELLCHECK_VERSION: "v0.11.0"')
+        self.write(CI_WORKFLOW, text.replace("GITLEAKS_VERSION: 8.30.1", "GITLEAKS_VERSION: '8.30.1'"))
+        self.assert_passes()
+
+    def test_version_value_with_comment_passes(self):
+        self.write(CI_WORKFLOW, CI_VERSIONS.replace("ZIZMOR_VERSION: 1.33.1", "ZIZMOR_VERSION: 1.33.1  # pinned"))
+        self.assert_passes()
+
+    def test_unreadable_pinned_version_fails_and_checks_the_rest(self):
+        text = CI_VERSIONS.replace("SHELLCHECK_VERSION: v0.11.0", "SHELLCHECK_VERSION: latest")
+        self.write(CI_WORKFLOW, text.replace("GITLEAKS_VERSION: 8.30.1", "GITLEAKS_VERSION: 8.31.0"))
+        self.assert_fails(
+            "FAIL tool-versions",
+            ".github/workflows/ci.yaml: cannot read SHELLCHECK_VERSION as a version",
+            "gitleaks 8.30.1 on PATH",
+        )
+
     def test_missing_tool_fails(self):
         path = "/usr/bin:/bin"
         self.assertIsNone(shutil.which("actionlint", path=path))

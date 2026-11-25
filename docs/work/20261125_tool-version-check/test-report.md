@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: done
 created: 2026-11-25
 ---
 
@@ -94,3 +94,46 @@ created: 2026-11-25
 - `Repository checks` のステップで、15 項目すべて PASS（`PASS tool-versions` を含む）。Linux のリリースのバイナリでも、版のコマンドの出力から版を読めた。
 - `Tests for repository checks` は 122 件（main の #128 の 2 件を含む）を実行し、成功した。
 - `Hook regression tests`（macos-latest）も成功した。
+
+docs のコミット（a1e6526）の CI（run 45551814609）も、2 つのジョブがどちらも成功した。
+
+<a name="codex"></a>
+
+## 7. Codex のレビュー
+
+<a name="codex-1"></a>
+
+### 7.1 1 回目（a1e6526）
+
+2026-11-25 に、ユーザーが通常のターミナルで `codex review --base main` を実行した。結果は `~/.codex/sessions` の記録の最終メッセージから読んだ。判定は `patch is incorrect`（確信度 0.97）で、指摘は 1 件。
+
+| 優先度 | 場所 | 指摘 |
+| --- | --- | --- |
+| P2 | `check-repo.py` 324〜328 行 | `ci.yaml` の値を引用符で囲む（`"v0.11.0"`）と、`version_key()` が `ValueError` を起こし、残りのツールも調べない。行末にコメントを付けると、キーがないと誤って判定する。どちらも、GitHub Actions に渡る値は変わらない |
+
+- 事実: 5 章で「指摘から外したもの」とした件（引用符・行末のコメント）と同じ入力である。外したときは、失敗の側に倒れるだけと見ていた。
+- 事実: 引用符のときは、比べる前の `version_key()` で例外になり、`main()` が検査を止める。その結果、残りのツールを調べない。これは D1（例外が抜けて残りを調べない）と同じ種類の不具合で、5 章の判断の時点では見落としていた。
+- Codex は、読み取り専用の環境なので、テストは実行していないと書いている。
+
+確かめたこと（a1e6526 の `check-repo.py` を、`ci.yaml` の shellcheck の値だけを変えた写しで実行した）:
+
+| 値 | tool-versions の出力 |
+| --- | --- |
+| `"v0.11.0"`（引用符） | `error: ValueError: invalid literal for int() with base 10: '"v0'` の 1 行だけ。残りの 3 つのツールを調べていない |
+| `v0.11.0 # pinned`（行末のコメント） | `.github/workflows/ci.yaml: SHELLCHECK_VERSION must be set exactly once`（原因と違う） |
+
+対応: ユーザーが「受け入れて直す」を選んだ。
+
+- 値の引用符と、空白の後の行末のコメントを外して読む。
+- 外した値が `x.y.z` として読めなければ、`cannot read <名前>_VERSION as a version` を出し、残りのツールを調べ続ける。
+
+テストを 3 件足した（引用符・行末のコメント・版として読めない値）。3 件は修正前に指摘どおりの理由で失敗し、修正後は 123 件すべて OK になった。`check-repo.py` は 15 項目すべて PASS。上の 2 つの写しは、修正後はどちらも `PASS tool-versions` になった。
+
+PR #129 は、この修正の前に a1e6526 のままマージされた（c0de6fe）。修正は、main から切ったブランチ `fix/tool-version-yaml-values` に写して、続きの PR で入れる。
+
+- そのブランチ（main の #128 と #129 を含む）でも確かめた。
+  - テスト: 125 件 OK
+  - `check-repo.py`: 15 項目すべて PASS
+  - shellcheck・`actionlint`・`zizmor --offline .`: 指摘なし
+
+Codex のレビューは、#129 で 1 回（上限は 5 回）。直した後には実行していない。
