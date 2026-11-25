@@ -248,8 +248,10 @@ def git(root, *args):
     return subprocess.run(["git", "-C", str(root), *args], check=True, capture_output=True, text=True).stdout
 
 
-def repo_files(root):
-    return [f for f in git(root, "ls-files", "-z", "--cached", "--others", "--exclude-standard").split("\0") if f]
+def repo_files(root, include_deleted=False):
+    files = [f for f in git(root, "ls-files", "-z", "--cached", "--others", "--exclude-standard").split("\0") if f]
+    # 作業ツリーで消したが index に反映していないファイルは、読めないので既定では除く（壊れた symlink は残す）。
+    return files if include_deleted else [f for f in files if os.path.lexists(root / f)]
 
 
 def tracked_modes(root):
@@ -294,7 +296,8 @@ def check_local_paths(root):
 
 
 def check_secret_files(root):
-    tracked = set(repo_files(root))
+    # 作業ツリーで消しただけのファイルも、index に残っていればコミットに入る。
+    tracked = set(repo_files(root, include_deleted=True))
     return [f"{rel}: must not be tracked" for rel in FORBIDDEN_FILES if rel in tracked]
 
 

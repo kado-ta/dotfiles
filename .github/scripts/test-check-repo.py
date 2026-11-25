@@ -334,6 +334,23 @@ class CheckRepoTests(unittest.TestCase):
         self.write("aws/config", "[default]\n")
         self.assert_fails("FAIL secret-files", "aws/config")
 
+    def test_files_deleted_but_still_in_the_index_are_skipped(self):
+        # 作業ツリーで消したが git rm していないファイル。読めないので、読む検査は飛ばす。
+        self.write("a.json", "{}\n")
+        self.write("b.toml", "x = 1\n")
+        self.write("NOTE.md", "# Note\n")
+        self.write("c.txt", "plain\n")
+        self.write("x/gone.sh", "#!/bin/bash\nln -s a b\n")
+        for rel in ("a.json", "b.toml", "NOTE.md", "c.txt", "x/gone.sh"):
+            (self.root / rel).unlink()
+        self.assert_passes()
+
+    def test_aws_credentials_deleted_but_still_in_the_index_fails(self):
+        # 作業ツリーで消しただけでは、index に残っていてコミットに入る。
+        self.write("aws/config", "[default]\n")
+        (self.root / "aws/config").unlink()
+        self.assert_fails("FAIL secret-files", "aws/config")
+
     def test_secret_in_tracked_file_fails(self):
         self.write("notes/token.txt", FAKE_PAT + "\n")
         self.assert_fails("FAIL secret-content", "notes/token.txt:1: github-pat")
@@ -1072,16 +1089,18 @@ class CheckRepoTests(unittest.TestCase):
 
     def test_unreadable_script_fails_per_file(self):
         # 1 本読めないだけで検査全体を 1 件の例外にせず、ほかのスクリプトも調べる。絶対パスは出さない。
-        # 消したファイルは local-paths も読めずに例外になる（変更前からの動き）ので、link-guard の節だけを見る。
+        # 読めないファイルは local-paths なども例外で落ちるので、link-guard の節だけを見る。
+        if os.geteuid() == 0:
+            self.skipTest("root can read files without read permission")
         self.write("ghostty/link.sh", "#!/bin/bash -e\n" + SCRIPT_DIR_LINE + LINK_BODY, add=False)
-        for name, rel in (("not utf-8", "x/latin1.sh"), ("deleted before git add", "x/gone.sh")):
+        for name, rel in (("not utf-8", "x/latin1.sh"), ("no read permission", "x/locked.sh")):
             with self.subTest(case=name):
                 path = self.root / rel
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_bytes(b"# \xe9\nln -s a b\n")
                 self.git("add", "--", rel)
-                if name == "deleted before git add":
-                    path.unlink()
+                if name == "no read permission":
+                    path.chmod(0)
                 code, out = self.check()
                 self.assertEqual(code, 1, out)
                 section = out.split("FAIL link-guard\n", 1)[-1].split("\nPASS ", 1)[0].split("\nFAIL ", 1)[0]
