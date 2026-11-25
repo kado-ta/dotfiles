@@ -70,6 +70,7 @@ scratchpad に置いた確認のスクリプト（コミットしない）で、
 
 - `git merge-tree --write-tree e9042b4 37b842f`（修正の前）は衝突なし。マージ後の tree を一時リポジトリに写して、`check-repo.py` が全項目 PASS、`test-check-repo.py` が 118 件通った。
 - `git merge-tree --write-tree 1dd6739 54cb442`（レビューの修正の後）も衝突なし。マージ後の tree（`00072ea`）で、`check-repo.py` が全項目 PASS、`test-check-repo.py` が 123 件通った。
+- `git merge-tree --write-tree 1dd6739 4e3acc1`（Codex の指摘の修正の後）も衝突なし。マージ後の tree（`0003c2a`）で、`check-repo.py` が全項目 PASS、`test-check-repo.py` が 123 件通った。
 - PR #128 の後も、`git add` 前に消したファイルは `local-paths` が読んで例外になる（[plan の対象外と残るリスク](plan.md#out-of-scope) の記述のまま）。
 
 <a name="codex"></a>
@@ -115,7 +116,7 @@ scratchpad に置いた確認のスクリプト（コミットしない）で、
 
 ## 検査（完了条件 4）
 
-レビューの修正の後（`54cb442`）に実行した。
+Codex の指摘の修正の後（`4e3acc1`）に実行した。
 
 - `python3 -B .github/scripts/check-repo.py`: 全項目 PASS（Python 3.15.2）
 - `python3 -B .github/scripts/test-check-repo.py`: 118 件 OK（main とのマージ後の tree では 123 件 OK）
