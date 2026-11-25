@@ -310,6 +310,10 @@ def check_secret_content(root):
     return errors
 
 
+def version_key(version):
+    return tuple(int(n) for n in version.split("."))
+
+
 # 手元（Homebrew）は版を固定しないので、brew upgrade で CI と黙ってずれないよう、PATH のツールの版を ci.yaml と比べる。
 def check_tool_versions(root):
     path = root / CI_WORKFLOW
@@ -327,15 +331,22 @@ def check_tool_versions(root):
         if exe is None:
             errors.append(f"{name} not found (install it with brew install {name})")
             continue
-        cp = subprocess.run([exe, arg], capture_output=True, text=True, timeout=TOOL_VERSION_TIMEOUT)
+        # CI のログは公開されるので、ツールのパスは出さない（TimeoutExpired・OSError のメッセージにはパスが入る）。
+        try:
+            cp = subprocess.run([exe, arg], capture_output=True, text=True, timeout=TOOL_VERSION_TIMEOUT)
+        except (subprocess.TimeoutExpired, OSError):
+            errors.append(f"cannot read the version of {name}")
+            continue
         found = TOOL_VERSION.search(cp.stdout)
         expected = pinned[0].removeprefix("v")
-        # CI のログは公開されるので、ツールのパスは出さない。
         if cp.returncode != 0 or found is None:
             errors.append(f"cannot read the version of {name}")
         elif found.group() != expected:
-            errors.append(f"{name} {found.group()} on PATH, but {CI_WORKFLOW} pins {expected} "
-                          f"(update {prefix}_VERSION and {prefix}_SHA256 together)")
+            # 手元が古いときに CI を上げる案内をすると、CI の版を下げてしまう（ほかの Mac で先に上げたときなど）。
+            local_newer = version_key(found.group()) > version_key(expected)
+            hint = (f"update {prefix}_VERSION and {prefix}_SHA256 together in a separate PR" if local_newer
+                    else f"run brew upgrade {name}")
+            errors.append(f"{name} {found.group()} on PATH, but {CI_WORKFLOW} pins {expected} ({hint})")
     return errors
 
 

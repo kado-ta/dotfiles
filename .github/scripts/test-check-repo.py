@@ -418,12 +418,21 @@ class CheckRepoTests(unittest.TestCase):
         self.assertIsNone(shutil.which("gitleaks", path=path))
         self.assert_fails("FAIL secret-content", "gitleaks not found", env={**os.environ, "PATH": path})
 
-    def test_tool_version_mismatch_fails(self):
+    def test_newer_local_tool_asks_to_bump_ci(self):
+        # 1.7.12 は 1.7.9 より新しい（文字列ではなく数で比べる）。
+        self.write(CI_WORKFLOW, CI_VERSIONS.replace("ACTIONLINT_VERSION: 1.7.12", "ACTIONLINT_VERSION: 1.7.9"))
+        self.assert_fails(
+            "FAIL tool-versions",
+            "actionlint 1.7.12 on PATH, but .github/workflows/ci.yaml pins 1.7.9 "
+            "(update ACTIONLINT_VERSION and ACTIONLINT_SHA256 together in a separate PR)",
+        )
+
+    def test_older_local_tool_asks_to_brew_upgrade(self):
+        # ほかの Mac で先に CI を上げたときなど。CI の版を下げる案内をしない。
         self.write(CI_WORKFLOW, CI_VERSIONS.replace("ZIZMOR_VERSION: 1.33.1", "ZIZMOR_VERSION: 1.34.0"))
         self.assert_fails(
             "FAIL tool-versions",
-            "zizmor 1.33.1 on PATH, but .github/workflows/ci.yaml pins 1.34.0 "
-            "(update ZIZMOR_VERSION and ZIZMOR_SHA256 together)",
+            "zizmor 1.33.1 on PATH, but .github/workflows/ci.yaml pins 1.34.0 (run brew upgrade zizmor)",
         )
 
     def test_missing_ci_workflow_fails(self):
@@ -454,6 +463,25 @@ class CheckRepoTests(unittest.TestCase):
     def test_tool_version_with_nonzero_exit_fails(self):
         self.override_tool("zizmor", "echo 'zizmor 1.33.1'\nexit 1\n")
         self.assert_fails("FAIL tool-versions", "cannot read the version of zizmor")
+
+    def test_hanging_tool_fails_without_path_and_checks_the_rest(self):
+        # 版のコマンドがタイムアウト（10 秒）したとき。例外のメッセージにはツールのパスが入る。
+        self.override_tool("zizmor", "exec sleep 30\n")
+        self.write(CI_WORKFLOW, CI_VERSIONS.replace("GITLEAKS_VERSION: 8.30.1", "GITLEAKS_VERSION: 8.31.0"))
+        code, out = self.check()
+        self.assertEqual(code, 1, out)
+        self.assertIn("cannot read the version of zizmor", out)
+        self.assertIn("gitleaks 8.30.1 on PATH", out)
+        self.assertNotIn(str(self.path_dirs[0]), out)
+
+    def test_tool_that_cannot_start_fails_without_path(self):
+        self.override_tool("shellcheck", "")
+        # シバンがないので、起動の時点で OSError（Exec format error）になる。
+        (self.path_dirs[0] / "shellcheck").write_text("echo 'version: 0.11.0'\n", encoding="utf-8")
+        code, out = self.check()
+        self.assertEqual(code, 1, out)
+        self.assertIn("cannot read the version of shellcheck", out)
+        self.assertNotIn(str(self.path_dirs[0]), out)
 
     def test_direct_hook_without_exec_bit_fails(self):
         self.write("claude/hooks/direct.sh", "#!/bin/bash\n", 0o644)

@@ -31,8 +31,9 @@ jobs:
         with:
           persist-credentials: false
 
-      # 版を固定し、チェックサムを確かめてから使う。手元（Homebrew）の版と違うと check-repo.py の tool-versions が失敗するので、
-      # 手元が上がったら、版と SHA256 を一緒に上げる。
+      # 版を固定し、チェックサムを確かめてから使う。手元（Homebrew）の版と違うと check-repo.py の tool-versions が失敗する。
+      # 手元が上がったら、別の PR で版と SHA256 を一緒に上げる。SHA256 は GitHub のリリースの asset の digest か
+      # checksums ファイルから取り、両方あれば照らす。
       - name: Install shellcheck, actionlint, zizmor and gitleaks
         run: |
           bin="$RUNNER_TEMP/bin"
