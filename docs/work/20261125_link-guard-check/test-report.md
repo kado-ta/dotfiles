@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: done
 created: 2026-11-25
 ---
 
@@ -125,8 +125,21 @@ Codex の指摘の修正の後（`4e3acc1`）に実行した。
 - `actionlint`: 指摘なし
 - `zizmor --offline .`: 指摘なし（v1.33.1）
 
+<a name="ci"></a>
+
+## CI
+
+PR #130 の GitHub Actions（run `45556464729`、`pull_request`、head `caa9604`。main をマージした後の最新のコミット）は、2 つのジョブとも成功した。
+
+| ジョブ | 結果 | 時間 |
+| --- | --- | --- |
+| Repository checks | pass | 2m26s |
+| Hook regression tests | pass | 2m52s |
+
+この記録を足したコミットの CI は、push の後に `gh pr checks` で確かめる（ここには書かない）。
+
 <a name="not-verified"></a>
 
 ## 確かめていないこと
 
-- CI（ubuntu-latest）での実行。PR の作成後に `gh pr checks` で確かめる。
+- リンク用のスクリプトそのものは動かしていない。書き方を読む検査なので、動かす確認は要らないと [plan](plan.md#done-criteria) で決めた。
