@@ -22,7 +22,7 @@
 - プラグインは [Sheldon](https://github.com/rossmacarthur/sheldon) で管理する（`setup_plugins.sh`）。
 - `zsh/*.zsh` は Sheldon のローカルプラグインとして、[zsh-defer](https://github.com/romkatv/zsh-defer) により**遅延読み込み**される。
 
-`.zshrc` 本体（環境変数・プロンプト・履歴・Sheldon / Starship / mise の初期化）は `bin/.zshrc` で管理しており、このディレクトリには含まれない。
+`.zshrc` 本体（環境変数・プロンプト・履歴・Sheldon / Starship / mise / atuin の初期化）は `bin/.zshrc` で管理しており、このディレクトリには含まれない。
 
 <a name="directory-structure"></a>
 
@@ -131,7 +131,7 @@ exec zsh
 | `bindkey.zsh`             | Emacs 風キーバインド（`bindkey -e`）                                                                                                    |
 | `select-word-style.zsh`   | 単語区切り文字（`/` も区切りにして `^W` でパス 1 階層分を削除）、補完の大文字小文字無視、`sudo` 後のコマンド補完、`ps` のプロセス名補完 |
 | `setpot.zsh`              | `setopt` によるシェルオプション（ヒストリ共有・重複除外、`auto_cd`、`auto_pushd`、`extended_glob`、`no_beep` など）                     |
-| `zsh-autosuggestions.zsh` | zsh-autosuggestions の候補表示色（`ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE='fg=242'`）                                                          |
+| `zsh-autosuggestions.zsh` | zsh-autosuggestions の候補表示色（`ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE='fg=242'`）と、候補の出どころ（zsh の履歴。atuin の初期化が変えるので戻す） |
 
 ### `alias.zsh` の主な定義
 
@@ -161,8 +161,9 @@ exec zsh
 | `zsh-users/zsh-autosuggestions`    | 遅延     | 入力候補のグレー表示                             |
 | `zsh-users/zsh-completions`        | 遅延     | 補完定義の追加                                   |
 | `compinit`（inline）               | 遅延     | 補完の有効化と aws-cli 補完                      |
-| `z-shell/H-S-MW`                   | 遅延     | `Ctrl-R` で複数キーワード AND 検索               |
 | `dotfile-defers`（local）          | 遅延     | `~/dotfiles/zsh/*.zsh`                           |
+
+`Ctrl-R` の履歴の検索は、プラグインではなく atuin が受け持つ。`bin/.zshrc` で初期化し、設定は `config/atuin/config.toml` に置く（[config/README.md](../config/README.md)）。`~/.zsh_history` は自動では取り込まれないので、最初に一度だけ `atuin import zsh` を実行する（もう一度実行すると全件が重複する）。取り込みは秘密情報の除外（`secrets_filter`）を通らないので、続けて `atuin history prune` で該当する行を検索から外す。どちらも `~/.atuin` に書くので、Claude Code の sandbox の中ではなく通常のターミナルで実行する。prune しても DB のファイルには平文が残るので、履歴に残っていた秘密情報は失効させる。
 
 <a name="completions"></a>
 
