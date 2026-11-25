@@ -97,6 +97,27 @@ MISE_ENV_GLOBS = ("bin/.z*", "zsh/*.zsh")
 # グローバルの git の設定（~/.gitconfig の実体）。rerere が動くと、sandbox の外の git が、.git/rr-cache と MERGE_RR（どちらも
 # sandbox が書ける）の解決を任意のパス（作業ツリーの外も）に書く。rerere.enabled がなくても、rr-cache があれば動くので false にする。
 GITCONFIG = "bin/.gitconfig"
+# リンク用のスクリプトの worktree の判定（PR #124）。worktree の中から実行すると、リンクが worktree を指し、worktree を
+# 消すと警告なしに切れる。CI はスクリプトを動かさないので、書き方で確かめる。誤操作を防ぐためのもので、わざと崩した書き方は通る。
+# 対象は ln を呼ぶ *.sh。hook のテストは一時ディレクトリの中にリンクを作るので除く。
+LINK_GUARD_EXEMPT = ("claude/hooks/tests/",)
+LN_COMMAND = re.compile(r"(?:^|[\s;&|(])(?:\S*/)?ln\s")
+SHELL_BLANK_OR_COMMENT = re.compile(r"\s*(?:#.*)?")
+# 判定は $SCRIPT_DIR/../.git を見るので、スクリプトはルートの 1 つ下に置く。インデントした判定は、ほかのブロックの中で
+# 実行されないことがあるので数えない。
+LINK_GUARD = re.compile(r'if \[ -f "\$(?:SCRIPT_DIR|\{SCRIPT_DIR\})/\.\./\.git" \]; then\s*')
+LINK_GUARD_SCRIPT_DIR = re.compile(r'\s*SCRIPT_DIR=\$\(cd "\$\(dirname "\$0"\)" && pwd\)\s*')
+# 判定より前に置いてよい行（set と、macOS や CLAUDECODE の確認の部品）。書き込むコマンドはツールの呼び出しも含めて
+# 並べきれないので、許す行を決める。
+LINK_GUARD_PRELUDE = (
+    SHELL_BLANK_OR_COMMENT,
+    LINK_GUARD_SCRIPT_DIR,
+    re.compile(r"\s*set(?:\s+[-+][A-Za-z]+|\s+[a-z]+)+\s*"),
+    re.compile(r"\s*if \[ [^;&|<>`]* \] ?; then\s*"),
+    re.compile(r'\s*echo "[^"]*"(?: >&2)?\s*'),
+    re.compile(r"\s*exit [0-9]+\s*"),
+    re.compile(r"\s*fi\s*"),
+)
 # ユーザー設定のこれらのリストは、~/ でも / でも始まらないパスが ~/.claude を起点にし、黙って効かない。
 SANDBOX_PATH_LISTS = ("denyRead", "denyWrite", "allowWrite", "allowRead")
 # additionalDirectories は作業ディレクトリとして数えられ、そこでは WRITE_BLOCK が効かない。
@@ -506,6 +527,40 @@ def check_rerere(root):
     return []
 
 
+def exits_before_fi(lines):
+    """判定の if の次の行から、最初の fi までに exit 1 だけの行があるか。"""
+    for line in lines:
+        if line.strip() == "fi":
+            return False
+        if line.strip() == "exit 1":
+            return True
+    return False
+
+
+def check_link_guard(root):
+    errors = []
+    for rel in repo_files(root):
+        if not rel.endswith(".sh") or rel.startswith(LINK_GUARD_EXEMPT):
+            continue
+        lines = (root / rel).read_text(encoding="utf-8").splitlines()
+        if not any(LN_COMMAND.search(line) for line in lines if not SHELL_BLANK_OR_COMMENT.fullmatch(line)):
+            continue
+        if len(PurePosixPath(rel).parts) != 2:
+            errors.append(f"{rel}: runs ln but is not directly under a top-level directory "
+                          "(the worktree guard checks $SCRIPT_DIR/../.git)")
+        start = next((i for i, line in enumerate(lines) if LINK_GUARD.fullmatch(line)), None)
+        if start is None or not exits_before_fi(lines[start + 1:]):
+            errors.append(f'{rel}: runs ln without the worktree guard (if [ -f "$SCRIPT_DIR/../.git" ]; then ... exit 1; fi)')
+            continue
+        before = lines[:start]
+        errors += [f"{rel}:{n}: only blank lines, comments, set, SCRIPT_DIR=... and if/echo/exit/fi checks "
+                   "may come before the worktree guard"
+                   for n, line in enumerate(before, 1) if not any(p.fullmatch(line) for p in LINK_GUARD_PRELUDE)]
+        if not any(LINK_GUARD_SCRIPT_DIR.fullmatch(line) for line in before):
+            errors.append(f'{rel}: SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd) must come before the worktree guard')
+    return errors
+
+
 def check_syntax(root):
     errors = []
     for rel in repo_files(root):
@@ -622,6 +677,7 @@ CHECKS = (
     ("project-permissions", check_project_permissions),
     ("mise-paranoid", check_mise_paranoid),
     ("rerere", check_rerere),
+    ("link-guard", check_link_guard),
     ("syntax", check_syntax),
     ("markdown-names", check_markdown_names),
     ("markdown-links", check_markdown_links),
