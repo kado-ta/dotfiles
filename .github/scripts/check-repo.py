@@ -341,7 +341,11 @@ def check_secret_content(root):
         # 手元の環境変数で設定が差し替わらないようにする。ログの色は --no-color では消えないので NO_COLOR で消す。
         env = {k: v for k, v in os.environ.items() if k not in ("GITLEAKS_CONFIG", "GITLEAKS_CONFIG_TOML")}
         env["NO_COLOR"] = "1"
-        cp = subprocess.run(cmd, cwd=src, env=env, capture_output=True, text=True, timeout=GITLEAKS_TIMEOUT)
+        # CI のログは公開されるので、パスは出さない（TimeoutExpired・OSError のメッセージにはパスが入る）。
+        try:
+            cp = subprocess.run(cmd, cwd=src, env=env, capture_output=True, text=True, timeout=GITLEAKS_TIMEOUT)
+        except (subprocess.TimeoutExpired, OSError) as e:
+            return [f"error: cannot run gitleaks ({type(e).__name__})"]
         if cp.returncode not in (0, GITLEAKS_LEAKS_EXIT):
             return [f"error: gitleaks exited with {cp.returncode}", *cp.stderr.splitlines()]
         # CI のログは公開されるので、Secret と Match は出さない。
