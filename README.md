@@ -57,6 +57,9 @@ Finder で `init.command` をダブルクリックする（ターミナルから
 | 11  | `biome/setup.sh`       | Biome のグローバル設定を `~/Library/Application Support/biome/` にリンクする                                                    |
 | 12  | `obsidian/setup.sh`    | Obsidian の設定を Vault（`~/Obsidian/main/.obsidian/`）にリンクする。Vault を作成し、Obsidian を閉じてから実行する              |
 
+> [!NOTE]
+> `bin/setup_brew.sh`・`zsh/setup_plugins.sh` 以外は、git worktree の中から実行すると、何もせずにエラーで終了する。リンクが worktree を指し、worktree を消すと警告なしに切れるため。個別に実行するときは `~/dotfiles` のものを実行する（`setup.command` は常に `~/dotfiles` のものを実行する）。
+
 <a name="setup-manual"></a>
 
 ### 3. 手動で行う作業
