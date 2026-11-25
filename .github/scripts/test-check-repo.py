@@ -5,6 +5,7 @@
 
 import json
 import os
+import shlex
 import shutil
 import subprocess
 import sys
@@ -109,6 +110,23 @@ MWG_DENY = [
 README = "## Foo Bar\n\n[x](#foo-bar)\n\n"
 PARANOID_CONFIG = '[settings]\nparanoid = ["config", "env_files"]\n'
 GITCONFIG = "[merge]\n\tff = false\n[rerere]\n\tenabled = false\n"
+CI_WORKFLOW = ".github/workflows/ci.yaml"
+CI_VERSIONS = (
+    "    env:\n"
+    "      SHELLCHECK_VERSION: v0.11.0\n"
+    "      ACTIONLINT_VERSION: 1.7.12\n"
+    "      ZIZMOR_VERSION: 1.33.1\n"
+    "      GITLEAKS_VERSION: 8.30.1\n"
+)
+# 手元（Homebrew）の版のコマンドの出力（2026-11-25 に確かめた）。偽のツールが出す。
+FAKE_VERSION_OUTPUT = {
+    "shellcheck": "ShellCheck - shell script analysis tool\nversion: 0.11.0\n"
+                  "license: GNU General Public License, version 3\nwebsite: https://www.shellcheck.net\n",
+    "actionlint": "1.7.12\ninstalled from Homebrew\nbuilt with go1.26.3 compiler for darwin/arm64\n",
+    "zizmor": "zizmor 1.33.1\n",
+    "gitleaks": "8.30.1\n",
+}
+REAL_GITLEAKS = shutil.which("gitleaks")
 
 
 def settings():
@@ -175,7 +193,29 @@ def project_settings():
     }
 
 
+def write_fake_tool(directory, name, body):
+    path = directory / name
+    path.write_text("#!/bin/sh\n" + body, encoding="utf-8")
+    path.chmod(0o755)
+
+
 class CheckRepoTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        # 手元に入っている版に結果が左右されないよう、check() は版を出す偽のツールを PATH の先頭に置く。
+        # 新しく作ったスクリプトは初回の起動に 0.1〜0.3 秒かかるので、クラスで 1 回だけ作る。
+        cls.fake_bin = Path(tempfile.mkdtemp(prefix="check-repo-fake-tools-"))
+        cls.addClassCleanup(shutil.rmtree, cls.fake_bin)
+        for name, output in FAKE_VERSION_OUTPUT.items():
+            body = f"printf '%s' '{output}'\n"
+            if name == "gitleaks":
+                # 入っていなければ、secret-content と tool-versions がどちらも not found で失敗する。
+                if REAL_GITLEAKS is None:
+                    continue
+                # secret-content は本物の gitleaks で動かす。
+                body = f'if [ "$1" = version ]; then {body}exit 0; fi\nexec {shlex.quote(REAL_GITLEAKS)} "$@"\n'
+            write_fake_tool(cls.fake_bin, name, body)
+
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory(prefix="check-repo-")
         self.addCleanup(self.tmp.cleanup)
@@ -192,6 +232,15 @@ class CheckRepoTests(unittest.TestCase):
         self.write("README.md", README)
         self.write("mise/mise_config.toml", PARANOID_CONFIG)
         self.write("bin/.gitconfig", GITCONFIG)
+        self.write(CI_WORKFLOW, CI_VERSIONS)
+        self.path_dirs = [self.fake_bin]
+
+    def override_tool(self, name, body):
+        """このテストだけ、偽のツールを差し替える（クラスで共有する偽のツールは書き換えない）。"""
+        directory = Path(tempfile.mkdtemp(prefix="check-repo-override-"))
+        self.addCleanup(shutil.rmtree, directory)
+        write_fake_tool(directory, name, body)
+        self.path_dirs.insert(0, directory)
 
     def git(self, *args):
         subprocess.run(["git", "-C", str(self.root), *args], check=True, capture_output=True)
@@ -214,6 +263,8 @@ class CheckRepoTests(unittest.TestCase):
         self.write("claude/mcp/playwright.json", json.dumps({"args": args}, indent=2))
 
     def check(self, env=None):
+        if env is None:
+            env = {**os.environ, "PATH": os.pathsep.join([*map(str, self.path_dirs), os.environ["PATH"]])}
         cp = subprocess.run([sys.executable, "-B", str(SCRIPT), str(self.root)], capture_output=True, text=True, env=env)
         return cp.returncode, cp.stdout + cp.stderr
 
@@ -366,6 +417,43 @@ class CheckRepoTests(unittest.TestCase):
         path = "/usr/bin:/bin"
         self.assertIsNone(shutil.which("gitleaks", path=path))
         self.assert_fails("FAIL secret-content", "gitleaks not found", env={**os.environ, "PATH": path})
+
+    def test_tool_version_mismatch_fails(self):
+        self.write(CI_WORKFLOW, CI_VERSIONS.replace("ZIZMOR_VERSION: 1.33.1", "ZIZMOR_VERSION: 1.34.0"))
+        self.assert_fails(
+            "FAIL tool-versions",
+            "zizmor 1.33.1 on PATH, but .github/workflows/ci.yaml pins 1.34.0 "
+            "(update ZIZMOR_VERSION and ZIZMOR_SHA256 together)",
+        )
+
+    def test_missing_ci_workflow_fails(self):
+        self.git("rm", "-q", "-f", CI_WORKFLOW)
+        self.assert_fails("FAIL tool-versions", ".github/workflows/ci.yaml: missing")
+
+    def test_missing_version_key_fails(self):
+        self.write(CI_WORKFLOW, CI_VERSIONS.replace("      GITLEAKS_VERSION: 8.30.1\n", ""))
+        self.assert_fails("FAIL tool-versions", ".github/workflows/ci.yaml: GITLEAKS_VERSION must be set exactly once")
+
+    def test_duplicate_version_key_fails(self):
+        self.write(CI_WORKFLOW, CI_VERSIONS + "      GITLEAKS_VERSION: 8.31.0\n")
+        self.assert_fails("FAIL tool-versions", ".github/workflows/ci.yaml: GITLEAKS_VERSION must be set exactly once")
+
+    def test_missing_tool_fails(self):
+        path = "/usr/bin:/bin"
+        self.assertIsNone(shutil.which("actionlint", path=path))
+        self.assert_fails(
+            "FAIL tool-versions",
+            "actionlint not found (install it with brew install actionlint)",
+            env={**os.environ, "PATH": path},
+        )
+
+    def test_unreadable_tool_version_fails(self):
+        self.override_tool("shellcheck", "echo 'ShellCheck - shell script analysis tool'\n")
+        self.assert_fails("FAIL tool-versions", "cannot read the version of shellcheck")
+
+    def test_tool_version_with_nonzero_exit_fails(self):
+        self.override_tool("zizmor", "echo 'zizmor 1.33.1'\nexit 1\n")
+        self.assert_fails("FAIL tool-versions", "cannot read the version of zizmor")
 
     def test_direct_hook_without_exec_bit_fails(self):
         self.write("claude/hooks/direct.sh", "#!/bin/bash\n", 0o644)

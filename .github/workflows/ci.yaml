@@ -31,7 +31,8 @@ jobs:
         with:
           persist-credentials: false
 
-      # 手元（Homebrew）と同じ版に固定し、チェックサムを確かめてから使う。
+      # 版を固定し、チェックサムを確かめてから使う。手元（Homebrew）の版と違うと check-repo.py の tool-versions が失敗するので、
+      # 手元が上がったら、版と SHA256 を一緒に上げる。
       - name: Install shellcheck, actionlint, zizmor and gitleaks
         run: |
           bin="$RUNNER_TEMP/bin"
