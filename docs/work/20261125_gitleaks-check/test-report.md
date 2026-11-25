@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: done
 created: 2026-11-25
 ---
 
@@ -116,3 +116,93 @@ main（#115〜#120）を取り込んだ。#119（CI に zizmor を追加）と `
 | `actionlint` | 出力なし |
 | `zizmor --offline .` | 指摘なし |
 | shellcheck（CLAUDE.md の規約のコマンド） | 出力なし |
+
+<a name="codex"></a>
+
+## Codex のレビュー
+
+PR #123 のマージ後に、ユーザーが通常のターミナルで実行した。結果は Codex の記録（`last_agent_message`）から読んだ。
+
+<a name="codex-1"></a>
+
+### 1 回目: `codex review --base 305dba0`（2026-11-25、66fad2a）
+
+総評は「patch is incorrect」。Codex は `git diff --check`・構文解析・shellcheck・actionlint・zizmor を実行して指摘なし、回帰テストは読み取り専用のため未実行。
+
+| 指摘 | 優先度 | 内容 |
+| --- | --- | --- |
+| 1 | P2 | 0 と 42 以外で終わったときに gitleaks の stderr をそのまま出すので、`.gitleaks.toml` の構文エラーや不正な正規表現に含まれる値が CI のログに出る（`--redact` でも残ることを Codex が確認） |
+| 2 | P2 | 途中のディレクトリが symlink だと、リポジトリの外のファイルを写して調べる（`is_symlink()` は最後の要素だけを見る） |
+| 3 | P3 | gitleaks が PATH の相対ディレクトリにあると、`shutil.which()` が相対パスを返し、`cwd` を変えた後に起動できない |
+| 4 | P3 | gitleaks がないときのテストが、`/usr/bin`・`/bin` に gitleaks がある環境では前提の確認で失敗する |
+
+<a name="codex-2"></a>
+
+### 2 回目: challenge（`codex exec`、2026-11-25、66fad2a）
+
+依頼文は Git の管理外の `.gstack/tmp/codex-challenge.md`（変更前と比べて期待どおりに働かない入力を、リポジトリのスクリプトを実行せずに挙げる依頼）。結果はコードからの予測で、Codex は検証していない。
+
+| 指摘 | 優先度 | 内容 |
+| --- | --- | --- |
+| C1 | P1 | 見つかった値がファイル名や `.gitleaks.toml` のルール ID に入っていると、`File`・`RuleID` は伏せられないので出力に出る |
+| C2 | P1 | `.gitleaks.toml` の `[extend] path` に書いたユーザー名入りの絶対パスが、gitleaks のエラー（stderr）経由で出る |
+| C3 | P1 | `[extend] useDefault = true` もルールもない `.gitleaks.toml`（`title` だけなど）だと、既定のルールが使われず、全件を見逃して PASS する |
+| C4 | P1 | 大文字小文字を区別しない macOS の一時ディレクトリでは、写した `.GITLEAKSIGNORE` を gitleaks が `.gitleaksignore` として読み、相対パスの fingerprint で検出を外す |
+| C5 | P2 | `git()` が `text=True` で読むので、ファイル名の CR が LF に変わり、別のファイルを調べる |
+| C6 | P2 | 大文字小文字だけが違う 2 つのファイルが、大文字小文字を区別しない一時ディレクトリで上書きされる |
+| C7 | P2 | ルートの `.gitleaksignore` 自体の中身は調べない |
+| C8 | P2 | 1 行が 10 万バイトを超えると、gitleaks の分割の境界をまたぐ値を見逃す |
+
+<a name="codex-decisions"></a>
+
+### 採否（ユーザーの判断）
+
+| 指摘 | 採否 | 理由 |
+| --- | --- | --- |
+| 1 回目の 2、C3、C4 | 採用 | 下の「Codex の指摘への修正」で直した |
+| 1 回目の 1、C1、C2 | 不採用 | 出るのはファイル名・`.gitleaks.toml` の中身など、push した時点でリポジトリで公開済みのもので、CI のログに出ても新しい漏れにならない。手元の出力は公開されない。stderr は CI で gitleaks が動かない理由を調べる手がかりになる |
+| 1 回目の 3 | 不採用 | PATH に相対ディレクトリを入れることはまれで、起きても FAIL になる |
+| 1 回目の 4 | 不採用 | 前提を `assertIsNone` で明示しているので、理由の分かる失敗になる。CI と手元の Mac には当てはまらない |
+| C5 | 不採用 | CR を含む名前が 1 つだけなら `local-paths` がファイルを開けずに FAIL する。黙って通るのは、CR と LF だけが違う名前が並ぶ場合だけ |
+| C6 | 不採用 | worktree が大文字小文字を区別しないボリュームにあり、大文字小文字だけが違う 2 つのファイルを並べて置けない |
+| C7、C8 | 受け入れる | 下の「増えた受け入れリスク」に書いた |
+
+<a name="codex-fixes"></a>
+
+### Codex の指摘への修正
+
+設計書（`done`）は編集せず、変えた振る舞いをここに書く。
+
+- 実体のパスがリポジトリの外にあるファイル（途中のディレクトリが symlink のもの）は写さない（1 回目の 2）。
+- ルートの `.gitleaksignore` は、大文字小文字を区別せずに写さない（C4）。
+- `.gitleaks.toml` に `[extend] useDefault = true` がなければ `.gitleaks.toml: [extend] useDefault = true is required` で FAIL にする。TOML として読めない設定は gitleaks に渡し、gitleaks のエラーで FAIL にする（C3）。
+
+| 確認 | 結果 |
+| --- | --- |
+| 修正前に足したテスト 3 件（`test_file_under_symlinked_dir_is_not_copied`・`test_gitleaks_toml_without_default_rules_fails`・`test_uppercase_gitleaksignore_does_not_suppress`）を実行 | 3 件とも失敗した。C3 と C4 は Codex の予測どおり、秘密を見逃して PASS した（C4 は macOS の一時ディレクトリで再現） |
+| 修正後の `python3 -B .github/scripts/test-check-repo.py` | 110 件すべて OK（42.9 秒） |
+| `python3 -B .github/scripts/check-repo.py` | すべて PASS |
+| 作業ツリーに偽の秘密を置いて実行 | `FAIL secret-content`、値は出力に出ない |
+| shellcheck・actionlint | 出力なし |
+
+symlink のテストでは、既存の `local-paths` も symlink 先のディレクトリを開けずに FAIL した（`IsADirectoryError`）。今回の範囲外なので直していない。
+
+<a name="accepted-risks"></a>
+
+### 増えた受け入れリスク
+
+[design.md](design.md#residual-risks) の「残るリスク」に加えて、次を受け入れる。
+
+- ルートの `.gitleaksignore` 自体の中身は調べない（C7）。
+- 1 行が 10 万バイトを超えると、gitleaks の分割の境界をまたぐ値を見逃しうる（C8。gitleaks 8.30.1 の制約）。
+- 見つかった値がファイル名や `.gitleaks.toml` のルール ID に入っていると、出力に出る（C1）。gitleaks が 0 と 42 以外で終わったときの stderr に、`.gitleaks.toml` の中身が出うる（1 回目の 1、C2）。どちらも公開済みのリポジトリの中身で、新しい漏れではない。
+
+<a name="ci"></a>
+
+## PR の CI
+
+| PR | 結果 |
+| --- | --- |
+| [#123](https://github.com/kado-ta/dotfiles/pull/123)（66fad2a） | Repository checks: pass（1 分 17 秒）、Hook regression tests: pass（2 分 55 秒） |
+
+PR を作った直後は、main が進んで PR が衝突していたため、CI が始まらなかった（`gh pr checks` は「no checks reported」）。main（305dba0）を取り込み、`CLAUDE.md` の衝突を解決して push した後に実行された。
