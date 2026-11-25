@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: done
 created: 2026-11-25
 ---
 
@@ -80,7 +80,10 @@ created: 2026-11-25
 
 ### 4.3 GitHub Actions
 
-PR の CI の結果を書く。
+[PR #119](https://github.com/kado-ta/dotfiles/pull/119) の CI（run 45533063858、d2490a8）で、2 つのジョブがどちらも成功した。
+
+- Install のステップで `zizmor.tar.gz: OK` と出た。GitHub API の `digest` と同じ sha256 であることを、ここで確かめた。
+- zizmor のステップは `zizmor v1.33.1` で `./.github/workflows/ci.yaml` を監査し、注釈は出なかった。
 
 <a name="tradeoffs"></a>
 
