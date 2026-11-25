@@ -407,9 +407,9 @@ Claude Code から PR を作成・編集するためのラッパー。`cc-safe-p
 ```sh
 cd ~/dotfiles
 sudo install -o root -g wheel -m 0755 claude/bin/cc-safe-pr /usr/local/libexec/claude-push/cc-safe-pr
-# 依頼ファイルをグローバルの ignore に追加する（すでに書かれていれば何もしない）
-grep -qxF '.cc-pr-request.json' ~/.config/git/ignore || echo '.cc-pr-request.json' >> ~/.config/git/ignore
 ```
+
+依頼ファイル（`.cc-pr-request.json`）は、どのリポジトリでも `config/git/ignore`（`config/link.sh` が `~/.config/git/ignore` にリンクする）で無視する。
 
 ラッパーか `cc-safe-push` を変更したら、再度インストールして両方のテストを実行する。`cc-safe-pr` は同じディレクトリの `cc-safe-push` を読み込むので、片方だけ古いと動かないことがある。
 
@@ -459,9 +459,9 @@ cd ~/dotfiles
 sudo install -d -o root -g wheel -m 0755 /usr/local/libexec/claude-crit
 sudo install -o root -g wheel -m 0755 claude/bin/cc-crit /usr/local/libexec/claude-crit/cc-crit
 sudo install -o root -g wheel -m 0644 claude/bin/cc-crit.sb /usr/local/libexec/claude-crit/cc-crit.sb
-# 依頼ファイルをグローバルの ignore に追加する（すでに書かれていれば何もしない）
-grep -qxF '.cc-crit-request.json' ~/.config/git/ignore || echo '.cc-crit-request.json' >> ~/.config/git/ignore
 ```
+
+依頼ファイル（`.cc-crit-request.json`）は、cc-safe-pr の依頼ファイルと同じく `config/git/ignore` で無視する。
 
 インストールしたら、sandbox の外で profile のテストを実行する。Claude Code の sandbox の中では `sandbox-exec` を入れ子にできないので、スキップされる。
 

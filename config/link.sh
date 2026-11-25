@@ -56,6 +56,14 @@ echo "ATUIN_DIR: $ATUIN_DIR"
 if [ ! -d $ATUIN_DIR ]; then mkdir -m 700 $ATUIN_DIR; fi
 ln -snfv "$SCRIPT_DIR/atuin/config.toml" "$ATUIN_DIR/"
 
+# git（グローバルの ignore）
+# ~/.config/git/ にはほかの Git の設定も置けるため、ファイル単位でリンクする。
+# Claude Code は足りないパターンをこのファイルに追記するので、追記はリンク先（dotfiles）の差分になる。
+GIT_CONF_DIR="$CONFIG_DIR/git"
+echo "GIT_CONF_DIR: $GIT_CONF_DIR"
+if [ ! -d $GIT_CONF_DIR ]; then mkdir $GIT_CONF_DIR; fi
+ln -snfv "$SCRIPT_DIR/git/ignore" "$GIT_CONF_DIR/"
+
 # NOTE: karabiner は使用していないので、関連コマンドをコメントアウトする。
 # KARABINER_DIR="$CONFIG_DIR/karabiner"
 # echo "KARABINER_DIR: $KARABINER_DIR"
