@@ -35,7 +35,8 @@ created: 2026-11-25
 - 終了コード: 見つからなければ 0、見つかれば `--exit-code` の値、エラー（部分的な走査を含む）は 1。
 - 設定の優先順: `--config` → `GITLEAKS_CONFIG` → `GITLEAKS_CONFIG_TOML` → 対象のパスの `.gitleaks.toml` → 既定の設定。
 - `.gitleaksignore` は、`-i`（既定はカレントディレクトリ）と、対象のパスの直下の両方から読む。
-- allowlist の `paths` の正規表現は、走査したときのパス（一時ディレクトリの絶対パス）に当てる。`^fixtures/` のように行頭で固定すると当たらないので、`(?:^|/)fixtures/` のように書く。
+- allowlist の `paths` の正規表現は、走査したときのパスに当てる。絶対パスを渡すと絶対パスに当たる。
+  - レビュー後の変更: 絶対パスに当たると、`(?:^|/)tmp/` のような除外で全ファイルが外れるので、写した先を cwd にして `.` を調べる形に変えた（[design.md](design.md#design) の 3）。`paths` はリポジトリからの相対パスで、`^fixtures/` のように書く。この計画の下の手順にある `(?:^|/)` の案内と `--exit-code 2` は、レビュー前の内容。
 - 報告の JSON は Finding の配列で、項目は `RuleID`・`StartLine`・`File`・`Secret`・`Match` など。見つからなければ `[]`。
 - 既定のルール `github-pat` は `ghp_[0-9a-zA-Z]{36}`（entropy 3）。
 

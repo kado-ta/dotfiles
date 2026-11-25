@@ -45,13 +45,15 @@ created: 2026-11-25
 1. `check-repo.py` に検査 `secret-content` を足す（`secret-files` の次）。
 2. `repo_files()` のうち通常のファイルだけを一時ディレクトリに写し、そこに `gitleaks dir` をかける。symlink は写さない（公開されるのはリンク先の中身ではなくリンクの文字列なので）。
    - 理由（v8.30.1 の `cmd/directory.go`・`sources/files.go` で確認した事実）: `gitleaks dir` は 1 つのパスを受け取って `filepath.WalkDir` で全部をたどり、`.gitignore` を見ない。リポジトリのルートにかけると、`.git` と無視しているファイル（`aws/credentials` など）まで読む。読めないファイルは警告を出して飛ばす（失敗にならない）ので、sandbox の `denyRead` に当たったファイルが黙って抜ける。写す処理は Python が行うので、読めなければ例外で FAIL になる。
-3. 呼び出しは `gitleaks dir <写し> --no-banner --redact --report-format json --report-path <別の一時ファイル> --exit-code 2`。
-   - 終了コード 1 は「見つかった」と「エラー」の両方に使われるので、見つかったときを 2 に分ける。0 と 2 以外は FAIL（fail closed）。
-   - 設定は、リポジトリに `.gitleaks.toml` があればそれを `--config` で渡し、なければ gitleaks の既定の設定を使う。環境変数 `GITLEAKS_CONFIG`・`GITLEAKS_CONFIG_TOML` は子プロセスに渡さない（手元の環境で設定が差し替わらないように）。
-   - `.gitleaksignore` は使わない。gitleaks をリポジトリの外の一時ディレクトリで実行し、ルートの `.gitleaksignore` を読ませない。
-4. 出力は JSON の報告から `File`（写しの中の相対パス）・`StartLine`・`RuleID` だけを取り、`<path>:<line>: <rule>` の形で出す。`Secret`・`Match` は出さない。`--redact` は gitleaks 自身のログへの備えとして併用する。
+3. 呼び出しは、写した先を cwd にして `gitleaks dir . --no-banner --redact --report-format json --report-path <別の一時ファイル> --exit-code 42`。
+   - 写した先の絶対パスを渡すと、allowlist の `paths` が絶対パスに当たり、`(?:^|/)tmp/` のような一見狭い除外で全ファイルが外れる（レビューで分かった。CI の一時ディレクトリは `/tmp`）。`.` を渡すと、`paths` はリポジトリからの相対パスに当たる。
+   - 終了コード 1 は「見つかった」と「エラー」の両方に使われ、2 は Go の panic と重なるので、見つかったときを 42 に分ける。0 と 42 以外は FAIL（fail closed）。
+   - 設定は、リポジトリに `.gitleaks.toml` があればそれを `--config` で渡し、なければ gitleaks の既定の設定を使う。`--config` がないと、gitleaks は設定を名前（`.gitleaks`）で探し、`.gitleaks.json` などを `.gitleaks.toml` より先に読む（実測）。環境変数 `GITLEAKS_CONFIG`・`GITLEAKS_CONFIG_TOML` は子プロセスに渡さない（手元の環境で設定が差し替わらないように）。
+   - ログの色は `--no-color` では消えない（設定の読み込みのログに効かない）ので、子プロセスに `NO_COLOR=1` を渡す。
+   - `.gitleaksignore` は使わない。ルートの `.gitleaksignore` を写さないので、gitleaks が読む場所（cwd と対象のルート。どちらも写した先）にない。
+4. 出力は JSON の報告から `File`（リポジトリからの相対パス）・`StartLine`・`RuleID` だけを取り、`<path>:<line>: <rule>` の形で出す。`Secret`・`Match` は出さない。`--redact` は gitleaks 自身のログへの備えとして併用する。
 5. gitleaks が PATH にないときは FAIL（`main()` の「検査できないときは成功扱いにしない」と同じ）。
-6. 誤検知は、1 行ずつなら行末の `gitleaks:allow` コメントで、ファイル単位でまとまるなら `.gitleaks.toml`（既定のルールを継承し、パスを allowlist に入れる）で外す。どちらも sandbox から書けるが、PR の差分に出るのでレビューで見る。
+6. 誤検知は、1 行ずつなら行末の `gitleaks:allow` コメントで、ファイル単位でまとまるなら `.gitleaks.toml`（既定のルールを継承し、パスを allowlist に入れる。`^fixtures/` のようにリポジトリからの相対パスで書く）で外す。どちらも sandbox から書けるが、PR の差分に出るのでレビューで見る。
 
 <a name="install"></a>
 
@@ -71,6 +73,7 @@ created: 2026-11-25
 - 無視されているファイルの秘密 → PASS。
 - `gitleaks:allow` の付いた行 → PASS。
 - PATH に gitleaks がない → FAIL。
+- レビューで足したもの: 環境変数 `GITLEAKS_CONFIG_TOML` を無視する、allowlist が相対パスに当たる（`^fixtures/` が効き、`(?:^|/)src/` では全体が外れない）、`.gitleaks.json` が設定を上書きしない、壊れた設定で `error: gitleaks exited with 1` になり色の制御文字が出ない、「見つかった」の終了コードなのに報告が空なら FAIL。
 
 `test_clean_fixture_passes` を含めて、テストの実行に gitleaks が要るようになる。
 
@@ -88,7 +91,9 @@ created: 2026-11-25
 
 - 履歴は調べないので、まだ push していないブランチで秘密を入れてから消した場合、今のファイルの検査は通るが、push でそのコミットが公開される。
 - 手元での実行は習慣に頼る。CI で見つかったときは公開済みなので、値を失効させる。
+- 調べるのは作業ツリーの中身で、push で公開される HEAD や index とずれうる。秘密をコミットした後に作業ツリーだけから消した（削除は未コミット）場合や、`git add` の後に作業ツリーだけ直した場合、手元の検査は通る（レビューで分かった。ユーザーの判断で受け入れた。`local-paths` も作業ツリーだけを見ている）。
 - 判定はパターンによるので、形式のない秘密（パスワードなど）は抜けうる。
+- gitleaks の既定の設定が除外する種類のファイル（`.svg`・`.pdf`・ロックファイル・`vendor/`・`node_modules/` など）と、`.gitleaks.toml` 自体の中身は調べない。今のリポジトリに前者は追跡されていない。
 - GitHub の push protection が有効かは、読み取り専用トークンでは確かめられなかった（403）。
 
 <a name="verification"></a>
