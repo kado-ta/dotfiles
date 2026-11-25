@@ -283,6 +283,29 @@ class CheckRepoTests(unittest.TestCase):
         (self.root / "link.txt").symlink_to(target)
         self.assert_passes()
 
+    def test_file_under_symlinked_dir_is_not_copied(self):
+        # 追跡しているディレクトリを外への symlink に差し替えても、リンク先は読まない。
+        self.write("sub/f.txt", "ok\n")
+        outside = tempfile.TemporaryDirectory(prefix="check-repo-outside-")
+        self.addCleanup(outside.cleanup)
+        (Path(outside.name) / "f.txt").write_text(FAKE_PAT + "\n", encoding="utf-8")
+        shutil.rmtree(self.root / "sub")
+        (self.root / "sub").symlink_to(outside.name)
+        _, out = self.check()
+        self.assertIn("PASS secret-content", out)
+
+    def test_gitleaks_toml_without_default_rules_fails(self):
+        # [extend] useDefault = true がないと、gitleaks は既定のルールを使わない。
+        self.write(".gitleaks.toml", 'title = "dotfiles"\n')
+        self.write("notes/token.txt", FAKE_PAT + "\n")
+        self.assert_fails("FAIL secret-content", ".gitleaks.toml: [extend] useDefault = true is required")
+
+    def test_uppercase_gitleaksignore_does_not_suppress(self):
+        # 大文字小文字を区別しない一時ディレクトリでは、gitleaks が .GITLEAKSIGNORE を .gitleaksignore として読む。
+        self.write(".GITLEAKSIGNORE", "notes/token.txt:github-pat:1\n")
+        self.write("notes/token.txt", FAKE_PAT + "\n")
+        self.assert_fails("FAIL secret-content", "notes/token.txt:1: github-pat")
+
     def test_path_with_space_and_japanese_is_reported(self):
         self.write("docs/日本語 メモ.txt", FAKE_PAT + "\n")
         self.assert_fails("FAIL secret-content", "docs/日本語 メモ.txt:1: github-pat")

@@ -257,10 +257,15 @@ def check_secret_content(root):
         src = base / "src"
         src.mkdir()
         report = base / "report.json"
+        real_root = root.resolve()
         for rel in repo_files(root):
             path = root / rel
-            # gitleaks は対象のルートの .gitleaksignore も読むので、写さない。
-            if path.is_symlink() or not path.is_file() or rel == ".gitleaksignore":
+            # 公開されるのはリンクの文字列なので、symlink とその先（途中のディレクトリが symlink の場合も）は読まない。
+            if path.is_symlink() or not path.is_file() or not path.resolve().is_relative_to(real_root):
+                continue
+            # gitleaks は対象のルートの .gitleaksignore も読む。一時ディレクトリが大文字小文字を区別しないと
+            # .GITLEAKSIGNORE なども読むので、大文字小文字を区別せずに写さない。
+            if rel.casefold() == ".gitleaksignore":
                 continue
             dest = src / rel
             dest.parent.mkdir(parents=True, exist_ok=True)
@@ -268,8 +273,17 @@ def check_secret_content(root):
         cmd = [exe, "dir", ".", "--no-banner", "--redact", "--report-format", "json",
                "--report-path", str(report), "--exit-code", str(GITLEAKS_LEAKS_EXIT)]
         # 名前（.gitleaks）で探させると .gitleaks.json などが先に読まれるので、.gitleaks.toml に固定する。
-        if (src / ".gitleaks.toml").is_file():
-            cmd += ["--config", str(src / ".gitleaks.toml")]
+        config = src / ".gitleaks.toml"
+        if config.is_file():
+            # 設定を渡すと既定のルールは使われないので、継承していない設定では全件を見逃す。
+            # 読めない設定は gitleaks に渡し、gitleaks のエラーで FAIL にする。
+            try:
+                extend = tomllib.loads(config.read_text(encoding="utf-8")).get("extend", {})
+            except tomllib.TOMLDecodeError:
+                extend = {"useDefault": True}
+            if extend.get("useDefault") is not True:
+                return [".gitleaks.toml: [extend] useDefault = true is required"]
+            cmd += ["--config", str(config)]
         # 手元の環境変数で設定が差し替わらないようにする。ログの色は --no-color では消えないので NO_COLOR で消す。
         env = {k: v for k, v in os.environ.items() if k not in ("GITLEAKS_CONFIG", "GITLEAKS_CONFIG_TOML")}
         env["NO_COLOR"] = "1"
