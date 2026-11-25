@@ -88,4 +88,9 @@ created: 2026-11-25
 
 ## 6. GitHub Actions
 
-PR の CI の結果を、ここに書く。
+[PR #129](https://github.com/kado-ta/dotfiles/pull/129) の CI（run 45550287534、838ffcd）で、2 つのジョブがどちらも成功した。
+
+- Install のステップで、4 つの tarball の `sha256sum -c` がすべて `OK` だった。
+- `Repository checks` のステップで、15 項目すべて PASS（`PASS tool-versions` を含む）。Linux のリリースのバイナリでも、版のコマンドの出力から版を読めた。
+- `Tests for repository checks` は 122 件（main の #128 の 2 件を含む）を実行し、成功した。
+- `Hook regression tests`（macos-latest）も成功した。
