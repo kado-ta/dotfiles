@@ -62,7 +62,19 @@ ln -snfv "$SCRIPT_DIR/atuin/config.toml" "$ATUIN_DIR/"
 GIT_CONF_DIR="$CONFIG_DIR/git"
 echo "GIT_CONF_DIR: $GIT_CONF_DIR"
 if [ ! -d $GIT_CONF_DIR ]; then mkdir $GIT_CONF_DIR; fi
-ln -snfv "$SCRIPT_DIR/git/ignore" "$GIT_CONF_DIR/"
+# 実体に、リポジトリのファイルにない行（Claude Code が書き足した行など）があるときと、
+# 確かめられないときは、リンクせずに残す。後の手順を止めないように、終了コードは 0 のままにする。
+GIT_IGNORE_RC=1
+if [ -f "$GIT_CONF_DIR/ignore" ] && [ ! -L "$GIT_CONF_DIR/ignore" ]; then
+  GIT_IGNORE_RC=0
+  grep -qvxF -e '' -f "$SCRIPT_DIR/git/ignore" "$GIT_CONF_DIR/ignore" || GIT_IGNORE_RC=$?
+fi
+if [ "$GIT_IGNORE_RC" -eq 1 ]; then
+  ln -snfv "$SCRIPT_DIR/git/ignore" "$GIT_CONF_DIR/"
+else
+  echo "WARNING: $GIT_CONF_DIR/ignore にリポジトリにない行があるか、読めないのでリンクしなかった。次の行を $SCRIPT_DIR/git/ignore に移してから、もう一度実行する。" >&2
+  grep -vxF -e '' -f "$SCRIPT_DIR/git/ignore" "$GIT_CONF_DIR/ignore" >&2 || true
+fi
 
 # NOTE: karabiner は使用していないので、関連コマンドをコメントアウトする。
 # KARABINER_DIR="$CONFIG_DIR/karabiner"

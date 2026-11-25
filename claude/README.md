@@ -409,7 +409,7 @@ cd ~/dotfiles
 sudo install -o root -g wheel -m 0755 claude/bin/cc-safe-pr /usr/local/libexec/claude-push/cc-safe-pr
 ```
 
-依頼ファイル（`.cc-pr-request.json`）は、どのリポジトリでも `config/git/ignore`（`config/link.sh` が `~/.config/git/ignore` にリンクする）で無視する。
+依頼ファイル（`.cc-pr-request.json`）は、どのリポジトリでも `config/git/ignore`（`config/link.sh` が `~/.config/git/ignore` にリンクする）で無視する。`config/link.sh` をまだ実行していなければ、先に実行する。
 
 ラッパーか `cc-safe-push` を変更したら、再度インストールして両方のテストを実行する。`cc-safe-pr` は同じディレクトリの `cc-safe-push` を読み込むので、片方だけ古いと動かないことがある。
 
@@ -461,7 +461,7 @@ sudo install -o root -g wheel -m 0755 claude/bin/cc-crit /usr/local/libexec/clau
 sudo install -o root -g wheel -m 0644 claude/bin/cc-crit.sb /usr/local/libexec/claude-crit/cc-crit.sb
 ```
 
-依頼ファイル（`.cc-crit-request.json`）は、cc-safe-pr の依頼ファイルと同じく `config/git/ignore` で無視する。
+依頼ファイル（`.cc-crit-request.json`）は、cc-safe-pr の依頼ファイルと同じく `config/git/ignore` で無視する。`config/link.sh` をまだ実行していなければ、先に実行する。
 
 インストールしたら、sandbox の外で profile のテストを実行する。Claude Code の sandbox の中では `sandbox-exec` を入れ子にできないので、スキップされる。
 
