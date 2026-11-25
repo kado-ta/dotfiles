@@ -94,6 +94,6 @@ Finder で `init.command` をダブルクリックする（ターミナルから
 | `biome/`     | Biome のグローバル設定。`$schema` のバージョンは mise の postinstall で自動更新する           | `~/Library/Application Support/biome/`     | —                                        |
 | `obsidian/`  | Obsidian の Vault 設定と CSS スニペット                                                       | `~/Obsidian/main/.obsidian/`               | [obsidian/README.md](obsidian/README.md) |
 | `docs/`      | 設計・計画などの作業文書                                                                      | —                                          | —                                        |
-| `.github/`   | `init.command` を macOS ランナーで実行する CI（GitHub 上で無効化している）                    | —                                          | —                                        |
+| `.github/`   | PR と main への push で動く CI（`ci.yaml`）と、リポジトリの検査（`check-repo.py`）            | —                                          | —                                        |
 
 リポジトリルートには、セットアップのエントリーポイント（`init.command`・`setup.command`）、保守用タスク（`mise.toml`）、AI エージェント向けのリポジトリガイド（[CLAUDE.md](CLAUDE.md)・`AGENTS.md`）を置いている。
