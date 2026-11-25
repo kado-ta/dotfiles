@@ -93,3 +93,26 @@ created: 2026-11-25
 | 修正後 | 107 件すべて OK（45.1 秒） |
 | 守りを外した写しで各テストを実行（`GITLEAKS_CONFIG_TOML` を除かない、`--config` を渡さない、絶対パスを渡す、`NO_COLOR` を外す、報告が空の分岐を消す） | 5 件ともテストが失敗した（捕まえた） |
 | 絶対パスと相対パスで、今のリポジトリを調べたバイト数 | どちらも 2,577,698 バイト。検査の範囲は変わっていない |
+
+`/review` は修正を入れたパスで終え、修正後に全体をもう一度見直すパスは回していない（記録は `converged:false`）。Red Team は起動条件（差分 200 行超）に当たったが、差分の大半が作業文書でコードは 116 行のため、起動していない。
+
+<a name="security-review"></a>
+
+## `/security-review`
+
+修正後のブランチ（41fd11a）に実行した。信頼度 8 以上の指摘はなかった。
+
+<a name="merge-main"></a>
+
+## main の取り込み
+
+main（#115〜#120）を取り込んだ。#119（CI に zizmor を追加）と `.github/workflows/ci.yaml` が衝突したので、両方の版の定義と取得の手順を残した。マージは sandbox の中では `claude/` などへの書き込みで止まるため、ユーザーが通常のターミナルで実行し、衝突の解決とコミットを Claude が行った。
+
+| 確認（マージ後） | 結果 |
+| --- | --- |
+| `python3 -B .github/scripts/check-repo.py` | すべて PASS |
+| `python3 -B .github/scripts/test-check-repo.py` | 107 件 OK |
+| `claude/scripts/test-skills-check.py`・`test-skill-usage.py`・`test-trust-audit.py` | すべて OK |
+| `actionlint` | 出力なし |
+| `zizmor --offline .` | 指摘なし |
+| shellcheck（CLAUDE.md の規約のコマンド） | 出力なし |
