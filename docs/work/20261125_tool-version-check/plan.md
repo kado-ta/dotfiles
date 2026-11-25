@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: done
 created: 2026-11-25
 ---
 
@@ -46,11 +46,11 @@ created: 2026-11-25
 
 ### 3.1 `.github/scripts/check-repo.py`
 
-`/review` の指摘を受けて、3.1〜3.3 の一部を変えた（[試験記録の 5 章](test-report.md#review)）。
+`/review` と Codex のレビューの指摘を受けて、3.1〜3.3 の一部を変えた（[試験記録の 5 章](test-report.md#review)・[7 章](test-report.md#codex)）。
 
 `secret-content` の次に、検査 `tool-versions` を足す。
 
-- `.github/workflows/ci.yaml` を読み、4 つの `<名前>_VERSION` の値を行の正規表現で取る（標準ライブラリに YAML の parser がないため）。ファイルがないか、キーがちょうど 1 回現れなければ FAIL にする。
+- `.github/workflows/ci.yaml` を読み、4 つの `<名前>_VERSION` の値を行の正規表現で取る（標準ライブラリに YAML の parser がないため）。ファイルがないか、キーがちょうど 1 回現れなければ FAIL にする。値の引用符と、空白の後の行末のコメントは外す（どちらも GitHub Actions に渡る値を変えない）。外した値が `数字.数字.数字` として読めなければ、`.github/workflows/ci.yaml: cannot read <名前>_VERSION as a version` で FAIL にし、残りのツールは調べる。
 - PATH のツールを `shutil.which` で探し、版のコマンド（gitleaks は `version`、ほかは `--version`）を実行する。出力の最初の `数字.数字.数字` を版とする。比べる前に、`ci.yaml` の値の先頭の `v` を外す。
 - 次のときは FAIL にする（検査できないときも成功扱いにしない）。メッセージにパスは出さない（CI のログは公開される）。
   - 見つからない: `<ツール> not found (install it with brew install <ツール>)`
@@ -61,7 +61,7 @@ created: 2026-11-25
 
 - 最小構成に、4 つの版だけを書いた `.github/workflows/ci.yaml` を足す。
 - `check()` は既定で、2 章の出力をまねる偽のツールを置いたディレクトリを PATH の先頭に足す。手元に入っている版に結果が左右されないようにするため。偽の gitleaks は、`version` のときだけ版を出し、ほかの引数では本物の gitleaks に渡す（`secret-content` のテストは本物で動かす）。
-- 足すテスト: 手元が新しいと CI を上げる案内で FAIL（数で比べる）/ 手元が古いと brew upgrade の案内で FAIL / `ci.yaml` がないと FAIL / キーがないと FAIL / キーが 2 回あると FAIL / ツールがないと FAIL / 版を読めないと FAIL / 終了コードが 0 でないと FAIL / タイムアウトするとパスを出さずに FAIL し、残りのツールも調べる / 起動できないとパスを出さずに FAIL。
+- 足すテスト: 手元が新しいと CI を上げる案内で FAIL（数で比べる）/ 手元が古いと brew upgrade の案内で FAIL / `ci.yaml` がないと FAIL / キーがないと FAIL / キーが 2 回あると FAIL / ツールがないと FAIL / 版を読めないと FAIL / 終了コードが 0 でないと FAIL / タイムアウトするとパスを出さずに FAIL し、残りのツールも調べる / 起動できないとパスを出さずに FAIL / 引用符で囲んだ値は通る / 行末にコメントのある値は通る / 版として読めない値は FAIL し、残りのツールも調べる。
 
 ### 3.3 `.github/workflows/ci.yaml`
 
