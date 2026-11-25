@@ -42,7 +42,7 @@ Claude Code の設定を管理するディレクトリ。`setup.sh` で `~/.clau
 
 ### 新規セットアップ（`setup.sh`）
 
-通常のターミナルで、Claude Code のセッションをすべて閉じてから実行する（dotfiles 全体のセットアップでは、ルートの `setup.command` から実行される）。セッションの中と IDE の統合ターミナルでは実行を拒否する。`setup.sh` は次を行う。
+通常のターミナルで、Claude Code のセッションをすべて閉じてから実行する（dotfiles 全体のセットアップでは、ルートの `setup.command` から実行される）。セッションの中と IDE の統合ターミナル、git worktree の中のスクリプトでは実行を拒否する。`setup.sh` は次を行う。
 
 - `settings.json`・`CLAUDE.md`・`rules/`・`hooks/`・`scripts/statusline.sh` を `~/.claude/` にリンクする。`~/.claude/hooks/` が実ディレクトリの場合は、削除してからリンクに置き換える。
 - `skills/*/` の個人スキルを `~/.claude/skills/` にリンクする（全プロジェクトで使える）。
