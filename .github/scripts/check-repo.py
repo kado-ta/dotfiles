@@ -99,16 +99,19 @@ MISE_ENV_GLOBS = ("bin/.z*", "zsh/*.zsh")
 GITCONFIG = "bin/.gitconfig"
 # リンク用のスクリプトの worktree の判定（PR #124）。worktree の中から実行すると、リンクが worktree を指し、worktree を
 # 消すと警告なしに切れる。CI はスクリプトを動かさないので、書き方で確かめる。誤操作を防ぐためのもので、わざと崩した書き方は通る。
-# 対象は ln を呼ぶ *.sh。hook のテストは一時ディレクトリの中にリンクを作るので除く。\ln・`ln …`・LN="ln …" の形も
-# 対象にする（文字列の中の ln も当たるが、漏れて黙って通るより、誤って失敗して除外に足すほうを選ぶ）。
+# 対象は ln を呼ぶ *.sh。hook のテストは一時ディレクトリの中にリンクを作るので除く。\ln・`ln …`・LN="ln"・"/bin/ln"・
+# ln>/dev/null の形も対象にする（文字列の中の ln も当たるが、漏れて黙って通るより、誤って失敗して除外に足すほうを選ぶ）。
 LINK_GUARD_EXEMPT = ("claude/hooks/tests/",)
-LN_COMMAND = re.compile(r"(?:^|[\s;&|(`\"'=\\])(?:\S*/)?ln(?:\s|$)")
+LN_COMMAND = re.compile(r"(?:^|[\s;&|(`\"'=\\])(?:\S*/)?ln(?:[\s;&|()<>`\"']|$)")
 SHELL_BLANK_OR_COMMENT = re.compile(r"\s*(?:#.*)?")
 # 判定は $SCRIPT_DIR/../.git を見るので、スクリプトはルートの 1 つ下に置く。インデントした判定と、前置きの if の中の判定は、
 # 実行されないことがあるので数えない。
 LINK_GUARD = re.compile(r'if \[ -f "\$(?:SCRIPT_DIR|\{SCRIPT_DIR\})/\.\./\.git" \]; then\s*')
 LINK_GUARD_SCRIPT_DIR = re.compile(r'\s*SCRIPT_DIR=\$\(cd "\$\(dirname "\$0"\)" && pwd\)\s*')
-LINK_GUARD_ECHO = re.compile(r'\s*echo "[^"]*"(?: >&2)?\s*')
+# 引用符の中の \" は文字列を閉じない。行末の \" で次の行へ続く文字列（その中の exit 1）を echo として数えない。
+LINK_GUARD_ECHO = re.compile(r'\s*echo "(?:[^"\\]|\\.)*"(?: >&2)?\s*')
+# パイプやリダイレクトの付かない fi（後ろのコメントは可）。
+SHELL_FI_LINE = re.compile(r"\s*fi\s*(?:#.*)?")
 # 判定より前に置いてよい行（set と、macOS や CLAUDECODE の確認の部品）。書き込むコマンドはツールの呼び出しも含めて
 # 並べきれないので、許す行を決める。判定の本体も同じく、echo とコメントの後の exit 1 だけを数える（抜け道の || {、
 # 継続行、case、入れ子の if・else の中の exit 1 は、条件しだいで実行されない）。
@@ -119,7 +122,7 @@ LINK_GUARD_PRELUDE = (
     re.compile(r"\s*set(?:\s+[-+][A-Za-z]+|\s+[a-z]+)+\s*"),
     re.compile(r"\s*if \[ [^;&|<>`]* \] ?; then\s*"),
     re.compile(r"\s*exit [0-9]+\s*"),
-    re.compile(r"\s*fi\s*(?:#.*)?"),
+    SHELL_FI_LINE,
 )
 # 前置きの if の深さを数えるための fi と、1 行で閉じる if（…; fi）。
 SHELL_FI = re.compile(r"\s*fi\b")
@@ -534,11 +537,19 @@ def check_rerere(root):
 
 
 def guard_exits(lines):
-    """判定の if の次の行から、空行・コメント・echo "…" だけを挟んで exit 1 だけの行があるか。"""
+    """判定の if の次の行から、空行・コメント・echo "…" だけを挟んで exit 1 があり、次の行がただの fi か。
+
+    fi にパイプなどが付くと、if 全体が子シェルで動き、exit 1 は子シェルだけを終える。
+    """
+    exited = False
     for line in lines:
+        if SHELL_BLANK_OR_COMMENT.fullmatch(line):
+            continue
+        if exited:
+            return bool(SHELL_FI_LINE.fullmatch(line))
         if line.strip() == "exit 1":
-            return True
-        if not (SHELL_BLANK_OR_COMMENT.fullmatch(line) or LINK_GUARD_ECHO.fullmatch(line)):
+            exited = True
+        elif not LINK_GUARD_ECHO.fullmatch(line):
             return False
     return False
 

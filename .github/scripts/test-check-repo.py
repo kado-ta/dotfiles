@@ -763,7 +763,9 @@ class CheckRepoTests(unittest.TestCase):
         tabs = 'if [ -f "${SCRIPT_DIR}/../.git" ]; then\n\techo "${SCRIPT_DIR} is in a git worktree." >&2\n\texit 1\nfi\n'
         for name, text in (("braced", link_script(guard=GUARD.replace("$SCRIPT_DIR", "${SCRIPT_DIR}"))),
                            ("tabs", link_script(guard=tabs)), ("prelude", link_script(before=prelude)),
-                           ("fi with comment", link_script(guard=GUARD.replace("fi\n", "fi # worktree guard\n")))):
+                           ("fi with comment", link_script(guard=GUARD.replace("fi\n", "fi # worktree guard\n"))),
+                           ("escaped quotes", link_script(guard=GUARD.replace(
+                               'worktree."', 'worktree. Run it from \\"~/dotfiles\\"."')))):
             with self.subTest(case=name):
                 self.write("aws/link.sh", text)
                 self.assert_passes()
@@ -785,7 +787,9 @@ class CheckRepoTests(unittest.TestCase):
                      'command ln -s "$SCRIPT_DIR/x" "$HOME/x"', 'true;ln -s "$SCRIPT_DIR/x" "$HOME/x"',
                      'ln "$SCRIPT_DIR/x" "$HOME/x"', '\\ln -s "$SCRIPT_DIR/x" "$HOME/x"',
                      'out=`ln -s "$SCRIPT_DIR/x" "$HOME/x"`', 'LN="ln -snfv"\n$LN "$SCRIPT_DIR/x" "$HOME/x"',
-                     "LN='ln -snfv'\n$LN \"$SCRIPT_DIR/x\" \"$HOME/x\"", 'LN=ln\n$LN -s "$SCRIPT_DIR/x" "$HOME/x"'):
+                     "LN='ln -snfv'\n$LN \"$SCRIPT_DIR/x\" \"$HOME/x\"", 'LN=ln\n$LN -s "$SCRIPT_DIR/x" "$HOME/x"',
+                     'LN="ln"\n"$LN" -s "$SCRIPT_DIR/x" "$HOME/x"', 'ln>/dev/null -s "$SCRIPT_DIR/x" "$HOME/x"',
+                     '"/bin/ln" -snfv "$SCRIPT_DIR/x" "$HOME/x"'):
             with self.subTest(line=line):
                 self.write("aws/link.sh", "#!/bin/bash -e\n" + SCRIPT_DIR_LINE + line + "\n")
                 self.assert_fails("FAIL link-guard", "aws/link.sh: runs ln without the worktree guard")
@@ -830,7 +834,12 @@ class CheckRepoTests(unittest.TestCase):
                             # 抜け道や継続行、case の中の exit 1 も、条件しだいで実行されない。
                             ("or brace", GUARD.replace("  exit 1\n", '  [ -n "${ALLOW_WORKTREE:-}" ] || {\n    exit 1\n  }\n')),
                             ("or continuation", GUARD.replace("  exit 1\n", '  [ -n "${X:-}" ] ||\n  exit 1\n')),
-                            ("case", GUARD.replace("  exit 1\n", '  case "${X:-}" in\n    "")\n      exit 1\n      ;;\n  esac\n'))):
+                            ("case", GUARD.replace("  exit 1\n", '  case "${X:-}" in\n    "")\n      exit 1\n      ;;\n  esac\n')),
+                            # 行末の \" では文字列が閉じず、次の行の exit 1 は文字列の一部になる。
+                            ("escaped quote at end", GUARD.replace('worktree." >&2\n  exit 1\nfi\n',
+                                                                    'worktree.\\"\n  exit 1\n"\nfi\n')),
+                            # fi にパイプが付くと if 全体が子シェルで動き、exit 1 は子シェルだけを終える。
+                            ("pipe on fi", GUARD.replace("fi\n", "fi 2>&1 | sed 's/^/[aws] /' >&2\n"))):
             with self.subTest(case=name):
                 self.write("aws/link.sh", link_script(guard=guard))
                 self.assert_fails("FAIL link-guard", "aws/link.sh: runs ln without the worktree guard")
