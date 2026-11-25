@@ -1,0 +1,7 @@
+**/.claude/.cc-writes/
+
+**/.claude/settings.local.json
+.cc-pr-request.json
+.cc-crit-request.json
+# claude -w の worktree。Claude Code は、スケジュール済みタスクを動かしたリポジトリの .git/info/exclude にしか足さない。
+**/.claude/worktrees/
