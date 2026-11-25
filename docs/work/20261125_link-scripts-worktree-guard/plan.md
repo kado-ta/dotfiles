@@ -76,7 +76,8 @@ fi
 ## 採らなかった案
 
 - **リンク元を常に `~/dotfiles` に固定する**: worktree で試しているつもりでも、main のファイルにリンクされる。
-- **`~/dotfiles` 以外のチェックアウトをすべて止める（clone も含む）**: 偽の HOME での確認（PR #117 で使った方法）ができなくなる。別の場所の clone（`~/ClaudeWork` の案）は Issue #75 で保留しているので、そのときに判断する。
+- **`~/dotfiles` 以外のチェックアウトをすべて止める（clone も含む）**: 一時ディレクトリに写したリポジトリで、偽の HOME を使って確かめることもできなくなる（採った案でも、worktree の中では偽の HOME での確認はできない。[対象外と残るリスク](#out-of-scope) を参照）。別の場所の clone（`~/ClaudeWork` の案）は Issue #75 で保留しているので、そのときに判断する。
+- **HOME が本物のホームのときだけ止める**（`dscl` で調べる）: worktree の中でも偽の HOME で確かめられるが、10 本に本物のホームを調べるコードが入る。2026-11-25 のレビューで採らないことにした。
 - **`git rev-parse --git-dir` と `--git-common-dir` を比べる**: git が要り、worktree の設定を読む git を動かす。
 - **共通の関数のファイルを `source` する**: ディレクトリごとに独立している今の構成と合わない。5 行の重複は受け入れる。
 
@@ -105,8 +106,12 @@ fi
 
 ## 対象外と残るリスク
 
-- `git clone --separate-git-dir` で作ったチェックアウトも `.git` がファイルなので止まる。このリポジトリでは使っていない。
-- 別の場所の clone からの実行は止めない（Issue #75）。
+- 判定は誤操作を防ぐためのもので、守りではない。判定は worktree 自身のスクリプトの中にあるので、この判定を含まない古いブランチの worktree（2026-11-25 時点の `.claude/worktrees/add-gitleaks` の `feat/gitleaks-check` など）では止まらない。worktree の中のセッションが判定を消すこともできる。古いブランチの worktree のスクリプトは、main を取り込むまで実行しない。
+- worktree の中では、偽の HOME を使った確認もできない（判定は HOME を見ない）。一時ディレクトリの git リポジトリに写して確かめる（[test-report.md](test-report.md#method) の方法）。2026-11-25 のレビューで受け入れた。
+- 判定が抜けないようにする自動の検査はない（CI はこれらのスクリプトを動かさない）。リンク用のスクリプトを足したり移したりしたときに、判定がなくても気づけない。`check-repo.py` に検査を足すことは、このブランチのマージ後に対応する（2026-11-25 のレビューで決定）。
+- `.git` がファイルになる本体（`git clone --separate-git-dir`、bare リポジトリからの `git worktree add`、submodule）も止まる。メッセージは worktree と言うので、原因が分かりにくい。このリポジトリではどれも使っていない。
+- 別の場所の clone と、`.git` のないコピー（`cp -R`、アーカイブの展開など）からの実行は止めない（clone は Issue #75）。
+- 変更前からある問題: bash で `source` すると `$0` が bash になり、`SCRIPT_DIR` がカレントディレクトリになるので、判定を通る。そのとき `aws/link.sh` は、リポジトリのルートに ignore されない `config`・`credentials` を作る。この PR では直さない。
 - 既に worktree を指しているリンクは直さない。2026-11-25 に、この Mac の主なリンク（`~/.zshrc`・`~/.gitconfig`・`~/.config/` の下・`~/.atuin/config.toml`・`~/.claude/` の settings・hooks・rules・`~/.codex/AGENTS.md`・biome・VSCode）がどれも `~/dotfiles` を指していることを確かめた。`~/.aws` は sandbox から読めないので見ていない。
 - リンクを作らないスクリプト（`bin/init.sh`・`bin/setup_brew.sh`・`zsh/setup.sh`・`zsh/setup_plugins.sh`・`biome/sync_schema.sh`）は変えない。`sync_schema.sh` は mise の設定のリンクをたどって動くので、`mise/setup.sh` を止めれば足りる。
 - 判定は、スクリプトがルートの 1 つ下にあることに頼る。スクリプトを深い階層に移すときは、判定のパスも変える。
