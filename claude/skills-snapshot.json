@@ -529,6 +529,14 @@
       "provider": "gstack",
       "user_invocable": true
     },
+    "pm-assist": {
+      "description": "sha256:72620ef370d6a666",
+      "dmi": false,
+      "hooks": null,
+      "override": "on",
+      "provider": "personal",
+      "user_invocable": true
+    },
     "pstack:architect": {
       "description": "sha256:0099a63aeda44737",
       "dmi": true,
