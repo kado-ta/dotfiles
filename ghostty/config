@@ -57,6 +57,9 @@ macos-option-as-alt = left
 # Cursor
 # =============================================================================
 cursor-color = #3fade5
+# カーソルの下の文字は、セルの背景色にする。テーマ（GitHub Dark Dimmed）の #93dbff のままだと、
+# 上の cursor-color とのコントラストが 1.66 しかなく、ブロックカーソルの下の文字が読めないため。
+cursor-text = cell-background
 cursor-style = block
 cursor-style-blink = true
 
