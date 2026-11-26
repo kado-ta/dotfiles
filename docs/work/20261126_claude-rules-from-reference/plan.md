@@ -31,9 +31,9 @@ created: 2026-11-26
 
 ### 2.1 Claude Code に元からある指示（v2.1.331）
 
-- Agent ツールの説明に「Do the work yourself when it is a handful of tool calls ...; don't delegate a check you could run inline.」「Delegate review only when you want a read that isn't anchored on yours」「When in doubt, don't spawn.」がある。候補 1 の前半と同じで、後半（検証を委譲しない）もほぼ同じ。
+- Agent ツールの説明に「Do the work yourself when it is a handful of tool calls ...; don't delegate a check you could run inline.」「Delegate review only when you want a read that isn't anchored on yours」「When in doubt, don't spawn.」がある。候補 1 の前半と同じ。後半（検証を委譲しない）は「don't delegate a check you could run inline」と重なる。独立した読みが欲しいときのレビューの委譲は、元からある指示が認めている（この作業の `/review` もその使い方）。
 - Agent ツールの説明に「Never fabricate or predict a pending agent's results」がある。対象はまだ届いていない結果だけで、空か壊れた応答と、ツールの空の出力には触れていない（候補 3 は一部だけ重なる）。
-- レビューの頼み方（候補 2）と、ターンの末尾の形（候補 4）に当たる記述はない。候補 2 とは逆に、「give a recommendation, not an exhaustive survey」「keep the scope explicit and narrow」と、絞る向きの記述がある。
+- レビューの頼み方（候補 2）と、ターンの末尾の形（候補 4）に当たる記述はない。候補 2 とは逆に、絞る向きの記述がある（システムプロンプトの「give a recommendation, not an exhaustive survey」と、Agent ツールの説明の「keep the scope explicit and narrow」）。
 
 <a name="facts-existing"></a>
 
@@ -146,7 +146,7 @@ challenge の行の「変更前と比べた後退や、壊れる入力を具体�
 3. `docs(claude): end investigation and implementation turns with deliverables and decisions`（3.2）
 4. `docs(claude): ask the Codex challenge for every finding`（3.3）
 5. `docs(codex): report minor findings in reviews for Claude Code`（3.4）
-6. `docs: record the checks for the reference rules work`（4 章の結果と `status`）
+6. `docs: record the checks for the reference rules work`（4 章の結果を `test-report.md` に書き、この plan の `status` を変える）
 
 PR の前に `/review` を実行し、指摘を直してから `/crit-review` でブランチの差分を開く。承認の後に `cc-safe-push` と `cc-safe-pr create` を実行し、`gh pr checks` で CI を確かめる。マージはユーザーが行う。
 
@@ -154,6 +154,6 @@ PR の前に `/review` を実行し、指摘を直してから `/crit-review` �
 
 ## 6. 採らなかった案
 
-- 候補 1 を `CLAUDE.md` か `SKILL_ROUTING.md` に入れる。元からある指示とほぼ同じで、`CLAUDE.md` に入れると行数が 80 を超える。元からある指示が版で変わって、委譲しすぎが 2 回あれば入れ直す。
+- 候補 1 を `CLAUDE.md` か `SKILL_ROUTING.md` に入れる。元からある指示とほぼ同じで、`CLAUDE.md` に 1 行足すと上限の 80 行に達し、ほかの追記の余地がなくなる。元からある指示が版で変わって、委譲しすぎが 2 回あれば入れ直す。
 - 候補 4 を Stop フックで強制する。`INSTRUCTION_PLACEMENT.md` では「毎回 Y」はフックで強制する対象だが、軽い質問のターンを見分けにくく、止めるたびに書き直しの生成が増える。文章で守られないことが 2 回あれば、フックを検討する。
 - 候補 2 を subagent へのレビューの依頼にも広げる。Claude がレビューを subagent に頼む経路は、元からある指示とスキルの規則で少ないので、今は challenge の行だけにする。
