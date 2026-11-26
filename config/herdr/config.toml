@@ -61,15 +61,16 @@ description = "scratch shell"
 width = "80%"
 height = "80%"
 
-# prefix なしのキーを足す。タブの作成・移動と、ペインの上下左右・直前に戻る・分割・閉じる・ズームは cmd+option、
-# ペインを順に移動するのは cmd+ctrl に割り当てる（cmd+option+[ / ] はタブの移動に使っている）。
+# prefix なしのキーを足す。タブの作成・移動と、ペインの移動・分割・閉じる・ズームは cmd+option、
+# エージェントの移動は cmd+ctrl に割り当てる。
 # Ghostty は macos-option-as-alt = left のため、左の Option で押す。
-# Ghostty の split 用のキー（cmd+[ / ]、cmd+option+矢印、cmd+ctrl+矢印）とは重ねない。
+# Ghostty の split 用のキー（cmd+[ / ]、cmd+ctrl+矢印）とは重ねない。cmd+option+矢印は Ghostty 側で外している（ghostty/config）。
 [keys]
 # 新しいタブは Ghostty の cmd+t に倣う。
 new_tab = ["prefix+c", "cmd+alt+t"]
-next_tab = ["prefix+n", "cmd+alt+]"]
-previous_tab = ["prefix+p", "cmd+alt+["]
+# タブの移動は、Ghostty のタブの移動（cmd+←/→）に option を足したキーにする。
+next_tab = ["prefix+n", "cmd+alt+right"]
+previous_tab = ["prefix+p", "cmd+alt+left"]
 # 分割は prefix と同じ v（右）と minus（下）にする。Ghostty の cmd+d に倣った cmd+option+d は、
 # macOS の Dock の自動非表示の切り替えに使われているので避ける。
 split_vertical = ["prefix+v", "cmd+alt+v"]
@@ -87,8 +88,8 @@ focus_pane_left = ["prefix+h", "cmd+alt+h"]
 focus_pane_down = ["prefix+j", "cmd+alt+j"]
 focus_pane_up = ["prefix+k", "cmd+alt+k"]
 focus_pane_right = ["prefix+l", "cmd+alt+l"]
-cycle_pane_next = ["prefix+tab", "cmd+ctrl+]"]
-cycle_pane_previous = ["prefix+shift+tab", "cmd+ctrl+["]
+cycle_pane_next = ["prefix+tab", "cmd+alt+]"]
+cycle_pane_previous = ["prefix+shift+tab", "cmd+alt+["]
 last_pane = "cmd+alt+o"
 next_agent = "cmd+ctrl+j"
 previous_agent = "cmd+ctrl+k"

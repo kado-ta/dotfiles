@@ -73,8 +73,8 @@ herdr の主なキーと、[config.toml](config.toml) で足した prefix なし
 | 操作 | 直接キー | prefix のキー |
 | --- | --- | --- |
 | 新しいタブ | `cmd+option+t` | `prefix+c` |
-| 次のタブへ | `cmd+option+]` | `prefix+n` |
-| 前のタブへ | `cmd+option+[` | `prefix+p` |
+| 次のタブへ | `cmd+option+→` | `prefix+n` |
+| 前のタブへ | `cmd+option+←` | `prefix+p` |
 
 | 操作 | prefix のキー |
 | --- | --- |
@@ -92,8 +92,8 @@ herdr の主なキーと、[config.toml](config.toml) で足した prefix なし
 | --- | --- | --- |
 | 左・下・上・右のペインへ移動 | `cmd+option+h` / `j` / `k` / `l` | `prefix+h` / `j` / `k` / `l` |
 | 直前のペインに戻る | `cmd+option+o` | なし |
-| 次のペインへ | `cmd+ctrl+]` | `prefix+tab` |
-| 前のペインへ | `cmd+ctrl+[` | `prefix+shift+tab` |
+| 次のペインへ | `cmd+option+]` | `prefix+tab` |
+| 前のペインへ | `cmd+option+[` | `prefix+shift+tab` |
 | 右に分割 | `cmd+option+v` | `prefix+v` |
 | 下に分割 | `cmd+option+minus` | `prefix+minus` |
 | ペインを閉じる | `cmd+option+x` | `prefix+x` |
