@@ -113,7 +113,7 @@ docs/
     └── assets/                 # 画像など（必要なときだけ）
 ```
 
-- ID は、GitHub Issue なら `GH-<番号>` とし、ゼロ埋めしない（例: `GH-12`）。それ以外のトラッカー（例: Salesforce Lifecycle Center の `WI-000002`）の ID は、各リポジトリのルールで決める。
+- ID は、GitHub Issue なら `GH-<番号>` とし、ゼロ埋めしない（例: `GH-12`）。それ以外のトラッカーの ID は、各リポジトリのルールで決める。
 - 先頭の `YYYYMMDD` は作成日（YAML ヘッダーの `created` と同じ日）とし、後から変えない。ID のない作業は `YYYYMMDD_<slug>` にする。
 - superpowers の brainstorming の design は `work/YYYYMMDD_<ID>_<slug>/design.md` に、writing-plans の plan は `work/YYYYMMDD_<ID>_<slug>/plan.md` に書く。
 
