@@ -262,6 +262,8 @@ def in_worktree(path):
         os.lstat(path)
     except (FileNotFoundError, NotADirectoryError):
         return False
+    except OSError:
+        pass
     return True
 
 

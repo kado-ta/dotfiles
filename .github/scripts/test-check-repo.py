@@ -393,15 +393,18 @@ class CheckRepoTests(unittest.TestCase):
         self.assert_fails("FAIL markdown-names", "notes.md: Markdown file names")
 
     def test_file_that_cannot_be_looked_up_is_not_treated_as_deleted(self):
-        # ディレクトリの権限で lstat できないファイルは、消えたのではない。読む検査で失敗させる。
+        # ディレクトリの権限で lstat できないファイルは、消えたのではない。一覧には残し、読む検査で失敗させる。
+        # そのファイルを読まない検査は、ほかのファイルの結果を出す。
         if os.geteuid() == 0:
             self.skipTest("root can look up files without permission")
         self.write("locked/f.txt", "plain\n")
+        self.write("ghostty/link.sh", "#!/bin/bash -e\n" + SCRIPT_DIR_LINE + LINK_BODY)
         (self.root / "locked").chmod(0)
         self.addCleanup((self.root / "locked").chmod, 0o755)
         code, out = self.check()
         self.assertEqual(code, 1, out)
         self.assertIn("FAIL local-paths\n  error: PermissionError", out)
+        self.assertIn("FAIL link-guard\n  ghostty/link.sh: runs ln without the worktree guard", out)
         self.assertNotIn("deleted from the working tree", out)
 
     def test_aws_credentials_deleted_but_still_in_the_index_fails(self):
