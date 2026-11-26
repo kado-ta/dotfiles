@@ -1,12 +1,19 @@
 # =============================================================================
 # Font
 # =============================================================================
-# HackGen Nerd は Starship のアイコン表示に必要）
+# HackGen Nerd は Starship のアイコン表示に必要
 font-family = Fira Code
 font-family = HackGen Console NF
 font-size = 12
 font-feature = +calt
 font-feature = +liga
+# 太字は Fira Code と PlemolJP Console の SemiBold にする。HackGen には Regular と Bold しかなく、
+# 日本語の Bold が潰れて読みにくいため。通常の文字は font-family のフォントのまま。
+font-family-bold = Fira Code
+font-family-bold = PlemolJP Console
+font-style-bold = SemiBold
+# 行間を広げる。セルの高さを 5% 増やし、文字はセルの上下中央に置かれる。
+adjust-cell-height = 5%
 
 # =============================================================================
 # Window
@@ -50,6 +57,9 @@ macos-option-as-alt = left
 # Cursor
 # =============================================================================
 cursor-color = #3fade5
+# カーソルの下の文字は、セルの背景色にする。テーマ（GitHub Dark Dimmed）の #93dbff のままだと、
+# 上の cursor-color とのコントラストが 1.66 しかなく、ブロックカーソルの下の文字が読めないため。
+cursor-text = cell-background
 cursor-style = block
 cursor-style-blink = true
 
@@ -76,28 +86,15 @@ clipboard-paste-protection = true
 # =============================================================================
 # Colors
 # =============================================================================
+theme = GitHub Dark Dimmed
+# テーマの背景の白っぽさを黒くして落ち着かせる。
 background = #181d1f
-foreground = #8ea0b3
-bold-color = #b5babf
+# テーマの文字色が白くコントラストが強いのを少し暗くして落ち着かせる。
+foreground = #9aa7b4
+# 太字は #9aa7b4 より少し明るくする。
+bold-color = #adbac7
 selection-background = #1a4d74
 selection-foreground = #f4f7fa
-
-palette = 0=#003440
-palette = 1=#ed5165
-palette = 2=#6dc04c
-palette = 3=#b58900
-palette = 4=#3fade5
-palette = 5=#e07bff
-palette = 6=#5c87b1
-palette = 7=#e2e2e2
-palette = 8=#002833
-palette = 9=#e9244f
-palette = 10=#1b9d00
-palette = 11=#d7a301
-palette = 12=#0084cb
-palette = 13=#b333e1
-palette = 14=#006ba5
-palette = 15=#e7e7e7
 
 # =============================================================================
 # Notifications

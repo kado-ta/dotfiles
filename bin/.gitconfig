@@ -25,6 +25,26 @@
 	process = git-lfs filter-process
 	required = true
 	clean = git-lfs clean -- %f
+[color "diff"]
+# 追加行は、削除行の赤と見分けやすいよう、緑ではなく明るい青にする（Claude Code の差分の配色と同じ考え方）。
+# @@ の行は、既定のシアンが文字色と見分けにくいので、マゼンタにする。
+	new = brightblue
+	frag = magenta
+[color "status"]
+# ステージした変更は、ステージしていない変更の赤と見分けやすいよう、差分の追加行と同じ明るい青にする。
+# status -sb の自分のブランチは、git branch の現在のブランチと同じ明るい黄の太字にする。
+	added = brightblue
+	localBranch = brightyellow bold
+[color "decorate"]
+# git log のローカルのブランチは、リモートのブランチの赤と見分けやすいよう、明るい黄の太字にする。
+# タグは、既定の太字の黄だと Ghostty で明るい黄になり、ローカルのブランチと同じ色になるので、太字なしの青にする。
+	branch = brightyellow bold
+	tag = blue
+[color "branch"]
+# 現在のブランチは明るい黄の太字、ほかのワークツリーで使われているブランチ（+）は明るい青にする。
+# 既定の緑は暗く、シアンは文字色と見分けにくいため。明るい青は明るい黄より彩度が低く、現在のブランチより目立たない。
+	current = brightyellow bold
+	worktree = brightblue
 
 [includeIf "gitdir:~/Dev/numm/"]
 	path = ~/.gitconfig_numm

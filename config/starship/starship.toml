@@ -3,3 +3,7 @@ add_newline = true
 [directory]
 truncation_length = 100
 truncate_to_repo = false
+
+# 成功の ❯ は、失敗の赤と見分けやすいよう、既定の緑ではなく青にする（git の差分の追加行と同じ考え方）。
+[character]
+success_symbol = "[❯](bold blue)"
