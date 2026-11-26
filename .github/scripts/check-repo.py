@@ -738,12 +738,58 @@ def check_link_guard(root):
     return errors
 
 
+def strip_jsonc(text):
+    """JSONC のコメントと、閉じ括弧の直前の末尾のカンマを空白に替える。改行は残すので、行番号はずれない。
+
+    閉じていないブロックコメントと、要素の後でないカンマ（{,} など）は VSCode でも誤りなので、そのまま残して
+    json.loads に誤りとして報告させる。
+    """
+    out = list(text)
+    i, n = 0, len(text)
+    last = None  # 文字列とコメントの外の、直前の空白でない文字（文字列は '"'）。
+    comma = None  # 要素の後の最後のカンマ。後に空白とコメントしか続かないあいだだけ保つ。
+    while i < n:
+        if text[i] == '"':
+            comma, last = None, '"'
+            i += 1
+            while i < n and text[i] != '"':
+                i += 2 if text[i] == "\\" else 1
+            i += 1
+        elif text.startswith(("//", "/*"), i):
+            line_comment = text[i + 1] == "/"
+            end = text.find("\n" if line_comment else "*/", i + 2)
+            if end == -1:
+                if not line_comment:
+                    break
+                end = n
+            elif not line_comment:
+                end += 2
+            for j in range(i, end):
+                if out[j] != "\n":
+                    out[j] = " "
+            i = end
+        else:
+            ch = text[i]
+            if ch == ",":
+                comma = None if last in (None, "{", "[", ",") else i
+            elif ch in "}]" and comma is not None:
+                out[comma] = " "
+                comma = None
+            elif not ch.isspace():
+                comma = None
+            if not ch.isspace():
+                last = ch
+            i += 1
+    return "".join(out)
+
+
 def check_syntax(root):
     errors = []
     for rel in repo_files(root):
-        if rel.endswith(".json") and rel not in JSONC_FILES:
+        if rel.endswith(".json"):
             try:
-                json.loads((root / rel).read_text(encoding="utf-8"))
+                text = (root / rel).read_text(encoding="utf-8")
+                json.loads(strip_jsonc(text) if rel in JSONC_FILES else text)
             except json.JSONDecodeError as e:
                 errors.append(f"{rel}:{e.lineno}: {e.msg}")
         elif rel.endswith(".toml"):
