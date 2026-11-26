@@ -355,16 +355,39 @@ class CheckRepoTests(unittest.TestCase):
         self.write("aws/config", "[default]\n")
         self.assert_fails("FAIL secret-files", "aws/config")
 
-    def test_files_deleted_but_still_in_the_index_are_skipped(self):
-        # 作業ツリーで消したが git rm していないファイル。読めないので、読む検査は飛ばす。
-        self.write("a.json", "{}\n")
-        self.write("b.toml", "x = 1\n")
-        self.write("NOTE.md", "# Note\n")
-        self.write("c.txt", "plain\n")
-        self.write("x/gone.sh", "#!/bin/bash\nln -s a b\n")
-        for rel in ("a.json", "b.toml", "NOTE.md", "c.txt", "x/gone.sh"):
+    def test_files_deleted_but_still_in_the_index_fail_only_local_paths(self):
+        # 作業ツリーで消したが git rm していないファイルは、index に残っていてコミットに入る。中身を読めないので、
+        # 公開を防ぐ local-paths は相対パスで FAIL にし、ほかの中身を読む検査は飛ばす。
+        files = {"a.json": "{}\n", "b.toml": "x = 1\n", "NOTE.md": "# Note\n", "c.txt": "plain\n",
+                 "x/gone.sh": "#!/bin/bash\nln -s a b\n"}
+        for rel, text in files.items():
+            self.write(rel, text)
             (self.root / rel).unlink()
-        self.assert_passes()
+        code, out = self.check()
+        self.assertEqual(code, 1, out)
+        for rel in files:
+            self.assertIn(f"  {rel}: deleted from the working tree but still in the index", out)
+        for name in ("syntax", "markdown-names", "markdown-links", "link-guard"):
+            self.assertIn(f"PASS {name}\n", out)
+        self.assertNotIn("error:", out)
+
+    def test_badly_named_markdown_deleted_but_still_in_the_index_fails(self):
+        # markdown-names は名前だけを見るので、index に残る（コミットに入る）ファイルも調べる。
+        self.write("notes.md", "# Notes\n")
+        (self.root / "notes.md").unlink()
+        self.assert_fails("FAIL markdown-names", "notes.md: Markdown file names")
+
+    def test_file_that_cannot_be_looked_up_is_not_treated_as_deleted(self):
+        # ディレクトリの権限で lstat できないファイルは、消えたのではない。読む検査で失敗させる。
+        if os.geteuid() == 0:
+            self.skipTest("root can look up files without permission")
+        self.write("locked/f.txt", "plain\n")
+        (self.root / "locked").chmod(0)
+        self.addCleanup((self.root / "locked").chmod, 0o755)
+        code, out = self.check()
+        self.assertEqual(code, 1, out)
+        self.assertIn("FAIL local-paths\n  error: PermissionError", out)
+        self.assertNotIn("deleted from the working tree", out)
 
     def test_aws_credentials_deleted_but_still_in_the_index_fails(self):
         # 作業ツリーで消しただけでは、index に残っていてコミットに入る。
