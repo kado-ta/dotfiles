@@ -95,7 +95,7 @@ https://x.com/ai_database/status/2114184481951330365?s=12
 
 ## Cross-model review (Codex)
 
-- Codex はレビュワーとして使う。設計判断を含む変更、大規模変更、セキュリティ関連の変更では、完了前に Codex レビューを提案する。
+- Codex はレビュワーとして使う。設計判断を含む変更、大規模変更、セキュリティ関連の変更では、完了前（ブランチの差分を `/crit-review` で開くときは、その前）に Codex レビューを提案する。
 - Codex の指摘は鵜呑みにせず、採用/不採用と理由を整理して提示する。
 - Codex レビューは 1 タスク（PR）あたり最大 5 回までとする。5 回を超えて必要な場合は判断を仰ぐ。
 
@@ -112,7 +112,7 @@ https://x.com/ai_database/status/2114184481951330365?s=12
 - 今のブランチ以外の PR のレビュー依頼には、作者を問わず、チェックアウトせずに `/code-review medium <PR の URL>` を使う（番号だけなら `gh pr view` で URL にする。URL なら、読めないときにほかの差分をレビューせずに止まる）。`--comment`・`--fix` は付けない。高リスクでも、今のブランチを見るレビュー（`/security-review`・Codex・`interrogate`）は重ねない。`/review <番号>` で今のブランチ以外の PR を頼まれたら、始める前に止めてこちらを提案する。レビューのために PR を手元に取り込まない（PR の hooks などが sandbox の外で動きうる）。`ultra` は、Claude のアカウントに GitHub をつなぐ必要があるので提案しない。
 - Crit での人間のレビューは `/crit-review` で開く。
   - 作業文書の design / plan を書き終えて承認を求めるときは、チャットで頼む代わりに `/crit-review <file>` で開く。`approved: true` が返ったら承認とみなす。
-  - PR を作るときは毎回、push と PR 作成の前に `/crit-review` でブランチの差分を開き、`approved: true` が返るまでどちらもしない。AI のレビュー（`/review` など）をするときは、その指摘を直した後に開く。
+  - PR を作るときは毎回、push と PR 作成の前に `/crit-review` でブランチの差分を開き、`approved: true` が返るまでどちらもしない。AI のレビュー（`/review`・Codex など）をするときは、その指摘の採否を決め、採用したものを直した後に開く。
 
 <!--
 gstack の CLAUDE.md へのルーティング規則の追記案内は routing_declined で止めている。
