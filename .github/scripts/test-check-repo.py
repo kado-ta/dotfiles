@@ -68,6 +68,12 @@ OBSIDIAN_DENY_WRITE = ["/**/.obsidian", "~/Obsidian/*/.gitignore"]
 OBSIDIAN_DENY_READ = ["/**/.obsidian/plugins"]
 OBSIDIAN_DENY = ["Edit(//**/.obsidian/**)", "Read(//**/.obsidian/plugins/**)"]
 OBSIDIAN_ASK = ["Edit(~/Obsidian/*/.gitignore)"]
+WORKBOOK_DIR = "~/Dev/workbook_intake"
+WORKBOOK_DUMMY = "/dev/null/workbook-intake-dummy"
+WORKBOOK_SHA = "0123456789abcdef0123456789abcdef01234567"
+WORKBOOK_UV_DIRS = ["~/.cache/uv", "~/.local/share/uv"]
+WORKBOOK_DENY_WRITE = [WORKBOOK_DIR] + WORKBOOK_UV_DIRS
+WORKBOOK_DENY = [f"Read({WORKBOOK_DIR}/**)", f"Edit({WORKBOOK_DIR}/**)"] + [f"Edit({d}/**)" for d in WORKBOOK_UV_DIRS]
 PROJECT_ASK = [
     "Edit(/claude/**)",
     "Edit(/zsh/**)",
@@ -196,6 +202,22 @@ def settings():
         "statusLine": {"type": "command", "command": "~/.claude/scripts/status.sh"},
         "disabledMcpjsonServers": ["playwright"],
     }
+
+
+def workbook_settings():
+    """workbook-intake のマーケットプレイスと、受取用フォルダ・uv の守りを足した設定。"""
+    data = settings()
+    data["env"] = {"WORKBOOK_INTAKE_DIR": WORKBOOK_DUMMY}
+    data["extraKnownMarketplaces"] = {
+        "workbook-intake": {
+            "source": {"source": "github", "repo": "kado-ta/workbook-intake", "ref": WORKBOOK_SHA},
+            "autoUpdate": False,
+        },
+    }
+    data["permissions"]["deny"] += WORKBOOK_DENY
+    data["sandbox"]["filesystem"]["denyRead"].append(WORKBOOK_DIR)
+    data["sandbox"]["filesystem"]["denyWrite"] += WORKBOOK_DENY_WRITE
+    return data
 
 
 def link_script(before="", guard=GUARD):
@@ -925,6 +947,75 @@ class CheckRepoTests(unittest.TestCase):
                 data["permissions"]["ask"].remove(rule)
                 self.write_settings(data)
                 self.assert_fails("FAIL obsidian-vault", f"permissions.ask lacks {rule}")
+
+    def test_workbook_intake_settings_pass(self):
+        self.write_settings(workbook_settings())
+        self.assert_passes()
+
+    def test_missing_workbook_intake_deny_write_fails(self):
+        # 受取用フォルダは検査の後の差し替えを、uv のキャッシュと Python は xlide が sandbox の外で動かすコードの
+        # 書き換えを防ぐ。~ で起動したセッションでは、どちらも sandbox から書ける場所になる。
+        for path in WORKBOOK_DENY_WRITE:
+            with self.subTest(path=path):
+                data = workbook_settings()
+                data["sandbox"]["filesystem"]["denyWrite"].remove(path)
+                self.write_settings(data)
+                self.assert_fails("FAIL workbook-intake", f"sandbox.filesystem.denyWrite lacks {path}")
+
+    def test_missing_workbook_intake_deny_read_fails(self):
+        # プラグインの必須の設定。外から受け取ったブックを Bash に読ませない。
+        data = workbook_settings()
+        data["sandbox"]["filesystem"]["denyRead"].remove(WORKBOOK_DIR)
+        self.write_settings(data)
+        self.assert_fails("FAIL workbook-intake", f"sandbox.filesystem.denyRead lacks {WORKBOOK_DIR}")
+
+    def test_missing_workbook_intake_deny_fails(self):
+        # denyWrite・denyRead は Bash しか止めない。Read・Edit ツールは規則で止める。
+        for rule in WORKBOOK_DENY:
+            with self.subTest(rule=rule):
+                data = workbook_settings()
+                data["permissions"]["deny"].remove(rule)
+                self.write_settings(data)
+                self.assert_fails("FAIL workbook-intake", f"permissions.deny lacks {rule}")
+
+    def test_workbook_intake_env_other_than_dummy_fails(self):
+        # ユーザー設定の env は全プロジェクトの MCP の定義にも展開される。本物のフォルダ（や、作れて守られない
+        # フォルダ、既定値に戻る未設定）にすると、プラグインを有効にしていないプロジェクトの xlide がそこを読む。
+        # 本物のフォルダは、使うプロジェクトの .claude/settings.local.json でだけ指す。
+        for value in (WORKBOOK_DIR, "~/workbook-intake", None):
+            with self.subTest(value=value):
+                data = workbook_settings()
+                if value is None:
+                    del data["env"]["WORKBOOK_INTAKE_DIR"]
+                else:
+                    data["env"]["WORKBOOK_INTAKE_DIR"] = value
+                self.write_settings(data)
+                self.assert_fails("FAIL workbook-intake", f"env.WORKBOOK_INTAKE_DIR must be {WORKBOOK_DUMMY}")
+
+    def test_unpinned_workbook_intake_marketplace_fails(self):
+        # ブランチやタグの ref は、取得のたびに新しいコミットへ動く。
+        for ref in ("main", "v0.1.1", WORKBOOK_SHA[:7], None):
+            with self.subTest(ref=ref):
+                data = workbook_settings()
+                source = data["extraKnownMarketplaces"]["workbook-intake"]["source"]
+                if ref is None:
+                    del source["ref"]
+                else:
+                    source["ref"] = ref
+                self.write_settings(data)
+                self.assert_fails("FAIL workbook-intake", "ref must be a 40-character commit SHA")
+
+    def test_workbook_intake_auto_update_fails(self):
+        for value in (True, None):
+            with self.subTest(value=value):
+                data = workbook_settings()
+                marketplace = data["extraKnownMarketplaces"]["workbook-intake"]
+                if value is None:
+                    del marketplace["autoUpdate"]
+                else:
+                    marketplace["autoUpdate"] = value
+                self.write_settings(data)
+                self.assert_fails("FAIL workbook-intake", "autoUpdate must be false")
 
     def playwright_group(self, data):
         return next(g for g in data["hooks"]["PreToolUse"] if g["matcher"] == "mcp__playwright__.*")

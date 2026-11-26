@@ -116,3 +116,18 @@ sandbox の中では、どこにも `.obsidian` という名前のフォルダ�
 dotfiles で起動したセッションでは、`~/dotfiles/obsidian/`（Vault の設定ファイルの実体）に Bash から書けず、Edit ツールは承認を求める。プロジェクト設定の `./obsidian` の denyWrite と `Edit(/obsidian/**)` の ask による（`project-permissions`）。
 
 経緯は [docs/work/20261126_KAD-19_obsidian-vault-sandbox/plan.md](../../docs/work/20261126_KAD-19_obsidian-vault-sandbox/plan.md) を参照する。
+
+<a name="workbook-intake"></a>
+
+## workbook-intake
+
+workbook-intake プラグインは、使う Mac の使うプロジェクトでだけ local スコープで入れる。受取用フォルダ（`~/Dev/workbook_intake`。`check-repo.py` の `WORKBOOK_DIR`）の守りとマーケットプレイスの固定は、全 Mac に共通のユーザー設定に置く。マーケットプレイスの宣言があるあいだ、`check-repo.py` の `workbook-intake` が次を確かめる。手順と、守りの外に残るものは [claude/README.md](../../claude/README.md#workbook-intake) にある。
+
+- 受取用フォルダの `sandbox.filesystem.denyRead` と `Read(~/Dev/workbook_intake/**)` の deny: プラグインの必須の設定。外から受け取ったブックを、Claude の Bash と Read ツールに読ませない（`denyRead` は Read ツールを止めない）。プラグインのスキルは、Read の拒否を確かめてから進む。拒否はユーザー設定で全プロジェクトに掛ける。
+- 受取用フォルダの `denyWrite` と `Edit(~/Dev/workbook_intake/**)` の deny: 検査の後のファイルの差し替えを防ぐ。`~` や `~/Dev` で起動したセッションでは、フォルダが allowWrite の `.` に入り、`blockWritesOutsideWorkingDirectories` も効かない。
+- ユーザー設定の `env.WORKBOOK_INTAKE_DIR` はダミーの `/dev/null/workbook-intake-dummy`: ユーザー設定の `env` は、全プロジェクトのフックと MCP の定義の `${WORKBOOK_INTAKE_DIR}` に渡る。本物のフォルダにすると、プラグインを有効にしていないプロジェクトの xlide（プラグインの開発用のリポジトリが、`.mcp.json` で定義して承認している）が、フックの守りを通らずに受取用フォルダを読む（`/review` の Security のレビュワーの指摘）。`/dev/null` の下には誰もフォルダを作れないので、置き間違いも起きない。本物のフォルダは、使うプロジェクトの `.claude/settings.local.json` の `env` で指す。プロジェクトの `env` がユーザー設定より優先され、Bash・フック・プロジェクトの `.mcp.json` に届くことは、2026-11-27 に試験用のプロジェクトで確かめた（プラグインの `.mcp.json` は未確認）。
+- `~/.cache/uv`・`~/.local/share/uv` の `denyWrite` と `Edit(…/**)` の deny: xlide は uvx で起動し、uv のキャッシュと uv が入れた Python のコードを、sandbox の外でユーザーの権限で動かす。`~` で起動したセッションから書き換えさせない（Playwright MCP の入れ場所と同じ考え方）。
+- マーケットプレイスの `ref` は 40 文字のコミット SHA、`autoUpdate` は `false`: 確かめたコミットだけを使う。ブランチやタグの `ref` は、取得のたびに新しいコミットへ動く。
+- denyRead を変えたら、cc-crit の `COVERED_DENY_READ` と `cc-crit.sb` も直し、全 Mac で入れ直す（[Crit のレビュー](#cc-crit)）。
+
+MCP サーバーは sandbox の外で動き、上の拒否は効かない。プラグインを使わないプロジェクトの `env` に、本物のフォルダを書かない。
