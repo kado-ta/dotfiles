@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: done
 created: 2026-11-26
 ---
 
@@ -104,7 +104,14 @@ P2 と P3 は、/review の指摘を直した後と、Codex の指摘を直し�
 
 ## 7. GitHub Actions
 
-[PR #136](https://github.com/kado-ta/dotfiles/pull/136) の fe2d21b の CI（run 45734709835）で、2 つのジョブ（Repository checks・Hook regression tests）がどちらも成功した。Codex の指摘を直したコミットの CI は、push の後に確かめる。
+[PR #136](https://github.com/kado-ta/dotfiles/pull/136) の CI で、どちらのコミットでも 2 つのジョブ（Repository checks・Hook regression tests）が成功した。
+
+| コミット | run | 結果 |
+| --- | --- | --- |
+| fe2d21b（/review の指摘を直した後） | 45734709835 | 成功 |
+| 10c6eb6（Codex の指摘を直した後） | 45737498501 | 成功 |
+
+PR #136 は 2026-11-26 に 21c3ccf でマージされ、Issue #104 は閉じた。Codex のレビューは 1 回目で終えた。
 
 <a name="codex"></a>
 
