@@ -117,10 +117,10 @@ Codex のユーザー設定 `~/.codex/config.toml` は、モデルや MCP の設
 4. `~/dotfiles/codex/rules/dotfiles.rules` を一時ディレクトリに写して検査し、その写しを `~/.codex/rules/dotfiles.rules` へコピーする（`install -m 0644`）。次のときは、コピーせずに止まる（[rules](#rules)）。
    - `allow` を含む。または、`prefix_rule(` の数と `decision = "prompt"` / `"forbidden"` の数が合わない（`decision` を省くと allow になる）。文字列の数で確かめるので、書き忘れなどの事故は止まるが、意図して崩した書き方（文字列の中の偽の `decision` など）は止まらない。
    - `codex execpolicy check` に失敗する。
-   - `git status`・`git diff`・`git log`・`git show` に当たる規則がある（`codex exec`・`codex review` で拒否されるため）。
+   - `git status`・`git diff`・`git log`・`git show` に当たる規則がある（`codex exec`・`codex review` で拒否されるため）。`git`・`/usr/bin/git`・`/opt/homebrew/bin/git` のそれぞれで照らす。引数のない形だけを見る。
    - `~/.codex/rules` の既存のファイルと一緒に読み込めない。
 
-   先頭が絶対パスの `allow` が既存のファイルにあれば警告する。コピーの前に、今入っているものとの差分を表示する。
+   先頭が絶対パスの `allow` が既存のファイルにあれば警告する（TUI が書く 1 行の形だけを見る）。コピーの前に、今入っているものとの差分を表示する。
 5. superpowers プラグインが未インストールなら追加する（`codex plugin add superpowers@openai-curated`）。`~/.codex/plugins/cache/openai-curated/superpowers` があればインストール済みとみなす。
 6. Understand Anything スキルが未インストールなら、Codex 向けにインストールする（GitHub の `install.sh` を `curl | bash` で実行）。Codex 用のスキルのリンク `~/.agents/skills/understand` と `~/.understand-anything-plugin` の両方があれば、インストール済みとみなす。
 7. Claude Code 用にインストールした gstack を、Codex でも使えるようにセットアップする（`~/.claude/skills/gstack/setup --host codex`）。
@@ -556,10 +556,17 @@ chmod 600 "$HOME/.codex/config.toml"
 **`codex exec`・`codex review` が `Error loading rules:` で止まる**
 
 - `~/.codex/rules/` の規則が読み込めない（構文の誤りや、`match`・`not_match` の例の食い違い）。TUI は警告を出し、規則なしで動く。
-- 次のコマンドで、読み込めないファイルを探す。`~/.codex/rules/default.rules`（Codex が書く）が原因のこともある。
+- まず、Codex と同じ対象（`.` で始まる名前を含み、リンクを除く）と順（バイト順）で、まとめて検査する。先に読まれるファイルの `host_executable()` で、後のファイルの `match` の例が外れることもあるため。
 
   ```bash
-  for f in ~/.codex/rules/*.rules; do codex execpolicy check --rules "$f" -- git status > /dev/null || echo "NG: $f"; done
+  args=(); while IFS= read -r f; do args+=(--rules "$f"); done < <(find -H ~/.codex/rules -maxdepth 1 -type f -name '*.rules' ! -name .rules | LC_ALL=C sort)
+  codex execpolicy check "${args[@]}" -- git status > /dev/null && echo OK
+  ```
+
+- 失敗したら、1 つずつ検査して原因を絞る。`~/.codex/rules/default.rules`（Codex が書く）が原因のこともある。
+
+  ```bash
+  find -H ~/.codex/rules -maxdepth 1 -type f -name '*.rules' ! -name .rules | while IFS= read -r f; do codex execpolicy check --rules "$f" -- git status > /dev/null || echo "NG: $f"; done
   ```
 - リポジトリの規則を直して `setup.sh` を実行し直す。急ぐときは `rm ~/.codex/rules/dotfiles.rules` で外す。
 
@@ -577,7 +584,7 @@ chmod 600 "$HOME/.codex/config.toml"
 
 - 両スクリプトは `CODEX_HOME` が定義されていれば、そのディレクトリ内の `config.toml` / `config.local.toml` を使用する。
 - `CODEX_HOME` によって **実ファイル側** のパスが変わる。`config.base.toml` はスクリプトの配置先を基準にする。
-- `setup.sh` は `~/.codex` 固定でリンクを作成する点に注意する。
+- `setup.sh` は `~/.codex` 固定でリンクを作成し、規則をコピーする点に注意する。`CODEX_HOME` を変えていると、規則（`rules/dotfiles.rules`）は読み込まれない。
 
 <a name="security"></a>
 

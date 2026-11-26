@@ -47,23 +47,29 @@ if printf '%s\n' "$RULES_CODE" | grep -nE "[\"']allow[\"']" || [ "$RULE_COUNT" -
 fi
 
 # codex exec と codex review は承認が never なので、git の読み取りに当たる規則があると、レビューで拒否される。
-for GIT_CMD in status diff log show; do
-    if ! RULES_RESULT=$(codex execpolicy check --resolve-host-executables --rules "$RULES_NEW" -- git "$GIT_CMD"); then
-        echo "codex execpolicy check failed on $RULES_SRC (is codex installed?). The rules are not installed." >&2
-        exit 1
-    fi
-    if [ "$RULES_RESULT" != '{"matchedRules":[]}' ]; then
-        echo "A rule in $RULES_SRC matches \`git $GIT_CMD\`, which Codex reviews use: $RULES_RESULT. The rules are not installed." >&2
-        exit 1
-    fi
+# 規則の先頭の候補と同じ綴りでも照らす。
+for GIT_BIN in git /usr/bin/git /opt/homebrew/bin/git; do
+    for GIT_CMD in status diff log show; do
+        if ! RULES_RESULT=$(codex execpolicy check --resolve-host-executables --rules "$RULES_NEW" -- "$GIT_BIN" "$GIT_CMD"); then
+            echo "codex execpolicy check failed on $RULES_SRC (is codex installed?). The rules are not installed." >&2
+            exit 1
+        fi
+        if [ "$RULES_RESULT" != '{"matchedRules":[]}' ]; then
+            echo "A rule in $RULES_SRC matches \`$GIT_BIN $GIT_CMD\`, which Codex reviews use: $RULES_RESULT. The rules are not installed." >&2
+            exit 1
+        fi
+    done
 done
 
 # Codex は ~/.codex/rules の、拡張子が rules の通常のファイル（リンクを除き、. で始まる名前も含む）を
 # バイト順に全部読み、1 つでも読めないと codex exec と codex review が止まる。入れた後と同じ組み合わせと順で、
 # 読み込めることを確かめる（find -type f はリンクを含めない。.rules という名前だけのファイルは Codex が読まない）。
+# ~/.codex/rules 自体がリンクなら、Codex はその先を読むので、-H で開始点のリンクだけをたどる。
+# 写せないファイルがあれば、install の失敗で止まる（find -exec は子の失敗を返さないので使わない）。
 if [ -d "$CODEX_DIR/rules" ]; then
-    find "$CODEX_DIR/rules" -maxdepth 1 -type f -name '*.rules' ! -name .rules ! -name dotfiles.rules \
-        -exec install -m 0600 {} "$RULES_TMP/rules/" \;
+    while IFS= read -r RULES_FILE; do
+        install -m 0600 "$RULES_FILE" "$RULES_TMP/rules/"
+    done < <(find -H "$CODEX_DIR/rules" -maxdepth 1 -type f -name '*.rules' ! -name .rules ! -name dotfiles.rules)
 fi
 RULES_ARGS=()
 while IFS= read -r RULES_FILE; do
@@ -76,6 +82,7 @@ fi
 
 # 絶対パスで書かれた規則は、実行ファイル名で照らす規則より先に当たる。先頭が絶対パスの allow があると、
 # dotfiles.rules が候補に入れていない場所では、その実行ファイルが確認なしに動く。入れるのは止めずに警告する。
+# 見るのは TUI の「今後は聞かない」が書く 1 行の形だけで、複数行で書いた規則は見ない。
 if grep -rnE 'pattern[[:space:]]*=[[:space:]]*\[[[:space:]]*"/.*decision[[:space:]]*=[[:space:]]*"allow"' "$RULES_TMP/rules"; then
     echo "WARNING: the allow rules above in $CODEX_DIR/rules start with an absolute path. They run that program outside the sandbox without asking, and win over dotfiles.rules for paths it does not list. Remove them unless you meant it." >&2
 fi
