@@ -399,6 +399,14 @@ if [ "$seatbelt" = 1 ]; then
   input key "$V/notes/key.md"
   run "$T/key.json"
   no_secret 'note linked to an id_rsa*.md in the Vault is not read' VAULT-KEY-MD
+  # Plugin folders hold credentials. Claude Code's sandbox cannot create a .obsidian folder anywhere,
+  # so this fixture is made only here, where the test runs outside that sandbox.
+  mkdir -p "$V/.obsidian/plugins/p"
+  printf '# VAULT-PLUGIN-MD\n' >"$V/.obsidian/plugins/p/README.md"
+  ln -sf "$V/.obsidian/plugins/p/README.md" "$V/notes/plugin.md"
+  input plugin "$V/notes/plugin.md"
+  run "$T/plugin.json"
+  no_secret 'note linked to a .md under .obsidian/plugins/ in the Vault is not read' VAULT-PLUGIN-MD
   # Files outside $HOME and the temporary directories are not read either (reads are denied by default).
   # The shared folder of all users is writable by everyone. (The path is split so that the repository
   # check does not take "Shared" for a user name.)

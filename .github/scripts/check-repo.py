@@ -170,6 +170,16 @@ PLAYWRIGHT_DENY_READ = ("~/.crit",)
 PLAYWRIGHT_SERVER = "playwright"
 PLAYWRIGHT_HOOK = "hooks/guard-playwright-mcp.sh"
 PLAYWRIGHT_MATCHER = "mcp__playwright__.*"
+# Obsidian の Vault。.obsidian/plugins のコードは、次に Obsidian が起動したとき sandbox の外で動き、その設定（data.json など）
+# には認証情報がある。.obsidian の中の symlink はリンク自体を差し替えられるので、.obsidian ごと書かせない。Vault を
+# 動かしても外れないよう、場所を問わず名前で判定する。Vault の .gitignore で .obsidian を外すと、sandbox の外の
+# obsidian-git がプラグインの設定をコミットし、git のオブジェクトから読めるので、.gitignore も Bash から書かせず、
+# Edit は ask にする。Vault は ~/Obsidian の直下に置く決まりなので、.gitignore はそこに絞る。denyWrite・denyRead は
+# Bash しか止めないので、Edit・Read ツールは規則で止める。
+OBSIDIAN_DENY_WRITE = ("/**/.obsidian", "~/Obsidian/*/.gitignore")
+OBSIDIAN_DENY_READ = ("/**/.obsidian/plugins",)
+OBSIDIAN_DENY = ("Edit(//**/.obsidian/**)", "Read(//**/.obsidian/plugins/**)")
+OBSIDIAN_ASK = ("Edit(~/Obsidian/*/.gitignore)",)
 # 上流から取り込んだスキル。claude/scripts/update-modern-web-guidance.py が npm の配布物から書く。
 # SKILL.md が参照ファイルを名前で指すので、上流の名前のまま置き、markdown-names の対象から外す。
 VENDORED_SKILLS = ("claude/skills/modern-web-guidance/", "claude/skills/chrome-extensions/")
@@ -586,6 +596,20 @@ def check_playwright_mcp(root):
     return errors
 
 
+def check_obsidian_vault(root):
+    settings = load_settings(root)
+    permissions = settings.get("permissions", {})
+    filesystem = settings.get("sandbox", {}).get("filesystem", {})
+    deny, ask = set(permissions.get("deny", [])), set(permissions.get("ask", []))
+    errors = [f"{SETTINGS}: sandbox.filesystem.denyWrite lacks {path}"
+              for path in OBSIDIAN_DENY_WRITE if path not in filesystem.get("denyWrite", [])]
+    errors += [f"{SETTINGS}: sandbox.filesystem.denyRead lacks {path}"
+               for path in OBSIDIAN_DENY_READ if path not in filesystem.get("denyRead", [])]
+    errors += [f"{SETTINGS}: permissions.deny lacks {rule}" for rule in OBSIDIAN_DENY if rule not in deny]
+    errors += [f"{SETTINGS}: permissions.ask lacks {rule}" for rule in OBSIDIAN_ASK if rule not in ask]
+    return errors
+
+
 def check_modern_web_guidance(root):
     if not (root / MWG_SKILL).exists():
         return []
@@ -828,6 +852,7 @@ CHECKS = (
     ("push-permissions", check_push_permissions),
     ("edit-permissions", check_edit_permissions),
     ("playwright-mcp", check_playwright_mcp),
+    ("obsidian-vault", check_obsidian_vault),
     ("modern-web-guidance", check_modern_web_guidance),
     ("project-permissions", check_project_permissions),
     ("mise-paranoid", check_mise_paranoid),

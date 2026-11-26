@@ -457,9 +457,11 @@ crit はレビュー中のファイルの全文を `~/.cc-crit` に書き出す�
 ```sh
 cd ~/dotfiles
 sudo install -d -o root -g wheel -m 0755 /usr/local/libexec/claude-crit
-sudo install -o root -g wheel -m 0755 claude/bin/cc-crit /usr/local/libexec/claude-crit/cc-crit
 sudo install -o root -g wheel -m 0644 claude/bin/cc-crit.sb /usr/local/libexec/claude-crit/cc-crit.sb
+sudo install -o root -g wheel -m 0755 claude/bin/cc-crit /usr/local/libexec/claude-crit/cc-crit
 ```
+
+profile を先に入れる。ラッパーを先に入れて profile の入れ替えが失敗すると、新しいラッパーが denyRead の照合を通り、古い profile で crit を動かす。
 
 依頼ファイル（`.cc-crit-request.json`）は、cc-safe-pr の依頼ファイルと同じく `config/git/ignore` で無視する。`config/link.sh` をまだ実行していなければ、先に実行する。
 
@@ -473,7 +475,7 @@ mise run crit:profile-test
 
 ### 更新するとき
 
-`cc-crit` か `cc-crit.sb` を変更したら、再度インストールする。crit、git、macOS を更新したら、profile のテストをやり直す（`mise run crit:profile-test`）。profile は crit と git の実行ファイルの場所と、動作に要る権限に依存する。
+`cc-crit` か `cc-crit.sb` を変更したら、再度インストールする。入れ直す前に、開いたままの Crit のレビューを Finish Review で閉じ、`pgrep -x crit` で何も出ないことを確かめる。cc-crit は、同じレビューの daemon が動いていればそれにつなぐ。動いている daemon は、入れ直した後も古い profile のまま使われ続ける。crit、git、macOS を更新したら、profile のテストをやり直す（`mise run crit:profile-test`）。profile は crit と git の実行ファイルの場所と、動作に要る権限に依存する。
 
 アンインストールは、`settings.json` の `cc-crit` の行を消して `sudo rm -r /usr/local/libexec/claude-crit` を実行する。専用 HOME の `~/.cc-crit` は残るので、要らなければ消す。
 

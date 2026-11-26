@@ -98,3 +98,21 @@ Edit・Write ツールは sandbox の外で動くので、`permissions` の規�
 - リポジトリの `.git/config` は、sandbox が既定で書き込みを止めている。submodule の `.git/modules/*/config` は書けるが、そこでは `core.fsmonitor` などでもっと直接コードが動くので、入れ子のリポジトリの経路として次の作業で扱う（Linear の KAD-10 の非目標）。
 
 経緯は [docs/work/20261123_rerere-mise-checks/plan.md](../../docs/work/20261123_rerere-mise-checks/plan.md) を参照する。
+
+<a name="obsidian-vault"></a>
+
+## Obsidian の Vault
+
+Obsidian のコミュニティプラグイン（Vault の `.obsidian/plugins/<id>/`）は、次に Obsidian が起動したとき、sandbox の外でユーザーの権限で動く。プラグインの設定（Remotely Save の接続情報など）には認証情報がある。Vault で起動したセッションでは Vault が作業ディレクトリになり、allowWrite の `.` に入る。そのため、ユーザー設定に次を置き、`check-repo.py` の `obsidian-vault` が確かめる。
+
+- `sandbox.filesystem.denyWrite` の `/**/.obsidian` と、`permissions.deny` の `Edit(//**/.obsidian/**)`: `.obsidian` ごと書かせない。`plugins` だけでは足りない。`.obsidian` の中の symlink（`community-plugins.json` など。実体は `~/dotfiles/obsidian/`）は、リンク先に書けなくても、リンク自体を差し替えられる。テーマと obsidian-git の設定（git の実行ファイルのパスなど）も `.obsidian` にある。場所を問わず、`.obsidian` という名前で判定する。Vault をほかの場所へ動かしても外れない（macOS では、グロブは `sandbox.filesystem` の 4 つのリストすべてで効く）。
+- `sandbox.filesystem.denyRead` の `/**/.obsidian/plugins` と、`permissions.deny` の `Read(//**/.obsidian/plugins/**)`: プラグインの設定を読ませない。`denyRead` は Read ツールを止めないので、`Read(...)` の deny も置く。`data.json` 以外の名前で保存するプラグインもあるので、`plugins` ごと止める。denyRead を変えたら、cc-crit の `COVERED_DENY_READ` と `cc-crit.sb` も直し、入れ直す（[Crit のレビュー](#cc-crit)）。Vault のノートの点検フックの profile（`claude/hooks/check-vault-note.sb`）も、`.obsidian/plugins` の下の `.md` を読ませない。
+- `sandbox.filesystem.denyWrite` の `~/Obsidian/*/.gitignore` と、`permissions.ask` の `Edit(~/Obsidian/*/.gitignore)`: Vault の `.gitignore` で `.obsidian` を外すと、sandbox の外で動く obsidian-git の自動コミットがプラグインの設定をリポジトリに入れ、git のオブジェクトから読める。グロブでは「`.obsidian` の隣の `.gitignore`」を表せないので、Vault を置く決まりの場所（`~/Obsidian` の直下）に絞る。Claude が `.gitignore` を変える場面はあるので、Edit は ask にする。
+
+sandbox の中では、どこにも `.obsidian` という名前のフォルダを作れない。`.obsidian` を追跡しているリポジトリと、Vault の `.gitignore` を書き換える git の操作（ブランチの切り替えなど）は、sandbox の中では途中で止まる。
+
+この設定で止まらない経路は、Linear の KAD-19 に記録している。
+
+dotfiles で起動したセッションでは、`~/dotfiles/obsidian/`（Vault の設定ファイルの実体）に Bash から書けず、Edit ツールは承認を求める。プロジェクト設定の `./obsidian` の denyWrite と `Edit(/obsidian/**)` の ask による（`project-permissions`）。
+
+経緯は [docs/work/20261126_KAD-19_obsidian-vault-sandbox/plan.md](../../docs/work/20261126_KAD-19_obsidian-vault-sandbox/plan.md) を参照する。

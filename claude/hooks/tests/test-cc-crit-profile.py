@@ -104,6 +104,8 @@ class ProfileTests(unittest.TestCase):
         (cls.repo / "plan.md").write_text("# Probe\n\n- step\n")
         (cls.repo / ".env").write_text("SECRET=1\n")
         (cls.repo / "secret.pem").write_text("-----BEGIN-----\n")
+        (cls.repo / ".obsidian" / "plugins" / "probe").mkdir(parents=True)
+        (cls.repo / ".obsidian" / "plugins" / "probe" / "data.json").write_text('{"secret": 1}\n')
         exe = sys.executable
         cls.test_profile = cls.root / "test.sb"
         # 本番の profile に、探査用の python の実行だけを足す。本番の profile は python を許さない。
@@ -239,6 +241,11 @@ class ProfileTests(unittest.TestCase):
 
     def test_read_pem_file_denied(self):
         self.assertDenied(f"attempt(lambda: open({str(self.repo / 'secret.pem')!r}).read())")
+
+    def test_read_obsidian_plugin_data_denied(self):
+        # Obsidian のプラグインの設定には、認証情報がある（Remotely Save の接続情報など）。
+        p = self.repo / ".obsidian" / "plugins" / "probe" / "data.json"
+        self.assertDenied(f"attempt(lambda: open({str(p)!r}).read())")
 
     def test_read_ssh_config_denied(self):
         p = self.home_real / ".ssh" / "config"
