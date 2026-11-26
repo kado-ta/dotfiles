@@ -22,7 +22,7 @@
 | --- | --- |
 | 軽微 | スキルを使わない。テストか確認コマンドを実行して終える |
 | 通常 | 振る舞いを変えるなら `test-driven-development`。PR の前に `/review` |
-| 複雑 | `brainstorming` → `writing-plans` → `/crit-review` → 実装 → `/review` → Codex レビューを提案する |
+| 複雑 | `brainstorming` → `writing-plans` → `/crit-review` → 実装 → `/review` → Codex レビューを提案する → ブランチの差分の `/crit-review` |
 | 高リスク | 規模の構成に次を足す。実装の前に変更の影響を確かめる（`/pstack:blast-radius` を提案する）。セキュリティの境界に触れるなら `/security-review`。ロールバックの手順。Codex レビューの提案 |
 
 ## Overlapping skills
@@ -47,7 +47,7 @@
 | `/pstack:arena` | 実装・文面・設定の候補を並べて比べたいとき（`architect` の中でも使われるので、重ねない） |
 | `/pstack:blast-radius` | 高リスクの差分で、差分の外への影響を確かめたいとき |
 | `/pstack:interrogate` | `/review` の後に、実行で確かめられる不変条件が残るとき |
-| 通常ターミナルで `cd <repo> && codex review --base <base> -c 'sandbox_mode="read-only"' -c skills.include_instructions=false` | 複雑か高リスクの変更が完了する前（Bash からは実行しない。`!` では失敗することがある） |
+| 通常ターミナルで `cd <repo> && codex review --base <base> -c 'sandbox_mode="read-only"' -c skills.include_instructions=false` | 複雑か高リスクの変更が完了する前。ブランチの差分を `/crit-review` で開くときは、その前（Bash からは実行しない。`!` では失敗することがある）。`--base` の指示文は `git diff <merge-base>` を読ませ、未追跡のファイルを含まないので、提案の文面で先にコミットすると伝え、受け入れられたら、実行してもらう前に、この作業の変更だけをパスを指定してコミットする（直した後に再実行するときも、その前にコミットする）。その後の指摘で秘密情報や公開できない内容を消したときは、先のコミットに残っていないかを確かめ、残っていれば push の前に伝える |
 | 通常ターミナルで `cd <repo> && codex exec - -s read-only -c skills.include_instructions=false < <プロンプトのファイル>`（challenge） | セキュリティの境界か設計判断を含む変更で、上の `codex review` に加えて 1 回（5 回の上限に数える）。プロンプトは Claude が書く。攻撃者として迂回を探せという書き方は OpenAI 側の判定で拒否されることがあるので、変更前と比べた後退や、壊れる入力を具体的に挙げるよう頼む。重大なものだけ、などと絞らずに全件を挙げてもらう。作業ディレクトリの中の git 管理外の場所（`git check-ignore` で確かめる）に置いて絶対パスで渡し、全文をチャットにも示す |
 | `/careful`・`/freeze <dir>` | 本番に近い環境を調べる前（危険なコマンドの警告と、編集範囲の制限） |
 
