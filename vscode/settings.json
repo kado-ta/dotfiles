@@ -54,8 +54,9 @@
             "terminalCursor.background": "#181d1f" // ブロックカーソルの下の文字の色
         }
     },
-    // 構文の色: テーマの白（#adbac7）と青（#6cb6ff・#96d0ff）を、Ghostty の文字色と同じ量（OKLab の明るさで -0.06）暗くする。
-    // 文字列などの水色（#96d0ff）は眩しいので、明るさをもう少し下げ、彩度も 15% 下げる。
+    // 構文の色: テーマの白（#adbac7）・青（#6cb6ff・#96d0ff）・オレンジ（#f69d50）を、Ghostty の文字色と同じ量
+    // （OKLab の明るさで -0.06）暗くする。文字列などの水色（#96d0ff）は眩しいので、明るさをもう少し下げ、彩度も 15% 下げる。
+    // キーワードの赤（#f47067）も同じ量だけ暗くする。オレンジだけ暗くすると、1 型・2 型の見え方で赤と見分けにくくなるため。
     // セレクタは、テーマ（GitHub Dark Dimmed 6.3.5）で最終的にその色になるもの。
     // 太字（markup.bold）は、Ghostty の bold-color と同じく #adbac7 のまま、通常の文字より少し明るく残す。
     "editor.tokenColorCustomizations": {
@@ -118,6 +119,33 @@
                     ],
                     "settings": {
                         "foreground": "#86b5dd"
+                    }
+                },
+                {
+                    "scope": [
+                        "entity.name",
+                        "meta.export.default",
+                        "meta.definition.variable",
+                        "variable",
+                        "punctuation.definition.list.begin.markdown",
+                        "markup.changed",
+                        "punctuation.definition.changed"
+                    ],
+                    "settings": {
+                        "foreground": "#e18a3b"
+                    }
+                },
+                {
+                    "scope": [
+                        "constant.other.placeholder",
+                        "constant.character",
+                        "keyword",
+                        "storage",
+                        "storage.type",
+                        "punctuation.section.embedded"
+                    ],
+                    "settings": {
+                        "foreground": "#df5d55"
                     }
                 }
             ]

@@ -65,20 +65,23 @@ GitHub Dark Dimmed に替える。構文の色が Ghostty の 16 色と同じ pr
 
 ### 構文の色（Task 4 での依頼）
 
-テーマの白（#adbac7）と 2 つの青を、#155 で Ghostty の文字色を下げたのと同じ量（OKLab の明るさで -0.0606。色相と彩度は保つ）だけ暗くする。`editor.foreground` は `workbench.colorCustomizations` に、構文の色は `editor.tokenColorCustomizations` の `"[GitHub Dark Dimmed]"` の `textMateRules` に置く。
+テーマの白（#adbac7）・2 つの青・オレンジ・キーワードの赤を、#155 で Ghostty の文字色を下げたのと同じ量（OKLab の明るさで -0.0606。色相と彩度は保つ）だけ暗くする。`editor.foreground` は `workbench.colorCustomizations` に、構文の色は `editor.tokenColorCustomizations` の `"[GitHub Dark Dimmed]"` の `textMateRules` に置く。
 
 | テーマ | 新しい色 | 対象 |
 | --- | --- | --- |
 | #adbac7 | #9aa7b4 | `editor.foreground` と、`meta.block`・`variable.other`・`markup.italic` など 12 個のセレクタ |
 | #6cb6ff | #59a3ea | `constant`・`entity`・`support`・`markup.heading` など 17 個のセレクタ |
 | #96d0ff | #86b5dd | `string`・`string.regexp`・`string.other.link` など 9 個のセレクタ |
+| #f69d50 | #e18a3b | `variable`・`entity.name`・Markdown の箇条書きの記号など 7 個のセレクタ |
+| #f47067 | #df5d55 | `keyword`・`storage`・`constant.character` など 6 個のセレクタ |
 
 - セレクタは、拡張の `themes/dark-dimmed.json` の `tokenColors` を順に見て、最終的にその色になるものだけを取った。同じセレクタが後のルールで別の色に上書きされるもの（`entity.name.constant` の青、`string.regexp constant.character.escape` の青）は、元の色のセレクタに入れない。セレクタをテーマと同じ文字列にするので、どのトークンにどのルールが当たるかは変わらない。
 - 太字（`markup.bold`）は、Ghostty の `bold-color` と同じく #adbac7 のまま、通常の文字より少し明るく残す。
 - #cdd9e5 は改行コードの表示（赤い背景の上）にしか使われないので、変えない。
 - 文字列などの水色は、同じ量だけ下げた #83bceb でも眩しいと指摘があったので、明るさを L 0.773 から 0.754 に下げ、彩度を 15% 下げた（0.090 → 0.077）#86b5dd にした。彩度を下げたのは、PR #155 で目立ち方を決めていたのが明るさより彩度だったため。3 つの見え方のうち最小の色差は、通常の文字 0.057、定数 0.067、関数（#dcbdfb）0.062（#83bceb では 0.038）、Markdown の太字（#adbac7）0.045（同 0.054）。
+- 変数名などのオレンジ（#f69d50）は、赤と緑を見分けにくい見え方では明るい薄黄色に見え、眩しいと指摘があった。オレンジとキーワードの赤（#f47067）の違いは、その見え方では主に明るさ（L 0.772 と 0.702）なので、オレンジだけを同じ量だけ下げると最小の色差が 0.081 から 0.043 に縮む（彩度も下げると 0.007）。そのため、キーワードの赤も同じ量だけ下げる（#df5d55、背景とのコントラスト 4.73）。両者の色差は 0.079 で元とほぼ同じ。オレンジとタグの緑（#8ddb8c）の差は 0.068 から 0.115 に、キーワードとコメントの 1 型での差は 0.072 から 0.086 に広がる。
 - 通常の文字とコメント（#768390）の色差は 0.179 から 0.118 に縮む（コントラストは 6.94 と 4.39）。
-- 選択範囲の上のコントラストは、通常の文字 3.63（元 4.51）、文字列 4.10、定数 3.33。検索の一致（#805400）の上では、通常の文字 2.69、定数 2.46 に下がる。
+- 選択範囲の上のコントラストは、通常の文字 3.63（元 4.51）、文字列 4.10、定数 3.33、変数名 3.35、キーワード 2.47。検索の一致（#805400）の上では、通常の文字 2.69、定数 2.46 に下がる。
 
 <a name="decision-diff"></a>
 
@@ -216,7 +219,7 @@ cd ~/dotfiles && mise run vscode:ext:list
 - `workbench.colorTheme == "GitHub Dark Dimmed"`
 - `workbench.colorCustomizations` のキーが `"[GitHub Dark Dimmed]"` だけである（テーマを限定しない色がない）
 - その中身が「[決めたこと](#decisions)」の表のキーと色に完全に一致する（41 個。過不足があれば、キーごとに表示して失敗する）
-- Task 4 の依頼の後: `editor.foreground` を加えて 42 個。`editor.tokenColorCustomizations` のキーが `"[GitHub Dark Dimmed]"` だけで、`textMateRules` のセレクタと色が「[構文の色](#decision-syntax)」の 38 個に完全に一致する
+- Task 4 の依頼の後: `editor.foreground` を加えて 42 個。`editor.tokenColorCustomizations` のキーが `"[GitHub Dark Dimmed]"` だけで、`textMateRules` のセレクタと色が「[構文の色](#decision-syntax)」の 51 個に完全に一致する
 
 - [ ] **Step 2:** `python3 -I <scratchpad>/check_vscode_colors.py ~/dotfiles/vscode/settings.json` を実行する。期待: FAIL（テーマが Catppuccin Mocha）。
 - [ ] **Step 3:** `vscode/settings.json` の 2〜8 行を Edit ツールで書き換える。グループごと（背景・文字とカーソル・選択と検索・差分と git・統合ターミナル）に 1 行のコメントを付ける。
