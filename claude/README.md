@@ -465,17 +465,17 @@ profile を先に入れる。ラッパーを先に入れて profile の入れ替
 
 依頼ファイル（`.cc-crit-request.json`）は、cc-safe-pr の依頼ファイルと同じく `config/git/ignore` で無視する。`config/link.sh` をまだ実行していなければ、先に実行する。
 
-インストールしたら、sandbox の外で profile のテストを実行する。Claude Code の sandbox の中では `sandbox-exec` を入れ子にできないので、スキップされる。
+インストールしたら、sandbox の外で profile のテストを実行する。テストはリポジトリの profile を試すので、先に `cmp` で、入れた 2 つのファイルがリポジトリのものと同じであることを確かめる（入れ忘れや、違うブランチからの入れ直しに気づくため）。Claude Code の sandbox の中では `sandbox-exec` を入れ子にできないので、テストはスキップされる。
 
 ```sh
-mise run crit:profile-test
+cmp claude/bin/cc-crit.sb /usr/local/libexec/claude-crit/cc-crit.sb && cmp claude/bin/cc-crit /usr/local/libexec/claude-crit/cc-crit && mise run crit:profile-test
 ```
 
 <a name="cc-crit-update"></a>
 
 ### 更新するとき
 
-`cc-crit` か `cc-crit.sb` を変更したら、再度インストールする。入れ直す前に、開いたままの Crit のレビューを Finish Review で閉じ、`pgrep -x crit` で何も出ないことを確かめる。cc-crit は、同じレビューの daemon が動いていればそれにつなぐ。動いている daemon は、入れ直した後も古い profile のまま使われ続ける。crit、git、macOS を更新したら、profile のテストをやり直す（`mise run crit:profile-test`）。profile は crit と git の実行ファイルの場所と、動作に要る権限に依存する。
+`cc-crit` か `cc-crit.sb` を変更したら、再度インストールする。入れ直す前に、開いたままの Crit のレビューを Finish Review で閉じ、`lsof -nP -iTCP:47810-47829 -sTCP:LISTEN` で何も出ないことを確かめる。cc-crit の crit は、このポートの範囲で待ち受ける。`pgrep -x crit` は、Crit プラグインやターミナルの crit も数えるので、この確認には使わない。cc-crit は、同じレビューの daemon が動いていればそれにつなぐ。動いている daemon は、入れ直した後も古い profile のまま使われ続ける。crit、git、macOS を更新したら、profile のテストをやり直す（`mise run crit:profile-test`）。profile は crit と git の実行ファイルの場所と、動作に要る権限に依存する。
 
 アンインストールは、`settings.json` の `cc-crit` の行を消して `sudo rm -r /usr/local/libexec/claude-crit` を実行する。専用 HOME の `~/.cc-crit` は残るので、要らなければ消す。
 
