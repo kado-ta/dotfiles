@@ -1328,9 +1328,23 @@ class CheckRepoTests(unittest.TestCase):
         self.write("x.toml", "a =\n")
         self.assert_fails("FAIL syntax", "x.toml")
 
-    def test_jsonc_file_skipped(self):
-        self.write("vscode/settings.json", '{\n  // comment\n  "a": 1\n}\n')
+    def test_jsonc_comments_and_trailing_commas_pass(self):
+        # VSCode の設定は JSONC。コメントと末尾のカンマを許し、文字列の中の // や /* はそのまま読む。
+        self.write(
+            "vscode/settings.json",
+            '{\n  // comment\n  "a": "https://example.com/*x*/",\n  "b": "q\\" // still a string",\n'
+            '  /* block\n     comment */\n  "c": [1, 2,],\n}\n',
+        )
         self.assert_passes()
+
+    def test_invalid_jsonc_fails(self):
+        # コメントを空白に替えるので、行番号はずれない。
+        self.write("vscode/settings.json", '{\n  // comment\n  "a": 1\n  "b": 2\n}\n')
+        self.assert_fails("FAIL syntax", "vscode/settings.json:4")
+
+    def test_unterminated_jsonc_comment_fails(self):
+        self.write("vscode/keybindings.json", '[\n  /* comment\n]\n')
+        self.assert_fails("FAIL syntax", "vscode/keybindings.json")
 
     def test_lowercase_markdown_name_fails(self):
         self.write("notes.md", "# Notes\n")
