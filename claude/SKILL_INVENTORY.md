@@ -52,8 +52,8 @@
 
 | スキル | 機能（入力 → 出力） | 起動 | 状態 | 依存・制約 |
 | --- | --- | --- | --- | --- |
-| `brainstorming` | 対話で要件と設計を固める → design | 自動 | 有効 | 設計の承認前に実装しない（HARD-GATE）。軽微な作業の例外がある。次は `writing-plans`。保存先は DOCUMENTS.md に従い `docs/work/<ID>_<slug>/design.md` |
-| `writing-plans` | 仕様 → タスクに分けた実装計画 | 自動 | 有効 | 保存先は `docs/work/<ID>_<slug>/plan.md` |
+| `brainstorming` | 対話で要件と設計を固める → design | 自動 | 有効 | 設計の承認前に実装しない（HARD-GATE）。軽微な作業の例外がある。次は `writing-plans`。保存先は DOCUMENTS.md に従い `docs/work/YYYYMMDD_<ID>_<slug>/design.md` |
+| `writing-plans` | 仕様 → タスクに分けた実装計画 | 自動 | 有効 | 保存先は `docs/work/YYYYMMDD_<ID>_<slug>/plan.md` |
 | `executing-plans` | 計画をこのセッションで自分で実行する | 自動 | 有効 | — |
 | `subagent-driven-development` | 計画のタスクごとにサブエージェントで実装し、タスクごとにレビューする | 自動 | 有効 | サブエージェントが多い。独立したタスクが多い大きな計画のときだけ |
 | `dispatching-parallel-agents` | 独立した 2 つ以上の作業を並列のサブエージェントに分ける | 自動 | 有効 | — |
