@@ -72,10 +72,11 @@ cursor-click-to-move = false
 keybind = super+left=previous_tab
 keybind = super+right=next_tab
 
-# split を方向で移るキー（既定の goto_split:up/down/left/right）を外し、herdr に渡す。
-# cmd+option+←/→ は herdr のタブ移動に使う（config/herdr/config.toml）。split は cmd+[ / ] で順に移る。
-keybind = super+alt+arrow_up=unbind
-keybind = super+alt+arrow_down=unbind
+# split を方向で移るキー（既定の goto_split:up/down/left/right）を無効にする。split は cmd+[ / ] で順に移る。
+# cmd+option+←/→ は herdr のタブ移動に使うので、unbind で herdr に渡す（config/herdr/config.toml）。
+# cmd+option+↑/↓ は herdr も使わないので、ignore で捨てる（unbind だとペインの中のシェルまで届く）。
+keybind = super+alt+arrow_up=ignore
+keybind = super+alt+arrow_down=ignore
 keybind = super+alt+arrow_left=unbind
 keybind = super+alt+arrow_right=unbind
 
