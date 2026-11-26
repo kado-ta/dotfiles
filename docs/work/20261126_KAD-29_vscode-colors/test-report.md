@@ -16,13 +16,14 @@ created: 2026-11-27
 
 ## 自動の検査
 
-ブランチ `feat/KAD-29-vscode-colors` の d2d8837 で、2026-11-27 に実行した。
+ブランチ `feat/KAD-29-vscode-colors` の 72cd363 で、2026-11-27 に実行した（最初の記録は d2d8837 で、そのときは 42 色・51 セレクタ、`test-check-repo.py` は 147 件）。
 
 | 検査 | 結果 |
 | --- | --- |
-| 配色の検査スクリプト（下記） | PASS（42 個の色と、51 個の構文のセレクタが一致） |
-| `python3 -B .github/scripts/check-repo.py` | 16 項目すべて PASS |
-| `python3 -B .github/scripts/test-check-repo.py` | 147 件 OK |
+| 配色の検査スクリプト（下記） | PASS（39 個の色と、54 個の構文のセレクタが一致） |
+| テーマの実物との突き合わせ（下記） | 上書きの色のうち、テーマと同じ値のものは 0 件。構文の 54 個のセレクタは、すべてテーマに実在し、テーマでの色も想定どおり |
+| `python3 -B .github/scripts/check-repo.py` | 16 項目すべて PASS（JSONC の `settings.json`・`keybindings.json` の構文も検査する） |
+| `python3 -B .github/scripts/test-check-repo.py` | 151 件 OK |
 | `git ls-files -z '*.sh' '*.command' ':!:claude/hooks/herdr-agent-state.sh' \| xargs -0 shellcheck -S warning` | 終了コード 0 |
 | `actionlint` | 終了コード 0 |
 | `zizmor --offline .` | 終了コード 0（No findings） |
@@ -34,6 +35,8 @@ created: 2026-11-27
 - 色とセレクタが plan の「[決めたこと](plan.md#decisions)」と過不足なく一致する。
 
 変更前の `settings.json` で FAIL（43 件）になることを確かめてから書き換えた。期待値を変えるたびにも、先に FAIL を確かめた。
+
+このスクリプトは plan の表とだけ突き合わせていたので、表の誤り（統合ターミナルの 5 色が「テーマと違う」）を見逃した。`/review` の後に、インストール済みの `~/.vscode/extensions/github.github-vscode-theme-6.3.5/themes/dark-dimmed.json` と突き合わせる確認（上の表の 2 行目。これも一時ディレクトリのスクリプト）を足した。
 
 <a name="visual"></a>
 
@@ -55,6 +58,32 @@ created: 2026-11-27
 | 明るい青というか水色が少し眩しい | 文字列などの水色の明るさと彩度を下げた | 0205291 |
 | 明るい薄黄色も眩しい | 変数名などのオレンジを暗くし、見分けるためにキーワードの赤も暗くした | 5ece496 |
 | 赤が暗くなりすぎている | キーワードの赤を少し明るく戻した | d2d8837 |
+
+<a name="review"></a>
+
+## レビュー
+
+<a name="gstack-review"></a>
+
+### gstack の /review（17bed4b）
+
+専門レビュー（testing・maintainability・simplification）、red team、adversarial を実行した。Codex のパスは gstack の `codex_reviews` が無効なので実行していない。指摘への対応は plan の各節に書いた（412ee2e・6d3d31a）。修正後のフルの再レビューは実行しておらず、修正分は Claude が読み直し、検査とテストで確かめた。
+
+<a name="codex-review"></a>
+
+### Codex のレビュー
+
+ユーザーが通常のターミナルで `codex review --base main` を実行した。結果は `~/.codex/sessions` の記録の最終メッセージから読んだ。
+
+**1 回目（2026-11-26T16:01:33Z、6d3d31a）**: 「patch is incorrect」。指摘は 5 件。
+
+| 優先度 | 指摘 | 採否 | 理由 |
+| --- | --- | --- | --- |
+| P2 | `strip_jsonc` が、ルートを閉じた後の閉じないブロックコメントを EOF まで空白にするので、VSCode では誤りのファイルが通る | 採用 | 手元で再現した |
+| P2 | 要素のないカンマ（`{,}`、`[/* c */, ]`）を末尾のカンマとして消すので、VSCode では誤りのファイルが通る | 採用 | 手元で再現した |
+| P3 | `chat.linesAddedForeground` は透明度が必須で、不透明な `#539bf5` は設定の診断に出る | 採用 | VSCode のソースの `chatColors.ts` で、`registerColor` の `needsTransparency` が `true` であることを確かめた。ほかの不透明な上書きのキーは `false` |
+| P3 | `json.loads` が `NaN`・`Infinity` を読むので、JSONC の検査を通る | 不採用 | VSCode の設定に書く見込みがなく、書いても VSCode がすぐ誤りを表示する |
+| P3 | UTF-8 の BOM 付きで保存すると、検査が 1 行目で失敗する | 不採用 | BOM 付きで保存する見込みが低く、起きても CI が FAIL を出すので、黙って通ることはない |
 
 <a name="not-verified"></a>
 
