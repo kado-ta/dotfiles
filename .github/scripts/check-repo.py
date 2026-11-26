@@ -7,6 +7,7 @@
 CI は push の後に動くので、公開前に防ぐには push する前に手元で実行する。そのとき git add 前のファイルも見る。
 """
 
+import getpass
 import json
 import os
 import posixpath
@@ -239,7 +240,10 @@ PROJECT_DENY_WRITE = (
 HOOK_SCRIPT = re.compile(r"\.claude/(?:hooks|scripts)/")
 # 直前にシェルの変数（$T・${T}）があれば、その変数の下の階層なので外す。パスの途中の /Users/ でも、
 # /Volumes/Backup/Users/<名前> のように実在するユーザー名でありうるので、外すのは変数の直後だけにする。
-LOCAL_PATH = re.compile(r"(\$(?:\w+|\{\w+\}))?/(?:Users|home)/([A-Za-z0-9._-]+)")
+# 変数が実在のマウント先を表すこともあるので、実行しているユーザーのログイン名は、変数の直後でも止める。
+# 名前は先読みにして読み進めない（$X/home/Users/<名前> の /Users/<名前> も調べる）。
+LOCAL_PATH = re.compile(r"(\$(?:\w+|\{\w+\}))?/(?:Users|home)(?=/([A-Za-z0-9._-]+))")
+LOGIN = getpass.getuser()
 FENCE = re.compile(r"^\s*(`{3,}|~{3,})(.*)$")
 INLINE_CODE = re.compile(r"(`+).+?(?<!`)\1(?!`)")
 HEADING = re.compile(r"^ {0,3}#{1,6}\s+(.*?)(?:\s+#+)?\s*$")
@@ -281,7 +285,8 @@ def load_settings(root):
 
 
 def has_real_user_path(text):
-    return any(m.group(1) is None and m.group(2) not in NON_USER_NAMES for m in LOCAL_PATH.finditer(text))
+    return any(m.group(2) not in NON_USER_NAMES and (m.group(1) is None or m.group(2) == LOGIN)
+               for m in LOCAL_PATH.finditer(text))
 
 
 def check_local_paths(root):

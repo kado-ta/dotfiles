@@ -345,11 +345,23 @@ class CheckRepoTests(unittest.TestCase):
 
     def test_user_paths_not_right_after_a_variable_fail(self):
         # 外すのは変数の直後だけ。パスの途中や URL の中でも、実在しうるユーザー名は止める。
+        # 変数の直後の一致は、次の階層を読み進めない（$X/home/Users/<名前> の /Users/<名前> も調べる）。
         for text in ("/Volumes/Backup/Users/" + "alice/x", "file:///Users/" + "alice/x", "HOME=/home/" + "alice",
-                     "$T/x/home/" + "alice", "${T}x/Users/" + "alice"):
+                     "$T/x/home/" + "alice", "${T}x/Users/" + "alice", "$X/home/Users/" + "alice",
+                     "$X/Users/home/" + "alice", "${X}/Users/Users/" + "alice"):
             with self.subTest(text=text):
                 self.write("notes.txt", text + "\n")
                 self.assert_fails("FAIL local-paths", "notes.txt:1:")
+
+    def test_login_name_right_after_a_variable_fails(self):
+        # 実行しているユーザーのログイン名は、変数の直後でも止める。getpass.getuser() は LOGNAME を先に見る。
+        self.write("notes.txt", "$T/Users/" + "alice/x\n" + "${T}/home/" + "bob/x\n")
+        env = {**os.environ, "PATH": os.pathsep.join([*map(str, self.path_dirs), os.environ["PATH"]]),
+               "LOGNAME": "alice"}
+        code, out = self.check(env)
+        self.assertEqual(code, 1, out)
+        self.assertIn("FAIL local-paths\n  notes.txt:1: absolute path", out)
+        self.assertNotIn("notes.txt:2:", out)
 
     def test_tracked_aws_credentials_fails(self):
         self.write("aws/config", "[default]\n")
