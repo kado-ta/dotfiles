@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: done
 created: 2026-11-26
 ---
 
@@ -229,6 +229,8 @@ D5 は新しい設計の変更なので、Crit の前にもう一度 `codex revi
 | C4-3 | P2 | 「受け入れて結果を待っている」も「提案する」の条件に入っていて、もう一度提案する | 採用。9 章の #8 の修正で、状態を 1 つの文にまとめたのが原因。提案は「まだ提案しておらず」のときだけにし、受け入れた後は「受け入れた回（challenge も含む）の結果がそろうか、ユーザーが残りを見送るまで Crit に進まない」と分けた |
 | C4-4 | P2 | 早見表の B 章のコマンドの例が `--base` だけで、D 章の使い分けと合っていない | 採用。B 章の Codex の行を `--uncommitted` にし、先のコミットがあれば `--base <base>` と添えた。列幅は変わらず、変わったのは 90 行目だけ |
 
+Codex は 5 回の上限のうち 4 回を使い、5 回目は使わずに Crit に進んだ。
+
 <a name="final-checks"></a>
 
 ## 12. 最終の確認
@@ -251,3 +253,23 @@ D5 は新しい設計の変更なので、Crit の前にもう一度 `codex revi
 | `git ls-files -z '*.sh' '*.command' ':!:claude/hooks/herdr-agent-state.sh' \| xargs -0 shellcheck -S warning` | 警告なし（終了コード 0） |
 | `actionlint` | 指摘なし（終了コード 0） |
 | `zizmor --offline .` | No findings to report（終了コード 0） |
+
+<a name="merge"></a>
+
+## 13. Crit・PR・マージ
+
+| 確かめること | 結果 |
+| --- | --- |
+| ブランチの差分の Crit（2026-11-26、6 ファイル） | コメントなしで承認された（`approved: true`）。承認の前後で HEAD（`86b9f44`）は変わらなかった |
+| main との競合（`git merge-tree --write-tree --name-only origin/main HEAD`、main は `835338b`） | 競合なし（終了コード 0） |
+| push（`cc-safe-push`） | `PUSHED: kado-ta/dotfiles, 740e51cfb9d7 -> refs/heads/docs/codex-before-crit`。HEAD と一致 |
+| PR（`cc-safe-pr create`） | [#150](https://github.com/kado-ta/dotfiles/pull/150) を作成した |
+| CI（`gh pr checks 150`） | Repository checks（2m13s）と Hook regression tests（3m4s）がどちらも pass（終了コード 0） |
+| マージ | ユーザーがマージした（2026-11-26T06:53:21Z、マージコミット `bec73363e67e`） |
+| `~/.claude` への反映 | `~/.claude/CLAUDE.md`（`~/dotfiles/claude/CLAUDE.md` へのリンク）と `~/.claude/rules/SKILL_ROUTING.md` に「で開くときは、その前」が 1 件ずつ、`~/.claude/rules/SKILL_ROUTING.md` に `--uncommitted` が 1 件、`~/.claude/skills/commit-staged-pr/SKILL.md` に「手順 2 の確認をして手順 4 でコミット」が 4 件あった。`~/dotfiles` の main に取り込まれている |
+
+後続の作業の候補（この作業では扱わない）:
+
+- Codex に見せてよいファイルだけの環境で Codex を動かす（9 章の #2）。
+- Codex を提案する条件の書き方を、CLAUDE.md（設計判断・大規模・セキュリティ）と SKILL_ROUTING.md（複雑か高リスク）で揃える（plan の 7 章）。
+- SKILL_ROUTING.md の試行の見直し（2026-12-07 に測定）で `codex review` の行を変えるときは、commit-staged-pr の参照も直す（auto memory の測定のメモに書いた）。
