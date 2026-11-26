@@ -346,9 +346,12 @@ class CheckRepoTests(unittest.TestCase):
     def test_user_paths_not_right_after_a_variable_fail(self):
         # 外すのは変数の直後だけ。パスの途中や URL の中でも、実在しうるユーザー名は止める。
         # 変数の直後の一致は、次の階層を読み進めない（$X/home/Users/<名前> の /Users/<名前> も調べる）。
+        # 外すのはパスの先頭の変数だけで、パスの途中の $ で始まるディレクトリ名は外さない。
+        # Shared を外すのは macOS の /Users の下だけ。
         for text in ("/Volumes/Backup/Users/" + "alice/x", "file:///Users/" + "alice/x", "HOME=/home/" + "alice",
                      "$T/x/home/" + "alice", "${T}x/Users/" + "alice", "$X/home/Users/" + "alice",
-                     "$X/Users/home/" + "alice", "${X}/Users/Users/" + "alice"):
+                     "$X/Users/home/" + "alice", "${X}/Users/Users/" + "alice", "/Volumes/$Archive/Users/" + "bob/x",
+                     "/home/" + "Shared/x"):
             with self.subTest(text=text):
                 self.write("notes.txt", text + "\n")
                 self.assert_fails("FAIL local-paths", "notes.txt:1:")

@@ -21,9 +21,8 @@ import tomllib
 import urllib.parse
 from pathlib import Path, PurePosixPath
 
-# ユーザー名ではない語。既存のプレースホルダー（codex/README.md の /Users/example と、cc-safe-push のテストの
-# "/Users/some one"）と、macOS の全ユーザーの共有フォルダ（/Users/Shared）。
-NON_USER_NAMES = {"example", "some", "Shared"}
+# 既存のプレースホルダー（codex/README.md の /Users/example と、cc-safe-push のテストの "/Users/some one"）。
+PLACEHOLDER_USERS = {"example", "some"}
 FORBIDDEN_FILES = ("aws/config", "aws/credentials")
 GITLEAKS_TIMEOUT = 120
 # 見つかったときの終了コード。1 はエラー、2 は Go の panic と重なるので避ける。
@@ -238,11 +237,12 @@ PROJECT_DENY_WRITE = (
 )
 
 HOOK_SCRIPT = re.compile(r"\.claude/(?:hooks|scripts)/")
-# 直前にシェルの変数（$T・${T}）があれば、その変数の下の階層なので外す。パスの途中の /Users/ でも、
+# パスの先頭がシェルの変数（$T・${T}）なら、その変数の下の階層なので外す。パスの途中の /Users/ でも、
 # /Volumes/Backup/Users/<名前> のように実在するユーザー名でありうるので、外すのは変数の直後だけにする。
+# 直前が / や名前の文字の $ は、変数ではなくディレクトリ名の一部（/Volumes/$Archive/Users/<名前>）なので外さない。
 # 変数が実在のマウント先を表すこともあるので、実行しているユーザーのログイン名は、変数の直後でも止める。
 # 名前は先読みにして読み進めない（$X/home/Users/<名前> の /Users/<名前> も調べる）。
-LOCAL_PATH = re.compile(r"(\$(?:\w+|\{\w+\}))?/(?:Users|home)(?=/([A-Za-z0-9._-]+))")
+LOCAL_PATH = re.compile(r"((?<![\w/.-])\$(?:\w+|\{\w+\}))?/(Users|home)(?=/([A-Za-z0-9._-]+))")
 LOGIN = getpass.getuser()
 FENCE = re.compile(r"^\s*(`{3,}|~{3,})(.*)$")
 INLINE_CODE = re.compile(r"(`+).+?(?<!`)\1(?!`)")
@@ -285,8 +285,14 @@ def load_settings(root):
 
 
 def has_real_user_path(text):
-    return any(m.group(2) not in NON_USER_NAMES and (m.group(1) is None or m.group(2) == LOGIN)
-               for m in LOCAL_PATH.finditer(text))
+    for m in LOCAL_PATH.finditer(text):
+        variable, base, name = m.groups()
+        # /Users/Shared は macOS の全ユーザーの共有フォルダ。/home の下の Shared はアカウントでありうるので外さない。
+        if name in PLACEHOLDER_USERS or (base, name) == ("Users", "Shared"):
+            continue
+        if variable is None or name == LOGIN:
+            return True
+    return False
 
 
 def check_local_paths(root):
