@@ -367,7 +367,7 @@ sandbox の外で `/cso` を実行すると、保存先に秘密ファイルの�
 
 ## 規則の効果の確認
 
-規則（[SKILL_ROUTING.md](rules/SKILL_ROUTING.md)）を置く前と後で、スキルの使われ方を比べる。予定と結果は GitHub Issue で管理する。基準値（2026-10-27〜11-16）は [test-report.md](../docs/work/20261116_skill-role-division/test-report.md#baseline) にある。
+規則（[SKILL_ROUTING.md](rules/SKILL_ROUTING.md)）を置く前と後で、スキルの使われ方を比べる。予定と結果は Linear の dotfiles プロジェクトで管理する。基準値（2026-10-27〜11-16）は [test-report.md](../docs/work/20261116_skill-role-division/test-report.md#baseline) にある。
 
 - 期間: 後の期間は PR #29 のマージ（2026-11-16）から 21 日間。測定日は 2026-12-07、期限は 2026-12-16（トランスクリプトは既定で 30 日で消える）。
 - 実行: 新しいセッションで Claude に頼むか、自分で `mise run claude:skill-usage 2026-11-16 2026-12-07` を実行する（スクリプトは `claude/scripts/skill-usage.py`。終わりの日は含まない）。件数とセッション ID だけを出し、会話の中身は出さない。
