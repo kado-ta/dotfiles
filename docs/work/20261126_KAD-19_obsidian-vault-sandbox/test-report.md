@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: done
 created: 2026-11-26
 ---
 
@@ -135,8 +135,60 @@ Codex の 1 回目の指摘を受けて、マージ前に確かめた（2026-11-
 | `check_deny_read` が照合する設定の範囲が、Claude Code が読む設定の範囲と違う | 不採用 | この PR より前からの性質。Linear の KAD-19 に記録済み |
 | 大文字・小文字を変えたパスを、cc-crit と点検フックの profile でも止められるかは試していない | 記録だけ | Claude Code の sandbox（同じ Seatbelt）では止まった。2 つの profile では試していない |
 
-<a name="pending"></a>
+<a name="post-merge"></a>
 
-## 未実施
+## マージ後の確認（plan の手順 7・8）
 
-- マージ後の手順 7（cc-crit の入れ直しと、入れた profile でのテスト）と手順 8（Vault で起動したセッションでの確認。`.gitignore` の ask を含む）。
+2026-11-27 に、PR #156 のマージ後の main（`~/dotfiles`）で確かめた。
+
+<a name="post-merge-cc-crit"></a>
+
+### 手順 7: cc-crit の入れ直し
+
+- plan の `pgrep -x crit` は、cc-crit 以外の crit（Crit プラグインやターミナルの crit）も数えるので、10 件出た。cc-crit の crit はポート 47810〜47829 で待ち受けるので、人間が `lsof -nP -iTCP:47810-47829 -sTCP:LISTEN` で確かめ、何も出なかった。`claude/README.md` の更新の手順を、この確かめ方に直した。
+- 人間が、profile、ラッパーの順に入れ直した。`cmp` では、2 つともリポジトリのものと同じだった。
+- 入れた profile でのテスト（`CC_CRIT_PROFILE=/usr/local/libexec/claude-crit/cc-crit.sb CC_CRIT_PROFILE_REQUIRED=1`）: 30 件で OK（スキップ 1）。スキップは、ファイルがあるときだけ動くテストのどれか。`CC_CRIT_PROFILE_REQUIRED=1` では、profile を適用できないときは、スキップではなく失敗になる。
+- `claude/README.md` のインストールの手順の `mise run crit:profile-test` は、リポジトリの profile を試す。その前に `cmp` で確かめる手順を足した。
+
+<a name="post-merge-vault"></a>
+
+### 手順 8: Vault で起動したセッション
+
+人間が通常のターミナルで、試験用の Vault（`~/Obsidian/kad19-scratch`）を作った。中身は次のとおりで、git で 1 回コミットした。そこで起動したセッションで確かめた。
+
+- `.obsidian/plugins/probe/data.json` と `.obsidian/app.json`: 偽の値
+- `.gitignore`: `.obsidian/`
+
+| # | 操作 | 結果 |
+| --- | --- | --- |
+| 1 | Bash: `touch .obsidian/.kad19-probe` | 拒否された（権限の設定。実行の前に止まった） |
+| 2 | Bash: `touch .gitignore` | `Operation not permitted`（sandbox） |
+| 3 | Bash: `: < .obsidian/plugins/probe/data.json` | `operation not permitted`（sandbox） |
+| 4 | Bash: `: < .obsidian/app.json` | 通った |
+| 5 | Read ツール: `.obsidian/plugins/probe/data.json` | 拒否された |
+| 6 | Read ツール: `.obsidian/app.json` | 通った |
+| 7 | Write ツール: `.obsidian/kad19-probe.md` | 拒否された |
+| 8 | Edit ツール: `.gitignore` に 1 行足す | 承認画面が出た（人間が拒否し、書き込まれていない） |
+| 9 | Write・Edit ツールと Bash の `rm` で、ノートを作り、直し、消す | どれも通った |
+| 10 | Bash: `git status --short` | 通った（変更なし） |
+| 11・12 | Grep・Glob ツール | 実行できなかった。セッションにツールがなかった（ToolSearch でも見つからない）。dotfiles のセッション（Claude Code 2.1.332）にもない |
+| 13 | Bash: `grep -rl kad19-dummy .` | `note.md` だけが出て、終了コードは 0。エラーは出なかった |
+
+1 は、sandbox まで届かなかった。denyWrite が allowWrite の中でも効くことは、dotfiles のセッションで確かめた。`$TMPDIR`（allowWrite に入る）の下に `.obsidian` を作ると、`Operation not permitted` になった。マージ前の実測と同じ結果。
+
+13 は、plan の「[影響](plan.md#impact-vault-session)」の見込み（`Operation not permitted` が出て、終了コードが 0 でなくなる）と違った。
+
+- Bash ツールの `grep` は、Claude Code が定義するシェル関数で、同梱の ugrep を `--ignore-files --hidden` で動かす。
+- Vault の `.gitignore` が `.obsidian/` を外しているので、`.obsidian` ごと見ない。`.obsidian/app.json` も出なかった。
+- この動きは、`$TMPDIR` に `.gitignore` のある場所とない場所を作って確かめた。
+- `/usr/bin/grep -rl` で試験用の Vault を調べると、見込みのとおりだった。`.obsidian/plugins` で `Operation not permitted` が出て、ほかの結果（`note.md`・`.obsidian/app.json`）は出て、終了コードは 2 だった。
+- `find .` は試していない。
+
+dotfiles のセッション（本番のユーザー設定）でも、次を確かめた。
+
+- Read ツールで、実在の Vault の `.obsidian/plugins/` の下の、存在しないパスを読む: 拒否された。
+- Write ツールで、scratchpad の `.obsidian/` の下に書く: 拒否された。
+- Bash で、実在の Vault の `data.json` を `: <` で開く: 実行の前に拒否された。権限の設定と auto mode の判定のどちらで止まったかは分からない。
+- sandbox の denyRead は、マージ前に同じファイルで確かめた。このセッションの sandbox の denyRead に `/**/.obsidian/plugins` があることは、セッションに渡された設定で確かめた。
+
+実在の Vault（`main`）での `git status` と検索は、試していない。同じ構成の試験用の Vault で確かめたので、完了の条件にしない。ふだんの作業で異常が出たら、Linear に起票する。
