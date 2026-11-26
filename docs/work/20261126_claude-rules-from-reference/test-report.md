@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: done
 created: 2026-11-26
 ---
 
@@ -59,4 +59,9 @@ gstack の手順は、修正の後にもう一度レビューして差分が変�
 
 ## 4. CI
 
-PR を作った後に追記する。
+[PR #139](https://github.com/kado-ta/dotfiles/pull/139) の head 7975ee9 で、GitHub Actions の run 45747380490 が 2 つのジョブとも通った（2026-11-26）。
+
+| ジョブ | 結果 | 所要時間 |
+| --- | --- | --- |
+| Hook regression tests | pass | 2m57s |
+| Repository checks | pass | 1m46s |
