@@ -525,7 +525,7 @@ class CheckRepoTests(unittest.TestCase):
         # 上限の 120 秒は待てないので、モジュールを読み込んで 1 秒にする。
         self.override_tool("gitleaks", 'if [ "$1" = version ]; then echo 8.30.1; exit 0; fi\nexec sleep 30\n')
         check_repo = load_check_repo()
-        path =os.pathsep.join([*map(str, self.path_dirs), os.environ["PATH"]])
+        path = os.pathsep.join([*map(str, self.path_dirs), os.environ["PATH"]])
         out = io.StringIO()
         with (mock.patch.object(check_repo, "GITLEAKS_TIMEOUT", 1), mock.patch.dict(os.environ, {"PATH": path}),
               contextlib.redirect_stdout(out)):
@@ -555,27 +555,31 @@ class CheckRepoTests(unittest.TestCase):
         self.assertNotIn(str(self.root), out)
         self.assertNotIn(str(self.root.resolve()), out)
 
-    def test_exception_message_with_a_user_path_outside_the_root_is_hidden(self):
-        # 検査の中で捕まえていない例外を、main() がどう出すか。ルートは "." にし、それでもユーザー名が残れば型だけを出す。
+    def test_exception_messages_with_the_root_under_a_user_dir(self):
+        # 検査の中で捕まえていない例外を、main() がどう出すか。CI のルート（runner のホームの下）のように、ルート自体が
+        # ユーザーのディレクトリの下にある。ルートは "." にして出し、それでもユーザー名が残れば（ルートの外）型だけを出す。
         check_repo = load_check_repo()
+        root = "/home/" + "runner/work/dotfiles/dotfiles"
         user_path = "/Users/" + "alice/.config/x"
         # CalledProcessError のメッセージの書式は Python の版で変わる（3.15 はコマンドを引用符で囲まない）。
         cases = (
-            (subprocess.CalledProcessError(128, ["git", "-C", str(self.root), "ls-files"]),
+            (subprocess.CalledProcessError(128, ["git", "-C", root, "ls-files"]),
              ("FAIL boom\n  error: CalledProcessError: ", "'-C', '.', 'ls-files'")),
+            (FileNotFoundError(2, "No such file or directory", root + "/x.json"),
+             ("FAIL boom\n  error: FileNotFoundError: [Errno 2] No such file or directory: './x.json'",)),
             (FileNotFoundError(2, "No such file or directory", user_path), ("FAIL boom\n  error: FileNotFoundError",)),
         )
         for exc, fragments in cases:
-            with self.subTest(exc=type(exc).__name__):
+            with self.subTest(exc=str(exc)):
                 def fail(root, exc=exc):
                     raise exc
                 out = io.StringIO()
                 with mock.patch.object(check_repo, "CHECKS", (("boom", fail),)), contextlib.redirect_stdout(out):
-                    code = check_repo.main(["check-repo.py", str(self.root)])
+                    code = check_repo.main(["check-repo.py", root])
                 self.assertEqual(code, 1, out.getvalue())
                 for fragment in fragments:
                     self.assertIn(fragment, out.getvalue())
-                self.assertNotIn(str(self.root), out.getvalue())
+                self.assertNotIn(root, out.getvalue())
                 self.assertNotIn(user_path, out.getvalue())
 
     def test_newer_local_tool_asks_to_bump_ci(self):
