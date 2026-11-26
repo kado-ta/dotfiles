@@ -286,7 +286,9 @@ class CheckRepoTests(unittest.TestCase):
 
     def check(self, env=None):
         if env is None:
-            env = {**os.environ, "PATH": os.pathsep.join([*map(str, self.path_dirs), os.environ["PATH"]])}
+            # local-paths はログイン名を変数の直後でも止めるので、実行する人の名前に結果が左右されないよう固定する。
+            env = {**os.environ, "PATH": os.pathsep.join([*map(str, self.path_dirs), os.environ["PATH"]]),
+                   "LOGNAME": "check-repo-test"}
         cp = subprocess.run([sys.executable, "-B", str(SCRIPT), str(self.root)], capture_output=True, text=True, env=env)
         return cp.returncode, cp.stdout + cp.stderr
 
