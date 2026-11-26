@@ -41,7 +41,10 @@ auto_switch = false
 [theme.custom]
 teal = "#89b4fa"
 
-# 日本語入力（macOS では prefix のあいだだけ英字配列に切り替え、抜けたら戻す）
+# 日本語入力（macOS では prefix のあいだだけ英字の配列に切り替え、抜けたら戻す）。
+# 切り替え先は、入力ソースに入っている英字の配列（U.S. など）で、ATOK の英字モードは選ばれない。
+# 配列が入力ソースにないと、エラーも出さずに何もしない。macOS のこの設定は dotfiles で管理していないので、
+# 新しい Mac では、システム設定 → キーボード → 入力ソースで U.S. を足す。
 [experimental]
 switch_ascii_input_source_in_prefix = true
 # ペインがカーソルを隠していても、IME の窓のためにカーソル位置を外のターミナル（Ghostty）に見せる。

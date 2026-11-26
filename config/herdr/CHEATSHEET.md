@@ -5,7 +5,7 @@ herdr の主なキーと、[config.toml](config.toml) で足した prefix なし
 - prefix は既定の `ctrl+b`。`prefix+c` は、`ctrl+b` を押してから `c` を押す。
 - 直接キーの `option` は**左**の Option で押す（Ghostty の `macos-option-as-alt = left` のため）。config.toml では `alt` と書く。
 - `cmd+option+h` は、macOS の設定で Ghostty の「Hide Others」を別のキーに付け替えないと herdr に届かない。手順は config.toml のコメントにある。
-- 日本語入力のままでも prefix のキーが効く。prefix を押しているあいだだけ英字配列に切り替わる（`experimental.switch_ascii_input_source_in_prefix`）。
+- 日本語入力のままでも prefix のキーが効く。prefix を押しているあいだだけ英字の配列に切り替わる（`experimental.switch_ascii_input_source_in_prefix`）。macOS の入力ソースに英字の配列（U.S. など）を入れておく必要がある。ATOK の英字モードは切り替え先にならない。
 - 直接キーを変えたら、この表も合わせて直す。
 
 <a name="toc"></a>
