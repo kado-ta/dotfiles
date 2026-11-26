@@ -42,6 +42,7 @@ link() {
 link "${SCRIPT_DIR}/settings.json" "${CLAUDE_DIR}/settings.json"
 link "${SCRIPT_DIR}/CLAUDE.md" "${CLAUDE_DIR}/CLAUDE.md"
 link "${SCRIPT_DIR}/rules" "${CLAUDE_DIR}/rules"
+link "${SCRIPT_DIR}/themes" "${CLAUDE_DIR}/themes"
 
 if [ -d "${CLAUDE_DIR}/hooks" ] && [ ! -L "${CLAUDE_DIR}/hooks" ]; then
   echo "Removing existing Claude Code hooks directory: ${CLAUDE_DIR}/hooks"
