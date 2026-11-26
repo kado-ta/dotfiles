@@ -118,3 +118,21 @@ main は分岐の後に PR #141・#143 で進んだ（`bfd312d`）。`claude/SKI
 | `zizmor --offline .` | No findings to report（終了コード 0） |
 
 main は `f25fb3b`（PR #141・#143〜#147）まで進んだ。分岐の後に main で変わったのは、変更した 4 ファイルのうち `claude/SKILL_CHEATSHEET.md` の 2 行（B 章と C 章の表）だけで、D 章の表とは重ならない。
+
+<a name="codex-1"></a>
+
+## 7. Codex レビュー 1 回目（`codex review`）
+
+ユーザーが通常のターミナルで `git fetch origin main && codex review --base origin/main -c 'sandbox_mode="read-only"' -c skills.include_instructions=false` を実行した。新しい規則のとおり、提案を受け入れてもらった後、実行の前に 2 つのコミット（`565fda6`・`5ca9619`）を作った。結果は SKILL_ROUTING.md の Exit criteria のコマンドで読んだ（2026-11-26T05:35:12Z、コミット `5ca9619`）。5 回の上限のうち 1 回目。
+
+最終メッセージの判定は「patch is incorrect」（overall_confidence_score 0.97）。Codex 自身は `git diff --check`・ShellCheck・`actionlint` を実行して通り、Codex と Crit の対話の流れは実行していないと書いている。
+
+| 指摘 | 優先度 | 内容 | 採否 | 理由と対応 |
+| --- | --- | --- | --- | --- |
+| C1-1 | P1 | commit-staged-pr で、未ステージの変更（例: 追跡しているファイルに残したローカルの認証情報）も `git diff <merge-base>` に入り、Codex に送られる。通常のターミナルの Codex には Claude の denyRead が効かないので、伝えるだけでは送信を防げない | 採用 | 事実（`git diff <merge-base>` は作業ツリーと比べる）。commit-staged-pr では、この変更で新しくできた経路。追跡しているファイルに未ステージの変更があるときは、コマンドを渡さずに伝え、片付けるか見送るかを選んでもらうようにした。一般の流れでも、ほかの変更が作業ツリーに残ると同じことが起きるので、SKILL_ROUTING.md の行にも同じ規則を足した |
+| C1-2 | P2 | `git commit -- <path>` は部分ステージを尊重せず、そのファイルの作業ツリーの内容をまとめて記録する。パスの指定だけでは「この作業の変更だけ」を保証できない | 採用 | `/review` の H7 の修正（「パスを指定して」）で入った。「この作業のファイルだけをステージしてコミットする」にし、ほかの変更が index か作業ツリーに残るとき（同じファイルに混ざっているときも）は、コミットせずに伝えるようにした |
+| C1-3 | P2 | フェーズ 2 で、Codex の項目と 100 行目の両方が同じ修正のステージとコミットを指示する。両方に従うと 2 回目はステージが空になる | 採用 | 100 行目のコミットの指示を Crit のコメントの場合だけにし、Codex の項目か Crit のコメントでコミットを足したときは、承認の後に手順 6 に進むとした |
+| C1-4 | P2 | フェーズ 2 から始めると、PR の base を確かめないまま Codex の手順に入る（例: `release/*` 向けの PR） | 採用 | `/review` の G6 で書き足さなかった点。フェーズ 2 から始めた場合は、Codex の項目の前に PR の base を確かめるとした |
+| C1-5 | P2 | 単一ブランチの clone などで、`git fetch origin <base>` が `origin/<base>` を更新しないことがある | 採用 | refspec を明示した（`git fetch origin +<base>:refs/remotes/origin/<base>`） |
+
+指摘の修正で消した秘密情報や公開できない内容はないので、先のコミット（`565fda6`・`5ca9619`）の確かめ（D4）は要らない。
