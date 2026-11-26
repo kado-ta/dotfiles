@@ -5,7 +5,8 @@
     "DISABLE_FEEDBACK_COMMAND": "1",
     "CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY": "1",
     "CLAUDE_CODE_ENABLE_TELEMETRY": "0",
-    "CLAUDE_CODE_NATIVE_CURSOR": "1"
+    "CLAUDE_CODE_NATIVE_CURSOR": "1",
+    "WORKBOOK_INTAKE_DIR": "~/Dev/workbook_intake"
   },
   "permissions": {
     "allow": [
@@ -190,7 +191,9 @@
       "Edit(~/.local/share/claude-mcp/**)",
       "Edit(~/Library/Caches/playwright-mcp/**)",
       "Edit(//**/.obsidian/**)",
-      "Read(//**/.obsidian/plugins/**)"
+      "Read(//**/.obsidian/plugins/**)",
+      "Read(~/Dev/workbook_intake/**)",
+      "Edit(~/Dev/workbook_intake/**)"
     ],
     "ask": [
       "Bash(gh pr create*)",
@@ -454,6 +457,14 @@
         "source": "github",
         "repo": "cursor/plugins"
       }
+    },
+    "workbook-intake": {
+      "source": {
+        "source": "github",
+        "repo": "kado-ta/workbook-intake",
+        "ref": "679a619fa814b548ad53217239d1d1e334c58062"
+      },
+      "autoUpdate": false
     }
   },
   "sandbox": {
@@ -483,7 +494,8 @@
         "~/.local/share/claude-mcp",
         "~/Library/Caches/playwright-mcp",
         "/**/.obsidian",
-        "~/Obsidian/*/.gitignore"
+        "~/Obsidian/*/.gitignore",
+        "~/Dev/workbook_intake"
       ],
       "denyRead": [
         "~/.aws/credentials",
@@ -495,7 +507,8 @@
         "~/.crit",
         "~/.colima/_lima/_config",
         "~/.lima/_config",
-        "/**/.obsidian/plugins"
+        "/**/.obsidian/plugins",
+        "~/Dev/workbook_intake"
       ]
     },
     "credentials": {

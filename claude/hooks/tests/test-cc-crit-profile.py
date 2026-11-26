@@ -283,6 +283,17 @@ class ProfileTests(unittest.TestCase):
             self.skipTest("~/.lima/_config does not exist")
         self.assertDenied(f"attempt(lambda: os.listdir({str(p)!r}))")
 
+    def test_read_workbook_intake_denied(self):
+        # workbook-intake の受取用フォルダ。プラグインを使う Mac にだけある。
+        # Claude の sandbox は大文字小文字だけ違う表記も拒否するので、crit もそれより多く読めないことを確かめる。
+        p = self.home_real / "Dev" / "workbook_intake"
+        if not p.is_dir():
+            self.skipTest("~/Dev/workbook_intake does not exist")
+        for path in (p, self.home_real / "dev" / "WORKBOOK_INTAKE"):
+            if path.is_dir():
+                with self.subTest(path=str(path)):
+                    self.assertDenied(f"attempt(lambda: os.listdir({str(path)!r}))")
+
     def test_read_real_crit_denied(self):
         # sandbox の外の crit（plan-hook）の状態。crit は使わない。
         p = self.home_real / ".crit"

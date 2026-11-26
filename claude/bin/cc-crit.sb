@@ -95,6 +95,9 @@
 ; Obsidian のプラグインのコードと設定（認証情報がある）。場所を問わず、名前で拒否する。
 ; denyRead: /**/.obsidian/plugins
 (deny file-read* (regex #"/\.obsidian/plugins(/|$)"))
+; workbook-intake の受取用フォルダ（外から受け取った Excel のブック）。読むのはプラグインのフックと xlide だけ。
+; denyRead: ~/Dev/workbook_intake
+(deny file-read* (subpath (home-path "/Dev/workbook_intake")))
 ; 以下は permissions.deny の Read(...) に相当する。
 (deny file-read*
   (regex #"/\.env[^/]*$")
