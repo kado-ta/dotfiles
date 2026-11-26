@@ -73,6 +73,9 @@ Crit の差分（依頼ファイル `{}`）は未追跡のファイルも含む�
 
 A を推奨する。受け入れの返事を、コミットの許可として扱う（提案の文面で「先にコミットする」と伝える）。
 
+> [!NOTE]
+> D1 は、Codex の challenge の指摘（先のコミットに秘密情報が残る、コミットできないときの進み方がない、など）を受けて、2026-11-26 にユーザーが D5 に変えた。先にコミットはせず、ブランチに base より先のコミットがなければ `codex review --uncommitted` を使う（[test-report の 9 章](test-report.md#codex-3)）。
+
 <a name="decision-skills"></a>
 
 ### D2. スキルの手順への反映
@@ -90,7 +93,7 @@ A を推奨する。受け入れの返事を、コミットの許可として扱
 
 ## 4. 変更
 
-承認の後、`/review` の指摘で文面を変えた（「完了前」を残す、commit-staged-pr の移り先など）。下の 4.1〜4.4 は承認したときの案のままにしている。変えた理由は test-report の [3 章](test-report.md#review-1)・[4 章](test-report.md#review-2)・[5 章](test-report.md#review-3) に、最終の文面はコミットの差分にある。
+承認の後、`/review` の指摘で文面を変えた（「完了前」を残す、commit-staged-pr の移り先など）。下の 4.1〜4.4 は承認したときの案のままにしている。変えた理由は test-report の [3 章](test-report.md#review-1)・[4 章](test-report.md#review-2)・[5 章](test-report.md#review-3)（`/review`）と [7〜9 章](test-report.md#codex-1)・[11 章](test-report.md#codex-4)（Codex）に、最終の文面はコミットの差分にある。
 
 <a name="change-claude-md"></a>
 
