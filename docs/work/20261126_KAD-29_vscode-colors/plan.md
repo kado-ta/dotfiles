@@ -37,7 +37,7 @@ GitHub Dark Dimmed に替える。構文の色が Ghostty の 16 色と同じ pr
 
 - 同じ拡張の GitHub Dark Colorblind (Beta) は使わない。全体の色調が Dimmed ではなく Dark（背景 #0d1117）で、削除がオレンジになり、ANSI の緑と青が同じ色（#58a6ff）になるため。
 - アイコンテーマ（catppuccin-perfect-dark）は色テーマとは別物なので、今のままにする。
-- Catppuccin の拡張は消さない（戻すときは `workbench.colorTheme` を戻せば済む）。`json.schemaDownload.trustedDomains` の catppuccin の行もそのままにする。
+- 当初は Catppuccin のテーマの拡張を残す案だった（戻すときは `workbench.colorTheme` を戻せば済む）。PR の前にユーザーがアンインストールし、`vscode/extensions` から外した（5f3d4df）。そのスキーマのための `json.schemaDownload.trustedDomains` の catppuccin/vscode の行も、使い道がなくなったので消す（アイコンの拡張は参照していない）。
 - herdr は Ghostty の中で動き、VSCode のテーマとは関係しないので、範囲外にする。
 
 <a name="decision-background"></a>
@@ -278,4 +278,4 @@ git commit -m "feat(vscode): switch to GitHub Dark Dimmed with the terminal's co
 
 ## ロールバック
 
-PR のコミットを revert する。すぐ戻すだけなら、`vscode/settings.json` の `workbench.colorTheme` を `Catppuccin Mocha` に戻せば、`"[GitHub Dark Dimmed]"` の上書きは効かなくなる（Catppuccin の拡張は残している）。ただし、前の選択と検索の色（テーマを限定しない 4 つ）は戻らない。
+PR のコミットを revert し、Catppuccin のテーマの拡張を入れ直す（`code --install-extension catppuccin.catppuccin-vsc`。revert で `vscode/extensions` に戻るので、新しい Mac では `vscode/setup.sh` も入れる）。すぐ戻すだけなら、拡張を入れ直してから `vscode/settings.json` の `workbench.colorTheme` を `Catppuccin Mocha` に戻せば、`"[GitHub Dark Dimmed]"` の上書きは効かなくなる。ただし、前の選択と検索の色（テーマを限定しない 4 つ）は戻らない。
