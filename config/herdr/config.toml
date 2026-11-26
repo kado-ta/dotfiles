@@ -5,9 +5,34 @@ delivery = "terminal"
 
 [ui]
 status_indicators = "symbols"
+# 幅は sidebar_max_width（既定 36）までに切られるので、上限も上げる。
+# サイドバーの端をマウスでドラッグすると、その幅が herdr の状態ファイルに残り、この設定より優先される。
+sidebar_width = 40
+sidebar_max_width = 40
 
 [ui.sound]
 enabled = true
+
+# Claude の音は Claude Code のフックに任せる（Codex の音は herdr が鳴らす）
+[ui.sound.agents]
+claude = "off"
+
+# Claude の行に、Claude Code がターミナルのタイトルに出す作業内容を表示する（ドキュメントの例のまま）。
+[ui.sidebar.agents.rows_by_agent]
+claude = [
+  [
+    "state_icon",
+    "agent",
+    "state_text",
+  ],
+  [
+    "terminal_title_stripped",
+  ],
+  [
+    "workspace",
+    "tab",
+  ],
+]
 
 [theme]
 name = "catppuccin"
@@ -16,7 +41,24 @@ auto_switch = false
 [theme.custom]
 teal = "#89b4fa"
 
-# prefix なしのキーを足す。タブの作成・移動と、ペインの上下左右・直前に戻る・分割・閉じるは cmd+option、
+# 日本語入力（macOS では prefix のあいだだけ英字配列に切り替え、抜けたら戻す）
+[experimental]
+switch_ascii_input_source_in_prefix = true
+# ペインがカーソルを隠していても、IME の窓のためにカーソル位置を外のターミナル（Ghostty）に見せる。
+# vim のノーマルモードなどで余計なカーソルが見えるので、対象を絞る。
+reveal_hidden_cursor_for_cjk_ime = true
+cjk_ime_agents = ["claude", "codex"]
+
+# 一時的なシェルをポップアップで開く。herdr が今のペインのディレクトリで起動するので、cd は要らない。exit で閉じる。
+[[keys.command]]
+key = "prefix+t"
+type = "popup"
+command = "exec \"${SHELL:-sh}\""
+description = "scratch shell"
+width = "80%"
+height = "80%"
+
+# prefix なしのキーを足す。タブの作成・移動と、ペインの上下左右・直前に戻る・分割・閉じる・ズームは cmd+option、
 # ペインを順に移動するのは cmd+ctrl に割り当てる（cmd+option+[ / ] はタブの移動に使っている）。
 # Ghostty は macos-option-as-alt = left のため、左の Option で押す。
 # Ghostty の split 用のキー（cmd+[ / ]、cmd+option+矢印、cmd+ctrl+矢印）とは重ねない。
@@ -31,6 +73,8 @@ split_vertical = ["prefix+v", "cmd+alt+v"]
 split_horizontal = ["prefix+minus", "cmd+alt+minus"]
 # 閉じるは prefix と同じ x にする。cmd+option+w は Ghostty がタブを閉じるのに使っている。
 close_pane = ["prefix+x", "cmd+alt+x"]
+# ズームは prefix と同じ z にする。Ghostty は cmd+z（元に戻す）と cmd+shift+z（やり直す）だけを使っている。
+zoom = ["prefix+z", "cmd+alt+z"]
 # focus_pane_left の cmd+option+h は Ghostty のメニューの「Hide Others」（macOS 標準）が使うので、herdr に届かない。
 # macOS のシステム設定 → キーボード → キーボードショートカット → アプリのショートカットで、
 # Ghostty の「Hide Others」に普段押さないキー （例: ctrl+option+shift+cmd+h） を割り当てて空けている。
@@ -43,3 +87,5 @@ focus_pane_right = ["prefix+l", "cmd+alt+l"]
 cycle_pane_next = ["prefix+tab", "cmd+ctrl+]"]
 cycle_pane_previous = ["prefix+shift+tab", "cmd+ctrl+["]
 last_pane = "cmd+alt+o"
+next_agent = "cmd+ctrl+j"
+previous_agent = "cmd+ctrl+k"
