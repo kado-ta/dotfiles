@@ -212,6 +212,14 @@ def write_fake_tool(directory, name, body):
     path.chmod(0o755)
 
 
+def load_check_repo():
+    """定数や検査を差し替えて main() を試すために、check-repo.py をモジュールとして読み込む。"""
+    spec = importlib.util.spec_from_file_location("check_repo", SCRIPT)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 class CheckRepoTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -278,7 +286,9 @@ class CheckRepoTests(unittest.TestCase):
 
     def check(self, env=None):
         if env is None:
-            env = {**os.environ, "PATH": os.pathsep.join([*map(str, self.path_dirs), os.environ["PATH"]])}
+            # local-paths はログイン名を変数の直後でも止めるので、実行する人の名前に結果が左右されないよう固定する。
+            env = {**os.environ, "PATH": os.pathsep.join([*map(str, self.path_dirs), os.environ["PATH"]]),
+                   "LOGNAME": "check-repo-test"}
         cp = subprocess.run([sys.executable, "-B", str(SCRIPT), str(self.root)], capture_output=True, text=True, env=env)
         return cp.returncode, cp.stdout + cp.stderr
 
@@ -330,8 +340,79 @@ class CheckRepoTests(unittest.TestCase):
         self.write("notes.txt", "/Users/example/x\n/Users/some one/x\n")
         self.assert_passes()
 
+    def test_non_user_paths_pass(self):
+        # /Users/Shared は macOS の全ユーザーの共有フォルダ。シェルの変数の直後の /home/・/Users/ は、その変数の下の階層。
+        self.write("notes.txt", "/Users/" + "Shared/x\n" + "$T/home/" + "Obsidian/main\n" + "${T}/Users/" + "alice/x\n")
+        self.assert_passes()
+
+    def test_user_paths_not_right_after_a_variable_fail(self):
+        # 外すのは変数の直後だけ。パスの途中や URL の中でも、実在しうるユーザー名は止める。
+        # 変数の直後の一致は、次の階層を読み進めない（$X/home/Users/<名前> の /Users/<名前> も調べる）。
+        # 外すのはパスの先頭の変数だけで、パスの途中の $ で始まるディレクトリ名は外さない。
+        # Shared を外すのは macOS の /Users の下だけ。
+        for text in ("/Volumes/Backup/Users/" + "alice/x", "file:///Users/" + "alice/x", "HOME=/home/" + "alice",
+                     "$T/x/home/" + "alice", "${T}x/Users/" + "alice", "$X/home/Users/" + "alice",
+                     "$X/Users/home/" + "alice", "${X}/Users/Users/" + "alice", "/Volumes/$Archive/Users/" + "bob/x",
+                     "/home/" + "Shared/x"):
+            with self.subTest(text=text):
+                self.write("notes.txt", text + "\n")
+                self.assert_fails("FAIL local-paths", "notes.txt:1:")
+
+    def test_login_name_right_after_a_variable_fails(self):
+        # 実行しているユーザーのログイン名は、変数の直後でも止める。getpass.getuser() は LOGNAME を先に見る。
+        self.write("notes.txt", "$T/Users/" + "alice/x\n" + "${T}/home/" + "bob/x\n")
+        env = {**os.environ, "PATH": os.pathsep.join([*map(str, self.path_dirs), os.environ["PATH"]]),
+               "LOGNAME": "alice"}
+        code, out = self.check(env)
+        self.assertEqual(code, 1, out)
+        self.assertIn("FAIL local-paths\n  notes.txt:1: absolute path", out)
+        self.assertNotIn("notes.txt:2:", out)
+
     def test_tracked_aws_credentials_fails(self):
         self.write("aws/config", "[default]\n")
+        self.assert_fails("FAIL secret-files", "aws/config")
+
+    def test_files_deleted_but_still_in_the_index_fail_only_local_paths(self):
+        # 作業ツリーで消したが git rm していないファイルは、index に残っていてコミットに入る。中身を読めないので、
+        # 公開を防ぐ local-paths は相対パスで FAIL にし、ほかの中身を読む検査は飛ばす。
+        files = {"a.json": "{}\n", "b.toml": "x = 1\n", "NOTE.md": "# Note\n", "c.txt": "plain\n",
+                 "x/gone.sh": "#!/bin/bash\nln -s a b\n"}
+        for rel, text in files.items():
+            self.write(rel, text)
+            (self.root / rel).unlink()
+        code, out = self.check()
+        self.assertEqual(code, 1, out)
+        for rel in files:
+            self.assertIn(f"  {rel}: deleted from the working tree but still in the index", out)
+        for name in ("syntax", "markdown-names", "markdown-links", "link-guard"):
+            self.assertIn(f"PASS {name}\n", out)
+        self.assertNotIn("error:", out)
+
+    def test_badly_named_markdown_deleted_but_still_in_the_index_fails(self):
+        # markdown-names は名前だけを見るので、index に残る（コミットに入る）ファイルも調べる。
+        self.write("notes.md", "# Notes\n")
+        (self.root / "notes.md").unlink()
+        self.assert_fails("FAIL markdown-names", "notes.md: Markdown file names")
+
+    def test_file_that_cannot_be_looked_up_is_not_treated_as_deleted(self):
+        # ディレクトリの権限で lstat できないファイルは、消えたのではない。一覧には残し、読む検査で失敗させる。
+        # そのファイルを読まない検査は、ほかのファイルの結果を出す。
+        if os.geteuid() == 0:
+            self.skipTest("root can look up files without permission")
+        self.write("locked/f.txt", "plain\n")
+        self.write("ghostty/link.sh", "#!/bin/bash -e\n" + SCRIPT_DIR_LINE + LINK_BODY)
+        (self.root / "locked").chmod(0)
+        self.addCleanup((self.root / "locked").chmod, 0o755)
+        code, out = self.check()
+        self.assertEqual(code, 1, out)
+        self.assertIn("FAIL local-paths\n  error: PermissionError", out)
+        self.assertIn("FAIL link-guard\n  ghostty/link.sh: runs ln without the worktree guard", out)
+        self.assertNotIn("deleted from the working tree", out)
+
+    def test_aws_credentials_deleted_but_still_in_the_index_fails(self):
+        # 作業ツリーで消しただけでは、index に残っていてコミットに入る。
+        self.write("aws/config", "[default]\n")
+        (self.root / "aws/config").unlink()
         self.assert_fails("FAIL secret-files", "aws/config")
 
     def test_secret_in_tracked_file_fails(self):
@@ -451,9 +532,7 @@ class CheckRepoTests(unittest.TestCase):
         # gitleaks がタイムアウトしたとき。例外のメッセージにはコマンド全体（gitleaks と一時ディレクトリのパス）が入る。
         # 上限の 120 秒は待てないので、モジュールを読み込んで 1 秒にする。
         self.override_tool("gitleaks", 'if [ "$1" = version ]; then echo 8.30.1; exit 0; fi\nexec sleep 30\n')
-        spec = importlib.util.spec_from_file_location("check_repo", SCRIPT)
-        check_repo = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(check_repo)
+        check_repo = load_check_repo()
         path = os.pathsep.join([*map(str, self.path_dirs), os.environ["PATH"]])
         out = io.StringIO()
         with (mock.patch.object(check_repo, "GITLEAKS_TIMEOUT", 1), mock.patch.dict(os.environ, {"PATH": path}),
@@ -472,6 +551,44 @@ class CheckRepoTests(unittest.TestCase):
         self.assertEqual(code, 1, out)
         self.assertIn("FAIL secret-content\n  error: cannot run gitleaks (OSError)\n", out)
         self.assertNotIn(str(self.path_dirs[0]), out)
+
+    def test_exception_message_shows_paths_relative_to_the_root(self):
+        if os.geteuid() == 0:
+            self.skipTest("root can read files without read permission")
+        self.write("x.json", "{}\n")
+        (self.root / "x.json").chmod(0)
+        code, out = self.check()
+        self.assertEqual(code, 1, out)
+        self.assertIn("FAIL syntax\n  error: PermissionError: [Errno 13] Permission denied: './x.json'\n", out)
+        self.assertNotIn(str(self.root), out)
+        self.assertNotIn(str(self.root.resolve()), out)
+
+    def test_exception_messages_with_the_root_under_a_user_dir(self):
+        # 検査の中で捕まえていない例外を、main() がどう出すか。CI のルート（runner のホームの下）のように、ルート自体が
+        # ユーザーのディレクトリの下にある。ルートは "." にして出し、それでもユーザー名が残れば（ルートの外）型だけを出す。
+        check_repo = load_check_repo()
+        root = "/home/" + "runner/work/dotfiles/dotfiles"
+        user_path = "/Users/" + "alice/.config/x"
+        # CalledProcessError のメッセージの書式は Python の版で変わる（3.15 はコマンドを引用符で囲まない）。
+        cases = (
+            (subprocess.CalledProcessError(128, ["git", "-C", root, "ls-files"]),
+             ("FAIL boom\n  error: CalledProcessError: ", "'-C', '.', 'ls-files'")),
+            (FileNotFoundError(2, "No such file or directory", root + "/x.json"),
+             ("FAIL boom\n  error: FileNotFoundError: [Errno 2] No such file or directory: './x.json'",)),
+            (FileNotFoundError(2, "No such file or directory", user_path), ("FAIL boom\n  error: FileNotFoundError",)),
+        )
+        for exc, fragments in cases:
+            with self.subTest(exc=str(exc)):
+                def fail(root, exc=exc):
+                    raise exc
+                out = io.StringIO()
+                with mock.patch.object(check_repo, "CHECKS", (("boom", fail),)), contextlib.redirect_stdout(out):
+                    code = check_repo.main(["check-repo.py", root])
+                self.assertEqual(code, 1, out.getvalue())
+                for fragment in fragments:
+                    self.assertIn(fragment, out.getvalue())
+                self.assertNotIn(root, out.getvalue())
+                self.assertNotIn(user_path, out.getvalue())
 
     def test_newer_local_tool_asks_to_bump_ci(self):
         # 1.7.12 は 1.7.9 より新しい（文字列ではなく数で比べる）。
@@ -1072,16 +1189,18 @@ class CheckRepoTests(unittest.TestCase):
 
     def test_unreadable_script_fails_per_file(self):
         # 1 本読めないだけで検査全体を 1 件の例外にせず、ほかのスクリプトも調べる。絶対パスは出さない。
-        # 消したファイルは local-paths も読めずに例外になる（変更前からの動き）ので、link-guard の節だけを見る。
+        # 読めないファイルは local-paths なども例外で落ちるので、link-guard の節だけを見る。
+        if os.geteuid() == 0:
+            self.skipTest("root can read files without read permission")
         self.write("ghostty/link.sh", "#!/bin/bash -e\n" + SCRIPT_DIR_LINE + LINK_BODY, add=False)
-        for name, rel in (("not utf-8", "x/latin1.sh"), ("deleted before git add", "x/gone.sh")):
+        for name, rel in (("not utf-8", "x/latin1.sh"), ("no read permission", "x/locked.sh")):
             with self.subTest(case=name):
                 path = self.root / rel
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_bytes(b"# \xe9\nln -s a b\n")
                 self.git("add", "--", rel)
-                if name == "deleted before git add":
-                    path.unlink()
+                if name == "no read permission":
+                    path.chmod(0)
                 code, out = self.check()
                 self.assertEqual(code, 1, out)
                 section = out.split("FAIL link-guard\n", 1)[-1].split("\nPASS ", 1)[0].split("\nFAIL ", 1)[0]

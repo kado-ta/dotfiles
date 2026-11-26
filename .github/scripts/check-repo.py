@@ -2,10 +2,12 @@
 
 使い方: python3 -B .github/scripts/check-repo.py [ROOT]
 検査ごとに PASS / FAIL を出し、1 件でも失敗すれば終了コード 1 を返す。
-対象は git が追跡しているファイルと、無視されていない未追跡のファイル。
+対象は git が追跡しているファイルと、無視されていない未追跡のファイル。作業ツリーで消したが index に残るファイルは、
+中身を読めないので local-paths が FAIL にし、中身を読むほかの検査は飛ばす（名前を見る検査は調べる）。
 CI は push の後に動くので、公開前に防ぐには push する前に手元で実行する。そのとき git add 前のファイルも見る。
 """
 
+import getpass
 import json
 import os
 import posixpath
@@ -235,7 +237,13 @@ PROJECT_DENY_WRITE = (
 )
 
 HOOK_SCRIPT = re.compile(r"\.claude/(?:hooks|scripts)/")
-LOCAL_PATH = re.compile(r"/(?:Users|home)/([A-Za-z0-9._-]+)")
+# パスの先頭がシェルの変数（$T・${T}）なら、その変数の下の階層なので外す。パスの途中の /Users/ でも、
+# /Volumes/Backup/Users/<名前> のように実在するユーザー名でありうるので、外すのは変数の直後だけにする。
+# 直前が / や名前の文字の $ は、変数ではなくディレクトリ名の一部（/Volumes/$Archive/Users/<名前>）なので外さない。
+# 変数が実在のマウント先を表すこともあるので、実行しているユーザーのログイン名は、変数の直後でも止める。
+# 名前は先読みにして読み進めない（$X/home/Users/<名前> の /Users/<名前> も調べる）。
+LOCAL_PATH = re.compile(r"((?<![\w/.-])\$(?:\w+|\{\w+\}))?/(Users|home)(?=/([A-Za-z0-9._-]+))")
+LOGIN = getpass.getuser()
 FENCE = re.compile(r"^\s*(`{3,}|~{3,})(.*)$")
 INLINE_CODE = re.compile(r"(`+).+?(?<!`)\1(?!`)")
 HEADING = re.compile(r"^ {0,3}#{1,6}\s+(.*?)(?:\s+#+)?\s*$")
@@ -248,8 +256,21 @@ def git(root, *args):
     return subprocess.run(["git", "-C", str(root), *args], check=True, capture_output=True, text=True).stdout
 
 
-def repo_files(root):
-    return [f for f in git(root, "ls-files", "-z", "--cached", "--others", "--exclude-standard").split("\0") if f]
+def in_worktree(path):
+    # 消えたとみなすのはファイルがないときだけ。権限で調べられないものは残し、読む検査で失敗させる（壊れた symlink も残る）。
+    try:
+        os.lstat(path)
+    except (FileNotFoundError, NotADirectoryError):
+        return False
+    except OSError:
+        pass
+    return True
+
+
+def repo_files(root, include_deleted=False):
+    files = [f for f in git(root, "ls-files", "-z", "--cached", "--others", "--exclude-standard").split("\0") if f]
+    # 作業ツリーで消したが index に反映していないファイルは、読めないので既定では除く。
+    return files if include_deleted else [f for f in files if in_worktree(root / f)]
 
 
 def tracked_modes(root):
@@ -266,14 +287,25 @@ def load_settings(root):
 
 
 def has_real_user_path(text):
-    return any(m.group(1) not in PLACEHOLDER_USERS for m in LOCAL_PATH.finditer(text))
+    for m in LOCAL_PATH.finditer(text):
+        variable, base, name = m.groups()
+        # /Users/Shared は macOS の全ユーザーの共有フォルダ。/home の下の Shared はアカウントでありうるので外さない。
+        if name in PLACEHOLDER_USERS or (base, name) == ("Users", "Shared"):
+            continue
+        if variable is None or name == LOGIN:
+            return True
+    return False
 
 
 def check_local_paths(root):
     errors = []
     real_root = root.resolve()
-    for rel in repo_files(root):
+    for rel in repo_files(root, include_deleted=True):
         path = root / rel
+        # 作業ツリーで消しても、index に残っていればコミットに入る。中身を読めないので、黙って通さない。
+        if not in_worktree(path):
+            errors.append(f"{rel}: deleted from the working tree but still in the index (git rm it or restore it)")
+            continue
         # 公開されるのはリンクの文字列なので、リンク先ではなくそれを調べる。
         # 公開される CI のログにユーザー名を出さないよう、パスそのものは表示しない。
         if path.is_symlink():
@@ -294,7 +326,8 @@ def check_local_paths(root):
 
 
 def check_secret_files(root):
-    tracked = set(repo_files(root))
+    # 作業ツリーで消しただけのファイルも、index に残っていればコミットに入る。
+    tracked = set(repo_files(root, include_deleted=True))
     return [f"{rel}: must not be tracked" for rel in FORBIDDEN_FILES if rel in tracked]
 
 
@@ -698,9 +731,10 @@ def check_syntax(root):
 
 
 def check_markdown_names(root):
+    # 名前だけを見るので、作業ツリーで消しても index に残る（コミットに入る）ファイルも調べる。
     return [
         f"{rel}: Markdown file names outside docs/ use only A-Z and _"
-        for rel in repo_files(root)
+        for rel in repo_files(root, include_deleted=True)
         if rel.endswith(".md") and not rel.startswith(("docs/",) + VENDORED_SKILLS)
         and not re.fullmatch(r"[A-Z_]+", PurePosixPath(rel).stem)
     ]
@@ -805,6 +839,19 @@ CHECKS = (
 )
 
 
+def exception_detail(e, root):
+    """例外の型の後ろに付ける文字列（": <メッセージ>"、出さないときは " (…)"）を返す。CI のログは公開されるので、
+    ユーザー名を含むパスは出さない。
+
+    OSError などのメッセージには絶対パスが入る。リポジトリのルートは "." にして原因を追えるようにし、
+    それでもユーザー名を含むパス（ルートの外のもの）が残れば、メッセージごと出さない。
+    """
+    message = str(e).replace(str(root.absolute()), ".")
+    if has_real_user_path(message):
+        return " (the message is not shown because it contains a path with a user name)"
+    return f": {message}"
+
+
 def main(argv):
     root = Path(argv[1]) if len(argv) > 1 else Path(__file__).resolve().parents[2]
     failed = False
@@ -813,7 +860,7 @@ def main(argv):
             errors = check(root)
         except Exception as e:
             # 検査できないときは成功扱いにしない（fail closed）。
-            errors = [f"error: {type(e).__name__}: {e}"]
+            errors = [f"error: {type(e).__name__}{exception_detail(e, root)}"]
         print(f"{'FAIL' if errors else 'PASS'} {name}")
         for error in errors:
             print(f"  {error}")
