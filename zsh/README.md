@@ -155,13 +155,14 @@ exec zsh
 | プラグイン                         | 読み込み | 役割                                             |
 | ---------------------------------- | -------- | ------------------------------------------------ |
 | `romkatv/zsh-defer`                | 即時     | 遅延読み込み機能                                 |
-| `johnhamelink/env-zsh`             | 即時     | 作業ディレクトリの `.env` から環境変数を読み込む |
 | `colors`（inline）                 | 遅延     | プロンプトの色                                   |
 | `zdharma/fast-syntax-highlighting` | 遅延     | シンタックスハイライト                           |
 | `zsh-users/zsh-autosuggestions`    | 遅延     | 入力候補のグレー表示                             |
 | `zsh-users/zsh-completions`        | 遅延     | 補完定義の追加                                   |
 | `compinit`（inline）               | 遅延     | 補完の有効化と aws-cli 補完                      |
 | `dotfile-defers`（local）          | 遅延     | `~/dotfiles/zsh/*.zsh`                           |
+
+作業ディレクトリの `.env` を読み込むプラグインは入れない。env-zsh は、ディレクトリを移るたびに `.env` をシェルのコードとして読み込み、中身を確かめる仕組みがなかったので外した（KAD-11）。プロジェクトの環境変数は、そのプロジェクトの `mise.toml` の `[env]` に `_.file = ".env"` と書いて読み込む。mise は `.env` を `KEY=value` として解析し、シェルとして実行しない。グローバルの設定の paranoid（`mise/mise_config.toml`）により、`mise.toml` と `.env` は、中身を確かめて `mise trust` を実行するまで読み込まれず、中身が変わると信頼が外れる。
 
 `Ctrl-R` の履歴の検索は、プラグインではなく atuin が受け持つ。`bin/.zshrc` で初期化し、設定は `config/atuin/config.toml` に置く（[config/README.md](../config/README.md)）。`~/.zsh_history` は自動では取り込まれないので、最初に一度だけ `atuin import zsh` を実行する（もう一度実行すると全件が重複する）。取り込みは秘密情報の除外（`secrets_filter`）を通らないので、続けて `atuin history prune` で該当する行を検索から外す。どちらも `~/.atuin` に書くので、Claude Code の sandbox の中ではなく通常のターミナルで実行する。prune しても DB のファイルには平文が残るので、履歴に残っていた秘密情報は失効させる。
 
