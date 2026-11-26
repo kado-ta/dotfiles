@@ -715,13 +715,18 @@ def check_link_guard(root):
 
 
 def strip_jsonc(text):
-    """JSONC のコメントと、閉じ括弧の直前の末尾のカンマを空白に替える。改行は残すので、行番号はずれない。"""
+    """JSONC のコメントと、閉じ括弧の直前の末尾のカンマを空白に替える。改行は残すので、行番号はずれない。
+
+    閉じていないブロックコメントと、要素の後でないカンマ（{,} など）は VSCode でも誤りなので、そのまま残して
+    json.loads に誤りとして報告させる。
+    """
     out = list(text)
     i, n = 0, len(text)
-    comma = None  # 文字列の外の最後のカンマ。後に空白とコメントしか続かないあいだだけ保つ。
+    last = None  # 文字列とコメントの外の、直前の空白でない文字（文字列は '"'）。
+    comma = None  # 要素の後の最後のカンマ。後に空白とコメントしか続かないあいだだけ保つ。
     while i < n:
         if text[i] == '"':
-            comma = None
+            comma, last = None, '"'
             i += 1
             while i < n and text[i] != '"':
                 i += 2 if text[i] == "\\" else 1
@@ -729,19 +734,27 @@ def strip_jsonc(text):
         elif text.startswith(("//", "/*"), i):
             line_comment = text[i + 1] == "/"
             end = text.find("\n" if line_comment else "*/", i + 2)
-            end = n if end == -1 else end + (0 if line_comment else 2)
+            if end == -1:
+                if not line_comment:
+                    break
+                end = n
+            elif not line_comment:
+                end += 2
             for j in range(i, end):
                 if out[j] != "\n":
                     out[j] = " "
             i = end
         else:
-            if text[i] == ",":
-                comma = i
-            elif text[i] in "}]" and comma is not None:
+            ch = text[i]
+            if ch == ",":
+                comma = None if last in (None, "{", "[", ",") else i
+            elif ch in "}]" and comma is not None:
                 out[comma] = " "
                 comma = None
-            elif not text[i].isspace():
+            elif not ch.isspace():
                 comma = None
+            if not ch.isspace():
+                last = ch
             i += 1
     return "".join(out)
 

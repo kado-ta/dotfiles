@@ -1346,6 +1346,17 @@ class CheckRepoTests(unittest.TestCase):
         self.write("vscode/keybindings.json", '[\n  /* comment\n]\n')
         self.assert_fails("FAIL syntax", "vscode/keybindings.json")
 
+    def test_unterminated_jsonc_comment_after_root_fails(self):
+        # ルートを閉じた後でも、閉じないブロックコメントは VSCode では誤り。
+        self.write("vscode/settings.json", '{\n  "a": 1\n}\n/* comment\n')
+        self.assert_fails("FAIL syntax", "vscode/settings.json:4")
+
+    def test_jsonc_comma_without_element_fails(self):
+        # 要素の後でないカンマは、末尾のカンマとして消さない（VSCode では誤り）。
+        self.write("vscode/settings.json", '{\n  "a": [/* comment */, ]\n}\n')
+        self.write("vscode/keybindings.json", '{,}\n')
+        self.assert_fails("FAIL syntax", "vscode/settings.json:2", "vscode/keybindings.json:1")
+
     def test_lowercase_markdown_name_fails(self):
         self.write("notes.md", "# Notes\n")
         self.assert_fails("FAIL markdown-names", "notes.md")
