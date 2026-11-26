@@ -27,14 +27,14 @@ docs/
 ```
 
 - ID は、GitHub Issue なら `GH-<番号>` とし、ゼロ埋めしない（例: `GH-12`）。それ以外のトラッカーの ID は、各リポジトリのルールで決める。
-- 先頭の `YYYYMMDD` は作成日（YAML ヘッダーの `created` と同じ日）とし、後から変えない。ID のない作業は `YYYYMMDD_<slug>` にする。
+- 先頭の `YYYYMMDD` はディレクトリを作った日（最初の文書の `created` と同じ日）とし、後から変えない。ID のない作業は `YYYYMMDD_<slug>` にする。
 - superpowers の brainstorming の design は `work/YYYYMMDD_<ID>_<slug>/design.md` に、writing-plans の plan は `work/YYYYMMDD_<ID>_<slug>/plan.md` に書く。
 
 ## Naming
 
 1. ファイル名・ディレクトリ名は英小文字・数字・ハイフン（kebab-case）だけにする。例外は作業ディレクトリ名の ID（`GH-12` など）と、日付・ID・slug の区切りの `_`。日本語のタイトルは本文に書く。日本語名は GitHub の URL がパーセントエンコードされて読めなくなり、macOS の Unicode 正規化の違いで別ファイル扱いになるおそれもあるため。
 2. ファイル名に `[ ]` を使わない。シェルが文字の集合と解釈するため（`[plan]_*` は `p_` `l_` `a_` `n_` で始まる名前にマッチする）。
-3. 作業ディレクトリは `YYYYMMDD_<ID>_<slug>`（ID のない作業は `YYYYMMDD_<slug>`）とする。日付を先頭に置くのは、名前の順が作成順になるため。ID 自体にハイフンを含むため、区切りは `_` にする。ID はブランチ名・Issue と一致させる。
+3. 作業ディレクトリは `YYYYMMDD_<ID>_<slug>`（ID のない作業は `YYYYMMDD_<slug>`）とする。日付を先頭に置くのは、名前の順が作成日の順になるため。ID 自体にハイフンを含むため、区切りは `_` にする。ID はブランチ名・Issue と一致させる。
 4. 作業ディレクトリ内のファイル名は種別だけにする（`plan.md` / `design.md` / `research-<topic>.md` / `test-report.md`）。
 5. ADR は `NNNN-<slug>.md`（4 桁の通し番号。MADR の既定）とし、採番後は変えない。
 6. 仕様書は `<feature>.md` とし、大きくなったら `specs/<feature>/` に分ける。
