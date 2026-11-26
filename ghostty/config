@@ -72,6 +72,13 @@ cursor-click-to-move = false
 keybind = super+left=previous_tab
 keybind = super+right=next_tab
 
+# split を方向で移るキー（既定の goto_split:up/down/left/right）を外し、herdr に渡す。
+# cmd+option+←/→ は herdr のタブ移動に使う（config/herdr/config.toml）。split は cmd+[ / ] で順に移る。
+keybind = super+alt+arrow_up=unbind
+keybind = super+alt+arrow_down=unbind
+keybind = super+alt+arrow_left=unbind
+keybind = super+alt+arrow_right=unbind
+
 # Ghostty 検索欄へ Cmd + v でクリップボードの内容を貼り付けられるようにする。
 keybind = super+v=paste_from_clipboard
 
