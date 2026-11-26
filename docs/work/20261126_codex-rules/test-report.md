@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: done
 created: 2026-11-26
 ---
 
@@ -13,6 +13,7 @@ created: 2026-11-26
 - [完了条件 1: 規則の照合](#rules-check)
 - [完了条件 2: setup.sh](#setup)
 - [完了条件 3: Codex の動き](#codex)
+- [マージ後](#post-merge)
 - [完了条件 4: リポジトリの規約](#repo-checks)
 - [レビュー](#review)
 - [Codex のレビュー](#codex-review)
@@ -206,6 +207,16 @@ worktree ではない一時ディレクトリ（`$TMPDIR` の下）に `codex/` 
 | `codex exec` が動き、規則が効く | `codex exec - -s read-only -c skills.include_instructions=false < tmp/codex-exec-check.md`（`git status --short` と `git clean -n` を順に実行させる） | `Error loading rules:` で止まらずに動いた。`git status --short` は終了 0。`git clean -n` は `approval required by policy, but AskForApproval is set to Never` で拒否された |
 | `codex review` が動く | `codex review --base main -c 'sandbox_mode="read-only"' -c skills.include_instructions=false` | 最後まで動き、指摘 6 件を返した（[Codex のレビュー](#codex-review)） |
 | TUI で確認が出て、「今後は聞かない」が出ない | 一時の git リポジトリで `codex` を起動し、`git clean -n` を頼む | 確認が出た。選択肢は「Yes, proceed」と「No, and tell Codex what to do differently」の 2 つだけで、接頭辞で許可する選択肢も、セッションの中だけ許可する選択肢も出なかった（ユーザーの報告） |
+
+<a name="post-merge"></a>
+
+## マージ後
+
+PR #144 は 2026-11-26 にマージされた（29852a1）。ユーザーが通常のターミナルで、main（f33269b）の `~/dotfiles/codex/setup.sh` を実行した。
+
+- `installed: ~/.codex/rules/dotfiles.rules` と表示された。入っていた写しと中身が同じなので、差分は出なかった。警告も出なかった。
+- そのあとのプラグイン・Understand Anything・gstack の手順も通り、`codex setup is succeeded!` で終わった。
+- `~/dotfiles/codex/rules/dotfiles.rules` と `~/.codex/rules/dotfiles.rules` の SHA-256 は、どちらも `4e74fccb…bfb91` だった。
 
 <a name="repo-checks"></a>
 

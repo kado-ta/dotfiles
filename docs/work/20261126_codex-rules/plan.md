@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: done
 created: 2026-11-26
 ---
 
@@ -25,6 +25,7 @@ created: 2026-11-26
 
 - [codex/README.md の「今後の改善候補」](../../../codex/README.md#future-work) に残っていた案（`~/.codex/rules/*.rules` で `forbidden` / `prompt` にする）。
 - 他者の dotfiles の rules と README を読んで参考にした。LICENSE がなく、規則もその人の環境向けなので、写さずに書いた。
+- PR #144（2026-11-26 にマージ）。
 
 <a name="background"></a>
 
@@ -274,7 +275,7 @@ AGENTS.md のリンクの直後、プラグインのインストールの前に�
    - setup.sh は worktree の中では止まるので、この確認だけは、検査とコピーの 3 行を手で実行してもらう。手順は Claude が示す。
    - `codex review` の結果は、Codex のレビュー（1 回目）として扱う。SKILL_ROUTING の方法で記録を読み、`test-report.md` に書いてから採否を整理する。
 7. `/crit-review` でブランチの差分を開く → 承認後にコミット・`cc-safe-push`・`cc-safe-pr`・`gh pr checks`。
-8. マージ後、ユーザーが `~/dotfiles`（main）で `codex/setup.sh` を実行する。
+8. マージ後、ユーザーが `~/dotfiles`（main）で `codex/setup.sh` を実行する（2026-11-26 に実行した。[test-report.md](test-report.md#post-merge)）。
 
 ロールバック: `rm ~/.codex/rules/dotfiles.rules` を実行して、Codex を起動し直す（規則は起動時に読む）。リポジトリは、この PR の revert で戻る。データやほかの設定は変えない。
 
