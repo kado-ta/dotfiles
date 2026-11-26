@@ -13,6 +13,13 @@ Claude Code の設定を管理するディレクトリ。`setup.sh` で `~/.clau
   - [Vault のノートの点検](#vault-note-check)
 - [MCP サーバー](#mcp)
   - [Playwright MCP](#playwright-mcp)
+- [workbook-intake](#workbook-intake)
+  - [全 Mac に共通の設定](#workbook-intake-settings)
+  - [全 Mac で行うこと](#workbook-intake-all-macs)
+  - [使う Mac とプロジェクトで入れる](#workbook-intake-install)
+  - [プラグインの版を上げる](#workbook-intake-update)
+  - [受取用フォルダを変える](#workbook-intake-folder)
+  - [プラグインを外す](#workbook-intake-remove)
 - [cc-safe-push](#cc-safe-push)
   - [動作](#cc-safe-push-policy)
   - [インストール](#cc-safe-push-install)
@@ -230,6 +237,97 @@ headless のブラウザを止めるサイトもある（login.salesforce.com �
 2. `mcp/playwright.json` を消す（残すと `setup.sh` が登録し直す）。
 3. `settings.json` の deny（`mcp__playwright__*` の 2 つ、`Read(~/.crit/**)`、`Edit(~/.local/share/claude-mcp/**)`、`Edit(~/Library/Caches/playwright-mcp/**)`）、denyRead の `~/.crit`、denyWrite の `~/.local/share/claude-mcp` と `~/Library/Caches/playwright-mcp`、`disabledMcpjsonServers` の `playwright`、フックの登録を消す。定義がなければ、`check-repo.py` はこれらを求めない。
 4. 入れた `~/.local/share/claude-mcp/playwright` と、出力の `~/Library/Caches/playwright-mcp` を消す。
+
+[目次に戻る](#toc)
+
+<a name="workbook-intake"></a>
+
+## workbook-intake
+
+外から受け取った Excel のブックを、Claude が xlide-mcp で読む前に検査するプラグイン [kado-ta/workbook-intake](https://github.com/kado-ta/workbook-intake)。仕組み・必須の設定・制限は、プラグインの [README.ja.md](https://github.com/kado-ta/workbook-intake/blob/main/README.ja.md) にある。
+
+この dotfiles を共有するすべての Mac で使うわけではない。受取用フォルダの守りと版の固定は、全 Mac に共通の `settings.json` に置く。プラグインは、使う Mac の使うプロジェクトでだけ、local スコープで入れる。ユーザー設定の `enabledPlugins` には入れない。
+
+<a name="workbook-intake-settings"></a>
+
+### 全 Mac に共通の設定
+
+| `settings.json` の項目                                                                 | 値                                                    | 理由                                                                                                                                                                       |
+| -------------------------------------------------------------------------------------- | ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `env.WORKBOOK_INTAKE_DIR`                                                              | `~/Dev/workbook_intake`                               | 受取用フォルダ。フック・`doctor.sh`・xlide が読む。Claude Code は `env` の `~` を展開しないが、プラグインの側で展開する。絶対パスにすると、公開リポジトリにユーザー名が入る |
+| `sandbox.filesystem.denyRead` と、`permissions.deny` の `Read(~/Dev/workbook_intake/**)` | 受取用フォルダ                                        | プラグインの必須の設定。Bash と Read ツールの両方にフォルダを読ませない（片方だけでは足りない）。プラグインを入れていないプロジェクトでも読ませない                         |
+| `sandbox.filesystem.denyWrite` と、`permissions.deny` の `Edit(~/Dev/workbook_intake/**)` | 受取用フォルダ                                        | 検査の後のファイルの差し替えを防ぐ。`~` や `~/Dev` で起動したセッションでは、フォルダが作業ディレクトリの中になるため                                                      |
+| `extraKnownMarketplaces.workbook-intake`                                               | `ref` にコミットの SHA（40 文字）、`autoUpdate: false` | 確かめたコミットに固定する。プラグインの取得元はマーケットプレイスの中（`./`）なので、プラグインも同じコミットになる。SHA の `ref` には Claude Code 2.1.324 以上が要る      |
+
+プラグインを使わない Mac でも、次の 2 つは起こる。
+
+- セッションの開始時に、Claude Code がマーケットプレイス（公開リポジトリ）を `~/.claude/plugins/marketplaces/` に clone する。プラグイン本体は、どこかで有効にしたときだけ取得される。
+- denyRead の項目が増えるので、cc-crit を入れ直すまで `/crit-review` が拒否される（[下記](#workbook-intake-all-macs)）。
+
+<a name="workbook-intake-all-macs"></a>
+
+### 全 Mac で行うこと
+
+この設定を `git pull` した後、cc-crit を入れている Mac では、プラグインを使うかどうかに関係なく cc-crit を入れ直す。cc-crit は、`settings.json` の denyRead の全項目を自分の profile が覆っていることを確かめ、覆っていない項目があると拒否する。手順は [cc-crit のインストール](#cc-crit-install)と同じで、`cmp` と profile のテストまで行う。受取用フォルダがない Mac では、profile のテストのうち受取用フォルダの項目はスキップされる。
+
+<a name="workbook-intake-install"></a>
+
+### 使う Mac とプロジェクトで入れる
+
+通常のターミナルで行う。`~/.claude/plugins` とプロジェクトの `.claude/settings.local.json` に書くので、sandbox の中ではできない。
+
+1. 受取用フォルダを作る（Mac ごとに 1 回）。sandbox からは書けないので、ブックは Finder かターミナルでこのフォルダに移す。コピーではなく移す（フォルダの外の写しは守られない）。
+
+   ```sh
+   mkdir -p ~/Dev/workbook_intake
+   ```
+
+2. マーケットプレイスが、固定した SHA で登録されていることを確かめる。出ないときは、一度 Claude Code を起動して clone させる。`claude plugin marketplace add` は実行しない（`settings.json` に宣言してあるので要らない。実行すると、ユーザー設定、つまりこのリポジトリの `settings.json` に書き込む）。
+
+   ```sh
+   claude plugin marketplace list   # workbook-intake が kado-ta/workbook-intake@<SHA> で出る
+   ```
+
+3. 使うプロジェクトで、local スコープで入れる。`enabledPlugins` は、そのプロジェクトの `.claude/settings.local.json` に書かれ、この Mac の自分にだけ効く。`--scope project` は使わない。共有する `.claude/settings.json` に書かれるので、コミットすると、同じリポジトリのほかの人の環境では、プラグインが入っていないというエラーになる。その人の環境には必須の設定もない。最後の行で、`settings.local.json` が git に無視されていることを確かめる（`ignored` と出なければ `.gitignore` に足す）。
+
+   ```sh
+   cd <使うプロジェクト>
+   claude plugin install workbook-intake@workbook-intake --scope local
+   git check-ignore -q .claude/settings.local.json && echo ignored
+   ```
+
+4. プロジェクトの `.mcp.json` に `xlide` があれば、そのプロジェクトの `.claude/settings.local.json` に `"disabledMcpjsonServers": ["xlide"]` を足す。プラグインの xlide が重複として外され、使えなくなることがあるため。ユーザー設定には入れない（プラグインを使わない Mac やプロジェクトの xlide まで止まる）。
+5. そのプロジェクトで Claude Code を起動し直し、受取用フォルダに置いたファイルの名前を示して、`/workbook-intake:analyze` で解析を頼む。スキルの最初の確かめ（`doctor.sh`、Read の拒否、`xlide_doctor` の `wrong_caller` での拒否）が通れば使える。止まったときは、プラグインの README のトラブルシューティングを見る。
+
+<a name="workbook-intake-update"></a>
+
+### プラグインの版を上げる
+
+1. 今の SHA から新しいコミットまでの差分を読む。
+2. 作業ブランチで、`settings.json` の `ref` を新しい SHA に変え、PR でマージする。全 Mac に効く。
+3. 入れている Mac で Claude Code を起動し直し、`claude plugin marketplace list` が新しい SHA を示すことを確かめてから、入れたプロジェクトごとに更新する。`update-skills.sh` は user スコープのプラグインしか更新しないので、このプラグインは手で更新する。SHA を変えた後に、この手順で入れ替わることは、まだ試していない（2026-11-27 時点）。
+
+   ```sh
+   cd <入れたプロジェクト> && claude plugin update workbook-intake@workbook-intake --scope local
+   ```
+
+<a name="workbook-intake-folder"></a>
+
+### 受取用フォルダを変える
+
+`env.WORKBOOK_INTAKE_DIR`、denyRead・denyWrite、`permissions.deny` の `Read(...)`・`Edit(...)` を、すべて同じフォルダに変える。denyRead が変わるので、cc-crit の `COVERED_DENY_READ` と `cc-crit.sb`（規則と `; denyRead:` の印）、`hooks/tests/test-cc-crit.py`・`hooks/tests/test-cc-crit-profile.py` も直し、全 Mac で cc-crit を入れ直す。
+
+<a name="workbook-intake-remove"></a>
+
+### プラグインを外す
+
+1. 入れたプロジェクトごとに外す。`--scope` を省くと user スコープが対象になるので、`--scope local` を必ず付ける。最後に入れていた場所から外すと、確認の記録（`~/.claude/plugins/data/<id>/`）も消える（`--keep-data` を付けると残る）。
+
+   ```sh
+   cd <入れたプロジェクト> && claude plugin uninstall workbook-intake@workbook-intake --scope local
+   ```
+
+2. どの Mac でも使わなくなったら、`settings.json` の上の項目を消す。cc-crit からも受取用フォルダの項目を外して、全 Mac で入れ直す。
 
 [目次に戻る](#toc)
 

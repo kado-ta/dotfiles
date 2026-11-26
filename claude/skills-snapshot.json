@@ -78,6 +78,13 @@
         "user"
       ],
       "version": "2.9.8"
+    },
+    "workbook-intake@workbook-intake": {
+      "enabled": false,
+      "scopes": [
+        "local"
+      ],
+      "version": "0.1.1"
     }
   },
   "skills": {
