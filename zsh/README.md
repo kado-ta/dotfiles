@@ -7,6 +7,7 @@
 - [読み込みの仕組み](#loading)
 - [セットアップ](#setup)
 - [設定ファイル](#config-files)
+- [プロジェクトの環境変数](#project-env)
 - [日常運用](#operations)
 - [既知の制約・注意点](#limitations)
 - [トラブルシューティング](#troubleshooting)
@@ -155,13 +156,14 @@ exec zsh
 | プラグイン                         | 読み込み | 役割                                             |
 | ---------------------------------- | -------- | ------------------------------------------------ |
 | `romkatv/zsh-defer`                | 即時     | 遅延読み込み機能                                 |
-| `johnhamelink/env-zsh`             | 即時     | 作業ディレクトリの `.env` から環境変数を読み込む |
 | `colors`（inline）                 | 遅延     | プロンプトの色                                   |
 | `zdharma/fast-syntax-highlighting` | 遅延     | シンタックスハイライト                           |
 | `zsh-users/zsh-autosuggestions`    | 遅延     | 入力候補のグレー表示                             |
 | `zsh-users/zsh-completions`        | 遅延     | 補完定義の追加                                   |
 | `compinit`（inline）               | 遅延     | 補完の有効化と aws-cli 補完                      |
 | `dotfile-defers`（local）          | 遅延     | `~/dotfiles/zsh/*.zsh`                           |
+
+作業ディレクトリの `.env` を読み込むプラグインは入れない（[プロジェクトの環境変数](#project-env)）。
 
 `Ctrl-R` の履歴の検索は、プラグインではなく atuin が受け持つ。`bin/.zshrc` で初期化し、設定は `config/atuin/config.toml` に置く（[config/README.md](../config/README.md)）。`~/.zsh_history` は自動では取り込まれないので、最初に一度だけ `atuin import zsh` を実行する（もう一度実行すると全件が重複する）。取り込みは秘密情報の除外（`secrets_filter`）を通らないので、続けて `atuin history prune` で該当する行を検索から外す。どちらも `~/.atuin` に書くので、Claude Code の sandbox の中ではなく通常のターミナルで実行する。prune しても DB のファイルには平文が残るので、履歴に残っていた秘密情報は失効させる。
 
@@ -173,6 +175,52 @@ exec zsh
 
 - `.zprofile` を読まない非ログインシェルでは `fpath` に入らないため、補完は効かない。
 - `mise completion zsh --install` は実行しなくてよい。書き出し先の `~/.local/share/zsh/site-functions/` は `fpath` に入っておらず、読み込まれない。コマンドが表示する `fpath` の行も、Homebrew 版で足りるので追加しない。
+
+<a name="project-env"></a>
+
+## プロジェクトの環境変数
+
+プロジェクトごとの環境変数は、そのプロジェクトの `mise.toml` の `[env]` で読み込む。作業ディレクトリの `.env` を読み込む zsh のプラグインは入れない（[env-zsh を外した理由](#env-zsh-removed)）。
+
+<a name="project-env-file"></a>
+
+### `.env` を読み込む
+
+そのプロジェクトの `mise.toml` に次のように書く。
+
+```toml
+[env]
+_.file = ".env"
+```
+
+- mise は `.env` を `KEY=value` として解析し、シェルとして実行しないので、`$(...)` や `~` は書いたままの文字列になる。
+- `PATH` の値は使われないので、足すディレクトリは `_.path` に書く。
+- `.env.term` で値を上書きしていたなら、`_.file = [".env", ".env.term"]` のように後ろに並べる（後ろのファイルの値が勝つ）。
+
+<a name="project-env-trust"></a>
+
+### 信頼する
+
+グローバルの設定の paranoid（`mise/mise_config.toml`）により、`mise.toml` と `.env` は、信頼するまで読み込まれず、中身が変わると信頼が外れる。全体を確かめたファイルだけを、1 つずつ信頼する。
+
+```bash
+mise trust mise.toml
+mise trust .env
+```
+
+パスを省いた `mise trust` は、その設定が読む env ファイルとスクリプトもまとめて信頼するので使わない。
+
+<a name="project-env-secrets"></a>
+
+### 秘密の値
+
+mise は読み込んだ値を export し、そのディレクトリで起動したプロセス（Claude Code を含む）にも渡す。秘密の値は `_.file` で読み込まず、要るコマンドにだけ渡す。
+
+<a name="env-zsh-removed"></a>
+
+### env-zsh を外した理由
+
+前は sheldon のプラグイン env-zsh で `.env` を読み込んでいた。env-zsh は、ディレクトリを移るたびに `.env` と `.env.term` をシェルのコードとして読み込み、中身を確かめる仕組みがなかったので外した（KAD-11）。外す前から開いている zsh は、起動し直すまで読み込みを続けるので、[プラグインを追加・削除した](#operations)ときの手順で起動し直す。
 
 <a name="operations"></a>
 

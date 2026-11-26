@@ -34,11 +34,6 @@ fpath = 'fpath=("{{ dir }}" $fpath)'
 github = "romkatv/zsh-defer"
 apply = ["source"]           # zsh 起動時に読み込まれる。
 
-# 作業ディレクトリの .env から環境変数をロードする。
-[plugins.env-zsh]
-github = "johnhamelink/env-zsh"
-apply = ["source"]
-
 # プロンプトで色を使用出来るようにする。
 [plugins.colors]
 inline = "autoload -Uz colors && zsh-defer colors"
