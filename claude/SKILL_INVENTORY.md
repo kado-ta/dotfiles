@@ -2,7 +2,7 @@
 
 入っているプラグイン・スキル・エージェント・hooks・MCP の一覧と、その状態・制約を書く。スキルの選び方の規則は [rules/SKILL_ROUTING.md](rules/SKILL_ROUTING.md)（毎回読み込まれる）、タスク別の早見表は [SKILL_CHEATSHEET.md](SKILL_CHEATSHEET.md) にある。重複の裁定の根拠は [作業文書](../docs/work/20261116_skill-role-division/research-routing.md) にある。
 
-- 時点: 2026-11-16。2026-11-23 に gstack 1.102.2.0 と pstack 0.15.46 への更新、個人スキル `/socratic-tutor`・`modern-web-guidance`・`chrome-extensions` の追加、gstack 1.103.0.0 への更新（`verify` を `build-check` に改名）を反映した。2026-11-24 に pstack 0.15.47 への更新（`reframe` の追加）を反映した。2026-11-25 に gstack 1.103.1.0・pstack 0.15.48・crit 1.8.18 への更新（スキルの増減なし）を反映した。Claude Code の版は 2.1.330（2026-11-23 に確認）。各スキルの SKILL.md・設定・hooks の実物を読んで書いた。
+- 時点: 2026-11-16。2026-11-23 に gstack 1.102.2.0 と pstack 0.15.46 への更新、個人スキル `/socratic-tutor`・`modern-web-guidance`・`chrome-extensions` の追加、gstack 1.103.0.0 への更新（`verify` を `build-check` に改名）を反映した。2026-11-24 に pstack 0.15.47 への更新（`reframe` の追加）を反映した。2026-11-25 に gstack 1.103.1.0・pstack 0.15.48・crit 1.8.18 への更新（スキルの増減なし）を反映した。2026-11-26 に個人スキル `/pm-assist` の追加を反映した。Claude Code の版は 2.1.330（2026-11-23 に確認）。各スキルの SKILL.md・設定・hooks の実物を読んで書いた。
 - この文書は `~/.claude` にリンクされない。Claude のコンテキストには載らない。
 - プラグインやスキルを更新したら、[更新したときの見直し](#upgrade)に従って直す。
 
@@ -35,7 +35,7 @@
 | crit | 1.8.18 | プラグイン、user。CLI は 0.24.0 | 3 | 0 | PermissionRequest | `/plugin` と Homebrew |
 | claude-code-setup | 1.0.0 | プラグイン、user | 1 | 0 | なし | `/plugin` |
 | ruby-lsp | 1.0.0 | プラグイン、user | 0（LSP だけ） | 0 | なし | `/plugin` |
-| 個人スキル | — | dotfiles の `claude/skills/` を `~/.claude/skills/` にリンク | 7 | 0 | なし | dotfiles（`modern-web-guidance`・`chrome-extensions` は `update-skills.sh`） |
+| 個人スキル | — | dotfiles の `claude/skills/` を `~/.claude/skills/` にリンク | 8 | 0 | なし | dotfiles（`modern-web-guidance`・`chrome-extensions` は `update-skills.sh`） |
 | dotfiles の project スキル | — | dotfiles の `.claude/skills/`。dotfiles で起動したセッションだけで使える | 1 | 0 | なし | dotfiles |
 | 組み込み・claude.ai | — | Claude Code に同梱、または claude.ai のアカウントから提供 | 下の表 | 7 | — | Claude Code の更新 |
 | salesforce-development | 2.5.0 | プラグイン、別リポジトリの local スコープ。このリポジトリでは無効 | — | — | — | — |
@@ -207,7 +207,7 @@ sandbox の外で `/cso` を実行すると、保存先に秘密ファイルの�
 
 <a name="crit"></a>
 
-## crit（3）・個人スキル（7）・project スキル（1）
+## crit（3）・個人スキル（8）・project スキル（1）
 
 | スキル | 機能 | 起動 | 状態 | 依存・制約 |
 | --- | --- | --- | --- | --- |
@@ -221,6 +221,7 @@ sandbox の外で `/cso` を実行すると、保存先に秘密ファイルの�
 | `/socratic-tutor`（個人） | 1 つのテーマを、診断・習熟度の表（0〜5）・1 問ずつの問答・最終試験で教える | 明示 | 有効 | janestreet/agent_skills の `7c6715c`（2026-11-03）の写し。MIT なので `LICENSE.md` を同梱した。frontmatter に `disable-model-invocation: true` だけを足した（日本語の「〜について教えて」での誤起動を避けるため）。規則に載せていないので、Claude は起動も提案もしない。pstack `teach`（説明型。方針で使わない）とは役割が別 |
 | `modern-web-guidance`（個人） | Web 標準の書き方のガイド（HTML・CSS・クライアントの JS）を、CLI で検索・取得する。既存のコードの古い書き方の検出（`legacy-scan`）もある | 自動 | 有効 | npm の `modern-web-guidance` の SKILL.md を、`claude/scripts/update-modern-web-guidance.py` が変換した写し（Apache-2.0。`LICENSE.md` を同梱）。手で編集しない。CLI は mise で版を固定する（`mise/mise_config.toml`）。コマンドに `DISABLE_TELEMETRY=1` を付けてテレメトリを止める（`settings.json` の `env` に置くと Claude Code の機能フラグも止まるため）。npx 系（`npx`・`pnpx`・`pnpm`・`bunx`・`bun`・`yarn`・`npm`・`deno`）での実行は `permissions.deny` で拒否する（`check-repo.py` の `modern-web-guidance` が確かめる。絶対パスや `sh -c` で包んだ形には当たらない）。説明文は「MANDATORY: Execute FIRST for all HTML/CSS and clientside JS tasks」で、応答の末尾に `### Modern Web Guidance` の節を付ける（どちらも原文のまま）。計画は [作業文書](../docs/work/20261123_modern-web-guidance/plan.md) |
 | `chrome-extensions`（個人） | Chrome 拡張機能（Manifest V3）の開発と、Chrome Web Store への公開のガイド | 自動 | 有効 | 同じ npm の配布物から、手を加えずに写す（`LICENSE.md` を同梱）。参照ファイルは上流の名前のまま置く（`check-repo.py` の `markdown-names` の例外）。CLI とネットワークは使わない |
+| `/pm-assist`（個人） | ゴールと期限のあるプロジェクトの現状・進め方・タスク・リスク・判断事項を整理する | 自動 | 有効 | 既定では書き込まない（保存は頼まれたときだけ。置き場所は DOCUMENTS.md の作業文書）。他の dotfiles の同名スキル（LICENSE なし）の考え方をもとに、文面は自分の言葉で書いた。起動の境界は description に書いた。起動テストの記録は [test-report.md](../docs/work/20261126_pm-assist-skill/test-report.md) にある |
 | `/sync-skill-docs`（dotfiles の project） | スキル・プラグインの更新の後、この文書・チートシート・規則を入っている状態に合わせる | 自動 | 有効 | 照合は `mise run claude:skills-check`。スナップショットの作り直しはユーザーが通常のターミナルで行う |
 | `/claude-code-setup:claude-automation-recommender` | Claude Code の自動化（hooks・スキル・MCP など）を勧める | 自動 | 有効 | 読み取りだけ |
 
@@ -306,6 +307,7 @@ sandbox の外で `/cso` を実行すると、保存先に秘密ファイルの�
 | --- | --- | --- | --- |
 | TDD・デバッグ・実装計画 | superpowers | `/pstack:how`・`/pstack:why`（原因が設計の意図に関わるとき） | pstack `tdd` |
 | 何を作るか | `/office-hours` | — | 同じ要件に `brainstorming` を重ねない |
+| プロジェクトの運営 | `/pm-assist` | — | チケットや 1 日のタスクの分解、開発中の変更や設計のリスク（スキルなし）。何を作るかは `/office-hours`、機能の要件は `brainstorming`、実装の計画は `writing-plans` |
 | 機能の要件・設計 | `brainstorming` → `writing-plans` | `/pstack:architect with checkpoint`（複雑か高リスク）、`/plan-eng-review`（明示だけ。計画のレビュー） | `/spec`、`/autoplan`（無効） |
 | 変更の影響 | Claude 自身の読解 | `/pstack:blast-radius`（高リスク） | `understand-diff`（グラフが前提） |
 | 差分のレビュー（今のブランチ） | `/review` | `/pstack:interrogate`（高リスクで実行による証明が要るとき） | 同じ差分に `/code-review`、`requesting-code-review` |
@@ -379,3 +381,5 @@ sandbox の外で `/cso` を実行すると、保存先に秘密ファイルの�
 `/pstack:` の提案の回数には、スキルの設定を扱うセッション（この文書を作ったセッションなど）で Claude がコマンド名を書いた分も入る。増減は、セッションの一覧と合わせて見る。
 
 後の期間の途中（2026-11-23）で gstack を 1.102.2.0 に更新した。説明文に「いつ使うか」の節が付き（1.100.0.0）、gstack のスキルの起動は、規則とは別の理由でも増えうる。gstack のスキルの増減は、この日の前後に分けて見る。同じ日に、自動で起動する個人スキル `modern-web-guidance`・`chrome-extensions` を足した。測る対象（レビューの重複、軽微な作業での計画系のスキル）とは役割が重ならない。さらに同じ日に gstack を 1.103.0.0 に更新し、`verify` が `build-check` に改名された。基準値の gstack の起動の多く（`verify` の 65 回）は commit の前の指示によるもので、改名の後はこの指示が出なくなった（2026-11-23 に新しいセッションで確かめた）ので、gstack の起動の数を比べるときは `verify`・`build-check` を除いて見る。同じ日に、今のブランチ以外の PR のレビューを `/review` から `/code-review medium <PR の URL>` に分けた（CLAUDE.md の Tools 節、SKILL_ROUTING.md の Overlapping skills）。`skill-usage.py` は、1 つのセッションで 2 種類以上のレビューのスキル（`review`・`code-review`・`superpowers:requesting-code-review`）が動くと重複に数えるので、この日の後は、今のブランチの `/review` と、ほかの PR の `/code-review` が同じセッションにあっても数えられる。スクリプトは、重複に数えたセッションの ID も件数の下に出す。そのセッションのレビューの呼び出しを、対象（そのセッションのブランチか、どの PR か）ごとに分け、同じ対象に 2 種類以上のレビューが動いた組が 1 つもなければ、重複から除く（ほかの PR の `/code-review` があっても、同じ差分に重ねた組があれば重複に数える）。
+
+2026-11-26 に、自動で起動する個人スキル `/pm-assist` を足した。プロジェクトの運営の相談で起動し、計画系のスキル（`brainstorming`・`writing-plans`）と競合しうる。起動テストでは、新規プロダクトの立ち上げの相談で、最初に起動したのは `brainstorming` ではなく pm-assist だった（一時コマンドで、最初のツール呼び出しを見て測った。3 回中 3 回。[test-report.md](../docs/work/20261126_pm-assist-skill/test-report.md#trigger-run-2)）。この日の後は、立ち上げの相談での計画系のスキルの起動が減りうるので、計画系のスキルの増減は、この日の前後に分けて見る。
