@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: done
 created: 2026-11-26
 ---
 
@@ -10,6 +10,7 @@ created: 2026-11-26
 ## 関連
 
 - Linear: KAD-11（この作業）、KAD-26（SOPS で暗号化したファイルを mise で読み込むか決める。別の作業）
+- PR: #152（マージ済み）
 - 変更したファイル: `config/sheldon/plugins.toml`・`zsh/README.md`・`.claude/rules/CLAUDE_CONFIG.md`
 
 <a name="summary"></a>
@@ -75,9 +76,22 @@ gstack の `/review` を 3ebcdc6 に対して実行した。差分は 9 行で�
 | [P2] `.env` の `PATH` は `_.path` に移すよう案内する | 採用 | C4 で、`PATH` が使われないことを確かめた |
 | [P2] `.env.term` を使っていた場合の移し方を案内する | 採用 | C4 で、配列の後ろのファイルが勝つことを確かめた |
 
+<a name="after-merge"></a>
+
+## マージ後の確認
+
+PR #152 は 2026-11-26 にマージされた（f76f1b7）。人間が `~/dotfiles` を main に更新し、通常のターミナルで次を実行した。
+
+| コマンド | 結果 |
+| --- | --- |
+| `~/dotfiles/zsh/setup_plugins.sh` | `~/.config/sheldon/plugins.toml` を読み、`~/dotfiles/zsh` と 4 つの GitHub のプラグインを確かめて lock を作り直した。env-zsh は含まれない |
+| `sheldon source \| grep -c env-zsh` | `0` |
+
+これから開く zsh は、env-zsh を読み込まない。
+
 <a name="unverified"></a>
 
 ## 未検証
 
 - Claude Code の sandbox の中で、`_.file = ".env"` にしたプロジェクトの mise がどう振る舞うか（C3）。
-- マージの後、`~/dotfiles` を更新して開き直した zsh で、`.env` が読み込まれないこと。人間が確かめる。
+- マージの前から開いていた zsh を起動し直したか（`chpwd_functions` に `load-local-conf` が残っていないか）。結果は記録していない。
