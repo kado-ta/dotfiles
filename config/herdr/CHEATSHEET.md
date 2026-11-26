@@ -5,6 +5,7 @@ herdr の主なキーと、[config.toml](config.toml) で足した prefix なし
 - prefix は既定の `ctrl+b`。`prefix+c` は、`ctrl+b` を押してから `c` を押す。
 - 直接キーの `option` は**左**の Option で押す（Ghostty の `macos-option-as-alt = left` のため）。config.toml では `alt` と書く。
 - `cmd+option+h` は、macOS の設定で Ghostty の「Hide Others」を別のキーに付け替えないと herdr に届かない。手順は config.toml のコメントにある。
+- 日本語入力のままでも prefix のキーが効く。prefix を押しているあいだだけ英字の配列に切り替わる（`experimental.switch_ascii_input_source_in_prefix`）。macOS の入力ソースに英字の配列（U.S. など）を入れておく必要がある。ATOK の英字モードは切り替え先にならない。
 - 直接キーを変えたら、この表も合わせて直す。
 
 <a name="toc"></a>
@@ -13,6 +14,7 @@ herdr の主なキーと、[config.toml](config.toml) で足した prefix なし
 
 - [基本操作](#basics)
 - [ワークスペース操作](#workspaces)
+- [エージェント操作](#agents)
 - [タブ操作](#tabs)
 - [ペイン操作](#panes)
 - [コピーモード](#copy-mode)
@@ -55,6 +57,15 @@ herdr の主なキーと、[config.toml](config.toml) で足した prefix なし
 | ワークスペースを閉じる（確認が出る） | `prefix+shift+d` |
 | サイドバーの表示を切り替える | `prefix+b` |
 
+<a name="agents"></a>
+
+## エージェント操作
+
+| 操作 | 直接キー | prefix のキー |
+| --- | --- | --- |
+| サイドバーの次のエージェントへ | `cmd+ctrl+j` | なし |
+| サイドバーの前のエージェントへ | `cmd+ctrl+k` | なし |
+
 <a name="tabs"></a>
 
 ## タブ操作
@@ -86,15 +97,16 @@ herdr の主なキーと、[config.toml](config.toml) で足した prefix なし
 | 右に分割 | `cmd+option+v` | `prefix+v` |
 | 下に分割 | `cmd+option+minus` | `prefix+minus` |
 | ペインを閉じる | `cmd+option+x` | `prefix+x` |
+| ズーム（今のペインをタブ全体に広げる。もう一度押すと戻る） | `cmd+option+z` | `prefix+z` |
 
 | 操作 | prefix のキー |
 | --- | --- |
 | 左・下・上・右のペインと入れ替え | `prefix+shift+h` / `j` / `k` / `l` |
-| ズーム | `prefix+z` |
 | リサイズモード | `prefix+r` |
 | ペインの名前を変える | `prefix+shift+p` |
 | スクロールバックを編集 | `prefix+e` |
 | 通知の対象を開く | `prefix+o` |
+| 一時的なシェルをポップアップで開く（`exit` で閉じる） | `prefix+t` |
 
 <a name="copy-mode"></a>
 
