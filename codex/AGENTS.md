@@ -114,7 +114,7 @@ docs/
 ```
 
 - ID は、GitHub Issue なら `GH-<番号>` とし、ゼロ埋めしない（例: `GH-12`）。それ以外のトラッカーの ID は、各リポジトリのルールで決める。
-- 先頭の `YYYYMMDD` はディレクトリを作った日（最初の文書の `created` と同じ日）とし、後から変えない。ID のない作業は `YYYYMMDD_<slug>` にする。
+- 先頭の `YYYYMMDD` はディレクトリを作った日（最初の文書の `created` と同じ日）とし、後から変えない。作業が終わるまでは、日をまたいでも同じディレクトリに書く（ID があれば `docs/work/*_<ID>_*` で探す）。ID のない作業は `YYYYMMDD_<slug>` にする。
 - superpowers の brainstorming の design は `work/YYYYMMDD_<ID>_<slug>/design.md` に、writing-plans の plan は `work/YYYYMMDD_<ID>_<slug>/plan.md` に書く。
 
 ### Naming
