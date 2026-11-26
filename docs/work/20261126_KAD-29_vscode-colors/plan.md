@@ -96,7 +96,7 @@ GitHub Dark Dimmed に替える。構文の色が Ghostty の 16 色と同じ pr
 | `editorGutter.addedBackground` | #46954a66 | #4184e466 |
 | `gitDecoration.addedResourceForeground` | #57ab5a | #539bf5 |
 | `gitDecoration.untrackedResourceForeground` | #57ab5a | #539bf5 |
-| `chat.linesAddedForeground` | #54B054（VSCode の既定） | #539bf5 |
+| `chat.linesAddedForeground` | #54B054（VSCode の既定） | #539bf5fe（透明度が必須の色なので、不透明に近い fe。Codex の指摘） |
 | `scmGraph.historyItemHoverAdditionsForeground` | #81B88B（VSCode の既定） | #539bf5 |
 
 - 追加と削除の色差（ΔE、通常 / 1 型 / 2 型）: 文字の背景はテーマの緑 0.095 / 0.036 / 0.009 から、青 0.101 / 0.073 / 0.083 になる。行の背景は 0.049 / 0.022 / 0.002 から 0.053 / 0.041 / 0.043 になる。

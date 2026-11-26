@@ -41,7 +41,7 @@
             "editorGutter.addedBackground": "#4184e466",
             "gitDecoration.addedResourceForeground": "#539bf5",
             "gitDecoration.untrackedResourceForeground": "#539bf5",
-            "chat.linesAddedForeground": "#539bf5",
+            "chat.linesAddedForeground": "#539bf5fe", // 透明度が必須の色なので、不透明に近い fe にする
             "scmGraph.historyItemHoverAdditionsForeground": "#539bf5",
             // 統合ターミナル: 背景・文字色・選択・カーソルを Ghostty と同じにする。
             // 16 色は、テーマがもともと Ghostty の GitHub Dark Dimmed と同じなので上書きしない。
