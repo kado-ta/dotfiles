@@ -2,9 +2,15 @@
 # codex/setup.sh が検査してから ~/.codex/rules/dotfiles.rules にコピーする。Codex はリンクを読まない。
 # ~/.codex/rules/default.rules は、TUI の「今後は聞かない」の書き込み先なので使わない。
 #
-# - decision は prompt だけにする。allow は、当たったコマンドを sandbox の外で確認なしに動かすので書かない
-#   （setup.sh も allow を含むファイルは入れない）。decision を省くと allow になるので、必ず書く。
-# - 規則に当たるコマンドには、TUI が「今後は聞かない」を提案しない。すでにある allow の規則にも prompt が勝つ。
+# - decision は prompt だけにする。allow は、当たったコマンドを sandbox の外で確認なしに動かすので書かない。
+#   decision を省くと allow になるので、必ず `decision = "prompt"` と書く（setup.sh は、allow を含むファイルと、
+#   prefix_rule の数と decision = "prompt" / "forbidden" の数が合わないファイルを入れない）。
+# - 規則に当たるコマンドには、TUI が「今後は聞かない」を提案しない。
+# - Codex は、絶対パスで書かれた規則（例 ["/usr/bin/git", ...]）を先に照らし、1 つも当たらないときだけ
+#   実行ファイル名で照らす。そのため、`/usr/bin/git` などの allow がほかのファイルにあると、名前だけの
+#   規則は当たらない。この Mac の主な場所の絶対パスを先頭の候補に入れ、そのときも prompt が勝つようにする。
+#   候補にない綴り（/opt/homebrew/opt/git/bin/git、Cellar の下、mise の terraform など）と、大文字小文字を
+#   変えた名前（GIT）は守れない。canonical_matching は公式ドキュメントにない項目なので使わない。
 # - pattern は位置で決まる前方一致。`git -C <dir> ...`・`git -c k=v ...` のように、サブコマンドの前に
 #   オプションがある形と、変数・リダイレクト・`$(...)` を含むシェルのスクリプトには当たらない。
 #   それらは developer_instructions の文章に任せる。
@@ -12,9 +18,13 @@
 # - 規則を変えたら codex/setup.sh を実行し直す。読み込みに失敗すると codex exec と codex review が止まる。
 # - 経緯と実測: docs/work/20261126_codex-rules/plan.md
 
+GIT = ["git", "/usr/bin/git", "/opt/homebrew/bin/git"]
+RM = ["rm", "/bin/rm"]
+GH = ["gh", "/opt/homebrew/bin/gh"]
+
 # 未追跡のファイルを消す。workspace-write の sandbox の中でも確認なしに動く（2026-11-26 に実測）。
 prefix_rule(
-    pattern = ["git", "clean"],
+    pattern = [GIT, "clean"],
     decision = "prompt",
     justification = "git clean は未追跡のファイルを消し、元に戻せない。実行の前にユーザーの承認を得る。",
     match = [
@@ -32,15 +42,18 @@ prefix_rule(
 )
 
 # 再帰の削除。sandbox の中でも確認なしに動く（実測）。-rf・-fr・--force など f を含む形は、
-# Codex の組み込みの判定が確認にするので、最初の引数が -r・-R・--recursive の形だけを書く。
+# Codex の組み込みの判定が確認にする。規則は引数の文字列の完全一致なので、f を含まない形のうち
+# よく使うものを並べる。`rm -v -r`・`rm dir -r`・`-rd` などは当たらない。
 prefix_rule(
-    pattern = ["rm", ["-r", "-R", "--recursive"]],
+    pattern = [RM, ["-r", "-R", "--recursive", "-rv", "-Rv", "-vr", "-vR"]],
     decision = "prompt",
     justification = "再帰の rm はディレクトリごと消す。実行の前にユーザーの承認を得る。",
     match = [
         ["rm", "-r", "dir"],
         ["rm", "-R", "dir"],
         ["rm", "--recursive", "dir"],
+        ["rm", "-rv", "dir"],
+        ["rm", "-vR", "dir"],
         ["rm", "-r", "-f", "dir"],
         ["/bin/rm", "-r", "dir"],
     ],
@@ -55,13 +68,14 @@ prefix_rule(
 # 「今後は聞かない」を選ぶと allow が書かれ、以後は確認なしに sandbox の外で動くので、それを防ぐ。
 
 prefix_rule(
-    pattern = ["git", "push"],
+    pattern = [GIT, "push"],
     decision = "prompt",
     justification = "push は明示的に依頼された場合だけ行う。main・master・staging へは push しない。force push は対象と影響を説明して承認を得る。",
     match = [
         ["git", "push"],
         ["git", "push", "origin", "main"],
         ["git", "push", "--force", "origin", "topic"],
+        ["/opt/homebrew/bin/git", "push"],
     ],
     not_match = [
         ["git", "pull"],
@@ -72,7 +86,7 @@ prefix_rule(
 )
 
 prefix_rule(
-    pattern = ["git", "reset", "--hard"],
+    pattern = [GIT, "reset", "--hard"],
     decision = "prompt",
     justification = "git reset --hard は未コミットの変更を破棄する。実行の前にユーザーの承認を得る。",
     match = [
@@ -87,23 +101,27 @@ prefix_rule(
     ],
 )
 
+# `git checkout <path>` も変更を捨てるが、規則ではブランチ名と区別できないので、checkout 全体を確認にする。
+# workspace-write の sandbox では、どの checkout も .git を書いて昇格の確認が出るので、確認は増えない。
 prefix_rule(
-    pattern = ["git", "checkout", ["--", "."]],
+    pattern = [GIT, "checkout"],
     decision = "prompt",
-    justification = "この git checkout は未コミットの変更を破棄する。実行の前にユーザーの承認を得る。",
+    justification = "git checkout はパスを指定すると未コミットの変更を破棄する。実行の前にユーザーの承認を得る。",
     match = [
         ["git", "checkout", "--", "file.txt"],
         ["git", "checkout", "."],
+        ["git", "checkout", "file.txt"],
+        ["git", "checkout", "main"],
     ],
     not_match = [
-        ["git", "checkout", "main"],
-        ["git", "checkout", "-b", "topic"],
+        ["git", "switch", "main"],
         ["git", "diff"],
+        ["git", "status"],
     ],
 )
 
 prefix_rule(
-    pattern = ["git", "restore"],
+    pattern = [GIT, "restore"],
     decision = "prompt",
     justification = "git restore は未コミットの変更を破棄しうる。実行の前にユーザーの承認を得る。",
     match = [
@@ -136,12 +154,13 @@ prefix_rule(
 )
 
 prefix_rule(
-    pattern = ["gh", "pr", "merge"],
+    pattern = [GH, "pr", "merge"],
     decision = "prompt",
     justification = "マージは明示的に依頼された場合だけ行う。",
     match = [
         ["gh", "pr", "merge"],
         ["gh", "pr", "merge", "123", "--squash"],
+        ["/opt/homebrew/bin/gh", "pr", "merge"],
     ],
     not_match = [
         ["gh", "pr", "view", "123"],
