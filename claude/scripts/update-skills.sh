@@ -35,6 +35,8 @@ step settings-home-paths /usr/bin/python3 -I -B "${script_dir}/settings-home-pat
 
 step marketplaces claude plugin marketplace update
 # local スコープは別のリポジトリのものなので、user スコープだけを更新する。
+# ID が @builtin で終わるものは Claude Code に同梱されたプラグインで（builtin はマーケットプレイスではなく予約語）、
+# 本体と一緒に更新される。plugin update に渡すと、見つからないと言って失敗するので除く。
 # -y は付けない。マーケットプレイスが宣言したインストールコマンドが変わったときに、人が見ないまま受け入れないため。
 # 確認が要るプラグインは、TTY がないとき（! や mise run）に拒否されて失敗に数えられる。
 # そのときはターミナルで claude plugin update <id> --scope user を直接実行する。
@@ -43,7 +45,7 @@ if plugins=$(claude plugin list --json | /usr/bin/python3 -I -B -c '
 import json, sys
 ids = []
 for plugin in json.load(sys.stdin):
-    if plugin.get("scope") == "user" and plugin["id"] not in ids:
+    if plugin.get("scope") == "user" and not plugin["id"].endswith("@builtin") and plugin["id"] not in ids:
         ids.append(plugin["id"])
 print("\n".join(ids))
 ') && [ -n "${plugins}" ]; then

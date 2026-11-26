@@ -21,7 +21,8 @@ SCRIPTS = Path(__file__).resolve().parent
 PROFILE_TEST = SCRIPTS.parent / "hooks" / "tests" / "test-cc-crit-profile.py"
 
 PLUGINS = ('[{"id":"a@m","scope":"user"},{"id":"s@m","scope":"local"},'
-           '{"id":"b@m","scope":"user"},{"id":"s@m","scope":"local"}]')
+           '{"id":"b@m","scope":"user"},{"id":"s@m","scope":"local"},'
+           '{"id":"x@builtin","scope":"user","version":"unknown"}]')
 
 CLOSING = ("次に、再起動する前に dotfiles の Claude Code で /sync-skill-docs を実行し、hooks の変化を確かめる。"
            "更新したプラグインは、Claude Code を再起動すると読み込まれる。")
@@ -130,6 +131,12 @@ class UpdateSkillsTest(unittest.TestCase):
         _, log = self.run_script()
         self.assertIn("claude plugin update a@m --scope user", log)
         self.assertFalse(any("s@m" in line for line in log))
+
+    def test_skips_builtin_plugins(self):
+        # @builtin は Claude Code に同梱されたプラグインで、plugin update に渡すと見つからずに失敗する。
+        result, log = self.run_script()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertFalse(any("@builtin" in line for line in log))
 
     def test_failure_continues_and_reports(self):
         result, log = self.run_script(gstack_rc=1)
