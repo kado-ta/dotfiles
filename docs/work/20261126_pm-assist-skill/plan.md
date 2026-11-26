@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: done
 created: 2026-11-26
 ---
 
@@ -33,7 +33,7 @@ created: 2026-11-26
 
 - 調査の推奨をすべて採る（[推奨の一覧](research-improvements.md#summary)）。
 - 自動で起動する（[C1](research-improvements.md#c1)）。明示だけ（C2）にはしない。
-- リンクは worktree に一時的に張り、マージの後に張り替える（[G1](research-improvements.md#g1) の案 A）。
+- リンクは worktree に一時的に張り、マージの後に張り替える（[G1](research-improvements.md#g1) の案 A）。その後、`/review` の指摘（守りの境界が動く）を受けて、出力の確認の後に外し、マージの直後に `~/dotfiles` に張ることにした（2026-11-26 にユーザーが判断）。
 - 起動テストは、ユーザーが通常のターミナルで実行する。
 
 <a name="files"></a>
@@ -45,7 +45,7 @@ created: 2026-11-26
 | `claude/skills/pm-assist/SKILL.md` | 新規（約 90 行） | 起動条件・確かめる順番・原則。下の [SKILL.md の要点](#skill-md) |
 | `claude/skills/pm-assist/REFERENCE.md` | 新規（約 90 行） | 必要なときに読む道具箱。下の [REFERENCE.md の要点](#reference-md) |
 | `claude/skills/pm-assist/TEMPLATES.md` | 新規（約 70 行） | 整理メモと見直しの 2 つの雛形。下の [TEMPLATES.md の要点](#templates-md) |
-| `docs/work/20261126_pm-assist-skill/assets/trigger-eval.json` | 新規 | 起動テストの依頼文 20 件（[一覧](#trigger-queries)）。結果の JSON はコミットしない |
+| `docs/work/20261126_pm-assist-skill/assets/trigger-eval.json` | 新規 | 起動テストの依頼文 21 件（[一覧](#trigger-queries)）。結果の JSON はコミットしない |
 | `docs/work/20261126_pm-assist-skill/test-report.md` | 新規 | 出典の確認（ユーザーのブラウザでの確認と、保存してもらった PDF）・起動テスト・出力の確認・リポジトリの検査の記録 |
 | `claude/SKILL_INVENTORY.md` | 変更 | 時点の行、提供元の表の個人スキルの件数（7 → 8）、個人スキルの節の見出しと表の行、重複と裁定の表に 1 行（プロジェクトの運営）、規則の効果の確認の節に 1 文（測定の期間中に、自動で起動するスキルを足した） |
 | `claude/SKILL_CHEATSHEET.md` | 変更 | 場面の表に 1 行、個人スキルの一覧に 1 行 |
@@ -192,18 +192,22 @@ created: 2026-11-26
 1. 準備と、2 件だけの試し（`claude -p` が止まらずに動くかを確かめる）:
 
    ```sh
-   mkdir -p ~/pm-assist-eval/.claude && cd ~/pm-assist-eval
-   WT=~/dotfiles/.claude/worktrees/pm-assist
-   SC=$(ls -d ~/.claude/skills/synced/*/skill-creator | head -1)
-   jq '.[0:1] + .[10:11]' "$WT/docs/work/20261126_pm-assist-skill/assets/trigger-eval.json" > smoke.json
-   PYTHONPATH="$SC" python3 -B -m scripts.run_eval --eval-set smoke.json --skill-path "$WT/claude/skills/pm-assist" --model claude-opus-5-5 --runs-per-query 1 --num-workers 1 --timeout 90 --verbose > smoke-result.json
+   mkdir -p ~/pm-assist-eval/.claude
+   cd ~/pm-assist-eval && WT=~/dotfiles/.claude/worktrees/pm-assist && SC=$(ls -d ~/.claude/skills/synced/*/skill-creator | head -1) && [ -n "$SC" ] \
+     && jq '.[0:1] + .[10:11]' "$WT/docs/work/20261126_pm-assist-skill/assets/trigger-eval.json" > smoke.json \
+     && PYTHONPATH="$SC" python3 -B -P -m scripts.run_eval --eval-set smoke.json --skill-path "$WT/claude/skills/pm-assist" --model claude-opus-5-5 --runs-per-query 1 --num-workers 1 --timeout 90 --verbose > smoke-result.json
    ```
 
 2. 本番（21 件 × 3 回）:
 
    ```sh
-   PYTHONPATH="$SC" python3 -B -m scripts.run_eval --eval-set "$WT/docs/work/20261126_pm-assist-skill/assets/trigger-eval.json" --skill-path "$WT/claude/skills/pm-assist" --model claude-opus-5-5 --runs-per-query 3 --num-workers 5 --timeout 90 --verbose > result-1.json
+   cd ~/pm-assist-eval && WT=~/dotfiles/.claude/worktrees/pm-assist && SC=$(ls -d ~/.claude/skills/synced/*/skill-creator | head -1) && [ -n "$SC" ] \
+     && PYTHONPATH="$SC" python3 -B -P -m scripts.run_eval --eval-set "$WT/docs/work/20261126_pm-assist-skill/assets/trigger-eval.json" --skill-path "$WT/claude/skills/pm-assist" --model claude-opus-5-5 --runs-per-query 3 --num-workers 1 --timeout 90 --verbose > result-2.json
    ```
+
+   どちらの手順も、単独で実行できるように `cd` と変数の定義から始め、skill-creator が見つからなければ止める。`-P`（Python 3.11 以上）は、カレントディレクトリを読み込み先から外す。`-m` は既定でカレントディレクトリを `PYTHONPATH` より先に探すので、sandbox から書けるディレクトリ（worktree など）で実行すると、そこに置かれた `scripts/run_eval.py` が sandbox の外で動くため（`/review` の敵対的レビューの指摘）。実際の実行は、`-P` のない形で `~/pm-assist-eval`（`scripts/` はない）から行った。
+
+   `--num-workers` は 1 にする。2 以上にすると、並行して動くプロセスがそれぞれの一時コマンドを同じ `.claude/commands/` に置くので、各回のスキル一覧に同じ内容のコマンドが ID 違いで並ぶ。Claude がほかのプロセスのコマンドを選ぶと、起動したのに「起動しない」と数えられる（1 回目の本番を `--num-workers 5` で実行して分かった。[test-report.md](test-report.md) に記録する）。
 
 Claude は `~/pm-assist-eval/*.json` を読んで記録する。ここで実行されるのは `~/.claude/skills/synced/` の skill-creator のコード（sandbox から書けない）と `claude` だけで、リポジトリの中のファイルは JSON と SKILL.md をデータとして読むだけ。
 
@@ -246,19 +250,19 @@ Claude は `~/pm-assist-eval/*.json` を読んで記録する。ここで実行�
 
 ユーザーが通常のターミナルで行う。
 
-1. リンクを張り替える: `ln -snf ~/dotfiles/claude/skills/pm-assist ~/.claude/skills/pm-assist`（`~/dotfiles` を main に更新した後）
+1. リンクを張る: `ln -s ~/dotfiles/claude/skills/pm-assist ~/.claude/skills/pm-assist`（`~/dotfiles` を main に更新した後。一時リンクは `/review` の後に外したので、張り替えではなく新しく張る）
 2. 新しいセッションを始め、`/pm-assist` が `/` のメニューに出ることと、[起動すべき依頼](#trigger-queries)の 1 番で起動することを確かめる。
-3. 確かめてから worktree を消す。張り替える前に消すと、リンクが切れてスキルが黙って消える。
+3. 確かめてから worktree を消す。
 
 <a name="risks"></a>
 
 ## リスクと戻し方
 
 - **誤起動**: 起動テストで測る。残れば明示だけ（C2）に切り替える。
-- **一時リンクが切れる**: 張り替えを worktree の削除より先に行う（[マージの後](#after-merge)）。
-- **起動テストの費用**: `claude -p` を 65 回実行する。description を直すと、1 回につき 63 回増える（最大 191 回）。
+- **一時リンクで守りの境界が動く**: リンク先の worktree の `claude/` は、`~/dotfiles` で起動したセッションからは書き込みを止められていない見込み（`/review` の Red Team と敵対的レビューの指摘。未検証）。dotfiles の denyWrite（`./claude`）と Edit の ask は `~/dotfiles/claude` にしか当たらないため。書き換えられると、全セッションで自動起動するスキルに指示を仕込める。出力の確認の後にリンクを外して閉じ、マージの直後に `~/dotfiles` に張る（2026-11-26 にユーザーが判断）。恒久策（worktree の `claude/` を守る設定）は、設定の変更なので別の Issue で扱う。
+- **起動テストの費用**: `claude -p` を 65 回実行する。description を直すと、1 回につき 63 回増える（最大 191 回）。並行の不具合で本番が 2 回（126 回）無効になったので、実際は試しを含めて 191 回動いた。
 - **測定の期間との重なり**: 規則の効果の測定（〜2026-12-07）の途中で、自動で起動するスキルを足す。`brainstorming` に行くはずの依頼を取ると、計画系のスキルの起動の数が変わりうるので、棚卸しの測定の節に日付とともに 1 文残す（前例: 2026-11-23 の `modern-web-guidance`）。
 - **skill-creator の助言を採らない点**: 起動しにくいので description を押しの強い書き方にする、という助言は、誤起動を避けたいので採らない。棚卸しの重複と裁定では、Claude Code の改善の補完は `writing-skills` だが、起動を測る手段がないので、今回は `run_eval.py` だけを使う（[F1](research-improvements.md#f1)）。表は変えない。
 - **戻し方**: ユーザーが `rm ~/.claude/skills/pm-assist` でリンクを消し、PR を revert する。設定ファイルは変えないので、ほかに戻すものはない。
 
-設計判断の大きい変更でも、セキュリティの境界に触れる変更でもないので、Codex のレビューは提案しない。
+PR の中身はスキルの文面と文書で、設定・フック・権限は変えない。一時リンクで守りの境界が動く点は、リンクを外して閉じた。そのため Codex のレビューは提案しない。
