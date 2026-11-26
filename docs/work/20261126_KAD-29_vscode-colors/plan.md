@@ -58,8 +58,26 @@ GitHub Dark Dimmed に替える。構文の色が Ghostty の 16 色と同じ pr
 ### 文字色
 
 - 統合ターミナルの文字色は Ghostty と同じ #9aa7b4 にする。
-- エディタの文字色はテーマの #adbac7（Ghostty の太字の色と同じ）のままにする。テーマは構文のルール 5 つ（`meta.block` を含む）で文字色を直接 #adbac7 に指定していて、`editor.foreground` だけを変えてもほとんど変わらない。#9aa7b4 にするには構文の上書き（`editor.tokenColorCustomizations`）が要り、範囲が広がる。試して明るすぎたら、後続で扱う。
 - VSCode のターミナルには太字の色の設定がない。既定の色の太字は #9aa7b4 のまま太くなる（Ghostty は #adbac7）。
+- 当初は、エディタの文字色をテーマの #adbac7 のままにする案だった。Task 4 の確認で、ユーザーが「エディタの青系の文字色」と「マークダウン等で白く表示される文字色」を少し暗くするよう依頼したので、次の「[構文の色](#decision-syntax)」のとおり変えた。
+
+<a name="decision-syntax"></a>
+
+### 構文の色（Task 4 での依頼）
+
+テーマの白（#adbac7）と 2 つの青を、#155 で Ghostty の文字色を下げたのと同じ量（OKLab の明るさで -0.0606。色相と彩度は保つ）だけ暗くする。`editor.foreground` は `workbench.colorCustomizations` に、構文の色は `editor.tokenColorCustomizations` の `"[GitHub Dark Dimmed]"` の `textMateRules` に置く。
+
+| テーマ | 新しい色 | 対象 |
+| --- | --- | --- |
+| #adbac7 | #9aa7b4 | `editor.foreground` と、`meta.block`・`variable.other`・`markup.italic` など 12 個のセレクタ |
+| #6cb6ff | #59a3ea | `constant`・`entity`・`support`・`markup.heading` など 17 個のセレクタ |
+| #96d0ff | #83bceb | `string`・`string.regexp`・`string.other.link` など 9 個のセレクタ |
+
+- セレクタは、拡張の `themes/dark-dimmed.json` の `tokenColors` を順に見て、最終的にその色になるものだけを取った。同じセレクタが後のルールで別の色に上書きされるもの（`entity.name.constant` の青、`string.regexp constant.character.escape` の青）は、元の色のセレクタに入れない。セレクタをテーマと同じ文字列にするので、どのトークンにどのルールが当たるかは変わらない。
+- 太字（`markup.bold`）は、Ghostty の `bold-color` と同じく #adbac7 のまま、通常の文字より少し明るく残す。
+- #cdd9e5 は改行コードの表示（赤い背景の上）にしか使われないので、変えない。
+- 通常の文字と文字列を一緒に暗くするので、両者の色差（0.084 / 0.087 / 0.077）は元とほぼ同じ。通常の文字とコメント（#768390）の色差は 0.179 から 0.118 に縮む（コントラストは 6.94 と 4.39）。
+- 選択範囲の上のコントラストは、通常の文字 3.63（元 4.51）、文字列 4.39、定数 3.33。検索の一致（#805400）の上では、通常の文字 2.69、定数 2.46 に下がる。
 
 <a name="decision-diff"></a>
 
@@ -120,7 +138,7 @@ VSCode 版のテーマの 16 色は、Ghostty の同名テーマと 5 色違う�
 
 ## 非目標
 
-- 構文の色（キーワードの赤とタグの緑など）。意味の対になる色ではないので変えない。
+- 構文の色の色相（キーワードの赤とタグの緑など）。意味の対になる色ではないので変えない（明るさは「[構文の色](#decision-syntax)」で一部を下げた）。
 - `editorBracketHighlight.*`（ブラケットの対の色。2 段目が緑、4 段目が赤）、`testing.iconPassed`、デバッグ・シンボルのアイコンの緑と赤。必要になったら後続で扱う。
 - herdr の配色、フォント、Cursor（`setup.sh` で無効にしている）。
 
@@ -128,7 +146,7 @@ VSCode 版のテーマの 16 色は、Ghostty の同名テーマと 5 色違う�
 
 ## 全体の制約
 
-- 色の上書きは、すべて `workbench.colorCustomizations` の `"[GitHub Dark Dimmed]"` の中に置く。テーマを限定しない色を残さない。
+- 色の上書きは、すべて `workbench.colorCustomizations` と `editor.tokenColorCustomizations` の `"[GitHub Dark Dimmed]"` の中に置く。テーマを限定しない色を残さない。
 - テーマ名は拡張の `package.json` の `label` と同じ `GitHub Dark Dimmed` にする（1 文字でも違うと、上書きが黙って効かない）。
 - `vscode/extensions` は `mise run vscode:ext:list` で生成し、手で編集しない（`vscode/README.md`）。
 - `vscode/` は sandbox から書けない（`.claude/settings.json` の denyWrite）。`settings.json` は Edit ツールで書き（確認が出る）、拡張の導入と `vscode/extensions` の生成は人間がターミナルで行う。
@@ -197,6 +215,7 @@ cd ~/dotfiles && mise run vscode:ext:list
 - `workbench.colorTheme == "GitHub Dark Dimmed"`
 - `workbench.colorCustomizations` のキーが `"[GitHub Dark Dimmed]"` だけである（テーマを限定しない色がない）
 - その中身が「[決めたこと](#decisions)」の表のキーと色に完全に一致する（41 個。過不足があれば、キーごとに表示して失敗する）
+- Task 4 の依頼の後: `editor.foreground` を加えて 42 個。`editor.tokenColorCustomizations` のキーが `"[GitHub Dark Dimmed]"` だけで、`textMateRules` のセレクタと色が「[構文の色](#decision-syntax)」の 38 個に完全に一致する
 
 - [ ] **Step 2:** `python3 -I <scratchpad>/check_vscode_colors.py ~/dotfiles/vscode/settings.json` を実行する。期待: FAIL（テーマが Catppuccin Mocha）。
 - [ ] **Step 3:** `vscode/settings.json` の 2〜8 行を Edit ツールで書き換える。グループごと（背景・文字とカーソル・選択と検索・差分と git・統合ターミナル）に 1 行のコメントを付ける。
