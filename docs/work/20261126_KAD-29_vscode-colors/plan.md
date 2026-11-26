@@ -51,7 +51,7 @@ GitHub Dark Dimmed に替える。構文の色が Ghostty の 16 色と同じ pr
 | #181d1f | `editor.background`・`tab.activeBackground`・`tab.hoverBackground`・`tab.activeBorder`・`tab.unfocusedActiveBorder`・`titleBar.activeBackground`・`activityBar.background`・`statusBar.background`・`statusBar.noFolderBackground`・`input.background`・`peekViewResult.background`・`terminal.background` |
 | #121719 | `sideBar.background`・`sideBarSectionHeader.background`・`panel.background`・`editorGroupHeader.tabsBackground`・`tab.inactiveBackground`・`titleBar.inactiveBackground`・`textBlockQuote.background`・`editorOverviewRuler.border` |
 
-テーマの `theme.js` で `canvas.default`・`canvas.inset`・`scale.black`・`scale.gray[9]` を使うキーがこれですべて。ポップアップ（`canvas.overlay` #2d333b）は明るいままでよい。
+テーマの `theme.js` で `canvas.default`・`canvas.inset`・`scale.black`・`scale.gray[9]` を使うキーがこれですべて（配布版の `themes/dark-dimmed.json` でも、#22272e と #1c2128 のキーは 19 個で、すべて上書きしている）。ポップアップ（`canvas.overlay` #2d333b）は明るいままでよい。
 
 <a name="decision-foreground"></a>
 
@@ -65,7 +65,7 @@ GitHub Dark Dimmed に替える。構文の色が Ghostty の 16 色と同じ pr
 
 ### 構文の色（Task 4 での依頼）
 
-テーマの白（#adbac7）・2 つの青・オレンジ・キーワードの赤を、#155 で Ghostty の文字色を下げたのと同じ量（OKLab の明るさで -0.0606。色相と彩度は保つ）だけ暗くする。`editor.foreground` は `workbench.colorCustomizations` に、構文の色は `editor.tokenColorCustomizations` の `"[GitHub Dark Dimmed]"` の `textMateRules` に置く。
+テーマの白（#adbac7）・青（#6cb6ff）・オレンジ（#f69d50）は、#155 で Ghostty の文字色を下げたのと同じ量（OKLab の明るさで -0.0606。色相と彩度は保つ）だけ暗くする。水色（#96d0ff）とキーワードの赤（#f47067）は、下の箇条書きのとおり別に調整した。`editor.foreground` は `workbench.colorCustomizations` に、構文の色は `editor.tokenColorCustomizations` の `"[GitHub Dark Dimmed]"` の `textMateRules` に置く。
 
 | テーマ | 新しい色 | 対象 |
 | --- | --- | --- |
@@ -81,7 +81,7 @@ GitHub Dark Dimmed に替える。構文の色が Ghostty の 16 色と同じ pr
 - 文字列などの水色は、同じ量だけ下げた #83bceb でも眩しいと指摘があったので、明るさを L 0.773 から 0.754 に下げ、彩度を 15% 下げた（0.090 → 0.077）#86b5dd にした。彩度を下げたのは、PR #155 で目立ち方を決めていたのが明るさより彩度だったため。3 つの見え方のうち最小の色差は、通常の文字 0.057、定数 0.067、関数（#dcbdfb）0.062（#83bceb では 0.038）、Markdown の太字（#adbac7）0.045（同 0.054）。
 - 変数名などのオレンジ（#f69d50）は、赤と緑を見分けにくい見え方では明るい薄黄色に見え、眩しいと指摘があった。オレンジとキーワードの赤（#f47067）の違いは、その見え方では主に明るさ（L 0.772 と 0.702）なので、オレンジだけを同じ量だけ下げると最小の色差が 0.081 から 0.043 に縮む（彩度も下げると 0.007）。そのため、キーワードの赤も暗くする。最初は同じ量だけ下げた #df5d55（L 0.642）にしたが、暗くなりすぎたと指摘があったので、色相と彩度を保って L 0.665 に戻した #e7645c にした（背景とのコントラスト 5.16）。これより明るくするとオレンジに、ピンク寄りにするとコメントの灰色に近づく。オレンジとの最小の色差は 0.062、コメントとは 0.075。オレンジとタグの緑（#8ddb8c）の差は 0.068 から 0.115 に広がる。
 - 通常の文字とコメント（#768390）の色差は 0.179 から 0.118 に縮む（コントラストは 6.94 と 4.39）。
-- 選択範囲の上のコントラストは、通常の文字 3.63（元 4.51）、文字列 4.10、定数 3.33、変数名 3.35、キーワード 2.70。検索の一致（#805400）の上では、通常の文字 2.69、定数 2.46 に下がる。
+- 選択範囲の上のコントラストは、通常の文字 3.63（元 4.51）、文字列 4.10、定数 3.33、変数名 3.35、キーワード 2.70。検索の一致の上では、通常の文字 3.90、キーワード 2.90、コメント 2.47（当初の #805400 の上では 2.69・2.00・1.70 だったので、`/review` の後に背景を薄くし、枠で示すように変えた）。
 
 <a name="decision-diff"></a>
 
@@ -97,6 +97,7 @@ GitHub Dark Dimmed に替える。構文の色が Ghostty の 16 色と同じ pr
 | `gitDecoration.addedResourceForeground` | #57ab5a | #539bf5 |
 | `gitDecoration.untrackedResourceForeground` | #57ab5a | #539bf5 |
 | `chat.linesAddedForeground` | #54B054（VSCode の既定） | #539bf5 |
+| `scmGraph.historyItemHoverAdditionsForeground` | #81B88B（VSCode の既定） | #539bf5 |
 
 - 追加と削除の色差（ΔE、通常 / 1 型 / 2 型）: 文字の背景はテーマの緑 0.095 / 0.036 / 0.009 から、青 0.101 / 0.073 / 0.083 になる。行の背景は 0.049 / 0.022 / 0.002 から 0.053 / 0.041 / 0.043 になる。
 - 追加の文字の背景の上の文字（#adbac7）のコントラストは 5.13（削除は 5.26）。
@@ -104,22 +105,19 @@ GitHub Dark Dimmed に替える。構文の色が Ghostty の 16 色と同じ pr
 - エクスプローラーの追加の色は、明るい青 #6cb6ff（git の CLI の追加の色）ではなく #539bf5 にする。#6cb6ff は通常のファイル名（#adbac7）との色差が 0.109 / 0.087 / 0.111 で、#539bf5（0.162 / 0.140 / 0.175）より見分けにくい。
 - Claude Code 拡張のサイドバーの差分は、`--vscode-diffEditor-*` の色で表示される（拡張 2.1.332 の webview の CSS で確認）。成功の色にも `gitDecoration.addedResourceForeground` が使われる。
 - `chat.linesAddedForeground` は、VSCode のチャットとエージェントのセッションの「+N −M」の表示の色。
+- `scmGraph.historyItemHoverAdditionsForeground` は、ソース管理のグラフのホバーの「+N insertions」の色。既定値は緑に固定されていて、テーマもガターの色も引き継がない（VSCode のソースの `scmHistory.ts` で確認）。削除の色（#C74E39）との最小の色差は 0.150 から 0.259 に広がる。`/review`（red team）の指摘で、ユーザーが足すと決めた。
+- 差分の構文（`.diff` のファイルや Markdown の ```` ```diff ```` のブロック）の追加は、テーマが緑（#8ddb8c）、削除が赤（#ff938a）で、2 型の見え方での色差は 0.039 しかない。テーマと同じセレクタ（`markup.inserted`・`meta.diff.header.to-file`・`punctuation.definition.inserted`）で、追加を定数と同じ青（#59a3ea）にする。削除との最小の色差は 0.149、通常の文字とは 0.090。これも `/review`（red team）の指摘で、ユーザーが変えると決めた。
 
 <a name="decision-terminal"></a>
 
 ### 統合ターミナル
 
-VSCode 版のテーマの 16 色は、Ghostty の同名テーマと 5 色違うので、その 5 色を Ghostty の値にする。残りの 11 色は同じ。
+VSCode 版のテーマ（6.3.5 の `themes/dark-dimmed.json`）の 16 色は、Ghostty の同名テーマと 16 色すべて同じなので、上書きしない。
 
-| キー | VSCode のテーマ | Ghostty（新しい色） |
-| --- | --- | --- |
-| `terminal.ansiBlack` | #22272e | #545d68 |
-| `terminal.ansiBrightBlack` | #2d333b | #636e7b |
-| `terminal.ansiCyan` | #76e3ea | #39c5cf |
-| `terminal.ansiBrightCyan` | #b3f0ff | #56d4dd |
-| `terminal.ansiBrightWhite` | #909dab | #cdd9e5 |
+> [!NOTE]
+> 当初は「VSCode 版のテーマは 5 色（黒・明るい黒・シアン 2 色・明るい白）が Ghostty と違う」として、その 5 色を上書きしていた。これは GitHub の main ブランチの `src/theme.js` と `@primer/primitives` 7.10.0 から推定した値で、配布されているテーマの実際の値ではなかった。`/review` で、上書きが同じ値の繰り返しだと分かったので外した（コミット b8ba30d の説明もこの誤りを含む）。
 
-ほかに、`terminal.foreground` #9aa7b4、`terminal.selectionBackground` #1a4d74、`terminal.selectionForeground` #f4f7fa、`terminalCursor.foreground` #3fade5、`terminalCursor.background` #181d1f（ブロックカーソルの下の文字の色。Ghostty の `cursor-text = cell-background` に当たる）を置く。
+`terminal.foreground` #9aa7b4、`terminal.selectionBackground` #1a4d74、`terminal.selectionForeground` #f4f7fa、`terminalCursor.foreground` #3fade5、`terminalCursor.background` #181d1f（ブロックカーソルの下の文字の色。Ghostty の `cursor-text = cell-background` に当たる）を置く。
 
 - `terminal.ansiGreen` は Ghostty と同じ緑のままにする。git と Starship は PR #155 で緑を使わなくなっている。
 - `terminal.integrated.minimumContrastRatio`（既定 4.5）は設定しない（今と同じ）。背景とのコントラストが 4.5 に届かない黒（2.55）・明るい黒（3.28）と、zsh-autosuggestions の候補の色（`fg=242`）は、VSCode が明るくして表示する。Ghostty より少し明るく見えるが、読みやすさを優先する。
@@ -135,8 +133,11 @@ VSCode 版のテーマの 16 色は、Ghostty の同名テーマと 5 色違う�
 | `editorCursor.foreground` | （テーマ #539bf5） | #3fade5 | Ghostty のカーソルと同じ |
 | `editor.selectionBackground` | #5e8881 | #1a4d74 | Ghostty の選択と同じ。今の色の上では、新しいテーマのコメント（1.02）とキーワード（1.38）がほぼ読めない。#1a4d74 では 2.30 と 3.12、通常の文字は 4.51 |
 | `editor.selectionHighlightBackground` | #3d4242d0 | #3d4242d0（そのまま） | 灰色で、選択と見分けられる（色差 0.094 以上） |
-| `editor.findMatchBackground` | #5691b3 | #805400 | 今の色の上では構文がほぼ読めない（通常の文字 1.74）。青の選択と見分けるため黄にする（選択との色差 0.165 以上、通常の文字 3.33） |
+| `editor.findMatchBackground` | #5691b3 | #ae7c1466（当初は #805400） | 今の色の上では構文がほぼ読めない（通常の文字 1.74）。青の選択と見分けるため黄にする。当初の #805400（選択との色差 0.165 以上、通常の文字 3.33）は、文字を暗くした後に通常の文字 2.69・キーワード 2.00・コメント 1.70 まで下がったので、`/review`（adversarial）の指摘を受けて、ユーザーの判断でほかの一致と同じ薄さにし、枠で示すことにした |
+| `editor.findMatchBorder` | （なし） | #daaa3f | フォーカスしている一致を、ほかの一致と枠で見分ける。背景に対して 7.94、一致の背景に対して 4.47 |
 | `editor.findMatchHighlightBackground` | #3b5768d0 | #ae7c1466 | 今の色は新しい選択の色と近い（色差 0.044〜0.050）。黄にすると 0.140 以上、通常の文字 4.84 |
+
+表の「理由」のコントラストは、断りのないものは Task 4 で文字色を暗くする前（通常の文字 #adbac7、キーワード #f47067）の値。暗くした後の値は、「[構文の色](#decision-syntax)」の最後の箇条書きにある（通常の文字は、選択の上 3.63、検索の一致とほかの一致の上 3.90）。
 
 <a name="non-goals"></a>
 
@@ -220,6 +221,7 @@ cd ~/dotfiles && mise run vscode:ext:list
 - `workbench.colorCustomizations` のキーが `"[GitHub Dark Dimmed]"` だけである（テーマを限定しない色がない）
 - その中身が「[決めたこと](#decisions)」の表のキーと色に完全に一致する（41 個。過不足があれば、キーごとに表示して失敗する）
 - Task 4 の依頼の後: `editor.foreground` を加えて 42 個。`editor.tokenColorCustomizations` のキーが `"[GitHub Dark Dimmed]"` だけで、`textMateRules` のセレクタと色が「[構文の色](#decision-syntax)」の 51 個に完全に一致する
+- Task 5 の `/review` の後: テーマと同じ値だった統合ターミナルの 5 色を外し、`editor.findMatchBorder` と `scmGraph.historyItemHoverAdditionsForeground` を足して 39 個。構文のセレクタは、差分の構文の追加の 3 個を足して 54 個。期待値を plan の表とだけ突き合わせると、表の誤り（テーマの値の推定違い）を見逃すので、上書きする色がテーマの実際の値と違うことも、インストール済みの `themes/dark-dimmed.json` と突き合わせて確かめる
 
 - [ ] **Step 2:** `python3 -I <scratchpad>/check_vscode_colors.py ~/dotfiles/vscode/settings.json` を実行する。期待: FAIL（テーマが Catppuccin Mocha）。
 - [ ] **Step 3:** `vscode/settings.json` の 2〜8 行を Edit ツールで書き換える。グループごと（背景・文字とカーソル・選択と検索・差分と git・統合ターミナル）に 1 行のコメントを付ける。
@@ -263,6 +265,14 @@ git commit -m "feat(vscode): switch to GitHub Dark Dimmed with the terminal's co
 - [ ] **Step 2:** plan の `status` を `done` にする。
 - [ ] **Step 3:** `/crit-review` でブランチの差分を開き、`approved: true` を受けてから、`cc-safe-push` と `cc-safe-pr create` で PR を作る。
 - [ ] **Step 4:** `gh pr checks` で CI の結果を確かめる。
+- [ ] **Step 5:** PR の本文に、マージ後の手順を書く。`vscode/settings.json` をリンクしているほかの Mac では、main を pull すると、拡張が入るまで VSCode が既定のテーマで表示する（テーマを限定しない色はなくなったので、前の選択と検索の色も効かない）。pull の直後に通常のターミナルで `code --install-extension GitHub.github-vscode-theme`（または `vscode/setup.sh`）を実行する。
+
+<a name="residual-risks"></a>
+
+## 残るリスク
+
+- 構文の色の上書きのセレクタと、背景を上書きするキーは、テーマ 6.3.5 の実際の値から取った。拡張の版は固定しておらず（`vscode/extensions` は ID だけで、VSCode は既定で拡張を自動更新する）、上流がセレクタや色を変えると、その部分だけ元の明るい色に戻るか、6.3.5 を前提にした色になる。ラベルが変わると、上書きはすべて効かなくなる。どれもエラーは出ない。拡張は 2024-10 の 6.3.5 から更新されていないので、起こる見込みは低い。テーマの版が変わったら、`~/.vscode/extensions/github.github-vscode-theme-<版>/themes/dark-dimmed.json` から写し直す。
+- `vscode/settings.json` は JSONC で、前は `check-repo.py` の構文の検査の対象外（`JSONC_FILES`）だった。`/review`（testing）の助言を受けて、ユーザーの判断で、コメントと末尾のカンマを空白に替えてから構文を検査するようにした（`strip_jsonc`）。テーマを限定しない色を足しても CI が通る点は残る（検査スクリプトはコミットしていない）。
 
 <a name="rollback"></a>
 

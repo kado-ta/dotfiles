@@ -27,10 +27,12 @@
             // 文字色: テーマの #adbac7 は白く強いので、Ghostty と同じ #9aa7b4 にする（構文の色は editor.tokenColorCustomizations）。
             "editor.foreground": "#9aa7b4",
             // カーソル・選択・検索: カーソルと選択は Ghostty と同じ色。検索は、青の選択と見分けられるよう黄にする。
+            // フォーカスしている一致は、上の文字を読めるよう背景をほかの一致と同じ薄さにし、枠で示す。
             "editorCursor.foreground": "#3fade5",
             "editor.selectionBackground": "#1a4d74", // 選択中テキスト
             "editor.selectionHighlightBackground": "#3d4242d0", // 選択中テキストと同じテキストのハイライト
-            "editor.findMatchBackground": "#805400", // 検索ヒットの内、現在、フォーカスしているもの
+            "editor.findMatchBackground": "#ae7c1466", // 検索ヒットの内、現在、フォーカスしているもの
+            "editor.findMatchBorder": "#daaa3f",
             "editor.findMatchHighlightBackground": "#ae7c1466", // 検索にヒットしたテキストと同じテキスト
             // 差分・ガター・git: 追加の緑を青にする（削除の赤はテーマのまま）。
             // ミニマップと概要ルーラーの追加の色は、ガターの色から決まる。
@@ -40,14 +42,11 @@
             "gitDecoration.addedResourceForeground": "#539bf5",
             "gitDecoration.untrackedResourceForeground": "#539bf5",
             "chat.linesAddedForeground": "#539bf5",
-            // 統合ターミナル: Ghostty と同じ色にする。テーマの 16 色のうち、Ghostty と違う 5 色を上書きする。
+            "scmGraph.historyItemHoverAdditionsForeground": "#539bf5",
+            // 統合ターミナル: 背景・文字色・選択・カーソルを Ghostty と同じにする。
+            // 16 色は、テーマがもともと Ghostty の GitHub Dark Dimmed と同じなので上書きしない。
             "terminal.background": "#181d1f",
             "terminal.foreground": "#9aa7b4",
-            "terminal.ansiBlack": "#545d68",
-            "terminal.ansiBrightBlack": "#636e7b",
-            "terminal.ansiCyan": "#39c5cf",
-            "terminal.ansiBrightCyan": "#56d4dd",
-            "terminal.ansiBrightWhite": "#cdd9e5",
             "terminal.selectionBackground": "#1a4d74",
             "terminal.selectionForeground": "#f4f7fa",
             "terminalCursor.foreground": "#3fade5",
@@ -146,6 +145,17 @@
                     ],
                     "settings": {
                         "foreground": "#e7645c"
+                    }
+                },
+                {
+                    // 差分の構文（.diff や ```diff）の追加の緑を、定数と同じ青にする（削除の赤はテーマのまま）。
+                    "scope": [
+                        "markup.inserted",
+                        "meta.diff.header.to-file",
+                        "punctuation.definition.inserted"
+                    ],
+                    "settings": {
+                        "foreground": "#59a3ea"
                     }
                 }
             ]
