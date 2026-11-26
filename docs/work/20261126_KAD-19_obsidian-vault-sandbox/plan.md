@@ -112,10 +112,10 @@ denyWrite と Edit の deny を両方置く理由は、mise・Playwright MCP と
    5. 人間が、通常のターミナルで、worktree の `/usr/bin/python3 -B claude/hooks/tests/test-cc-crit-profile.py` を実行する。変更前の profile（`CC_CRIT_PROFILE` で指定する）では新しいテストが失敗することも確かめる。
 5. `/review`、`/security-review`（sandbox の境界の変更のため）を実行し、Codex レビューを提案する。
 6. ブランチの差分を `/crit-review` で開き、承認されたらコミット・push・PR 作成をする。CI を `gh pr checks` で確かめる。
-7. マージ後（人間）: `~/dotfiles` を main に更新し、cc-crit を入れ直して（[claude/README.md](../../../claude/README.md#cc-crit-install)）、`mise run crit:profile-test` を実行する。入れ直すまで、`/crit-review` は DENIED で止まる（安全側に倒れる）。
-8. マージ後（人間が Vault で起動したセッション）: sandbox の中で `touch .obsidian/.kad19-probe` と `touch .gitignore` が `Operation not permitted` になり、`: < .obsidian/plugins/remotely-save/data.json` が拒否されることを確かめる。`dev_playbook` でも `.obsidian` への書き込みを 1 つ試す。[Vault で起動したセッションへの影響](#impact-vault-session)のとおりかも確かめる（試験用のノートの作成・編集・削除、`git status`、Grep・Glob ツールでの Vault 全体の検索）。
-   - Read・Edit ツールの規則が効くことを確かめる。手順 4 では、worktree の `.claude/settings.local.json` に置いた Read・Edit の規則がツールに効かなかった（sandbox には取り込まれた）。そのため、ユーザー設定に入った後に確かめる。Read ツールでは、秘密を含まないファイル（プラグインの `manifest.json`）を読む。
-   - 書き込みを伴う確かめ（Edit・Write ツールなど）は、実在の Vault ではなく、試験用の Vault（`~/Obsidian/kad19-scratch`）で起動したセッションで行う（2026-11-26 の人間の判断）。何を確かめるかと、結果の扱いは Linear の KAD-19 に書く。
+7. マージ後（人間）: `~/dotfiles` を main に更新する。開いたままの Crit のレビューを閉じ、`pgrep -x crit` で何も出ないことを確かめてから、cc-crit を入れ直す（profile を先に入れる。[claude/README.md](../../../claude/README.md#cc-crit-install)）。その後、入れた 2 つのファイルがリポジトリのものと同じであることを `cmp` で確かめ、入れた profile でテストを実行する（`CC_CRIT_PROFILE=/usr/local/libexec/claude-crit/cc-crit.sb CC_CRIT_PROFILE_REQUIRED=1 /usr/bin/python3 -B claude/hooks/tests/test-cc-crit-profile.py`）。`mise run crit:profile-test` はリポジトリの profile を試すので、入れた profile の確認にはならない。入れ直すまで、`/crit-review` は DENIED で止まる（安全側に倒れる）。
+8. マージ後（人間が Vault で起動したセッション）:
+   - 実在の Vault（`main`）では、読み取りだけを確かめる。`: < .obsidian/plugins/remotely-save/data.json` が拒否されること（`: <` は中身を出さない）。[Vault で起動したセッションへの影響](#impact-vault-session)のとおりかも確かめる（`git status`、Grep・Glob ツールでの Vault 全体の検索）。
+   - 書き込みを伴う確かめ（`touch .obsidian/.kad19-probe`・`touch .gitignore`、Edit・Write ツール、試験用のノートの作成・編集・削除など）は、実在の Vault ではなく、試験用の Vault（`~/Obsidian/kad19-scratch`）で起動したセッションで行う（2026-11-26 の人間の判断）。何を確かめるかと、結果の扱いは Linear の KAD-19 に書く。
 9. Linear の KAD-19 に、実測の結果と、この PR の外に残る経路を書く（公開リポジトリには書かない）。
 
 <a name="impact"></a>
@@ -143,7 +143,7 @@ denyWrite と Edit の deny を両方置く理由は、mise・Playwright MCP と
 
 ## 戻し方
 
-PR を revert し、`~/dotfiles` を main に更新する。cc-crit は入れ直さなくてよい。新しい cc-crit は覆う項目が増えるだけなので、古い設定でも動く。
+PR を revert し、`~/dotfiles` を main に更新する。cc-crit は入れ直さなくても動く。新しい cc-crit は覆う項目が増えるだけなので、古い設定でも動く。ただし、入れ直すまでは、crit から `.obsidian/plugins` の下を読めないままになる。
 
 <a name="out-of-scope"></a>
 

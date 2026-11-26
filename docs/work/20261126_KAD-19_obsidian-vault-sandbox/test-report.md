@@ -55,6 +55,8 @@ worktree の `tmp/kad19/vault`（Git の管理外）に試験用の Vault を作
 
 この PR の外に残る経路は、Linear の KAD-19 に書く。
 
+実測の後、人間が worktree の `.claude/settings.local.json` を消し、Claude が試験用の Vault（`tmp/kad19`）を消した（2026-11-26）。
+
 <a name="tool-rules"></a>
 
 ### Read・Edit ツール
@@ -74,11 +76,67 @@ worktree の `.claude/settings.local.json` に置いた Read・Edit の deny は
 | ユーザー設定 | `Read(~/**/credentials)` | 拒否された |
 | ユーザー設定 | `Read(~/**/*.key)`（`Read(**/*.key)` も当たりうる） | 拒否された |
 
-形を変えても、worktree の `settings.local.json` の規則はどれも効かなかった。ユーザー設定の `~/**/` の形は効いた。本番ではユーザー設定に置くので、ツールの規則はマージ後に確かめる（plan の手順 8）。
+形を変えても、worktree の `settings.local.json` の規則はどれも効かなかった。ユーザー設定の `~/**/` の形は効いた。
+
+<a name="tool-rules-user-settings"></a>
+
+#### 本番のユーザー設定での確認
+
+Codex の 1 回目の指摘を受けて、マージ前に確かめた（2026-11-26）。人間が `~/dotfiles/claude/settings.json` をバックアップし、`permissions.deny` の `Edit(//**/.obsidian/**)`・`Read(//**/.obsidian/plugins/**)` と、`permissions.ask` の `Edit(~/Obsidian/*/.gitignore)` を一時的に足した。試験用のファイル（`tmp/kad19-tool`。中身は偽の値）と存在しないパスで、次を確かめた。
+
+| ツール | 対象 | 結果 |
+| --- | --- | --- |
+| Read | 試験用の `.obsidian/plugins/p/data.json` | 拒否された |
+| Read | ホームの下の、存在しない `.obsidian/plugins/x.json` | 拒否された |
+| Read | ホームの外（`/private/tmp`）の、存在しない `.obsidian/plugins/x.json` | 拒否された |
+| Read | 実在の Vault の `plugins/html-viewer/manifest.json`（秘密を含まない） | 拒否された |
+| Read | 大文字・小文字を変えたパス（`.OBSIDIAN/PLUGINS/p/data.json`） | 拒否された |
+| Read | プラグインの設定を指す、`.obsidian` の外の symlink | 拒否された（文言は「Permission to read … has been denied」） |
+| Edit | 試験用の `.obsidian/app.json` | 拒否された。中身は変わっていない |
+| Write | 試験用の `.obsidian/new-probe.json`（新しいファイル） | 拒否された。作られていない |
+| Write | 大文字・小文字を変えたパス（`.OBSIDIAN/case-probe.json`） | 拒否された。作られていない |
+
+`Edit(~/Obsidian/*/.gitignore)` の ask は、この worktree の外の場所なので、ここでは確かめられなかった（作業ディレクトリの外への書き込みは、規則より先に止まる）。マージ後に、試験用の Vault で起動したセッションで確かめる（plan の手順 8）。
+
+<a name="codex-review"></a>
+
+## Codex のレビュー
+
+<a name="codex-review-1"></a>
+
+### 1 回目（2026-11-26T13:07Z、af46b2c、`codex review --base main`）
+
+結論は "patch is incorrect"（確信度 0.96）。指摘は 3 件で、すべて P2。
+
+| 指摘 | 採否 | 対応 |
+| --- | --- | --- |
+| cc-crit のインストールで、ラッパーを profile より先に入れている。profile の入れ替えが失敗すると、新しいラッパーが古い profile で crit を動かす | 採用 | `claude/README.md` のインストールの手順で、profile を先に入れる |
+| 入れ直す前から動いている crit の daemon は、古い profile のまま使われ続ける（cc-crit は同じレビューの daemon につなぐ） | 採用 | `claude/README.md` の更新の手順と plan の手順 7 に、開いたままのレビューを閉じて `pgrep -x crit` で確かめることを足す |
+| Read・Edit・Write ツールの拒否を、マージ前に本番と同じユーザー設定の範囲で確かめていない | 採用（2026-11-26 の人間の判断） | 本番のユーザー設定に一時的に規則を足して確かめた（[本番のユーザー設定での確認](#tool-rules-user-settings)） |
+
+<a name="codex-challenge-1"></a>
+
+### 2 回目（2026-11-26T13:24Z、af46b2c、challenge）
+
+変更前と比べた後退と、壊れる入力・設定・手順を、全件挙げるよう頼んだ。1 回目と重なる 2 件（profile を先に入れる、古い daemon）のほかは、次のとおり。
+
+| 指摘 | 採否 | 理由・対応 |
+| --- | --- | --- |
+| 入れ直した後の `mise run crit:profile-test` は、リポジトリの profile を試すので、入れた profile の確認にならない | 採用 | plan の手順 7 に、`cmp` と、入れた profile を `CC_CRIT_PROFILE` で指定したテストを足した |
+| 設定を revert しても、新しい profile のままでは crit から `.obsidian/plugins` を読めない | 採用 | plan の戻し方に書き足した |
+| `obsidian/setup.sh`・他の Vault への反映・新しい端末の手順（`git restore -- .gitignore`）は、Claude Code の sandbox の中では止まる | 採用 | `obsidian/README.md` に、通常のターミナルで実行することを書き足した |
+| plan の手順 8 が、実在の Vault で `touch` を試すことになっていて、書き込みは試験用の Vault で行う決まりと食い違う | 採用 | 実在の Vault では読み取りだけを確かめ、書き込みは試験用の Vault で行うように直した |
+| `CLAUDE_CONFIG.md` の「dotfiles のセッションから `~/dotfiles/obsidian/` に書けない」は、Edit ツールでは承認すれば書ける | 採用 | 「Bash から書けず、Edit ツールは承認を求める」に直した |
+| 試験記録では、一時的な設定を戻すのが未実施のままになっている | 採用 | 下の「未実施」を直した（戻して、試験用の Vault も消した） |
+| `.obsidian` を含むリポジトリ・アーカイブ・stash の展開や、プラグインのフォルダの検索が、sandbox の中で止まる | 不採用（受け入れる） | 決めたこと 6 で受け入れた引き換え。plan の「影響」に書いてある。今の作業用のリポジトリにはない |
+| 以前に追跡したプラグインのファイルがあると、`.gitignore` の前提が崩れる | 不採用 | `main`・`dev_playbook` の Vault とも、`.obsidian` の下は今も過去も追跡していない（`git ls-files` と `git log --all` で 0 件。2026-11-26 に確かめた） |
+| 普通のノートからプラグインの `.md` へのアンカー付きリンクがあると、点検フックの点検全体が止まる | 不採用（受け入れる） | そうしたリンクは今のノートの使い方では起きにくい。Linear の KAD-19 に記録する |
+| `check-repo.py` の `obsidian-vault` は、項目の文字列があるかだけを見る（sandbox を無効にしても通るなど） | 不採用 | ほかの検査と同じ方針で、この PR より前からの性質 |
+| `check_deny_read` が照合する設定の範囲が、Claude Code が読む設定の範囲と違う | 不採用 | この PR より前からの性質。Linear の KAD-19 に記録済み |
+| 大文字・小文字を変えたパスを、cc-crit と点検フックの profile でも止められるかは試していない | 記録だけ | Claude Code の sandbox（同じ Seatbelt）では止まった。2 つの profile では試していない |
 
 <a name="pending"></a>
 
 ## 未実施
 
-- worktree の `.claude/settings.local.json` を元に戻す（plan の手順 4-4）。置いてあるあいだは、今入っている cc-crit が `/crit-review` を DENIED で止める。戻したら、試験用の Vault（`tmp/kad19`）を消す。
-- マージ後の手順 7（cc-crit の入れ直しと `mise run crit:profile-test`）と手順 8（Vault で起動したセッションでの確認）。
+- マージ後の手順 7（cc-crit の入れ直しと、入れた profile でのテスト）と手順 8（Vault で起動したセッションでの確認。`.gitignore` の ask を含む）。
