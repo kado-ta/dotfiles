@@ -33,6 +33,7 @@ CLAUDE.md の規約の検査を、変更のたびに実行した。
 | 同上 | shellcheck（CLAUDE.md の形）・`actionlint`・`zizmor --offline .` | すべて rc=0 |
 | 7e0066c（コミット前の作業ツリー） | 上の 5 つ | 同じ結果 |
 | Codex の 1 回目への対応（コミット前の作業ツリー。この記録を含む） | 上の 5 つ | 同じ結果 |
+| Crit の 1 回目への対応（README の節の分割。コミット前の作業ツリー） | 上の 5 つ | 同じ結果 |
 
 <a name="behavior"></a>
 
