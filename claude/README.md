@@ -44,7 +44,7 @@ Claude Code の設定を管理するディレクトリ。`setup.sh` で `~/.clau
 
 通常のターミナルで、Claude Code のセッションをすべて閉じてから実行する（dotfiles 全体のセットアップでは、ルートの `setup.command` から実行される）。セッションの中と IDE の統合ターミナル、git worktree の中のスクリプトでは実行を拒否する。`setup.sh` は次を行う。
 
-- `settings.json`・`CLAUDE.md`・`rules/`・`hooks/`・`scripts/statusline.sh` を `~/.claude/` にリンクする。`~/.claude/hooks/` が実ディレクトリの場合は、削除してからリンクに置き換える。
+- `settings.json`・`CLAUDE.md`・`rules/`・`themes/`・`hooks/`・`scripts/statusline.sh` を `~/.claude/` にリンクする。`~/.claude/hooks/` が実ディレクトリの場合は、削除してからリンクに置き換える。`~/.claude/themes/` が実ディレクトリの場合は、`/theme` で作ったテーマを消さないように止まるので、中のテーマを `claude/themes/` に移してから `~/.claude/themes/` を消し、もう一度実行する。
 - `skills/*/` の個人スキルを `~/.claude/skills/` にリンクする（全プロジェクトで使える）。
 - プラグイン `superpowers`・`claude-code-setup`・`ruby-lsp`・`crit`・`understand-anything`・`pstack` と、スキル集 [gstack](https://github.com/garrytan/gstack) をインストールする（インストール済みならスキップする）。`ruby-lsp` プラグインは LSP サーバーを含まないので、`ruby-lsp` gem を別途入れて PATH に通す。
 - `mcp/*.json` の MCP サーバーを、`scripts/register-mcp.sh` で user スコープに登録する（登録済みなら置き換える。[MCP サーバー](#mcp)）。ネットワークや npm が使えずに失敗したときは、警告を出して先に進む。

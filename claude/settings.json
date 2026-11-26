@@ -7,7 +7,6 @@
     "CLAUDE_CODE_ENABLE_TELEMETRY": "0"
   },
   "permissions": {
-    "defaultMode": "auto",
     "allow": [
       "Bash(brew info *)",
       "Bash(brew search *)",
@@ -240,6 +239,7 @@
       "Edit(**/.rubocop.yml)",
       "Edit(**/.tflint.hcl)"
     ],
+    "defaultMode": "auto",
     "disableBypassPermissionsMode": "disable",
     "blockWritesOutsideWorkingDirectories": true,
     "additionalDirectories": [
@@ -472,6 +472,13 @@
         "~/.gstack/projects",
         "~/.gstack/security/cso"
       ],
+      "denyWrite": [
+        "~/.config/mise",
+        "~/dotfiles/mise",
+        "~/.local/state/mise",
+        "~/.local/share/claude-mcp",
+        "~/Library/Caches/playwright-mcp"
+      ],
       "denyRead": [
         "~/.aws/credentials",
         "~/dotfiles/aws/credentials",
@@ -482,13 +489,6 @@
         "~/.crit",
         "~/.colima/_lima/_config",
         "~/.lima/_config"
-      ],
-      "denyWrite": [
-        "~/.config/mise",
-        "~/dotfiles/mise",
-        "~/.local/state/mise",
-        "~/.local/share/claude-mcp",
-        "~/Library/Caches/playwright-mcp"
       ]
     },
     "credentials": {
@@ -522,7 +522,7 @@
       "effortLevel": "xhigh"
     }
   },
-  "theme": "dark-daltonized",
+  "theme": "custom:daltonized-soft",
   "inputNeededNotifEnabled": true,
   "agentPushNotifEnabled": true,
   "autoMode": {
