@@ -24,6 +24,23 @@ echo "CODEX_DIR: $CODEX_DIR"
 if [ ! -d $CODEX_DIR ]; then mkdir -p $CODEX_DIR; fi
 ln -snfv "$SCRIPT_DIR/AGENTS.md" "$CODEX_DIR/AGENTS.md"
 
+# execpolicy の規則。Codex はリンクを読まないので、通常のファイルとしてコピーする。
+# default.rules は TUI の「今後は聞かない」の書き込み先なので、別の名前にする。
+# allow は当たったコマンドを sandbox の外で確認なしに動かすので、含むファイルは入れない。
+# 読み込めない規則は codex exec と codex review を止めるので、検査に通ったときだけ入れる。
+RULES_SRC="$SCRIPT_DIR/rules/dotfiles.rules"
+if grep -nE "decision[[:space:]]*=[[:space:]]*[\"']allow[\"']" "$RULES_SRC"; then
+    echo "$RULES_SRC has an allow rule. allow runs commands outside the sandbox without asking, so the rules are not installed." >&2
+    exit 1
+fi
+if ! codex execpolicy check --rules "$RULES_SRC" -- git status > /dev/null; then
+    echo "$RULES_SRC failed codex execpolicy check, so the rules are not installed." >&2
+    exit 1
+fi
+mkdir -p "$CODEX_DIR/rules"
+install -m 0644 "$RULES_SRC" "$CODEX_DIR/rules/dotfiles.rules"
+echo "installed: $CODEX_DIR/rules/dotfiles.rules"
+
 # superpowers プラグイン
 # codex plugin list はオンラインだとリモートのカタログを返し、インストール済みでもこのプラグインを含まない。
 # そのため、codex plugin add が作るインストール先の有無で判定する。
