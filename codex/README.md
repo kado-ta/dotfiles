@@ -6,6 +6,7 @@
 - [ディレクトリ構成](#directory-structure)
 - [セットアップ（setup.sh）](#setup)
 - [指示ファイル：AGENTS.md と developer_instructions](#instructions)
+- [rules（execpolicy の規則）](#rules)
 - [コマンド（zsh エイリアス）](#commands)
 - [初期移行](#migration)
 - [日常運用](#operations)
@@ -43,6 +44,8 @@ Codex のユーザー設定 `~/.codex/config.toml` は、モデルや MCP の設
 │   ├── README.md
 │   ├── AGENTS.md                   # グローバル指示（~/.codex/AGENTS.md へリンク）
 │   ├── config.base.toml            # 共通設定
+│   ├── rules/
+│   │   └── dotfiles.rules          # execpolicy の規則（~/.codex/rules/dotfiles.rules へコピー）
 │   ├── setup.sh                    # 初回セットアップ
 │   ├── sync.py                     # base/local → config
 │   └── import.py                   # config → base（明示的な操作）
@@ -53,6 +56,9 @@ Codex のユーザー設定 `~/.codex/config.toml` は、モデルや MCP の設
 ├── AGENTS.md                       # → ~/dotfiles/codex/AGENTS.md（シンボリックリンク）
 ├── config.toml                     # Codex の実設定（通常ファイル・Git 管理しない）
 ├── config.local.toml               # 端末固有設定（任意・Git 管理しない）
+├── rules/
+│   ├── dotfiles.rules              # setup.sh がコピー（通常ファイル・リンクにしない）
+│   └── default.rules               # TUI の「今後は聞かない」の書き込み先（Codex が作る）
 ├── auth.json                       # 認証情報（Git 管理しない）
 └── ...
 ```
@@ -64,7 +70,8 @@ Codex のユーザー設定 `~/.codex/config.toml` は、モデルや MCP の設
 | `README.md`        | このドキュメント                                                                                                              | なし                                  |
 | `AGENTS.md`        | Codex のグローバル指示の正本（回答方針・作業ルール・安全ルール・レビュー方針など）                                            | `setup.sh` がシンボリックリンクを作成 |
 | `config.base.toml` | 複数端末で共有する Codex 設定（モデル・`developer_instructions`（安全ガードレール）・プラグイン・MCP など）                   | `sync.py` が `config.toml` へマージ   |
-| `setup.sh`         | `AGENTS.md` のリンク作成、superpowers プラグインと Understand Anything スキルのインストール、gstack の Codex 向けセットアップ | —                                     |
+| `rules/dotfiles.rules` | 破壊的なコマンドを確認にする execpolicy の規則（[rules](#rules)） | `setup.sh` が検査してからコピー |
+| `setup.sh`         | `AGENTS.md` のリンク作成、規則のコピー、superpowers プラグインと Understand Anything スキルのインストール、gstack の Codex 向けセットアップ | —                                     |
 | `sync.py`          | `config.base.toml` + `config.local.toml` → `config.toml`                                                                      | —                                     |
 | `import.py`        | `config.toml` の変更を選択的に `config.base.toml` へ取り込む                                                                  | —                                     |
 
@@ -80,10 +87,13 @@ Codex のユーザー設定 `~/.codex/config.toml` は、モデルや MCP の設
 | ----------------------------------- | ------------------ | -------- | ------------------------------------- |
 | `~/dotfiles/codex/AGENTS.md`        | 人                 | する     | `~/.codex/AGENTS.md` からリンクされる |
 | `~/dotfiles/codex/config.base.toml` | 人（編集・import） | する     | `[projects]` は記述しない             |
+| `~/dotfiles/codex/rules/dotfiles.rules` | 人 | する | `~/.codex/rules/dotfiles.rules` へコピーされる |
 | `~/dotfiles/codex/sync.py`          | 人                 | する     | Codex 設定反映スクリプト              |
 | `~/dotfiles/codex/import.py`        | 人                 | する     | Codex 設定取込スクリプト              |
 | `~/.codex/config.local.toml`        | 人                 | しない   | 必要な端末だけ作成                    |
 | `~/.codex/config.toml`              | Codex / sync.py    | しない   | `[projects]` を保持                   |
+| `~/.codex/rules/dotfiles.rules` | setup.sh | しない | 手で編集しない（検査を通らずに読み込まれる） |
+| `~/.codex/rules/default.rules` | Codex（TUI） | しない | 「今後は聞かない」で許可したコマンド |
 | `~/.codex/auth.json`                | Codex              | しない   | **絶対に Git へ追加しない**           |
 
 <a name="setup"></a>
@@ -104,16 +114,23 @@ Codex のユーザー設定 `~/.codex/config.toml` は、モデルや MCP の設
 1. macOS であることを確認する。
 2. `~/.codex/` がなければ作成する。
 3. `~/dotfiles/codex/AGENTS.md` を `~/.codex/AGENTS.md` へシンボリックリンクする（`ln -snfv`）。
-4. superpowers プラグインが未インストールなら追加する（`codex plugin add superpowers@openai-curated`）。`~/.codex/plugins/cache/openai-curated/superpowers` があればインストール済みとみなす。
-5. Understand Anything スキルが未インストールなら、Codex 向けにインストールする（GitHub の `install.sh` を `curl | bash` で実行）。Codex 用のスキルのリンク `~/.agents/skills/understand` と `~/.understand-anything-plugin` の両方があれば、インストール済みとみなす。
-6. Claude Code 用にインストールした gstack を、Codex でも使えるようにセットアップする（`~/.claude/skills/gstack/setup --host codex`）。
+4. `~/dotfiles/codex/rules/dotfiles.rules` を一時ディレクトリに写して検査し、その写しを `~/.codex/rules/dotfiles.rules` へコピーする（`install -m 0644`）。次のときは、コピーせずに止まる（[rules](#rules)）。
+   - `allow` を含む。または、`prefix_rule(` の数と `decision = "prompt"` / `"forbidden"` の数が合わない（`decision` を省くと allow になる）。文字列の数で確かめるので、書き忘れなどの事故は止まるが、意図して崩した書き方（文字列の中の偽の `decision` など）は止まらない。
+   - `codex execpolicy check` に失敗する。
+   - `git status`・`git diff`・`git log`・`git show` に当たる規則がある（`codex exec`・`codex review` で拒否されるため）。`git`・`/usr/bin/git`・`/opt/homebrew/bin/git` のそれぞれで照らす。引数のない形だけを見る。
+   - `~/.codex/rules` の既存のファイルと一緒に読み込めない。
+
+   先頭が絶対パスの `allow` が既存のファイルにあれば警告する（TUI が書く 1 行の形だけを見る）。コピーの前に、今入っているものとの差分を表示する。
+5. superpowers プラグインが未インストールなら追加する（`codex plugin add superpowers@openai-curated`）。`~/.codex/plugins/cache/openai-curated/superpowers` があればインストール済みとみなす。
+6. Understand Anything スキルが未インストールなら、Codex 向けにインストールする（GitHub の `install.sh` を `curl | bash` で実行）。Codex 用のスキルのリンク `~/.agents/skills/understand` と `~/.understand-anything-plugin` の両方があれば、インストール済みとみなす。
+7. Claude Code 用にインストールした gstack を、Codex でも使えるようにセットアップする（`~/.claude/skills/gstack/setup --host codex`）。
 
 **`setup.sh` は `config.toml` を作成・変更しない。** 設定の反映は後述の `codex-config-sync` で行う。
 
 ### 実行手順
 
 ```bash
-# 1. AGENTS.md のリンク、プラグインとスキルのインストール
+# 1. AGENTS.md のリンク、規則のコピー、プラグインとスキルのインストール
 ~/dotfiles/codex/setup.sh
 
 # 2. エイリアスを読み込む（新しいシェルを開いてもよい）
@@ -126,7 +143,7 @@ codex-config-sync --dry-run
 codex-config-sync
 ```
 
-`setup.sh` は何度実行してもよい（リンクは `ln -snfv` で張り直し、インストール済みのプラグインとスキルは飛ばす）。Understand Anything スキルを更新するときは `git -C ~/.understand-anything/repo pull --ff-only` を実行する（`install.sh --update` と同じ）。
+`setup.sh` は何度実行してもよい（リンクは `ln -snfv` で張り直し、規則は上書きでコピーし、インストール済みのプラグインとスキルは飛ばす）。Understand Anything スキルを更新するときは `git -C ~/.understand-anything/repo pull --ff-only` を実行する（`install.sh --update` と同じ）。
 
 <a name="instructions"></a>
 
@@ -176,11 +193,59 @@ Codex の動作をカスタマイズする2種類の指示。主な違いは**�
 - グローバルの `AGENTS.md` にはコミュニケーション方針と全リポジトリ共通の既定を書き、リポジトリ固有の規約・コマンドは各リポジトリ側に書く。
 - AGENTS.md の連結結果には `project_doc_max_bytes`（既定 32 KiB）の上限がある。グローバル分はリポジトリ側の AGENTS.md と合算されるため、肥大化させない。
 - HTML コメントがコンテキストから除去されるかは確認できていないため、メンテナンス用のメモは `AGENTS.md` ではなくこの README に書く。
-- 繰り返し使う手順はスキル（`~/.agents/skills`）に、必ず止めたいコマンドは文章ではなく Sandbox・承認ポリシー・Rules（experimental）で強制することを検討する。
+- 繰り返し使う手順はスキル（`~/.agents/skills`）に、必ず止めたいコマンドは文章ではなく Sandbox・承認ポリシー・[rules](#rules)（experimental）で強制する。
 
 ### 反映の確認
 
 変更後に Codex を再起動し、作業中のリポジトリのルートで「現在読み込まれている指示を要約して」と依頼する。`AGENTS.md` と `developer_instructions` の両方の内容が要約に含まれることを確認する。
+
+<a name="rules"></a>
+
+## rules（execpolicy の規則）
+
+破壊的なコマンドを、Codex 本体の仕組みで確認（`prompt`）にする。`developer_instructions` の文章による指示を補強する。Rules は experimental で、仕様が変わりうる。
+
+### 規則の一覧
+
+正本は `rules/dotfiles.rules`。理由は規則ごとのコメントにある。
+
+| コマンド | 確認にする理由 |
+| --- | --- |
+| `git clean` | 未追跡のファイルを消す。sandbox の中でも止まらない |
+| `rm -r`・`-R`・`--recursive`・`-rv`・`-Rv`・`-vr`・`-vR`（最初の引数） | 再帰の削除。sandbox の中でも止まらない。`-rf` など `f` を含む形は、Codex の組み込みの判定が確認にする |
+| `git push` | 明示の依頼のときだけ。force push と main への push を防ぐ |
+| `git reset --hard`・`git checkout`（全体）・`git restore` | 未コミットの変更を破棄する。`git checkout <path>` はブランチ名と区別できないので、checkout 全体を確認にする（TUI の workspace-write では、どの checkout ももともと昇格の確認が出る。`codex exec` では、sandbox の設定に関係なく拒否される） |
+| `terraform apply`・`terraform destroy` | 実際のインフラを変える |
+| `gh pr merge` | 明示の依頼のときだけ |
+
+decision はすべて `prompt`。`allow` は書かない。当たったコマンドを sandbox の外で確認なしに動かすため（`setup.sh` も入れない）。
+
+### 効き方
+
+- workspace-write の sandbox は、`.git` への書き込みとネットワークを止める。`git clean` と、`-f` のない `rm -r` は止めないので、規則で確認にする。
+- 昇格の確認で「今後は聞かない」を選ぶと、Codex が `~/.codex/rules/default.rules` に `allow` を書き、以後は同じ接頭辞のコマンドが確認なしに sandbox の外で動く。規則に当たるコマンドにはこの選択肢が出ず、同時に当たる `allow` には `prompt` が勝つ（最も厳しい decision が勝つ）。
+- ただし Codex は、絶対パスで書かれた規則を先に照らし、1 つも当たらないときだけ実行ファイル名で照らす。`["/usr/bin/git"]` の `allow` があると（どの規則にも当たらない `/usr/bin/git fetch` の「今後は聞かない」でも作られる）、名前だけの規則は当たらず、`/usr/bin/git push` が確認なしに動く。そのため、規則の先頭にこの Mac の主な場所（`/usr/bin/git`・`/opt/homebrew/bin/git`・`/bin/rm`・`/opt/homebrew/bin/gh`）も候補として入れ、そこでは `prompt` が勝つようにしている。候補にない綴り（`/opt/homebrew/opt/git/bin/git`・Cellar の下・Command Line Tools の git・mise で入れた terraform など）と、大文字小文字を変えた名前（`GIT`。APFS では実行できる）は守れない。`setup.sh` は、先頭が絶対パスの `allow` を見つけると警告する（入れた後に足されたものは、次に実行するまで気づけない）。
+- pattern は位置で決まる前方一致。`git -C <dir> …`・`git -c k=v …` のようにサブコマンドの前にオプションがある形と、変数・リダイレクト・`$(...)` を含むシェルのスクリプトには当たらない。これらは `developer_instructions` に任せる。
+- `codex exec`・`codex review` は承認が `never` なので、規則に当たるコマンドは拒否される。読み取り専用のレビューで使わないコマンドだけを対象にしている。
+- `approvals_reviewer` を `auto_review` にすると、確認をモデルが判定する。人が確認する前提が崩れるので、設定しない。
+
+### 入れ方と更新
+
+- `setup.sh` が検査してから `~/.codex/rules/dotfiles.rules` にコピーする。Codex はリンクを読まないので、AGENTS.md と違ってリンクにしない。`~/.codex/rules/default.rules` は Codex が書くので使わない。
+- 規則を変えたら `setup.sh` を実行し直し、Codex を起動し直す（規則は起動時に読む）。
+- `setup.sh` は作業ツリーのファイルをそのまま入れる。Codex を `~/dotfiles` で動かすと、`codex/rules/` を承認なしに書き換えられる（sandbox が守るのは直下の `.codex` などだけ）。`setup.sh` は差分を表示してからそのまま入れるので、意図しない変更があれば、規則を直して実行し直す。
+- 写しが読み込めないと、`codex exec`・`codex review` は `Error loading rules:` で止まり、TUI は規則なしで動く（[トラブルシューティング](#troubleshooting)）。
+
+### 確かめ方
+
+```bash
+codex execpolicy check --pretty --resolve-host-executables \
+  --rules ~/dotfiles/codex/rules/dotfiles.rules -- git clean -fd
+```
+
+当たれば `"decision": "prompt"`、当たらなければ `"matchedRules": []` になる。Codex 本体は、絶対パスの規則が当たらないときは実行ファイル名でも照らす（候補にない `/usr/local/bin/git` も `git` の規則に当たる）ので、`--resolve-host-executables` を付ける。
+
+経緯と実測は [docs/work/20261126_codex-rules/plan.md](../docs/work/20261126_codex-rules/plan.md) にある。
 
 <a name="commands"></a>
 
@@ -369,6 +434,12 @@ git -C "$HOME/dotfiles" diff -- codex/config.base.toml
 
 端末 A の `[projects]` は端末 B へ自動同期されない。
 
+### G. rules を変更した
+
+1. `~/dotfiles/codex/rules/dotfiles.rules` を編集する。規則ごとに `match` と `not_match` を書く。`decision = "prompt"` は二重引用符で、規則ごとに書く。文字列に `#` を入れない（`setup.sh` はコメントを除いてから数えるので、誤って止まる）。
+2. [確かめ方](#rules) のコマンドで、止めたいコマンドが `prompt` になり、止めたくないコマンドが当たらないことを確かめる。
+3. `~/dotfiles/codex/setup.sh` を実行し、表示された差分を確かめて、Codex を起動し直す。
+
 <a name="merge-spec"></a>
 
 ## マージ仕様
@@ -482,6 +553,23 @@ chmod 600 "$HOME/.codex/config.toml"
 - `ls -l ~/.codex/AGENTS.md` でリンク先を確認し、必要なら `setup.sh` を再実行する。
 - `~/.codex/AGENTS.override.md` が存在すると、そちらが優先される。
 
+**`codex exec`・`codex review` が `Error loading rules:` で止まる**
+
+- `~/.codex/rules/` の規則が読み込めない（構文の誤りや、`match`・`not_match` の例の食い違い）。TUI は警告を出し、規則なしで動く。
+- まず、Codex と同じ対象（`.` で始まる名前を含み、リンクを除く）と順（バイト順）で、まとめて検査する。先に読まれるファイルの `host_executable()` で、後のファイルの `match` の例が外れることもあるため。
+
+  ```bash
+  args=(); while IFS= read -r f; do args+=(--rules "$f"); done < <(find -H ~/.codex/rules -maxdepth 1 -type f -name '*.rules' ! -name .rules | LC_ALL=C sort)
+  codex execpolicy check "${args[@]}" -- git status > /dev/null && echo OK
+  ```
+
+- 失敗したら、1 つずつ検査して原因を絞る。`~/.codex/rules/default.rules`（Codex が書く）が原因のこともある。
+
+  ```bash
+  find -H ~/.codex/rules -maxdepth 1 -type f -name '*.rules' ! -name .rules | while IFS= read -r f; do codex execpolicy check --rules "$f" -- git status > /dev/null || echo "NG: $f"; done
+  ```
+- リポジトリの規則を直して `setup.sh` を実行し直す。急ぐときは `rm ~/.codex/rules/dotfiles.rules` で外す。
+
 **Codex アプリで変更した設定が元に戻った**
 
 - `sync.py` が `config.base.toml` / `config.local.toml` の値を優先するため。
@@ -496,7 +584,7 @@ chmod 600 "$HOME/.codex/config.toml"
 
 - 両スクリプトは `CODEX_HOME` が定義されていれば、そのディレクトリ内の `config.toml` / `config.local.toml` を使用する。
 - `CODEX_HOME` によって **実ファイル側** のパスが変わる。`config.base.toml` はスクリプトの配置先を基準にする。
-- `setup.sh` は `~/.codex` 固定でリンクを作成する点に注意する。
+- `setup.sh` は `~/.codex` 固定でリンクを作成し、規則をコピーする点に注意する。`CODEX_HOME` を変えていると、規則（`rules/dotfiles.rules`）は読み込まれない。
 
 <a name="security"></a>
 
@@ -519,7 +607,8 @@ chmod 600 "$HOME/.codex/config.toml"
 - dry-run を利用した自動テスト／サンプル TOML の回帰テスト。
 - `import.py` のキー名・値に対する機密情報検査の強化。
 - 不要バックアップの世代管理。
-- 破壊的コマンドを `~/.codex/rules/*.rules` で `forbidden` / `prompt` にし、`developer_instructions` の文章による指示を補強する（Rules は experimental）。
+- `gh auth token` などトークンを出力するコマンドを、rules で `forbidden` にする（先に、sandbox の中でトークンを読めるかを確かめる）。
+- rules の検査（`codex execpolicy check`）を CI に足す。
 
 <a name="references"></a>
 
@@ -530,6 +619,7 @@ chmod 600 "$HOME/.codex/config.toml"
 - [OpenAI Codex: AGENTS.md](https://developers.openai.com/codex/guides/agents-md)
 - [OpenAI Codex: Best practices](https://developers.openai.com/codex/learn/best-practices)
 - [OpenAI Codex: Customization](https://developers.openai.com/codex/concepts/customization)
+- [OpenAI Codex: Rules](https://developers.openai.com/codex/rules)
 - [uv: Running scripts / Inline script metadata](https://docs.astral.sh/uv/guides/scripts/)
 - [PEP 723: Inline script metadata](https://peps.python.org/pep-0723/)
 - [tomlkit: GitHub](https://github.com/python-poetry/tomlkit)

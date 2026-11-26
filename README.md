@@ -51,7 +51,7 @@ Finder で `init.command` をダブルクリックする（ターミナルから
 | 5   | `aws/link.sh`          | AWS CLI の設定（`config`・`credentials`）をリンクする                                                                           |
 | 6   | `mise/setup.sh`        | mise の設定を `~/.config/mise/config.toml` にリンクし、言語ランタイム・ツールをインストールする                                 |
 | 7   | `claude/setup.sh`      | Claude Code の設定をリンクし、プラグインと gstack をインストールする（[詳細](claude/README.md)）                                |
-| 8   | `codex/setup.sh`       | Codex の `AGENTS.md` をリンクし、プラグインとスキルをインストールする。7 でインストールした gstack を使うため、7 の後に実行する |
+| 8   | `codex/setup.sh`       | Codex の `AGENTS.md` をリンクし、execpolicy の規則を検査してコピーし、プラグインとスキルをインストールする。7 でインストールした gstack を使うため、7 の後に実行する |
 | 9   | `vscode/setup.sh`      | VSCode の設定をリンクし、拡張をインストールする                                                                                 |
 | 10  | `ghostty/link.sh`      | Ghostty の設定を `~/.config/ghostty/` にリンクする                                                                              |
 | 11  | `biome/setup.sh`       | Biome のグローバル設定を `~/Library/Application Support/biome/` にリンクする                                                    |
@@ -88,7 +88,7 @@ Finder で `init.command` をダブルクリックする（ターミナルから
 | `mise/`      | 言語ランタイム・ツールのグローバルバージョン（`mise_config.toml`）                            | `~/.config/mise/config.toml`               | [mise/README.md](mise/README.md)         |
 | `aws/`       | AWS CLI の設定（`config`・`credentials` は Git 管理外）                                       | `~/.aws/`                                  | [aws/README.md](aws/README.md)           |
 | `claude/`    | Claude Code の設定・フック・ルール・個人スキル                                                | `~/.claude/`                               | [claude/README.md](claude/README.md)     |
-| `codex/`     | Codex CLI のグローバル指示（`AGENTS.md`）と共通設定（`config.base.toml`）                     | `~/.codex/`                                | [codex/README.md](codex/README.md)       |
+| `codex/`     | Codex CLI のグローバル指示（`AGENTS.md`）・共通設定（`config.base.toml`）・execpolicy の規則（`rules/`） | `~/.codex/`                                | [codex/README.md](codex/README.md)       |
 | `vscode/`    | VSCode の設定・キーバインド・タスク・拡張リスト・Project Manager 拡張の設定                   | `~/Library/Application Support/Code/User/` | [vscode/README.md](vscode/README.md)     |
 | `ghostty/`   | Ghostty の設定                                                                                | `~/.config/ghostty/`                       | —                                        |
 | `biome/`     | Biome のグローバル設定。`$schema` のバージョンは mise の postinstall で自動更新する           | `~/Library/Application Support/biome/`     | —                                        |
