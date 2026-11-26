@@ -1,10 +1,56 @@
 {
-    "workbench.colorTheme": "Catppuccin Mocha",
+    "workbench.colorTheme": "GitHub Dark Dimmed",
+    // Ghostty（ghostty/config）と同じ配色にそろえる。追加は青、削除は赤にして、緑と赤の対比に頼らない。
     "workbench.colorCustomizations": {
-        "editor.selectionBackground": "#5e8881", // 選択中テキスト
-        "editor.selectionHighlightBackground": "#3d4242d0", // 選択中テキストと同じテキストのハイライト
-        "editor.findMatchBackground": "#5691b3", // 検索ヒットの内、現在、フォーカスしているもの
-        "editor.findMatchHighlightBackground": "#3b5768d0" // 検索にヒットしたテキストと同じテキスト
+        "[GitHub Dark Dimmed]": {
+            // 背景: テーマの #22272e は白っぽいので、Ghostty と同じ #181d1f にする。
+            // サイドバー・パネル・タブの列は、テーマと同じ明るさの差で、エディタより暗くする。
+            "editor.background": "#181d1f",
+            "tab.activeBackground": "#181d1f",
+            "tab.hoverBackground": "#181d1f",
+            "tab.activeBorder": "#181d1f",
+            "tab.unfocusedActiveBorder": "#181d1f",
+            "titleBar.activeBackground": "#181d1f",
+            "activityBar.background": "#181d1f",
+            "statusBar.background": "#181d1f",
+            "statusBar.noFolderBackground": "#181d1f",
+            "input.background": "#181d1f",
+            "peekViewResult.background": "#181d1f",
+            "sideBar.background": "#121719",
+            "sideBarSectionHeader.background": "#121719",
+            "panel.background": "#121719",
+            "editorGroupHeader.tabsBackground": "#121719",
+            "tab.inactiveBackground": "#121719",
+            "titleBar.inactiveBackground": "#121719",
+            "textBlockQuote.background": "#121719",
+            "editorOverviewRuler.border": "#121719",
+            // カーソル・選択・検索: カーソルと選択は Ghostty と同じ色。検索は、青の選択と見分けられるよう黄にする。
+            "editorCursor.foreground": "#3fade5",
+            "editor.selectionBackground": "#1a4d74", // 選択中テキスト
+            "editor.selectionHighlightBackground": "#3d4242d0", // 選択中テキストと同じテキストのハイライト
+            "editor.findMatchBackground": "#805400", // 検索ヒットの内、現在、フォーカスしているもの
+            "editor.findMatchHighlightBackground": "#ae7c1466", // 検索にヒットしたテキストと同じテキスト
+            // 差分・ガター・git: 追加の緑を青にする（削除の赤はテーマのまま）。
+            // ミニマップと概要ルーラーの追加の色は、ガターの色から決まる。
+            "diffEditor.insertedLineBackground": "#316dca26",
+            "diffEditor.insertedTextBackground": "#539bf54d",
+            "editorGutter.addedBackground": "#4184e466",
+            "gitDecoration.addedResourceForeground": "#539bf5",
+            "gitDecoration.untrackedResourceForeground": "#539bf5",
+            "chat.linesAddedForeground": "#539bf5",
+            // 統合ターミナル: Ghostty と同じ色にする。テーマの 16 色のうち、Ghostty と違う 5 色を上書きする。
+            "terminal.background": "#181d1f",
+            "terminal.foreground": "#9aa7b4",
+            "terminal.ansiBlack": "#545d68",
+            "terminal.ansiBrightBlack": "#636e7b",
+            "terminal.ansiCyan": "#39c5cf",
+            "terminal.ansiBrightCyan": "#56d4dd",
+            "terminal.ansiBrightWhite": "#cdd9e5",
+            "terminal.selectionBackground": "#1a4d74",
+            "terminal.selectionForeground": "#f4f7fa",
+            "terminalCursor.foreground": "#3fade5",
+            "terminalCursor.background": "#181d1f" // ブロックカーソルの下の文字の色
+        }
     },
     "workbench.editor.enablePreviewFromQuickOpen": false,
     "workbench.iconTheme": "catppuccin-perfect-dark",
