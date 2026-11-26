@@ -227,7 +227,7 @@ git -C ~/dotfiles diff -- obsidian/
 1. **対象 Vault のパスは固定。** `setup.sh` の `OBSIDIAN_DIR`（`~/Obsidian/main/.obsidian`）に直書きしている。
 2. **プラグインのバージョンと設定は端末間で自動的に揃わない。** プラグイン本体と `data.json` を管理しないため、端末ごとに更新・設定する。
 3. **自動テストはない。** 変更後は Obsidian で表示と設定画面を確認する。
-4. **Claude Code からは、Vault の `.obsidian` に書けず、`.obsidian/plugins` を読めない。** プラグインのコードは sandbox の外で動き、その設定には認証情報があるため、`claude/settings.json` で止めている。Vault の `.gitignore` も、Bash からは書けず、Edit ツールでは承認を求める。プラグインの設定は、Obsidian の設定画面で変える。理由は [CLAUDE_CONFIG.md](../.claude/rules/CLAUDE_CONFIG.md#obsidian-vault) を参照する。
+4. **Claude Code からは、Vault の `.obsidian` に書けず、`.obsidian/plugins` を読めない。** プラグインのコードは sandbox の外で動き、その設定には認証情報があるため、`claude/settings.json` で止めている。Vault の `.gitignore` も、Bash からは書けず、Edit ツールでは承認を求める。プラグインの設定は、Obsidian の設定画面で変える。`setup.sh`、他の Vault への設定の反映、[新しい端末のセットアップ手順](SYNC_BACKUP.md#new-device) は、`.obsidian` や `.gitignore` に書くので、通常のターミナルで実行する。理由は [CLAUDE_CONFIG.md](../.claude/rules/CLAUDE_CONFIG.md#obsidian-vault) を参照する。
 
 <a name="related-docs"></a>
 

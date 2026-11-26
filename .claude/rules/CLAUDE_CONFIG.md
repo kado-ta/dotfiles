@@ -113,6 +113,6 @@ sandbox の中では、どこにも `.obsidian` という名前のフォルダ�
 
 この設定で止まらない経路は、Linear の KAD-19 に記録している。
 
-dotfiles で起動したセッションから `~/dotfiles/obsidian/`（Vault の設定ファイルの実体）に書けないのは、プロジェクト設定の `./obsidian` の denyWrite と `Edit(/obsidian/**)` の ask による（`project-permissions`）。
+dotfiles で起動したセッションでは、`~/dotfiles/obsidian/`（Vault の設定ファイルの実体）に Bash から書けず、Edit ツールは承認を求める。プロジェクト設定の `./obsidian` の denyWrite と `Edit(/obsidian/**)` の ask による（`project-permissions`）。
 
 経緯は [docs/work/20261126_KAD-19_obsidian-vault-sandbox/plan.md](../../docs/work/20261126_KAD-19_obsidian-vault-sandbox/plan.md) を参照する。
