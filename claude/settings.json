@@ -188,7 +188,9 @@
       "mcp__playwright__browser_run_code_unsafe",
       "mcp__playwright__browser_file_upload",
       "Edit(~/.local/share/claude-mcp/**)",
-      "Edit(~/Library/Caches/playwright-mcp/**)"
+      "Edit(~/Library/Caches/playwright-mcp/**)",
+      "Edit(//**/.obsidian/**)",
+      "Read(//**/.obsidian/plugins/**)"
     ],
     "ask": [
       "Bash(gh pr create*)",
@@ -238,7 +240,8 @@
       "Edit(**/.eslintrc.*)",
       "Edit(**/eslint.config.*)",
       "Edit(**/.rubocop.yml)",
-      "Edit(**/.tflint.hcl)"
+      "Edit(**/.tflint.hcl)",
+      "Edit(~/Obsidian/*/.gitignore)"
     ],
     "disableBypassPermissionsMode": "disable",
     "blockWritesOutsideWorkingDirectories": true,
@@ -481,14 +484,17 @@
         "~/.cc-crit",
         "~/.crit",
         "~/.colima/_lima/_config",
-        "~/.lima/_config"
+        "~/.lima/_config",
+        "/**/.obsidian/plugins"
       ],
       "denyWrite": [
         "~/.config/mise",
         "~/dotfiles/mise",
         "~/.local/state/mise",
         "~/.local/share/claude-mcp",
-        "~/Library/Caches/playwright-mcp"
+        "~/Library/Caches/playwright-mcp",
+        "/**/.obsidian",
+        "~/Obsidian/*/.gitignore"
       ]
     },
     "credentials": {

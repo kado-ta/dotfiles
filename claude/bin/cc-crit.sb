@@ -92,6 +92,9 @@
 (deny file-read* (subpath (home-path "/.colima/_lima/_config")))
 ; denyRead: ~/.lima/_config
 (deny file-read* (subpath (home-path "/.lima/_config")))
+; Obsidian のプラグインのコードと設定（認証情報がある）。場所を問わず、名前で拒否する。
+; denyRead: /**/.obsidian/plugins
+(deny file-read* (regex #"/\.obsidian/plugins(/|$)"))
 ; 以下は permissions.deny の Read(...) に相当する。
 (deny file-read*
   (regex #"/\.env[^/]*$")

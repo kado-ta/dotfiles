@@ -64,6 +64,10 @@ PLAYWRIGHT_DENY_READ = ["~/.crit"]
 PLAYWRIGHT_DENY_WRITE = ["~/.local/share/claude-mcp", "~/Library/Caches/playwright-mcp"]
 PLAYWRIGHT_OUTPUT_DIR = "${HOME}/Library/Caches/playwright-mcp"
 PLAYWRIGHT_HOOK_ERROR = "hooks.PreToolUse lacks hooks/guard-playwright-mcp.sh"
+OBSIDIAN_DENY_WRITE = ["/**/.obsidian", "~/Obsidian/*/.gitignore"]
+OBSIDIAN_DENY_READ = ["/**/.obsidian/plugins"]
+OBSIDIAN_DENY = ["Edit(//**/.obsidian/**)", "Read(//**/.obsidian/plugins/**)"]
+OBSIDIAN_ASK = ["Edit(~/Obsidian/*/.gitignore)"]
 PROJECT_ASK = [
     "Edit(/claude/**)",
     "Edit(/zsh/**)",
@@ -142,8 +146,8 @@ def settings():
     return {
         "permissions": {
             "allow": [f"Bash({c})" for c in WRAPPER_COMMANDS],
-            "deny": list(DENY_PUSH) + CRIT_DENY + LIMA_DENY + EDIT_DENY + MISE_EDIT_DENY + PLAYWRIGHT_DENY,
-            "ask": list(MISE_ASK) + EDIT_ASK + MISE_EDIT_ASK,
+            "deny": list(DENY_PUSH) + CRIT_DENY + LIMA_DENY + EDIT_DENY + MISE_EDIT_DENY + PLAYWRIGHT_DENY + OBSIDIAN_DENY,
+            "ask": list(MISE_ASK) + EDIT_ASK + MISE_EDIT_ASK + OBSIDIAN_ASK,
             "blockWritesOutsideWorkingDirectories": True,
             "additionalDirectories": ["~/.gstack/projects"],
         },
@@ -151,8 +155,8 @@ def settings():
             "excludedCommands": list(WRAPPER_COMMANDS),
             "filesystem": {
                 "allowWrite": ["~/.gstack/projects"],
-                "denyRead": CRIT_DENY_READ + LIMA_DENY_READ + PLAYWRIGHT_DENY_READ,
-                "denyWrite": list(MISE_DENY_WRITE) + PLAYWRIGHT_DENY_WRITE,
+                "denyRead": CRIT_DENY_READ + LIMA_DENY_READ + PLAYWRIGHT_DENY_READ + OBSIDIAN_DENY_READ,
+                "denyWrite": list(MISE_DENY_WRITE) + PLAYWRIGHT_DENY_WRITE + OBSIDIAN_DENY_WRITE,
             },
         },
         "hooks": {
@@ -886,6 +890,42 @@ class CheckRepoTests(unittest.TestCase):
         self.write_settings(data)
         self.assert_fails("FAIL edit-permissions", GUARD_ERROR)
 
+    def test_missing_obsidian_deny_write_fails(self):
+        # Obsidian のプラグインは、次に Obsidian が起動したとき sandbox の外で動く。Vault の .gitignore で .obsidian を
+        # 外すと、sandbox の外の obsidian-git がプラグインの設定をコミットし、git のオブジェクトから読める。
+        for path in OBSIDIAN_DENY_WRITE:
+            with self.subTest(path=path):
+                data = settings()
+                data["sandbox"]["filesystem"]["denyWrite"].remove(path)
+                self.write_settings(data)
+                self.assert_fails("FAIL obsidian-vault", f"sandbox.filesystem.denyWrite lacks {path}")
+
+    def test_missing_obsidian_deny_read_fails(self):
+        # プラグインの設定（Remotely Save の接続情報など）には認証情報がある。
+        for path in OBSIDIAN_DENY_READ:
+            with self.subTest(path=path):
+                data = settings()
+                data["sandbox"]["filesystem"]["denyRead"].remove(path)
+                self.write_settings(data)
+                self.assert_fails("FAIL obsidian-vault", f"sandbox.filesystem.denyRead lacks {path}")
+
+    def test_missing_obsidian_deny_fails(self):
+        # denyWrite・denyRead は Bash しか止めない。Edit・Read ツールは規則で止める。
+        for rule in OBSIDIAN_DENY:
+            with self.subTest(rule=rule):
+                data = settings()
+                data["permissions"]["deny"].remove(rule)
+                self.write_settings(data)
+                self.assert_fails("FAIL obsidian-vault", f"permissions.deny lacks {rule}")
+
+    def test_missing_obsidian_ask_fails(self):
+        for rule in OBSIDIAN_ASK:
+            with self.subTest(rule=rule):
+                data = settings()
+                data["permissions"]["ask"].remove(rule)
+                self.write_settings(data)
+                self.assert_fails("FAIL obsidian-vault", f"permissions.ask lacks {rule}")
+
     def playwright_group(self, data):
         return next(g for g in data["hooks"]["PreToolUse"] if g["matcher"] == "mcp__playwright__.*")
 
@@ -994,7 +1034,8 @@ class CheckRepoTests(unittest.TestCase):
         (self.root / "claude/mcp/playwright.json").unlink()
         data = settings()
         data["permissions"]["deny"] = [r for r in data["permissions"]["deny"] if r not in PLAYWRIGHT_DENY]
-        data["sandbox"]["filesystem"]["denyWrite"] = list(MISE_DENY_WRITE)
+        data["sandbox"]["filesystem"]["denyWrite"] = [p for p in data["sandbox"]["filesystem"]["denyWrite"]
+                                                      if p not in PLAYWRIGHT_DENY_WRITE]
         data["hooks"]["PreToolUse"].remove(self.playwright_group(data))
         self.write_settings(data)
         self.assert_passes()

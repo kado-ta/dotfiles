@@ -42,10 +42,10 @@
   (literal (param "SELF"))
   (literal (param "COPY")))
 ; Vault の中で読めるのは .md だけ（点検スクリプトが読むのはノートと、リンク先の .md と、タグの辞書の .md）。
-; ユーザー設定の Read の deny が名前で拒否する場所（secrets/・credentials/・.ssh/・.aws/・.env*・id_rsa*・id_ed25519*）は、.md でも読ませない。
+; ユーザー設定の Read の deny が名前で拒否する場所（secrets/・credentials/・.ssh/・.aws/・.obsidian/plugins/・.env*・id_rsa*・id_ed25519*）は、.md でも読ませない。
 (allow file-read-data
   (require-all
     (subpath (param "VAULT"))
     (regex #"\.md$")
-    (require-not (regex #"/(secrets|credentials|\.ssh|\.aws)/"))
+    (require-not (regex #"/(secrets|credentials|\.ssh|\.aws|\.obsidian/plugins)/"))
     (require-not (regex #"/(\.env|id_rsa|id_ed25519)[^/]*$"))))

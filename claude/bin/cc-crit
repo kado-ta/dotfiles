@@ -49,6 +49,7 @@ COVERED_DENY_READ = frozenset({
     "~/.colima/_lima/_config",
     "~/.lima/_config",
     "~/.crit",
+    "/**/.obsidian/plugins",
 })
 # Claude Code の sandbox から専用 HOME を読ませないための項目。crit 自身は読むので、profile では覆わない。
 OWN_DENY_READ = frozenset({"~/.cc-crit"})
