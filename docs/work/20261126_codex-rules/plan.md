@@ -216,9 +216,9 @@ AGENTS.md のリンクの直後、プラグインのインストールの前に�
 
 1. `dotfiles.rules` を一時ディレクトリ（`mktemp -d "${TMPDIR:-/tmp}/…"`）に `install -m 0600` で写し、以降の検査とコピーはその写しで行う。作業ツリーのファイルが途中で書き換えられても、検査していない中身を入れない。
 2. コメントを除いた中身に `"allow"`・`'allow'` があるか、`prefix_rule(` の数と `decision = "prompt"` / `"forbidden"` の数が合わなければ止める。「allow を書かない」を、文章ではなく仕組みで守る。`decision` の省略（allow になる）・改行を挟む形・変数や文字列の連結も、数が合わないので止まる。
-3. `codex execpolicy check --resolve-host-executables --rules <写し> -- git <status|diff|log|show>` で検査する。構文の誤りと、`match`・`not_match` の例の食い違いで失敗する。結果が `{"matchedRules":[]}` でなければ止める（`codex exec`・`codex review` は承認が `never` なので、当たる規則があるとレビューで拒否される）。
-4. `~/.codex/rules` の、拡張子が rules の通常のファイル（リンクと `dotfiles.rules` を除き、`.` で始まる名前も含む）を一時ディレクトリに写し、バイト順（`LC_ALL=C sort`）に全部を `--rules` に渡して検査する。Codex と同じ組み合わせと順にする（例の検証は、先に読んだファイルの `host_executable()` の影響を受ける）。1 つでも読めないと、`codex exec` と `codex review` が止まるため。
-5. 先頭が絶対パスの `allow` がほかのファイルにあれば、警告する（入れるのは止めない）。
+3. `codex execpolicy check --resolve-host-executables --rules <写し> -- <git|/usr/bin/git|/opt/homebrew/bin/git> <status|diff|log|show>` で検査する。構文の誤りと、`match`・`not_match` の例の食い違いで失敗する。結果が `{"matchedRules":[]}` でなければ止める（`codex exec`・`codex review` は承認が `never` なので、当たる規則があるとレビューで拒否される）。
+4. `~/.codex/rules` の、拡張子が rules の通常のファイル（リンクと `dotfiles.rules` を除き、`.` で始まる名前も含む）を一時ディレクトリに写し（`~/.codex/rules` 自体がリンクならたどる。写せなければ止まる）、バイト順（`LC_ALL=C sort`）に全部を `--rules` に渡して検査する。Codex と同じ組み合わせと順にする（例の検証は、先に読んだファイルの `host_executable()` の影響を受ける）。1 つでも読めないと、`codex exec` と `codex review` が止まるため。
+5. 先頭が絶対パスの `allow` がほかのファイルにあれば、警告する（入れるのは止めない）。TUI が書く 1 行の形だけを見る。
 6. 今入っているものとの差分を表示し、`~/.codex/rules/` がなければ作り、`install -m 0644` で写しをコピーする。
 
 エラーのメッセージは、setup.sh のほかのメッセージに合わせて英語にし、標準エラーに出す。
@@ -305,6 +305,8 @@ AGENTS.md のリンクの直後、プラグインのインストールの前に�
 | 差分は表示するだけで止めない。一時の写しは Codex の sandbox から書ける | 文書を直した。HEAD と比べる案は採らない |
 | `codex exec` では、sandbox の設定に関係なく checkout も拒否される | 文書に書いた |
 
+完了条件 3 の `codex review`（Codex のレビューの 1 回目）の指摘 6 件の採否は、[test-report.md](test-report.md#codex-review) にある。`~/.codex/rules` 自体のリンク、写せないファイル、絶対パスの git での読み取りの検査、トラブルシューティングのコマンドを直した。`CODEX_HOME` と複数行の allow の警告は、文書に書くだけにした。
+
 <a name="out-of-scope"></a>
 
 ## 対象外と残るリスク
@@ -317,6 +319,8 @@ AGENTS.md のリンクの直後、プラグインのインストールの前に�
 - **git の読み取りの検査**: 引数のない `git status`・`diff`・`log`・`show` だけを照らす。`[GIT, "log", "-p"]` のような長い接頭辞の規則は通り、`codex exec`・`codex review` で `git log -p` が拒否される。
 - **一時の写し**: `$TMPDIR` の下に置く。Codex の workspace-write の sandbox は `$TMPDIR` に書けるので、同時に動く Codex からは守れない。差分は表示するだけで、止める手段はない（setup.sh で git を動かして HEAD と比べる案は、Claude の sandbox から書ける `.git/config` を sandbox の外で読むので採らない）。
 - **`git checkout` の確認**: `codex exec` は承認が `never` なので、sandbox の設定（`danger-full-access` を含む）に関係なく、checkout は拒否される。
+- **`CODEX_HOME`**: setup.sh は `~/.codex` 固定で入れる（`AGENTS.md` のリンクと同じ）。`CODEX_HOME` を変えると、規則は読み込まれない。
+- **絶対パスの allow の警告**: TUI が書く 1 行の形だけを見る。手で複数行に書いた規則は警告しない。
 - **規則のファイルの書き換え**: Claude Code からは、`codex/` への書き込みは確認が要る（`.claude/settings.json`）。しかし Codex を `~/dotfiles` で動かすと、`codex/rules/` も `codex/setup.sh` も承認なしに書き換えられる（sandbox が守るのは直下の `.codex` などだけ）。setup.sh は作業ツリーのファイルを入れるので、表示する差分を人が確かめる。setup.sh 自体が書き換えられると、検査も外せる。
 - **絶対パスの規則**: 先頭の候補にない綴りでは、絶対パスの `allow` があると規則が当たらない。この Mac には、候補のほかに `/opt/homebrew/opt/git/bin/git`・`/opt/homebrew/Cellar/git/<版>/bin/git`・`/Library/Developer/CommandLineTools/usr/bin/git`・`/opt/homebrew/opt/gh/bin/gh` などもある（再レビューで確かめた）。候補を並べる方法では閉じられない。setup.sh は警告するだけで、入れた後に TUI で足された `allow` には、次に setup.sh を実行するまで気づけない。
 - **大文字小文字**: `GIT push`・`/usr/bin/GIT push` はどの規則にも当たらない（APFS では実行できる）。prefix_rule には `canonical_matching` という項目があるが、公式ドキュメントにないので使わない（なくなると読み込みが失敗し、`codex exec`・`codex review` が止まる）。

@@ -15,6 +15,7 @@ created: 2026-11-26
 - [完了条件 3: Codex の動き](#codex)
 - [完了条件 4: リポジトリの規約](#repo-checks)
 - [レビュー](#review)
+- [Codex のレビュー](#codex-review)
 
 <a name="environment"></a>
 
@@ -164,7 +165,7 @@ created: 2026-11-26
 
 worktree ではない一時ディレクトリ（`$TMPDIR` の下）に `codex/` を写し、偽の HOME で `./codex/setup.sh` を実行した（shebang の `-e` が効く形）。プラグインと Understand Anything は、偽の HOME に目印を置いて飛ばした。gstack の手順は偽の HOME にないので、規則の後のそこで止まる（終了 1）。sandbox の中では macOS の mktemp の既定の場所に書けないので、`TMPDIR` を環境変数で渡した。
 
-結果: 15 通り・76 項目がすべて OK（[レビュー](#review) の 2 回目の修正の後の setup.sh で実行）。
+結果: 18 通り・88 項目がすべて OK（[Codex のレビュー](#codex-review) の修正の後の setup.sh で実行）。
 
 | 場合 | 確かめたこと | 結果 |
 | --- | --- | --- |
@@ -183,6 +184,9 @@ worktree ではない一時ディレクトリ（`$TMPDIR` の下）に `codex/` 
 | M. `.` で始まる名前の壊れた規則（`.local.rules`。Codex は読む） | 終了 1 / `cannot be loaded together` / 入れない / 進まない | OK |
 | N. 読み取り専用（0444）の `default.rules` | A の前半と同じ（一時の写しの後片付けで止まらない） | OK |
 | O. バイト順で先の `B.rules` の `host_executable()` で、`a.rules` の `match` の例が外れる | 終了 1 / `cannot be loaded together` / 入れない / 進まない | OK |
+| P. `~/.codex/rules` 自体が、壊れた規則を含むディレクトリへのリンク | 終了 1 / `cannot be loaded together` / 入れない / 進まない | OK |
+| Q. 既存の規則が読み取れない（権限 000） | 終了 1 / `install:` の失敗 / 入れない / 進まない | OK |
+| R. `/usr/bin/git diff` にだけ当たる規則 | 終了 1 / ``matches `/usr/bin/git diff` `` / 入れない / 進まない | OK |
 
 経緯:
 
@@ -195,7 +199,13 @@ worktree ではない一時ディレクトリ（`$TMPDIR` の下）に `codex/` 
 
 ## 完了条件 3: Codex の動き
 
-（ユーザーが通常のターミナルで実行した後に記録する）
+ユーザーが通常のターミナルで、worktree の `codex/rules/dotfiles.rules` を `~/.codex/rules/dotfiles.rules` に入れた（setup.sh は worktree の中では止まるので、検査とコピーだけを手で行った。SHA-256 `4e74fccb…bfb91` で、コミット 32870c8 の中身と同じ）。`~/.codex/rules` には、ほかのファイルはない。結果は、SKILL_ROUTING の方法で `~/.codex/sessions` の最終メッセージから読んだ。
+
+| 確認 | コマンド | 結果 |
+| --- | --- | --- |
+| `codex exec` が動き、規則が効く | `codex exec - -s read-only -c skills.include_instructions=false < tmp/codex-exec-check.md`（`git status --short` と `git clean -n` を順に実行させる） | `Error loading rules:` で止まらずに動いた。`git status --short` は終了 0。`git clean -n` は `approval required by policy, but AskForApproval is set to Never` で拒否された |
+| `codex review` が動く | `codex review --base main -c 'sandbox_mode="read-only"' -c skills.include_instructions=false` | 最後まで動き、指摘 6 件を返した（[Codex のレビュー](#codex-review)） |
+| TUI で確認が出て、「今後は聞かない」が出ない | 一時の git リポジトリで `codex` を起動し、`git clean -n` を頼む | 確認が出た。選択肢は「Yes, proceed」と「No, and tell Codex what to do differently」の 2 つだけで、接頭辞で許可する選択肢も、セッションの中だけ許可する選択肢も出なかった（ユーザーの報告） |
 
 <a name="repo-checks"></a>
 
@@ -246,3 +256,22 @@ README（ルートと `codex/`）・plan・この文書の内部リンクの参�
 13e6195 から作業ツリーまでの修正を、Claude の adversarial のレビューで見直した。専門家と Red Team は、もう一度は動かしていない（費用に見合わないと判断した。ブランチ全体の独立した見直しは、完了条件 3 の `codex review` で行う）。指摘 9 件と対応は [plan.md](plan.md#review-changes) の 2 つ目の表にある。コードを直したのは、組み合わせの検査の並びと `.` で始まる名前（完了条件 2 の M・O）と、一時の写しの権限と trap（N）。ほかは文書を直した。`canonical_matching` は公式ドキュメントにないので使わない。
 
 全体を見直す 3 回目は行っていないので、`/review` としては収束していない（修正の回数は 2）。
+
+<a name="codex-review"></a>
+
+## Codex のレビュー
+
+### 1 回目（2026-11-26、32870c8）
+
+完了条件 3 の `codex review --base main -c 'sandbox_mode="read-only"' -c skills.include_instructions=false` を、このタスクの Codex のレビューの 1 回目とした（上限は 5 回）。`--base main` は、HEAD と main の merge-base（9b81ce7）からの差分を見る（`codex-rs/prompts/src/review_request.rs` L21・L62-68）ので、ローカルの main が先に進んでいても、このブランチの変更だけが対象になる。結果は SKILL_ROUTING の方法で、最終メッセージ（`last_agent_message`）から読んだ。
+
+Codex の総評は "patch is incorrect"（confidence 0.98）。指摘と採否:
+
+| # | 指摘（優先度） | 採否 | 理由と対応 |
+| --- | --- | --- | --- |
+| 1 | `CODEX_HOME` を変えていると、規則が使われる場所に入らない（P2） | 文書だけ | `AGENTS.md` のリンクも `~/.codex` 固定で、README に書いてある前からの決まり。ユーザーは `CODEX_HOME` を使っていない。README のトラブルシューティングに、規則も同じだと書いた |
+| 2 | `~/.codex/rules` 自体がリンクだと、`find` が中を見ない（P2） | 採用 | Codex はディレクトリのリンクを読む（[plan の実測](plan.md#spec-measured)）。`find -H` にした（完了条件 2 の P） |
+| 3 | 既存の規則を写すのに失敗しても検査が続く（P2） | 採用 | `find -exec … \;` は子の失敗を返さない。1 つずつ `install` し、`-e` で止まるようにした（Q） |
+| 4 | 読み取りの検査が、絶対パスの git を見ない（P2） | 採用 | `git`・`/usr/bin/git`・`/opt/homebrew/bin/git` のそれぞれで照らすようにした（R） |
+| 5 | 複数行で書いた絶対パスの allow を警告しない（P2） | 文書だけ | TUI が書くのは 1 行の形（`execpolicy/src/amend.rs` L78-79）。複数行を見るには規則の解釈が要る。警告は 1 行の形だけを見る、と setup.sh のコメントと README に書いた |
+| 6 | トラブルシューティングで、Codex と同じ対象と順でまとめて検査する（P3） | 採用 | まとめて検査するコマンドを先に置き、1 つずつの検査は原因を絞る手順にした。偽の HOME の zsh で、正しい規則では `OK`、壊れた `.local.rules` を足すと失敗と `NG:` が出ることを確かめた |
