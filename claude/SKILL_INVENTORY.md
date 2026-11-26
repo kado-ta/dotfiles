@@ -2,7 +2,7 @@
 
 入っているプラグイン・スキル・エージェント・hooks・MCP の一覧と、その状態・制約を書く。スキルの選び方の規則は [rules/SKILL_ROUTING.md](rules/SKILL_ROUTING.md)（毎回読み込まれる）、タスク別の早見表は [SKILL_CHEATSHEET.md](SKILL_CHEATSHEET.md) にある。重複の裁定の根拠は [作業文書](../docs/work/20261116_skill-role-division/research-routing.md) にある。
 
-- 時点: 2026-11-16。2026-11-23 に gstack 1.102.2.0 と pstack 0.15.46 への更新、個人スキル `/socratic-tutor`・`modern-web-guidance`・`chrome-extensions` の追加、gstack 1.103.0.0 への更新（`verify` を `build-check` に改名）を反映した。2026-11-24 に pstack 0.15.47 への更新（`reframe` の追加）を反映した。2026-11-25 に gstack 1.103.1.0・pstack 0.15.48・crit 1.8.18 への更新（スキルの増減なし）を反映した。2026-11-26 に個人スキル `/pm-assist` の追加を反映した。Claude Code の版は 2.1.330（2026-11-23 に確認）。各スキルの SKILL.md・設定・hooks の実物を読んで書いた。
+- 時点: 2026-11-16。2026-11-23 に gstack 1.102.2.0 と pstack 0.15.46 への更新、個人スキル `/socratic-tutor`・`modern-web-guidance`・`chrome-extensions` の追加、gstack 1.103.0.0 への更新（`verify` を `build-check` に改名）を反映した。2026-11-24 に pstack 0.15.47 への更新（`reframe` の追加）を反映した。2026-11-25 に gstack 1.103.1.0・pstack 0.15.48・crit 1.8.18 への更新（スキルの増減なし）を反映した。2026-11-26 に個人スキル `/pm-assist` の追加と、gstack 1.103.3.0 への更新（スキルの増減なし）を反映した。Claude Code の版は 2.1.330（2026-11-23 に確認）。各スキルの SKILL.md・設定・hooks の実物を読んで書いた。
 - この文書は `~/.claude` にリンクされない。Claude のコンテキストには載らない。
 - プラグインやスキルを更新したら、[更新したときの見直し](#upgrade)に従って直す。
 
@@ -29,7 +29,7 @@
 | 提供元 | 版 | 入れ方・スコープ | スキル | エージェント | hooks | 更新 |
 | --- | --- | --- | --- | --- | --- | --- |
 | superpowers | 7.0.2 | プラグイン（claude-plugins-official）、user | 15 | 0 | SessionStart | `/plugin` |
-| gstack | 1.103.1.0 | `git clone` で `~/.claude/skills/gstack`。プラグインではないので、名前に接頭辞が付かない | 64（有効 25、明示 8、無効 31） | 0 | スキルの frontmatter だけ | `update-skills.sh` か zsh の `gstack-upgrade`（sandbox の外） |
+| gstack | 1.103.3.0 | `git clone` で `~/.claude/skills/gstack`。プラグインではないので、名前に接頭辞が付かない | 64（有効 25、明示 8、無効 31） | 0 | スキルの frontmatter だけ | `update-skills.sh` か zsh の `gstack-upgrade`（sandbox の外） |
 | pstack | 0.15.48 | プラグイン（cursor-plugins）、user | 59 | 2（deny） | なし | `/plugin`（自動更新 off） |
 | understand-anything | 2.9.8 | プラグイン、user | 9 | 11 | SessionStart、PostToolUse | `/plugin`（自動更新 on） |
 | crit | 1.8.18 | プラグイン、user。CLI は 0.24.0 | 3 | 0 | PermissionRequest | `/plugin` と Homebrew |
@@ -87,7 +87,7 @@
 | `cso` | セキュリティ監査。範囲（`--infra`・`--code`・`--supply-chain`・`--owasp` など）と `--diff` を選べる | 自動 | 制限 | 規則でユーザーが指定したときだけにしている。sandbox では静的な監査だけで、`.env.example` などを追跡しているリポジトリでは失敗する（[`/cso` を sandbox で使う](#cso-sandbox)）。ソースはすべてランチャー経由で読む |
 | `qa` | サイト・API・CLI を試し、見つけたバグを直して確かめる | 自動 | 有効 | 修正ごとに commit する（作業ツリーが汚れていれば commit か stash を尋ねる）。ブラウザは Aside か gstack のヘッドレスブラウザ。後者は localhost で待ち受けるので sandbox では動かない |
 | `qa-only` | `qa` の報告だけ | 自動 | 有効 | 直さない、commit しない。ブラウザの制約は `qa` と同じ |
-| `browse` | 1 回だけのブラウザ作業（開く、操作、スクリーンショット、console） | 自動 | 有効 | ブラウザの制約は `qa` と同じ。Aside が sandbox で動くかは未確認。Claude が直接ブラウザを操作するときは Playwright MCP を使う（CLAUDE.md の Tools 節）ので、gstack のスキルの中で使う |
+| `browse` | 1 回だけのブラウザ作業（開く、操作、スクリーンショット、console） | 自動 | 有効 | ブラウザの制約は `qa` と同じ。Aside が sandbox で動くかは未確認。1.103.3.0 から、Aside で保存するファイル（スクリーンショット・PDF）は、`bin/gstack-aside-repl`（bun）がスクリプトの標準出力から取り出して `--out` の場所（`browse` の既定はリポジトリの `.gstack/browse-reports/`）に書く。Aside がスクリプトの終わりに作業フォルダを消すため。`qa`・`design-review`・`canary` なども同じ経路を使う（保存先はスキルごとに違う）。Claude が直接ブラウザを操作するときは Playwright MCP を使う（CLAUDE.md の Tools 節）ので、gstack のスキルの中で使う |
 | `benchmark` | ページの性能を測り、ベースラインと比べる | 自動 | 有効 | ブラウザが必要 |
 | `canary` | デプロイ後にページを定期的に確かめる | 自動 | 有効 | ブラウザが必要。長く待つ |
 | `office-hours` | 対話で「何を作るか」を詰め、設計文書を作る | 自動 | 有効 | 設計文書だけを書く。既定の保存先は `docs/designs/` と `~/.gstack/projects/`。DOCUMENTS.md が優先する。2 つ目の意見とデザイン案の Codex の段は、`codex_reviews=disabled` で尋ねずに飛ばす |
