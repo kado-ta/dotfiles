@@ -48,7 +48,7 @@
 | `/pstack:blast-radius` | 高リスクの差分で、差分の外への影響を確かめたいとき |
 | `/pstack:interrogate` | `/review` の後に、実行で確かめられる不変条件が残るとき |
 | 通常ターミナルで `cd <repo> && codex review --base <base> -c 'sandbox_mode="read-only"' -c skills.include_instructions=false` | 複雑か高リスクの変更が完了する前（Bash からは実行しない。`!` では失敗することがある） |
-| 通常ターミナルで `cd <repo> && codex exec - -s read-only -c skills.include_instructions=false < <プロンプトのファイル>`（challenge） | セキュリティの境界か設計判断を含む変更で、上の `codex review` に加えて 1 回（5 回の上限に数える）。プロンプトは Claude が書く。攻撃者として迂回を探せという書き方は OpenAI 側の判定で拒否されることがあるので、変更前と比べた後退や、壊れる入力を具体的に挙げるよう頼む。作業ディレクトリの中の git 管理外の場所（`git check-ignore` で確かめる）に置いて絶対パスで渡し、全文をチャットにも示す |
+| 通常ターミナルで `cd <repo> && codex exec - -s read-only -c skills.include_instructions=false < <プロンプトのファイル>`（challenge） | セキュリティの境界か設計判断を含む変更で、上の `codex review` に加えて 1 回（5 回の上限に数える）。プロンプトは Claude が書く。攻撃者として迂回を探せという書き方は OpenAI 側の判定で拒否されることがあるので、変更前と比べた後退や、壊れる入力を具体的に挙げるよう頼む。重大なものだけ、などと絞らずに全件を挙げてもらう。作業ディレクトリの中の git 管理外の場所（`git check-ignore` で確かめる）に置いて絶対パスで渡し、全文をチャットにも示す |
 | `/careful`・`/freeze <dir>` | 本番に近い環境を調べる前（危険なコマンドの警告と、編集範囲の制限） |
 
 ## Exit criteria
