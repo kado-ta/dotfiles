@@ -28,7 +28,7 @@ created: 2026-11-27
 | --- | --- | --- |
 | P2: xlide が実際に使う uvx と Python（mise が入れたもの）も書き込み禁止にする | 不採用（設定は変えない）。文書は直す | 事実は正しい。uvx は `~/.local/share/mise/installs/uv/` の下にあり、xlide の仮想環境の `pyvenv.cfg` の `home` は mise の Python を指す（2026-11-27 に確かめた）。ただし、`~/.local/share/mise` を守らないことは D5 で決めて受け入れたリスクで、Playwright MCP の node と同じ。node・Python は MCP 専用ではなく、`~` で起動したセッションはほかにも sandbox の外で動く場所に書けるので、リポジトリのルートで起動し直す規則を主な守りとする。README の「uv のキャッシュと Python は、上の設定で書かせない」は誤りなので、守るものと守らないものを分けて書き直した（README と CLAUDE_CONFIG.md） |
 | P2: ブックを移す前に、移行先にも拒否ルールを掛ける | 採用 | README の「受取用フォルダを変える」を、新旧の両方を守る設定をマージ → 各 Mac で反映を確かめてからブックを移す → 古いフォルダの項目を外す、の順に直した |
-| P2: プラグインを入れていない Mac で、skills-check が差分を出す | 一部採用（文書だけ） | スナップショットから、プラグインのない状態を作って確かめた。`plugin removed: workbook-intake@workbook-intake` と `not installed but in SKILL_INVENTORY.md: workbook-intake` の 2 行が出る（この Mac では差分なし）。local スコープの salesforce-development も同じ扱いで、この PR より前からの性質。`skills-check.py` を直すと両方に効くので、この PR では変えない。README と SKILL_INVENTORY.md に、この 2 行は想定どおりで、項目を消さないことを書いた |
+| P2: プラグインを入れていない Mac で、skills-check が差分を出す | 一部採用（文書だけ） | スナップショットから、プラグインのない状態を作って確かめた。`plugin removed: workbook-intake@workbook-intake` と `not installed but in SKILL_INVENTORY.md: workbook-intake` の 2 行が出る（この Mac では差分なし）。local スコープの salesforce-development も同じ扱いで、この PR より前からの性質。`skills-check.py` を直すと両方に効くので、この PR では変えない。README と SKILL_INVENTORY.md に、この 2 行は想定どおりで、項目を消さないことを書いた。`skills-check.py` の直しは Linear の KAD-37 に記録した（2026-11-27 の人間の判断） |
 | P3: 受取用フォルダを変える手順に、`test-check-repo.py` の `WORKBOOK_DIR` を足す | 採用 | 2 番目の指摘の直しと合わせて、手順に足した |
 
 <a name="checks"></a>
