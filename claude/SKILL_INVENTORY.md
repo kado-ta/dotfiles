@@ -39,7 +39,7 @@
 | dotfiles の project スキル | — | dotfiles の `.claude/skills/`。dotfiles で起動したセッションだけで使える | 1 | 0 | なし | dotfiles |
 | 組み込み・claude.ai | — | Claude Code に同梱、または claude.ai のアカウントから提供 | 下の表 | 7 | — | Claude Code の更新 |
 | salesforce-development | 2.5.0 | プラグイン、別リポジトリの local スコープ。このリポジトリでは無効 | — | — | — | — |
-| workbook-intake | 0.1.1 | プラグイン（workbook-intake）、別リポジトリの local スコープ。このリポジトリでは無効。マーケットプレイスは `settings.json` でコミットの SHA に固定 | 1 | 1 | PreToolUse（xlide）、PostToolUse（AskUserQuestion） | [README の手順](README.md#workbook-intake-update)（プラグインは `update-skills.sh` の対象外） |
+| workbook-intake | 0.1.1 | プラグイン（workbook-intake）、別リポジトリの local スコープ。このリポジトリでは無効。マーケットプレイスは `settings.json` でコミットの SHA に固定。入れていない Mac で skills-check が出す plugin removed と not installed は想定どおりで、この行とスナップショットの項目を消さない | 1 | 1 | PreToolUse（xlide）、PostToolUse（AskUserQuestion） | [README の手順](README.md#workbook-intake-update)（プラグインは `update-skills.sh` の対象外） |
 
 - プラグインも `claude/scripts/update-skills.sh` でまとめて更新できる（user スコープのもの。ID が `@builtin` で終わる、Claude Code に同梱されたプラグインは、本体と一緒に更新されるので除く。crit は CLI も）。表の「更新」は、個別に更新するときの方法。手順は[更新したときの見直し](#upgrade)にある。
 - superpowers・claude-code-setup・ruby-lsp・understand-anything には、dotfiles を projectPath とする project スコープの重複登録があった（`installed_plugins.json`）。2026-11-16 に `claude plugin uninstall <名前> --scope project --keep-data` で消した。登録日の 2026-10-05 は `claude/` が `.claude/` という名前で、ユーザー設定がプロジェクト設定としても読み込まれていたためと推測する。`claude plugin list` に `Scope: project` が再び出たら、同じ手順で消す。

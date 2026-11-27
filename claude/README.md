@@ -262,10 +262,11 @@ headless のブラウザを止めるサイトもある（login.salesforce.com �
 
 マーケットプレイスの宣言があるあいだは、`.github/scripts/check-repo.py` の `workbook-intake` が、これらの項目がそろっていること（`env` がダミーであることと、SHA の固定を含む）を確かめる。受取用フォルダのパスは、検査の `WORKBOOK_DIR` にも書いてある。
 
-プラグインを使わない Mac でも、次の 2 つは起こる。
+プラグインを使わない Mac でも、次の 3 つは起こる。
 
 - セッションの開始時に、Claude Code がマーケットプレイス（公開リポジトリ）を `~/.claude/plugins/marketplaces/` に clone する。プラグイン本体は、どこかで有効にしたときだけ取得される。
 - denyRead の項目が増えるので、cc-crit を入れ直すまで `/crit-review` が拒否される（[下記](#workbook-intake-all-macs)）。
+- `mise run claude:skills-check` が、`plugin removed: workbook-intake@workbook-intake` と `not installed but in SKILL_INVENTORY.md: workbook-intake` を出す。`claude/skills-snapshot.json` と `SKILL_INVENTORY.md` は、プラグインを入れた Mac の状態を記録しているため（local スコープの salesforce-development と同じ）。この 2 行を理由に、スナップショットや `SKILL_INVENTORY.md` からプラグインを消さない。
 
 <a name="workbook-intake-limits"></a>
 
@@ -274,7 +275,7 @@ headless のブラウザを止めるサイトもある（login.salesforce.com �
 上の設定が止めるのは、Claude の sandbox の中の Bash と、Read・Edit・Write ツールだけ。次は止めない。
 
 - MCP サーバー。sandbox の外で、ユーザーの権限で動くので、上の拒否は効かない。プラグインを有効にしていないプロジェクトの xlide は、ユーザー設定のダミーを root にするので受取用フォルダを指さない。ただし、ほかの方法でファイルを読むサーバーは止められない。プラグインを使うプロジェクトでは、そのプロジェクトの `.mcp.json` の xlide にも本物のフォルダが渡るので、[手順 4](#workbook-intake-install) で無効にする。プラグインを使わないプロジェクトの `env` に、本物のフォルダを書かない（そのプロジェクトの xlide が、フックの守り（入力の確認と検査）を通らずに読める）。
-- `~` や `~/Dev` で起動したセッション。sandbox から書ける範囲が広がり、受取用フォルダの親を動かして、規則のパスから外せる見込み（試していない）。uv のキャッシュと Python は、上の設定で書かせない。リポジトリのルートで起動し直す規則を主な守りとする。
+- `~` や `~/Dev` で起動したセッション。sandbox から書ける範囲が広がり、受取用フォルダの親を動かして、規則のパスから外せる見込み（試していない）。uv のキャッシュ（xlide のコード）と uv が入れる Python は、上の設定で書かせない。uvx と、xlide の仮想環境が使う mise の Python（どちらも `~/.local/share/mise` の下）は守らない（Playwright MCP の node と同じ）。リポジトリのルートで起動し直す規則を主な守りとする。
 - `~/Dev` が symlink の Mac。規則は `~/Dev/workbook_intake` というパスに当たるので、実体のパスでは外れうる。そうした Mac では使わない。
 
 <a name="workbook-intake-all-macs"></a>
@@ -343,9 +344,11 @@ headless のブラウザを止めるサイトもある（login.salesforce.com �
 
 ### 受取用フォルダを変える
 
-先に、使っているすべての Mac で、古いフォルダのブックを新しいフォルダに移す。設定を変えると、古いフォルダは全 Mac で同時に Claude から読め、書けるようになるため。
+新旧どちらのフォルダも、ブックがあるあいだは守られているように、次の順で行う。`settings.json` の `env` はダミーのまま変えない。
 
-使っているプロジェクトの `.claude/settings.local.json` の `env.WORKBOOK_INTAKE_DIR`、`settings.json` の denyRead・denyWrite と `permissions.deny` の `Read(...)`・`Edit(...)`、`check-repo.py` の `WORKBOOK_DIR` を、すべて同じフォルダに変える。`settings.json` の `env` はダミーのまま変えない。denyRead が変わるので、cc-crit の `COVERED_DENY_READ` と `cc-crit.sb`（規則と `; denyRead:` の印）、`hooks/tests/test-cc-crit.py`・`hooks/tests/test-cc-crit-profile.py` も直し、全 Mac で cc-crit を入れ直す。
+1. 作業ブランチで、新しいフォルダの項目を足し、PR でマージする。古いフォルダの項目は残す。足すのは、`settings.json` の denyRead・denyWrite と `permissions.deny` の `Read(...)`・`Edit(...)`、cc-crit の `COVERED_DENY_READ` と `cc-crit.sb`（規則と `; denyRead:` の印）、`hooks/tests/test-cc-crit.py`・`hooks/tests/test-cc-crit-profile.py`。`check-repo.py` と `.github/scripts/test-check-repo.py` の `WORKBOOK_DIR` は、新しいフォルダに変える。
+2. 使っているすべての Mac で、`git pull` の後に cc-crit を入れ直し、Claude Code を起動し直す。新しいフォルダを作り、Claude の Bash の `ls <新しいフォルダ>` が `Operation not permitted` になることを確かめてから、ブックを移し、使っているプロジェクトの `.claude/settings.local.json` の `env.WORKBOOK_INTAKE_DIR` を変える。先にブックを移すと、設定が届くまで、どのセッションの Claude からも新しいフォルダを読め、`~` や `~/Dev` で起動したセッションからは書ける。
+3. すべての Mac で古いフォルダが空になったら、作業ブランチで古いフォルダの項目を外し、PR でマージして、全 Mac で cc-crit を入れ直す。項目を外すと、古いフォルダは全 Mac で同時に Claude から読め、書けるようになる。
 
 <a name="workbook-intake-remove"></a>
 
