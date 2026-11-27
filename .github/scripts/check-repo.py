@@ -187,6 +187,7 @@ OBSIDIAN_ASK = ("Edit(~/Obsidian/*/.gitignore)",)
 # 起動し、uv のキャッシュと uv の Python のコードを sandbox の外で動かすので、そこにも書かせない（~ で起動したセッション
 # では sandbox から書ける場所になる）。マーケットプレイスは確かめたコミットに固定し、自動で更新しない。
 WORKBOOK_MARKETPLACE = "workbook-intake"
+WORKBOOK_REPO = "kado-ta/workbook-intake"
 WORKBOOK_ENV = "WORKBOOK_INTAKE_DIR"
 WORKBOOK_DIR = "~/Dev/workbook_intake"
 WORKBOOK_DUMMY = "/dev/null/workbook-intake-dummy"
@@ -624,16 +625,24 @@ def check_obsidian_vault(root):
 
 def check_workbook_intake(root):
     settings = load_settings(root)
-    marketplace = settings.get("extraKnownMarketplaces", {}).get(WORKBOOK_MARKETPLACE)
-    if marketplace is None:
+    markets = settings.get("extraKnownMarketplaces", {})
+    if WORKBOOK_MARKETPLACE not in markets:
         return []
     name = f"extraKnownMarketplaces.{WORKBOOK_MARKETPLACE}"
     required = f"(required while {name} exists)"
     errors = []
-    if not WORKBOOK_REF.fullmatch(str(marketplace.get("source", {}).get("ref", ""))):
+    # null の宣言も、消したのではなく壊れた宣言として扱い、守りの検査を続ける
+    marketplace = markets[WORKBOOK_MARKETPLACE] if isinstance(markets[WORKBOOK_MARKETPLACE], dict) else {}
+    source = marketplace.get("source") if isinstance(marketplace.get("source"), dict) else {}
+    if source.get("source") != "github" or source.get("repo") != WORKBOOK_REPO:
+        errors.append(f"{SETTINGS}: {name}.source must be the GitHub repository {WORKBOOK_REPO}")
+    if not (isinstance(source.get("ref"), str) and WORKBOOK_REF.fullmatch(source["ref"])):
         errors.append(f"{SETTINGS}: {name}.source.ref must be a 40-character commit SHA")
     if marketplace.get("autoUpdate") is not False:
         errors.append(f"{SETTINGS}: {name}.autoUpdate must be false")
+    errors += [f"{SETTINGS}: enabledPlugins must not enable {plugin} (enable it with --scope local in each project)"
+               for plugin, on in settings.get("enabledPlugins", {}).items()
+               if on and plugin.endswith(f"@{WORKBOOK_MARKETPLACE}")]
     if settings.get("env", {}).get(WORKBOOK_ENV) != WORKBOOK_DUMMY:
         errors.append(f"{SETTINGS}: env.{WORKBOOK_ENV} must be {WORKBOOK_DUMMY} "
                       f"(set {WORKBOOK_DIR} only in .claude/settings.local.json of projects that use the plugin)")

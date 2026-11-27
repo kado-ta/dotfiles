@@ -993,8 +993,8 @@ class CheckRepoTests(unittest.TestCase):
                 self.assert_fails("FAIL workbook-intake", f"env.WORKBOOK_INTAKE_DIR must be {WORKBOOK_DUMMY}")
 
     def test_unpinned_workbook_intake_marketplace_fails(self):
-        # ブランチやタグの ref は、取得のたびに新しいコミットへ動く。
-        for ref in ("main", "v0.1.1", WORKBOOK_SHA[:7], None):
+        # ブランチやタグの ref は、取得のたびに新しいコミットへ動く。40 桁の数は SHA の文字列ではない。
+        for ref in ("main", "v0.1.1", WORKBOOK_SHA[:7], None, int("1" * 40)):
             with self.subTest(ref=ref):
                 data = workbook_settings()
                 source = data["extraKnownMarketplaces"]["workbook-intake"]["source"]
@@ -1016,6 +1016,30 @@ class CheckRepoTests(unittest.TestCase):
                     marketplace["autoUpdate"] = value
                 self.write_settings(data)
                 self.assert_fails("FAIL workbook-intake", "autoUpdate must be false")
+
+    def test_workbook_intake_other_source_fails(self):
+        # SHA だけでなく、取得元のリポジトリも固定する。null の宣言は、消したのと違って守りの検査を飛ばさない。
+        sources = (None, {"source": "github", "repo": "example/workbook-intake", "ref": WORKBOOK_SHA},
+                   {"source": "github", "ref": WORKBOOK_SHA},
+                   {"source": "git", "url": "https://github.com/kado-ta/workbook-intake.git", "ref": WORKBOOK_SHA})
+        for source in sources:
+            with self.subTest(source=source):
+                data = workbook_settings()
+                data["extraKnownMarketplaces"]["workbook-intake"]["source"] = source
+                self.write_settings(data)
+                self.assert_fails("FAIL workbook-intake", "source must be the GitHub repository kado-ta/workbook-intake")
+        data = workbook_settings()
+        data["extraKnownMarketplaces"]["workbook-intake"] = None
+        self.write_settings(data)
+        self.assert_fails("FAIL workbook-intake", "source must be the GitHub repository kado-ta/workbook-intake",
+                          "autoUpdate must be false")
+
+    def test_workbook_intake_enabled_for_all_projects_fails(self):
+        # プラグインは、使うプロジェクトでだけ local スコープで有効にする。ユーザー設定で有効にすると全プロジェクトに効く。
+        data = workbook_settings()
+        data["enabledPlugins"] = {"workbook-intake@workbook-intake": True}
+        self.write_settings(data)
+        self.assert_fails("FAIL workbook-intake", "enabledPlugins must not enable workbook-intake@workbook-intake")
 
     def playwright_group(self, data):
         return next(g for g in data["hooks"]["PreToolUse"] if g["matcher"] == "mcp__playwright__.*")
