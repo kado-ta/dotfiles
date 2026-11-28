@@ -55,7 +55,7 @@ cask "figma"
 cask "font-hackgen"       # Starship が必要とするフォント
 cask "font-hackgen-nerd"  # Starship が必要とするフォント
 cask "font-fira-code"     # コーディング見やすいかわいいフォント
-cask "font-plemol-jp"     # 太字は Fira Code と PlemolJP Console の SemiBold で表示する
+cask "font-plemol-jp"     # 太字は Fira Code と PlemolJP Console の Medium で表示する
 cask "ghostty"
 cask "keepingyouawake"
 cask "obsidian"
