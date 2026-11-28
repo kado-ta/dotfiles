@@ -168,7 +168,7 @@ PR #164 と、そのマージの後の main への push で確かめた（2026-1
 | C3: 判定のジョブそのものが失敗したときに、macOS のジョブが動く | 46143114040（pull_request） | `13c61c6`（一時的なコミット） | `Detect hook test changes` failure（4 秒。`hook_tests=false` を出してから `exit 1`）、`Hook regression tests` success（209 秒。skipped にならずに動いた）、`Repository checks` success（148 秒）。run 全体は failure |
 | C3 の打ち消し | 46143460698（pull_request） | `267b94c` | 3 つとも success（4 秒・164 秒・177 秒）。PR は `mergeStateStatus: CLEAN` になった |
 | C4（前半）: main への push で同じ判定にする | 46144146193（push） | `421ab39`（PR #164 のマージ） | `Detect hook test changes` success（5 秒）。ログは `EVENT_NAME: push`、`base: 9223cd7…`（マージの前の、最後に成功した main の push の run のコミット）で、警告はなかった。`ci.yaml` が変わったので `Hook regression tests` が動いて success（188 秒）。`Repository checks` success（153 秒） |
-| C1: 関係するファイルを変えない PR では、macOS のジョブが動かず、マージできる | この後片付けの PR（docs だけ） | — | この PR の CI で確かめ、下に追記する |
+| C1: 関係するファイルを変えない PR では、macOS のジョブが動かず、マージできる | 46145152402（pull_request、後片付けの PR #165） | `5b1535d` | `Detect hook test changes` success（8 秒）。ログは `HEAD_SHA: 5b1535d…`、`base: 421ab39…`（マージ先の main の先端）で、警告はなかった。`Hook regression tests` skipped（0 秒）、`Repository checks` success（172 秒）。PR は `mergeStateStatus: CLEAN` になり、skipped が必須のチェックを満たした |
 | C4（後半）: 関係するファイルを変えない main への push で、macOS のジョブが動かない | 後片付けの PR のマージの push | — | 作業が終わった後なので、この文書には書かない。Linear の KAD-32 に書く |
 
 - 判定のジョブのログは、run が終わる前は `gh run view --log` で読めない。終わったジョブのログは `gh api --allow-escape-sequences repos/kado-ta/dotfiles/actions/jobs/<ジョブの ID>/logs` で読んだ（転送先の blob のホストを、sandbox の `allowed_domains` に足した）。
