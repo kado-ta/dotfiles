@@ -128,7 +128,7 @@ bash claude/hooks/tests/test-check-vault-note.sh
 /usr/bin/python3 -B claude/hooks/tests/test-cc-safe-pr.py
 ```
 
-PR と main への push では、GitHub Actions が macOS の `/bin/bash` と `/usr/bin/python3` で同じテストを実行する。
+PR と main への push では、GitHub Actions が macOS の `/bin/bash` と `/usr/bin/python3` で同じテストを実行する。ただし、`.github/workflows/ci.yaml` の `changes` ジョブが挙げるパスのファイルが変わったときと、その判定に失敗したときだけ動く。PR の run を手で取り消すと、macOS のジョブが飛ばされて成功扱いになり、テストなしで必須のチェックがそろうことがあるので、取り消した PR は再実行してからマージする。
 
 <a name="vault-note-check"></a>
 
