@@ -8,8 +8,10 @@ on:
 permissions:
   contents: read
 
+# main への push は、コミットごとの group にして取り消し合わない。どの push の run も最後まで動かし、
+# hook-tests を壊した push を特定できるようにする。
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event_name == 'push' && github.sha || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -78,8 +80,83 @@ jobs:
       - name: zizmor
         run: zizmor --offline --format=github .
 
+  # macOS のジョブ（hook-tests）は、テストが読むファイルが変わったときだけ動かす。
+  changes:
+    name: Detect hook test changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # ジョブの permissions は、書かなかった権限を none にするので、contents も書く。
+    permissions:
+      contents: read
+      actions: read # 最後に成功した main の push の run を読む
+    outputs:
+      hook_tests: ${{ steps.diff.outputs.hook_tests }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          # 基点のコミットが、浅い取得の範囲の外にありうる。履歴は小さい（パックで約 500 KiB）。
+          fetch-depth: 0
+
+      # 対象のパスが基点と同じときだけ、hook-tests を飛ばす。
+      # hook-tests のテストが新しいファイルを読むようにしたら、ここのパスにも足す。チェックアウトの内容を
+      # 変えうる .gitattributes（対象のパスの上の階層のもの）も含める。
+      - name: Compare with the base
+        id: diff
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          # 判定できないときは、hook-tests を動かして、このジョブを成功で終える。失敗させると run が成功せず、
+          # push の基点（最後の成功）が進まないので、原因が続くと main が赤のまま抜け出せない。
+          run_hook_tests() {
+            echo "::warning::$1 hook-tests を動かす。"
+            echo "hook_tests=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          }
+          # 再実行は人が頼む確認なので、判定せずに動かす。判定し直すと、前の試行で動いて失敗した hook-tests を
+          # 飛ばし、run を緑にしうる。
+          if [ "${GITHUB_RUN_ATTEMPT:-1}" -gt 1 ]; then
+            echo "hook_tests=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          case "$EVENT_NAME" in
+            # テスト用のマージコミット（refs/pull/<番号>/merge）は、1 つ目の親が実際のマージ先、2 つ目の親が PR の先端。
+            # イベントの base.sha は 1 つ目の親とずれることがある。2 つ目の親を確かめずに HEAD^1 と比べると、
+            # checkout の ref を変えたときに、最後のコミットだけと比べてしまう。
+            pull_request)
+              { [ -n "$HEAD_SHA" ] && [ "$(git rev-parse -q --verify 'HEAD^2' || true)" = "$HEAD_SHA" ]; } \
+                || run_hook_tests "HEAD が PR のテスト用のマージコミットではない。"
+              base=$(git rev-parse 'HEAD^1') ;;
+            # before にすると、前の push の hook-tests が失敗・取り消し・未実行でも飛ばしてしまうので、
+            # 最後に成功した main の push の run のコミットと比べる。一覧は新しい順（2026-11-28 に API で確かめた）。
+            # 絞り込みが効かなかったとき（実行中のこの run が返るなど）に備えて、jq でも条件を確かめる。
+            push) base=$(gh api "repos/$REPO/actions/workflows/ci.yaml/runs?branch=main&event=push&status=success&per_page=1" \
+                    --jq '[.workflow_runs[] | select(.conclusion == "success" and .event == "push" and .head_branch == "main")][0].head_sha // empty') \
+                    || run_hook_tests "最後に成功した main の push の run を読めない。" ;;
+            *) echo "unexpected event: $EVENT_NAME" >&2; exit 1 ;;
+          esac
+          [ -n "$base" ] || run_hook_tests "比べる基点がない（成功した run がないなど）。"
+          echo "base: $base"
+          rc=0
+          # macOS のランナーは大文字・小文字を区別しないので、claude/Hooks/tests/test-x.sh などもテストの glob に入る。
+          git --icase-pathspecs diff --quiet "$base" HEAD -- \
+            claude/hooks claude/bin claude/scripts claude/mcp claude/settings.json .github/workflows/ci.yaml \
+            .gitattributes claude/.gitattributes || rc=$?
+          case "$rc" in
+            0) echo "hook_tests=false" >> "$GITHUB_OUTPUT" ;;
+            1) echo "hook_tests=true" >> "$GITHUB_OUTPUT" ;;
+            *) run_hook_tests "基点 $base と比べられない（git diff の終了コード $rc）。" ;;
+          esac
+
   hook-tests:
     name: Hook regression tests
+    needs: changes
+    # if で飛ばしたジョブは Success を報告し、必須のチェックを満たす。changes が成功して false を出したときだけ飛ばす。
+    # !cancelled() がないと、changes が失敗したときに飛ばされ、テストなしで必須のチェックが通る。
+    if: ${{ !cancelled() && !(needs.changes.result == 'success' && needs.changes.outputs.hook_tests == 'false') }}
     runs-on: macos-latest
     timeout-minutes: 10
     steps:
