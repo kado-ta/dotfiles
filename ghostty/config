@@ -7,11 +7,11 @@ font-family = HackGen Console NF
 font-size = 12
 font-feature = +calt
 font-feature = +liga
-# 太字は Fira Code と PlemolJP Console の SemiBold にする。HackGen には Regular と Bold しかなく、
+# 太字は Fira Code と PlemolJP Console の Medium にする。HackGen には Regular と Bold しかなく、
 # 日本語の Bold が潰れて読みにくいため。通常の文字は font-family のフォントのまま。
 font-family-bold = Fira Code
 font-family-bold = PlemolJP Console
-font-style-bold = SemiBold
+font-style-bold = Medium
 # 行間を広げる。セルの高さを 5% 増やし、文字はセルの上下中央に置かれる。
 adjust-cell-height = 5%
 
