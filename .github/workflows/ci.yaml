@@ -109,6 +109,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
         run: |
+          # 一時的（KAD-32 の C3）: このジョブが false を出してから失敗しても、hook-tests が動くかを確かめる。打ち消すコミットで戻す。
+          if [ -n "$EVENT_NAME" ]; then
+            echo "hook_tests=false" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
           # 判定できないときは、hook-tests を動かして、このジョブを成功で終える。失敗させると run が成功せず、
           # push の基点（最後の成功）が進まないので、原因が続くと main が赤のまま抜け出せない。
           run_hook_tests() {
