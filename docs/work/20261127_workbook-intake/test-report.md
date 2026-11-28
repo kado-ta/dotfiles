@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: done
 created: 2026-11-27
 ---
 
@@ -106,3 +106,20 @@ Codex の 2 回目（challenge）の指摘を直した後（2026-11-27）に実�
 | `shellcheck -S warning`（追跡しているシェルスクリプト）・`actionlint`・`zizmor --offline .` | 指摘なし |
 
 cc-crit の検査は、その前のコミット（505b6b7 まで）で実行した。`test-cc-crit.py` は OK。`test-cc-crit-profile.py` は、人間が sandbox の外で実行し、32 件 OK（スキップ 1）。Codex の 2 回の指摘の直しは、cc-crit には触れていない。
+
+<a name="post-merge"></a>
+
+## マージ後の確認
+
+2026-11-28 に、PR #161 のマージ後の main（`~/dotfiles`、`1dd22c4`）で確かめた。
+
+- cc-crit: 人間が通常のターミナルで、README の cc-crit の節の確認のコマンドを実行した。
+  - `cmp`: profile とラッパーの 2 つとも、インストールしたものはリポジトリのものと同じだった。
+  - `mise run crit:profile-test`: 32 件 OK（スキップ 1。`~/.lima/_config` がないため）。受取用フォルダの 2 件（`test_read_workbook_intake_denied`・`test_read_workbook_intake_file_denied`）も通った。環境は crit 0.24.0、git 2.56.1、macOS 26.7.1。
+  - このテストはリポジトリの profile を試す。インストールした profile は `cmp` で同じと確かめたので、同じ結果になる。
+- 受取用フォルダ: リポジトリのルートで起動したセッション（Claude Code 2.1.332）の sandbox から `ls ~/Dev/workbook_intake` を実行し、`Operation not permitted` になった。このフォルダは、人間がプラグイン用に作ったもので、ほかの用途には使っていない。
+
+この作業では、次は確かめていない。
+
+- ほかの Mac での更新と cc-crit の入れ直し、プラグインの導入。どれも README の手順で、Mac ごとに行う。問題が出たら、新しい作業にする。
+- プラグインを入れたプロジェクトでの、導入の手順 5 の確かめ。プラグインの経路は、マージ前に試験用のプロジェクトで確かめた（PR #161 の本文の「確かめたこと」）。プロジェクトの `settings.local.json` の `env` がユーザー設定より優先され、プラグインの xlide が `--root ~/Dev/workbook_intake` で動いた。この記録には、その時点で書いていなかった。
