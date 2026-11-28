@@ -2,7 +2,7 @@
 
 入っているプラグイン・スキル・エージェント・hooks・MCP の一覧と、その状態・制約を書く。スキルの選び方の規則は [rules/SKILL_ROUTING.md](rules/SKILL_ROUTING.md)（毎回読み込まれる）、タスク別の早見表は [SKILL_CHEATSHEET.md](SKILL_CHEATSHEET.md) にある。重複の裁定の根拠は [作業文書](../docs/work/20261116_skill-role-division/research-routing.md) にある。
 
-- 時点: 2026-11-16。2026-11-23 に gstack 1.102.2.0 と pstack 0.15.46 への更新、個人スキル `/socratic-tutor`・`modern-web-guidance`・`chrome-extensions` の追加、gstack 1.103.0.0 への更新（`verify` を `build-check` に改名）を反映した。2026-11-24 に pstack 0.15.47 への更新（`reframe` の追加）を反映した。2026-11-25 に gstack 1.103.1.0・pstack 0.15.48・crit 1.8.18 への更新（スキルの増減なし）を反映した。2026-11-26 に個人スキル `/pm-assist` の追加と、gstack 1.103.3.0 への更新（スキルの増減なし）を反映した。Claude Code の版は 2.1.330（2026-11-23 に確認）。各スキルの SKILL.md・設定・hooks の実物を読んで書いた。
+- 時点: 2026-11-16。2026-11-23 に gstack 1.102.2.0 と pstack 0.15.46 への更新、個人スキル `/socratic-tutor`・`modern-web-guidance`・`chrome-extensions` の追加、gstack 1.103.0.0 への更新（`verify` を `build-check` に改名）を反映した。2026-11-24 に pstack 0.15.47 への更新（`reframe` の追加）を反映した。2026-11-25 に gstack 1.103.1.0・pstack 0.15.48・crit 1.8.18 への更新（スキルの増減なし）を反映した。2026-11-26 に個人スキル `/pm-assist` の追加と、gstack 1.103.3.0 への更新（スキルの増減なし）を反映した。2026-11-27 に workbook-intake 0.1.1（別リポジトリの local スコープ）の追加を反映した。Claude Code の版は 2.1.330（2026-11-23 に確認）。各スキルの SKILL.md・設定・hooks の実物を読んで書いた。
 - この文書は `~/.claude` にリンクされない。Claude のコンテキストには載らない。
 - プラグインやスキルを更新したら、[更新したときの見直し](#upgrade)に従って直す。
 
@@ -39,6 +39,7 @@
 | dotfiles の project スキル | — | dotfiles の `.claude/skills/`。dotfiles で起動したセッションだけで使える | 1 | 0 | なし | dotfiles |
 | 組み込み・claude.ai | — | Claude Code に同梱、または claude.ai のアカウントから提供 | 下の表 | 7 | — | Claude Code の更新 |
 | salesforce-development | 2.5.0 | プラグイン、別リポジトリの local スコープ。このリポジトリでは無効 | — | — | — | — |
+| workbook-intake | 0.1.1 | プラグイン（workbook-intake）、別リポジトリの local スコープ。このリポジトリでは無効。マーケットプレイスは `settings.json` でコミットの SHA に固定。入れていない Mac で skills-check が出す plugin removed と not installed は想定どおりで、この行とスナップショットの項目を消さない | 1 | 1 | PreToolUse（xlide）、PostToolUse（AskUserQuestion） | [README の手順](README.md#workbook-intake-update)（プラグインは `update-skills.sh` の対象外） |
 
 - プラグインも `claude/scripts/update-skills.sh` でまとめて更新できる（user スコープのもの。ID が `@builtin` で終わる、Claude Code に同梱されたプラグインは、本体と一緒に更新されるので除く。crit は CLI も）。表の「更新」は、個別に更新するときの方法。手順は[更新したときの見直し](#upgrade)にある。
 - superpowers・claude-code-setup・ruby-lsp・understand-anything には、dotfiles を projectPath とする project スコープの重複登録があった（`installed_plugins.json`）。2026-11-16 に `claude plugin uninstall <名前> --scope project --keep-data` で消した。登録日の 2026-10-05 は `claude/` が `.claude/` という名前で、ユーザー設定がプロジェクト設定としても読み込まれていたためと推測する。`claude plugin list` に `Scope: project` が再び出たら、同じ手順で消す。
@@ -295,6 +296,7 @@ sandbox の外で `/cso` を実行すると、保存先に秘密ファイルの�
 ## MCP・コネクタ
 
 - MCP サーバーは `claude/mcp/*.json` の定義から user スコープに登録する（今は Playwright MCP だけ。[README](README.md#mcp)）。
+- プラグインが持ち込む MCP サーバーに、workbook-intake の xlide がある。別リポジトリの local スコープだけで有効で、このリポジトリでは無効。uvx で固定した版を PyPI から取得し、sandbox の外で動く（[README](README.md#workbook-intake-limits)）。
 - claude.ai のアカウントから、Claude Docs のコネクタが入る。easel（図表）は Claude Code の組み込みのプラグイン。
 
 <a name="overlaps"></a>

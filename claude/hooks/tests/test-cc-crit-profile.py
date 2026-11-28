@@ -283,6 +283,41 @@ class ProfileTests(unittest.TestCase):
             self.skipTest("~/.lima/_config does not exist")
         self.assertDenied(f"attempt(lambda: os.listdir({str(p)!r}))")
 
+    def test_read_workbook_intake_denied(self):
+        # workbook-intake の受取用フォルダ。プラグインを使う Mac にだけある。
+        # Claude の sandbox は大文字小文字だけ違う表記も拒否するので、crit もそれより多く読めないことを確かめる。
+        p = self.home_real / "Dev" / "workbook_intake"
+        if not p.is_dir():
+            self.skipTest("~/Dev/workbook_intake does not exist")
+        for path in (p, self.home_real / "dev" / "WORKBOOK_INTAKE"):
+            if path.is_dir():
+                with self.subTest(path=str(path)):
+                    self.assertDenied(f"attempt(lambda: os.listdir({str(path)!r}))")
+
+    def test_read_workbook_intake_file_denied(self):
+        # 規則がフォルダの中のファイルまで覆う（literal ではなく subpath）ことを、受取用フォルダのない Mac でも確かめる。
+        # HOME_REAL だけを仮のフォルダにする。隣のフォルダのファイルが読めることで、拒否がこの規則によることも確かめる。
+        fake_home = self.root / "fake-home"
+        book = fake_home / "Dev" / "workbook_intake" / "book.xlsx"
+        other = fake_home / "Dev" / "other" / "book.xlsx"
+        for path in (book, other):
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(b"PK\x03\x04")
+
+        def probe(path):
+            argv = [SANDBOX_EXEC, "-f", str(self.test_profile),
+                    "-D", f"HOME_REAL={fake_home}",
+                    "-D", f"CRIT_HOME={self.crit_home}",
+                    "-D", f"PRIVATE_TMP={self.private_tmp}",
+                    sys.executable, "-I", "-S", "-c", PROBE + f"attempt(lambda: open({str(path)!r}, 'rb').read())"]
+            cp = subprocess.run(argv, cwd=self.repo, env=self.env(), capture_output=True, text=True, timeout=30)
+            return cp.stdout.strip() + cp.stderr.strip()
+
+        out = probe(book)
+        self.assertTrue(out.startswith("DENIED"), out)
+        out = probe(other)
+        self.assertTrue(out.startswith("ALLOWED"), out)
+
     def test_read_real_crit_denied(self):
         # sandbox の外の crit（plan-hook）の状態。crit は使わない。
         p = self.home_real / ".crit"

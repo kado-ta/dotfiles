@@ -180,6 +180,19 @@ OBSIDIAN_DENY_WRITE = ("/**/.obsidian", "~/Obsidian/*/.gitignore")
 OBSIDIAN_DENY_READ = ("/**/.obsidian/plugins",)
 OBSIDIAN_DENY = ("Edit(//**/.obsidian/**)", "Read(//**/.obsidian/plugins/**)")
 OBSIDIAN_ASK = ("Edit(~/Obsidian/*/.gitignore)",)
+# workbook-intake プラグイン。受取用フォルダには外から受け取ったブックがあり、プラグインは Claude の Bash と Read ツールが
+# 読めないことを前提にする。検査の後の差し替えを防ぐため、書き込みも止める。拒否はユーザー設定で全プロジェクトに掛ける。
+# ユーザー設定の env は全プロジェクトの MCP の定義にも展開されるので、作れないダミーにし、本物のフォルダは使うプロジェクトの
+# .claude/settings.local.json でだけ指す（プロジェクトの env が優先されることは 2026-11-27 に確かめた）。xlide は uvx で
+# 起動し、uv のキャッシュと uv の Python のコードを sandbox の外で動かすので、そこにも書かせない（~ で起動したセッション
+# では sandbox から書ける場所になる）。マーケットプレイスは確かめたコミットに固定し、自動で更新しない。
+WORKBOOK_MARKETPLACE = "workbook-intake"
+WORKBOOK_REPO = "kado-ta/workbook-intake"
+WORKBOOK_ENV = "WORKBOOK_INTAKE_DIR"
+WORKBOOK_DIR = "~/Dev/workbook_intake"
+WORKBOOK_DUMMY = "/dev/null/workbook-intake-dummy"
+WORKBOOK_REF = re.compile(r"[0-9a-f]{40}")
+WORKBOOK_UV_DIRS = ("~/.cache/uv", "~/.local/share/uv")
 # 上流から取り込んだスキル。claude/scripts/update-modern-web-guidance.py が npm の配布物から書く。
 # SKILL.md が参照ファイルを名前で指すので、上流の名前のまま置き、markdown-names の対象から外す。
 VENDORED_SKILLS = ("claude/skills/modern-web-guidance/", "claude/skills/chrome-extensions/")
@@ -610,6 +623,40 @@ def check_obsidian_vault(root):
     return errors
 
 
+def check_workbook_intake(root):
+    settings = load_settings(root)
+    markets = settings.get("extraKnownMarketplaces", {})
+    if WORKBOOK_MARKETPLACE not in markets:
+        return []
+    name = f"extraKnownMarketplaces.{WORKBOOK_MARKETPLACE}"
+    required = f"(required while {name} exists)"
+    errors = []
+    # null の宣言も、消したのではなく壊れた宣言として扱い、守りの検査を続ける
+    marketplace = markets[WORKBOOK_MARKETPLACE] if isinstance(markets[WORKBOOK_MARKETPLACE], dict) else {}
+    source = marketplace.get("source") if isinstance(marketplace.get("source"), dict) else {}
+    if source.get("source") != "github" or source.get("repo") != WORKBOOK_REPO:
+        errors.append(f"{SETTINGS}: {name}.source must be the GitHub repository {WORKBOOK_REPO}")
+    if not (isinstance(source.get("ref"), str) and WORKBOOK_REF.fullmatch(source["ref"])):
+        errors.append(f"{SETTINGS}: {name}.source.ref must be a 40-character commit SHA")
+    if marketplace.get("autoUpdate") is not False:
+        errors.append(f"{SETTINGS}: {name}.autoUpdate must be false")
+    errors += [f"{SETTINGS}: enabledPlugins must not enable {plugin} (enable it with --scope local in each project)"
+               for plugin, on in settings.get("enabledPlugins", {}).items()
+               if on and plugin.endswith(f"@{WORKBOOK_MARKETPLACE}")]
+    if settings.get("env", {}).get(WORKBOOK_ENV) != WORKBOOK_DUMMY:
+        errors.append(f"{SETTINGS}: env.{WORKBOOK_ENV} must be {WORKBOOK_DUMMY} "
+                      f"(set {WORKBOOK_DIR} only in .claude/settings.local.json of projects that use the plugin)")
+    filesystem = settings.get("sandbox", {}).get("filesystem", {})
+    deny = set(settings.get("permissions", {}).get("deny", []))
+    errors += [f"{SETTINGS}: sandbox.filesystem.denyWrite lacks {path} {required}"
+               for path in (WORKBOOK_DIR, *WORKBOOK_UV_DIRS) if path not in filesystem.get("denyWrite", [])]
+    if WORKBOOK_DIR not in filesystem.get("denyRead", []):
+        errors.append(f"{SETTINGS}: sandbox.filesystem.denyRead lacks {WORKBOOK_DIR} {required}")
+    rules = [f"Read({WORKBOOK_DIR}/**)", f"Edit({WORKBOOK_DIR}/**)", *(f"Edit({path}/**)" for path in WORKBOOK_UV_DIRS)]
+    errors += [f"{SETTINGS}: permissions.deny lacks {rule} {required}" for rule in rules if rule not in deny]
+    return errors
+
+
 def check_modern_web_guidance(root):
     if not (root / MWG_SKILL).exists():
         return []
@@ -899,6 +946,7 @@ CHECKS = (
     ("edit-permissions", check_edit_permissions),
     ("playwright-mcp", check_playwright_mcp),
     ("obsidian-vault", check_obsidian_vault),
+    ("workbook-intake", check_workbook_intake),
     ("modern-web-guidance", check_modern_web_guidance),
     ("project-permissions", check_project_permissions),
     ("mise-paranoid", check_mise_paranoid),
